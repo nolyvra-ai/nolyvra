@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: app
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: ${PORT:8080}
