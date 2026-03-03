@@ -1,0 +1,25 @@
+/* Clean full-width dashboard reset */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Root must take full width */
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+/* Remove Vite demo styles */
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}
