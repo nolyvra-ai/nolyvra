@@ -1,18 +1,28 @@
 package com.depthhire.app.service;
 
 import com.depthhire.app.model.AnalysisRequest;
+import com.depthhire.app.model.AnalysisResponse;
 import com.depthhire.app.model.CandidateAnalysisResponse;
+import com.depthhire.app.model.CandidateResponse;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openai.client.OpenAIClient;
 import com.openai.client.okhttp.OpenAIOkHttpClient;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.RowMapper;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 
 @Service
 public class AnalysisService {
@@ -22,6 +32,7 @@ public class AnalysisService {
         private final String model;
 
         private final Map<String, CandidateAnalysisResponse> cache = new ConcurrentHashMap<>();
+        private final JdbcTemplate jdbc;
 
         /*
          * public AnalysisService(
@@ -48,16 +59,53 @@ public class AnalysisService {
         public AnalysisService(
                         ObjectMapper objectMapper,
                         OpenAIClient openAIClient,
+                        JdbcTemplate jdbcTemplate,
                         @Value("${openai.model:gpt-4o-mini}") String model) {
                 this.objectMapper = objectMapper;
                 this.openAI = openAIClient;
+                this.jdbc = jdbcTemplate;
                 this.model = model;
         }
 
-        public CandidateAnalysisResponse analyze(String candidateId,
-                        String jobId,
-                        AnalysisRequest request) {
+        private String loadJobDescriptionFromDb(String jobId) {
+                return jdbc.query("""
+                                select jd_text
+                                from jobs
+                                where id = ?
+                                """,
+                                (rs, rowNum) -> rs.getString("jd_text"),
+                                jobId).stream().findFirst()
+                                .orElseThrow(() -> new IllegalArgumentException("Job not found: " + jobId));
+        }
 
+        private String loadCvTextFromDb(String candidateId) {
+                return jdbc.query("""
+                                select cv_text
+                                from candidates
+                                where id = ?
+                                """,
+                                (rs, rowNum) -> rs.getString("cv_text"),
+                                candidateId).stream().findFirst()
+                                .orElseThrow(() -> new IllegalArgumentException("Candidate not found: " + candidateId));
+        }
+
+        private String loadLinkedinUrlFromDb(String candidateId) {
+                return jdbc.query("""
+                                select linkedin_url
+                                from candidates
+                                where id = ?
+                                """,
+                                (rs, rowNum) -> rs.getString("linkedin_url"),
+                                candidateId).stream().findFirst()
+                                .orElseThrow(() -> new IllegalArgumentException("Candidate not found: " + candidateId));
+        }
+
+        public CandidateAnalysisResponse analyze(String candidateId,
+                        String jobId) {
+
+                String jdText = loadJobDescriptionFromDb(jobId);
+                String cvText = loadCvTextFromDb(candidateId);
+                String linkedinUrl = loadLinkedinUrlFromDb(candidateId);
                 try {
 
                         String systemPrompt = """
@@ -105,9 +153,9 @@ public class AnalysisService {
                                         %s
                                         Now return the analysis JSON ONLY in the required schema.
                                         """.formatted(
-                                        safeTrim(request.getJobDescription(), 10000),
-                                        safeTrim(request.getCvText(), 10000),
-                                        safeTrim(request.getLinkedinProfile(), 10000));
+                                        safeTrim(jdText, 10000),
+                                        safeTrim(cvText, 10000),
+                                        safeTrim(linkedinUrl, 10000));
 
                         /*
                          * var params = ChatCompletionCreateParams.builder()
@@ -144,7 +192,7 @@ public class AnalysisService {
                                         ai.suggestedQuestions(),
                                         ai.riskFlags(),
                                         ai.recommendation());
-
+                        persistAnalysisToDb(response);
                         cache.put(candidateId, response);
                         return response;
 
@@ -170,5 +218,97 @@ public class AnalysisService {
                         java.util.List<CandidateAnalysisResponse.SuggestedQuestion> suggestedQuestions,
                         java.util.List<String> riskFlags,
                         String recommendation) {
+        }
+
+        private void persistAnalysisToDb(CandidateAnalysisResponse response) {
+                try {
+                        // store full response as JSONB
+                        String analysisJson = objectMapper.writeValueAsString(response);
+
+                        Integer consistencyScore = response.scores() != null ? response.scores().consistencyScore()
+                                        : null;
+                        Integer capabilityScore = response.scores() != null ? response.scores().capabilityScore()
+                                        : null;
+                        String riskLevel = response.scores() != null ? response.scores().riskLevel() : null;
+
+                        Integer timelineMatchPercent = response.consistency() != null
+                                        ? response.consistency().timelineMatchPercent()
+                                        : null;
+
+                        OffsetDateTime analyzedAt = response.analyzedAt() != null
+                                        ? OffsetDateTime.ofInstant(response.analyzedAt(), ZoneOffset.UTC)
+                                        : OffsetDateTime.now(ZoneOffset.UTC);
+
+                        jdbc.update("""
+                                        insert into analyses (
+                                          candidate_id,
+                                          job_id,
+                                          analyzed_at,
+                                          consistency_score,
+                                          capability_score,
+                                          risk_level,
+                                          timeline_match_percent,
+                                          analysis_json
+                                        )
+                                        values (?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+                                        """,
+                                        response.candidateId(),
+                                        response.jobId(),
+                                        analyzedAt,
+                                        consistencyScore,
+                                        capabilityScore,
+                                        riskLevel,
+                                        timelineMatchPercent,
+                                        analysisJson);
+
+                } catch (Exception e) {
+                        throw new RuntimeException("Failed to persist analysis to DB: " + e.getMessage(), e);
+                }
+        }
+
+        public String getJobIdForCandidate(String candidateId) {
+                return jdbc.query("""
+                                select job_id
+                                from candidates
+                                where id = ?
+                                """,
+                                (rs, rowNum) -> rs.getString("job_id"),
+                                candidateId).stream().findFirst()
+                                .orElseThrow(() -> new IllegalArgumentException("Candidate not found: " + candidateId));
+        }
+
+        private static final RowMapper<AnalysisResponse> ANALYSIS_MAPPER = (rs, rowNum) -> {
+                OffsetDateTime analyzedAt = rs.getObject("analyzed_at", OffsetDateTime.class);
+
+                return new AnalysisResponse(
+                                rs.getLong("id"),
+                                rs.getString("candidate_id"),
+                                rs.getString("candidate_name"),
+                                rs.getString("job_id"),
+                                analyzedAt != null ? analyzedAt.toInstant() : null,
+                                (Integer) rs.getObject("consistency_score"),
+                                (Integer) rs.getObject("capability_score"),
+                                rs.getString("risk_level"),
+                                (Integer) rs.getObject("timeline_match_percent"));
+        };
+
+        public List<AnalysisResponse> getAnalysesFromDb() {
+
+                return jdbc.query("""
+                                select
+                                  id,
+                                  candidate_id,
+                                  candidate_name,
+                                  job_id,
+                                  analyzed_at,
+                                  consistency_score,
+                                  capability_score,
+                                  risk_level,
+                                  timeline_match_percent
+                                from analyses
+                                order by analyzed_at desc
+                                limit 5
+                                """,
+                                ANALYSIS_MAPPER);
         }
 }

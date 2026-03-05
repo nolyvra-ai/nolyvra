@@ -1,0 +1,7 @@
+Backend:
+./mvnw clean package -DskipTests
+./mvnw spring-boot:run
+
+FrontEnd:
+npm run dev
+

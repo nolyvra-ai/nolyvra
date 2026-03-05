@@ -1,0 +1,14 @@
+1. Integration with dB (Done) Next -> create ServiceImpl and DAO. Remove direct service call from controller.
+2. Remove all the static reference from UI -> DB
+3. Fix the UI to match with wireframe
+4. Add/Remove Jobs + candidates
+5. CV upload option
+6. Cadidate report export option ("Do you want to download with question or separately",1 or 2 PDF )
+7. Implement user registration - Name, email, Org
+8. Implement logging
+9. Implement user profile (A recuriter can see only his/her jobs))
+10. Continerize spring Boot
+11. Upload in render.
+12. Setup the subcription logic
+13. Payment gateway integration
+14. Integrate with Domain

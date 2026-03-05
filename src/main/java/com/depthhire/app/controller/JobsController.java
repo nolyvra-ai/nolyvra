@@ -2,7 +2,7 @@ package com.depthhire.app.controller;
 
 import com.depthhire.app.model.JobCreateRequest;
 import com.depthhire.app.model.JobResponse;
-import com.depthhire.app.store.InMemoryStore;
+import com.depthhire.app.service.JobService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,24 +12,25 @@ import java.util.List;
 @RequestMapping("/api/jobs")
 public class JobsController {
 
-  private final InMemoryStore store;
+  private final JobService jobService;
 
-  public JobsController(InMemoryStore store) {
-    this.store = store;
+  public JobsController(JobService jobService) {
+    this.jobService = jobService;
   }
 
   @PostMapping
   public JobResponse createJob(@Valid @RequestBody JobCreateRequest req) {
-    return store.saveJob(req.title(), req.seniority(), req.jdText(), req.stackTags());
+    return jobService.createJob(req);
   }
 
   @GetMapping
   public List<JobResponse> listJobs() {
-    return store.listJobs();
+    return jobService.listJobs();
   }
 
   @GetMapping("/{jobId}")
   public JobResponse getJob(@PathVariable String jobId) {
-    return store.getJob(jobId).orElseThrow(() -> new IllegalArgumentException("Job not found: " + jobId));
+    return jobService.getJob(jobId)
+        .orElseThrow(() -> new IllegalArgumentException("Job not found: " + jobId));
   }
 }

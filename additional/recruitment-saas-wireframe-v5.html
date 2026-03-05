@@ -1,0 +1,1491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepHire — Wireframe v2</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F7F8FA;--white:#fff;
+  --sidebar:#0F1623;--sidebar-hover:#1C2537;--sidebar-active:#1B3A6B;
+  --accent:#1D72E8;--accent-light:#EBF2FF;
+  --success:#16A34A;--success-bg:#F0FDF4;
+  --warning:#D97706;--warning-bg:#FFFBEB;
+  --danger:#DC2626;--danger-bg:#FEF2F2;
+  --border:#E2E6ED;
+  --text-primary:#0F1623;--text-secondary:#5A6480;--text-muted:#9AA3B4;
+  --shadow:0 1px 4px rgba(0,0,0,0.07);
+  --radius:8px;--sw:224px;
+}
+html,body{height:100%;overflow:hidden;display:flex;flex-direction:column}
+body{font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-primary);display:flex;flex-direction:column}
+
+/* ── TOP NAV BAR ── */
+.topnav{
+  background:var(--sidebar);
+  display:flex;align-items:center;gap:6px;
+  padding:7px 14px;flex-shrink:0;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.topnav-brand{display:flex;align-items:center;gap:8px;margin-right:16px;}
+.brand-icon{width:26px;height:26px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff}
+.brand-name{color:#fff;font-size:14px;font-weight:600;letter-spacing:-0.3px}
+.brand-ver{font-size:9px;color:rgba(255,255,255,0.3);letter-spacing:0.5px}
+.nav-pill{
+  padding:4px 13px;border-radius:20px;font-size:11px;font-weight:500;
+  cursor:pointer;color:rgba(255,255,255,0.45);border:1px solid transparent;
+  transition:all .15s;white-space:nowrap;
+}
+.nav-pill:hover{color:rgba(255,255,255,0.8);border-color:rgba(255,255,255,0.1)}
+.nav-pill.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.nav-arrow{font-size:10px;color:rgba(255,255,255,0.18)}
+.nav-hint{margin-left:auto;font-size:10px;color:rgba(255,255,255,0.2)}
+
+/* ── BODY LAYOUT ── */
+.body-wrap{display:flex;flex:1;overflow:hidden}
+
+/* ── SIDEBAR ── */
+.sidebar{width:var(--sw);background:var(--sidebar);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.sb-logo{padding:18px 16px 14px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.sb-section{padding:12px 10px 4px}
+.sb-label{font-size:10px;font-weight:600;color:rgba(255,255,255,0.25);letter-spacing:.8px;text-transform:uppercase;padding:0 8px;margin-bottom:3px}
+.sb-item{
+  display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;
+  cursor:pointer;color:rgba(255,255,255,0.5);font-size:12.5px;font-weight:400;
+  transition:all .15s;margin-bottom:1px;
+}
+.sb-item:hover{background:var(--sidebar-hover);color:rgba(255,255,255,0.85)}
+.sb-item.active{background:var(--sidebar-active);color:#fff;font-weight:500}
+.sb-item .ic{width:15px;text-align:center;font-size:13px}
+.sb-badge{margin-left:auto;background:var(--accent);color:#fff;font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px}
+.sb-footer{margin-top:auto;padding:12px 10px;border-top:1px solid rgba(255,255,255,0.06)}
+.user-row{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;cursor:pointer}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0}
+.user-name{color:rgba(255,255,255,0.7);font-size:12px;font-weight:500}
+.user-role{color:rgba(255,255,255,0.3);font-size:10px}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.page-header{background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.ph-title{font-size:15px;font-weight:600}
+.ph-sub{font-size:11px;color:var(--text-muted);margin-top:1px}
+.ph-actions{display:flex;gap:8px;align-items:center}
+.content{flex:1;overflow-y:auto;padding:22px 24px}
+
+/* ── PAGES ── */
+.page{display:none;flex-direction:column;overflow:hidden}
+.page.active{display:flex;flex:1;overflow:hidden}
+
+/* ── COMPONENTS ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:var(--radius);font-size:12px;font-weight:500;cursor:pointer;border:none;font-family:inherit;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#155ec0}
+.btn-secondary{background:var(--white);color:var(--text-primary);border:1px solid var(--border)}.btn-secondary:hover{background:var(--bg)}
+.btn-sm{padding:5px 11px;font-size:11px}
+.btn-ghost{background:transparent;color:var(--accent);border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:500;padding:0}
+
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card-head{padding:13px 18px 11px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:13px;font-weight:600}
+.card-body{padding:16px 18px}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px}
+.row{display:flex;gap:16px}.col{display:flex;flex-direction:column;gap:14px}
+
+.stat-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:15px 18px;box-shadow:var(--shadow)}
+.stat-lbl{font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.stat-val{font-size:26px;font-weight:700;margin:4px 0 2px;line-height:1}
+.stat-delta{font-size:11px;color:var(--text-muted)}
+.stat-delta.up{color:var(--success)}
+
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:8px 14px;font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;background:var(--bg);border-bottom:1px solid var(--border)}
+td{padding:10px 14px;font-size:12px;border-bottom:1px solid #F0F2F6;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr{cursor:pointer;transition:background .1s}
+tbody tr:hover td{background:#FAFBFD}
+
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500}
+.bs{background:var(--success-bg);color:var(--success)}
+.bw{background:var(--warning-bg);color:var(--warning)}
+.bd{background:var(--danger-bg);color:var(--danger)}
+.bn{background:#F1F3F7;color:var(--text-secondary)}
+.ba{background:var(--accent-light);color:var(--accent)}
+
+.pbar-wrap{background:#EEF0F5;border-radius:4px;height:5px;overflow:hidden;margin-top:3px}
+.pbar{height:100%;border-radius:4px}
+
+.form-group{margin-bottom:14px}
+.form-label{font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:4px;display:block}
+.form-hint{font-size:11px;color:var(--text-muted);margin-bottom:5px}
+.req{color:var(--danger)}
+input.fi,select.fi{width:100%;padding:7px 11px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;font-family:inherit;color:var(--text-primary);background:var(--white);outline:none;transition:border-color .15s}
+input.fi:focus,select.fi:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(29,114,232,.1)}
+textarea.ft{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:var(--radius);font-size:12px;font-family:'DM Mono',monospace;color:var(--text-primary);background:#FAFBFD;outline:none;resize:vertical;line-height:1.6;transition:border-color .15s}
+textarea.ft:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(29,114,232,.1)}
+
+.divider{height:1px;background:var(--border);margin:14px 0}
+.sp{height:14px}
+.tag{display:inline-block;background:#F1F3F7;color:var(--text-secondary);border-radius:4px;padding:2px 8px;font-size:11px;font-weight:500;margin:2px}
+.tag.match{background:var(--success-bg);color:var(--success)}
+.tag.gap{background:var(--danger-bg);color:var(--danger)}
+
+.risk-item{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid #F0F2F6}
+.risk-item:last-child{border-bottom:none}
+.rdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.rdot.h{background:var(--danger)}.rdot.m{background:var(--warning)}.rdot.l{background:#60A5FA}
+
+.q-item{padding:11px 0;border-bottom:1px solid #F0F2F6;font-size:12.5px;line-height:1.55}
+.q-item:last-child{border-bottom:none}
+.q-num{display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;background:var(--accent-light);color:var(--accent);font-size:10px;font-weight:700;margin-right:7px;float:left;margin-top:2px}
+
+.score-circle{width:72px;height:72px;border-radius:50%;border:3px solid;display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:700}
+.sc-g{border-color:var(--success);color:var(--success)}
+.sc-w{border-color:var(--warning);color:var(--warning)}
+.sc-d{border-color:var(--danger);color:var(--danger)}
+
+.annot{display:inline-flex;align-items:center;font-size:10px;color:var(--text-muted);background:#FFF9E6;border:1px dashed #D4AC0D;padding:2px 8px;border-radius:4px;font-style:italic}
+
+.step-bar{display:flex;align-items:center;gap:6px;margin-bottom:20px}
+.step{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted)}
+.step-num{width:21px;height:21px;border-radius:50%;background:#EEF0F5;color:var(--text-muted);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600}
+.step.done .step-num{background:var(--success);color:#fff}
+.step.act .step-num{background:var(--accent);color:#fff}
+.step.act{color:var(--text-primary);font-weight:500}
+.step-line{flex:1;height:1px;background:var(--border)}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:4px}
+
+/* ── CANDIDATE DETAIL specific ── */
+.meta-strip{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px 20px;display:flex;gap:22px;align-items:center;flex-wrap:wrap;margin-bottom:16px;box-shadow:var(--shadow)}
+.mb-lbl{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.mb-val{font-size:13px;font-weight:500;margin-top:2px}
+</style>
+</head>
+<body>
+
+<!-- ═══ TOP NAVIGATION BAR ═══ -->
+<div class="topnav">
+  <div class="topnav-brand">
+    <div class="brand-icon">IQ</div>
+    <div>
+      <div class="brand-name">DeepHire</div>
+      <div class="brand-ver">MVP v0.1</div>
+    </div>
+  </div>
+
+  <span class="nav-arrow">│</span>
+  <span style="font-size:10px;color:rgba(255,255,255,0.25);margin-right:4px">PAGES:</span>
+
+  <div class="nav-pill active" id="pill-dashboard" onclick="nav('dashboard')">① Dashboard</div>
+  <span class="nav-arrow">›</span>
+  <div class="nav-pill" id="pill-jobs" onclick="nav('jobs')">② Jobs List</div>
+  <span class="nav-arrow">›</span>
+  <div class="nav-pill" id="pill-add-job" onclick="nav('add-job')">③ Create Job</div>
+  <span class="nav-arrow">›</span>
+  <div class="nav-pill" id="pill-candidates" onclick="nav('candidates')">④ Candidates List</div>
+  <span class="nav-arrow">›</span>
+  <div class="nav-pill" id="pill-add-candidate" onclick="nav('add-candidate')">⑤ Add Candidate</div>
+  <span class="nav-arrow">›</span>
+  <div class="nav-pill" id="pill-analysis" onclick="nav('analysis')">⑥ Analysis Result</div>
+
+  <span class="nav-hint">← click any tab or sidebar link to switch pages</span>
+</div>
+
+<!-- ═══ BODY ═══ -->
+<div class="body-wrap">
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sb-logo">
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="brand-icon">IQ</div>
+      <div><div style="color:#fff;font-size:14px;font-weight:600">DeepHire</div><div style="font-size:9px;color:rgba(255,255,255,.3)">MVP v0.1</div></div>
+    </div>
+  </div>
+
+  <div class="sb-section">
+    <div class="sb-label">Overview</div>
+    <div class="sb-item active" id="sb-dashboard" onclick="nav('dashboard')"><span class="ic">⊞</span> Dashboard</div>
+  </div>
+
+  <div class="sb-section">
+    <div class="sb-label">Jobs</div>
+    <div class="sb-item" id="sb-jobs" onclick="nav('jobs')"><span class="ic">📋</span> All Jobs <span class="sb-badge">3</span></div>
+    <div class="sb-item" id="sb-add-job" onclick="nav('add-job')"><span class="ic">＋</span> Create Job</div>
+  </div>
+
+  <div class="sb-section">
+    <div class="sb-label">Candidates</div>
+    <div class="sb-item" id="sb-candidates" onclick="nav('candidates')"><span class="ic">👤</span> All Candidates <span class="sb-badge">9</span></div>
+    <div class="sb-item" id="sb-add-candidate" onclick="nav('add-candidate')"><span class="ic">＋</span> Add Candidate</div>
+  </div>
+
+  <div class="sb-section">
+    <div class="sb-label">Settings</div>
+    <div class="sb-item"><span class="ic">⚙</span> Settings</div>
+  </div>
+
+  <div class="sb-footer">
+    <div class="user-row">
+      <div class="avatar">SR</div>
+      <div><div class="user-name">Sarah Reynolds</div><div class="user-role">Senior Recruiter</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+<!-- ════ PAGE 1: DASHBOARD ════ -->
+<div id="pg-dashboard" class="page active">
+  <div class="page-header">
+    <div><div class="ph-title">Dashboard</div><div class="ph-sub">Your recruitment pipeline at a glance</div></div>
+    <div class="ph-actions">
+      <button class="btn btn-secondary btn-sm">Export Report</button>
+      <button class="btn btn-primary btn-sm" onclick="nav('add-job')">＋ New Job</button>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- KPI Row -->
+    <div class="grid4" style="margin-bottom:16px">
+      <div class="stat-card">
+        <div class="stat-lbl">Active Jobs</div>
+        <div class="stat-val">3</div>
+        <div class="stat-delta up">↑ 1 this week</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-lbl">Total Candidates</div>
+        <div class="stat-val">9</div>
+        <div class="stat-delta up">↑ 4 this week</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-lbl">Analyses Run</div>
+        <div class="stat-val" style="color:var(--accent)">9</div>
+        <div class="stat-delta">All processed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-lbl">High-Risk Flags</div>
+        <div class="stat-val" style="color:var(--danger)">4</div>
+        <div class="stat-delta">Needs review</div>
+      </div>
+    </div>
+
+    <!-- Middle row -->
+    <div class="row">
+      <!-- Recent Jobs mini-table -->
+      <div style="flex:1">
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Recent Jobs</span>
+            <button class="btn-ghost" onclick="nav('jobs')">View All →</button>
+          </div>
+          <table>
+            <thead><tr><th>Job Title</th><th>Client</th><th>Candidates</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <tr onclick="nav('jobs')"><td><strong>Sr. Backend Engineer</strong></td><td>FinTech Co.</td><td><span class="badge bn">4</span></td><td><span class="badge bs">Active</span></td><td><button class="btn btn-secondary btn-sm">View</button></td></tr>
+              <tr onclick="nav('jobs')"><td><strong>Product Manager</strong></td><td>HealthStart Ltd</td><td><span class="badge bn">3</span></td><td><span class="badge bs">Active</span></td><td><button class="btn btn-secondary btn-sm">View</button></td></tr>
+              <tr onclick="nav('jobs')"><td><strong>Data Analyst</strong></td><td>Acme Corp</td><td><span class="badge bn">2</span></td><td><span class="badge bw">Draft</span></td><td><button class="btn btn-secondary btn-sm">View</button></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Right: Pipeline + Risk -->
+      <div style="flex:0 0 210px" class="col">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Pipeline</span></div>
+          <div class="card-body" style="padding:12px 16px">
+            <div style="margin-bottom:10px">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>High Match ≥80%</span><span style="font-weight:600;color:var(--success)">4</span></div>
+              <div class="pbar-wrap"><div class="pbar" style="width:44%;background:var(--success)"></div></div>
+            </div>
+            <div style="margin-bottom:10px">
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>Moderate 60–79%</span><span style="font-weight:600;color:var(--warning)">3</span></div>
+              <div class="pbar-wrap"><div class="pbar" style="width:33%;background:var(--warning)"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>Low Match &lt;60%</span><span style="font-weight:600;color:var(--danger)">2</span></div>
+              <div class="pbar-wrap"><div class="pbar" style="width:22%;background:var(--danger)"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Risk Summary</span></div>
+          <div class="card-body" style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center"><span style="display:flex;align-items:center;gap:6px;font-size:12px"><span class="rdot h"></span> High Risk</span><span class="badge bd">4</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center"><span style="display:flex;align-items:center;gap:6px;font-size:12px"><span class="rdot m"></span> Medium</span><span class="badge bw">6</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center"><span style="display:flex;align-items:center;gap:6px;font-size:12px"><span class="rdot l"></span> Low</span><span class="badge ba">3</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp"></div>
+    <!-- Recent candidates strip -->
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Recent Candidate Analyses</span>
+        <button class="btn-ghost" onclick="nav('candidates')">View All →</button>
+      </div>
+      <table>
+        <thead><tr><th>Candidate</th><th>Job</th><th>Consistency Score</th><th>Capability Match</th><th>Risk Flags</th><th></th></tr></thead>
+        <tbody>
+          <tr onclick="nav('analysis')"><td><strong>James Okafor</strong></td><td>Sr. Backend Eng.</td><td><span style="font-weight:600;color:var(--success)">87%</span> <div class="pbar-wrap" style="width:60px;display:inline-block;vertical-align:middle;margin-left:6px"><div class="pbar" style="width:87%;background:var(--success)"></div></div></td><td><span style="font-weight:600;color:var(--warning)">72%</span></td><td><span class="badge bd">2 High</span></td><td><button class="btn btn-secondary btn-sm" onclick="nav('analysis')">Results</button></td></tr>
+          <tr onclick="nav('analysis')"><td><strong>Priya Mehta</strong></td><td>Product Manager</td><td><span style="font-weight:600;color:var(--success)">91%</span></td><td><span style="font-weight:600;color:var(--success)">88%</span></td><td><span class="badge bw">1 Med</span></td><td><button class="btn btn-secondary btn-sm" onclick="nav('analysis')">Results</button></td></tr>
+          <tr onclick="nav('analysis')"><td><strong>Tom Harrington</strong></td><td>Sr. Backend Eng.</td><td><span style="font-weight:600;color:var(--danger)">54%</span></td><td><span style="font-weight:600;color:var(--warning)">65%</span></td><td><span class="badge bd">3 High</span></td><td><button class="btn btn-secondary btn-sm" onclick="nav('analysis')">Results</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sp"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="annot">⚡ GET /api/dashboard/summary</span>
+      <span class="annot">📊 MUI Grid + Card + LinearProgress</span>
+      <span class="annot">📋 MUI DataGrid for tables</span>
+    </div>
+  </div>
+</div>
+
+<!-- ════ PAGE 2: JOBS LIST ════ -->
+<div id="pg-jobs" class="page">
+  <div class="page-header">
+    <div><div class="ph-title">Jobs</div><div class="ph-sub">All active and draft job vacancies — click a row to view its candidates</div></div>
+    <div class="ph-actions">
+      <input class="fi" style="width:200px;font-size:12px;padding:6px 10px" type="text" placeholder="🔍 Search jobs…" />
+      <button class="btn btn-primary btn-sm" onclick="nav('add-job')">＋ Create Job</button>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- Filter bar -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">
+      <span style="font-size:12px;color:var(--text-muted);font-weight:500">Filter:</span>
+      <button class="btn btn-secondary btn-sm" style="border-color:var(--accent);color:var(--accent)">All (3)</button>
+      <button class="btn btn-secondary btn-sm">Active (2)</button>
+      <button class="btn btn-secondary btn-sm">Draft (1)</button>
+      <div style="margin-left:auto;font-size:12px;color:var(--text-muted)">3 jobs found</div>
+    </div>
+
+    <!-- Jobs table -->
+    <div class="card" style="margin-bottom:16px">
+      <table>
+        <thead><tr><th style="width:28px"></th><th>Job Title</th><th>Client</th><th>Location</th><th>Type</th><th>Candidates</th><th>Avg. Match</th><th>Status</th><th>Created</th><th></th></tr></thead>
+        <tbody>
+          <tr id="job-row-1" class="job-row selected-job" onclick="selectJob(1)" style="background:#EBF2FF">
+            <td style="color:var(--accent);font-size:11px;font-weight:700">▼</td>
+            <td><strong>Senior Backend Engineer</strong><br><span style="font-size:11px;color:var(--text-muted)">5+ yrs · Java/Kotlin</span></td>
+            <td>FinTech Co.</td><td>London / Hybrid</td><td><span class="badge bn">Full-time</span></td>
+            <td style="text-align:center"><strong>4</strong></td>
+            <td><span style="font-weight:600;color:var(--warning)">74%</span></td>
+            <td><span class="badge bs">Active</span></td>
+            <td style="color:var(--text-muted)">24 Feb 2026</td>
+            <td style="display:flex;gap:5px">
+              <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('add-candidate')">＋ Candidate</button>
+              <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()">Edit</button>
+            </td>
+          </tr>
+          <tr id="job-row-2" class="job-row" onclick="selectJob(2)">
+            <td style="color:var(--text-muted);font-size:11px">▶</td>
+            <td><strong>Product Manager</strong><br><span style="font-size:11px;color:var(--text-muted)">3+ yrs · B2B SaaS</span></td>
+            <td>HealthStart Ltd</td><td>Remote (UK)</td><td><span class="badge bn">Full-time</span></td>
+            <td style="text-align:center"><strong>3</strong></td>
+            <td><span style="font-weight:600;color:var(--success)">82%</span></td>
+            <td><span class="badge bs">Active</span></td>
+            <td style="color:var(--text-muted)">20 Feb 2026</td>
+            <td style="display:flex;gap:5px">
+              <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('add-candidate')">＋ Candidate</button>
+              <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()">Edit</button>
+            </td>
+          </tr>
+          <tr id="job-row-3" class="job-row" onclick="selectJob(3)">
+            <td style="color:var(--text-muted);font-size:11px">▶</td>
+            <td><strong>Data Analyst</strong><br><span style="font-size:11px;color:var(--text-muted)">2+ yrs · SQL/Python</span></td>
+            <td>Acme Corp</td><td>Manchester</td><td><span class="badge bn">Contract</span></td>
+            <td style="text-align:center"><strong>2</strong></td>
+            <td style="color:var(--text-muted)">—</td>
+            <td><span class="badge bw">Draft</span></td>
+            <td style="color:var(--text-muted)">28 Feb 2026</td>
+            <td style="display:flex;gap:5px">
+              <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('add-candidate')">＋ Candidate</button>
+              <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()">Edit</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Candidates panel — shown when a job row is selected -->
+    <div id="job-candidates-panel" class="card" style="margin-bottom:16px">
+      <div class="card-head" style="background:#F7F9FF;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:3px;height:18px;background:var(--accent);border-radius:2px"></div>
+          <span class="card-title" id="panel-job-title">Candidates — Senior Backend Engineer</span>
+          <span class="badge ba" id="panel-client-badge">FinTech Co.</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:11px;color:var(--text-muted)" id="panel-count">4 candidates</span>
+          <button class="btn btn-primary btn-sm" onclick="nav('add-candidate')">＋ Add Candidate</button>
+        </div>
+      </div>
+
+      <!-- Candidates table matching the screenshot layout -->
+      <table id="panel-table-1">
+        <thead>
+          <tr>
+            <th>Candidate</th>
+            <th>Applied For</th>
+            <th>Consistency Score</th>
+            <th>Capability Match</th>
+            <th>Risk Flags</th>
+            <th>Status</th>
+            <th>Analysed</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr onclick="nav('analysis')">
+            <td><strong>James Okafor</strong><br><span style="font-size:11px;color:var(--text-muted)"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="a7cdc6cac2d489c8ccc6c1c8d5e7c2cac6cecb89c4c8ca">[email&#160;protected]</a></span></td>
+            <td>Sr. Backend Engineer</td>
+            <td>
+              <span style="font-weight:700;color:var(--success)">87%</span>
+              <div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:87%;background:var(--success)"></div></div>
+            </td>
+            <td>
+              <span style="font-weight:700;color:var(--warning)">72%</span>
+              <div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:72%;background:var(--warning)"></div></div>
+            </td>
+            <td><span class="badge bd">2 High</span></td>
+            <td><span class="badge bw">Review</span></td>
+            <td style="color:var(--text-muted)">28 Feb 2026</td>
+            <td><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('analysis')">View Results</button></td>
+          </tr>
+          <tr onclick="nav('analysis')">
+            <td><strong>Tom Harrington</strong><br><span style="font-size:11px;color:var(--text-muted)"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="25514a480b4d654048444c490b464a48">[email&#160;protected]</a></span></td>
+            <td>Sr. Backend Engineer</td>
+            <td>
+              <span style="font-weight:700;color:var(--danger)">54%</span>
+              <div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:54%;background:var(--danger)"></div></div>
+            </td>
+            <td>
+              <span style="font-weight:700;color:var(--warning)">65%</span>
+              <div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:65%;background:var(--warning)"></div></div>
+            </td>
+            <td><span class="badge bd">3 High</span></td>
+            <td><span class="badge bd">Flagged</span></td>
+            <td style="color:var(--text-muted)">26 Feb 2026</td>
+            <td><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('analysis')">View Results</button></td>
+          </tr>
+          <tr onclick="nav('analysis')">
+            <td><strong>Leon Fischer</strong><br><span style="font-size:11px;color:var(--text-muted)"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="d2beb7bdbcfcb492b7bfb3bbbefcb1bdbf">[email&#160;protected]</a></span></td>
+            <td>Sr. Backend Engineer</td>
+            <td>
+              <span style="font-weight:700;color:var(--success)">83%</span>
+              <div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:83%;background:var(--success)"></div></div>
+            </td>
+            <td>
+              <span style="font-weight:700;color:var(--success)">80%</span>
+              <div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:80%;background:var(--success)"></div></div>
+            </td>
+            <td><span class="badge bw">1 Med</span></td>
+            <td><span class="badge bs">Approved</span></td>
+            <td style="color:var(--text-muted)">25 Feb 2026</td>
+            <td><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('analysis')">View Results</button></td>
+          </tr>
+          <tr>
+            <td><strong>Maria Santos</strong><br><span style="font-size:11px;color:var(--text-muted)"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="cfa2aebda6aee1bc8faaa2aea6a3e1aca0a2">[email&#160;protected]</a></span></td>
+            <td>Sr. Backend Engineer</td>
+            <td style="color:var(--text-muted)">—</td>
+            <td style="color:var(--text-muted)">—</td>
+            <td><span class="badge bn">Pending</span></td>
+            <td><span class="badge ba">Not Run</span></td>
+            <td style="color:var(--text-muted)">28 Feb 2026</td>
+            <td><button class="btn btn-primary btn-sm" onclick="nav('add-candidate')">Run Analysis</button></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- PM candidates (hidden by default) -->
+      <table id="panel-table-2" style="display:none">
+        <thead><tr><th>Candidate</th><th>Applied For</th><th>Consistency Score</th><th>Capability Match</th><th>Risk Flags</th><th>Status</th><th>Analysed</th><th></th></tr></thead>
+        <tbody>
+          <tr onclick="nav('analysis')">
+            <td><strong>Priya Mehta</strong><br><span style="font-size:11px;color:var(--text-muted)"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="2d5d5f44544c03404845594c6d48404c4441034e4240">[email&#160;protected]</a></span></td>
+            <td>Product Manager</td>
+            <td><span style="font-weight:700;color:var(--success)">91%</span><div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:91%;background:var(--success)"></div></div></td>
+            <td><span style="font-weight:700;color:var(--success)">88%</span><div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:88%;background:var(--success)"></div></div></td>
+            <td><span class="badge bw">1 Med</span></td><td><span class="badge bs">Approved</span></td><td style="color:var(--text-muted)">27 Feb 2026</td>
+            <td><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('analysis')">View Results</button></td>
+          </tr>
+          <tr onclick="nav('analysis')">
+            <td><strong>Aisha Kamara</strong><br><span style="font-size:11px;color:var(--text-muted)"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="2c4d455f444d02476c49414d4540024f4341">[email&#160;protected]</a></span></td>
+            <td>Product Manager</td>
+            <td><span style="font-weight:700;color:var(--success)">89%</span><div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:89%;background:var(--success)"></div></div></td>
+            <td><span style="font-weight:700;color:var(--success)">85%</span><div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:85%;background:var(--success)"></div></div></td>
+            <td><span class="badge bn">None</span></td><td><span class="badge bs">Approved</span></td><td style="color:var(--text-muted)">25 Feb 2026</td>
+            <td><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('analysis')">View Results</button></td>
+          </tr>
+          <tr>
+            <td><strong>Omar Siddiqui</strong><br><span style="font-size:11px;color:var(--text-muted)"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="3c53515d4e124f7c59515d5550125f5351">[email&#160;protected]</a></span></td>
+            <td>Product Manager</td>
+            <td style="color:var(--text-muted)">—</td><td style="color:var(--text-muted)">—</td>
+            <td><span class="badge bn">Pending</span></td><td><span class="badge ba">Not Run</span></td><td style="color:var(--text-muted)">28 Feb 2026</td>
+            <td><button class="btn btn-primary btn-sm" onclick="nav('add-candidate')">Run Analysis</button></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Data Analyst candidates (hidden by default) -->
+      <table id="panel-table-3" style="display:none">
+        <thead><tr><th>Candidate</th><th>Applied For</th><th>Consistency Score</th><th>Capability Match</th><th>Risk Flags</th><th>Status</th><th>Analysed</th><th></th></tr></thead>
+        <tbody>
+          <tr onclick="nav('analysis')">
+            <td><strong>Wei Zhang</strong><br><span style="font-size:11px;color:var(--text-muted)"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="0374666a2d7943666e626a6f2d606c6e">[email&#160;protected]</a></span></td>
+            <td>Data Analyst</td>
+            <td style="color:var(--text-muted)">—</td><td style="color:var(--text-muted)">—</td>
+            <td><span class="badge bn">Pending</span></td><td><span class="badge ba">Not Run</span></td><td style="color:var(--text-muted)">28 Feb 2026</td>
+            <td><button class="btn btn-primary btn-sm" onclick="nav('add-candidate')">Run Analysis</button></td>
+          </tr>
+          <tr onclick="nav('analysis')">
+            <td><strong>Fatima Al-Hassan</strong><br><span style="font-size:11px;color:var(--text-muted)"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="31575045585c501f5071545c50585d1f525e5c">[email&#160;protected]</a></span></td>
+            <td>Data Analyst</td>
+            <td style="color:var(--text-muted)">—</td><td style="color:var(--text-muted)">—</td>
+            <td><span class="badge bn">Pending</span></td><td><span class="badge ba">Not Run</span></td><td style="color:var(--text-muted)">27 Feb 2026</td>
+            <td><button class="btn btn-primary btn-sm" onclick="nav('add-candidate')">Run Analysis</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sp"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="annot">⚡ GET /api/jobs · GET /api/candidates?jobId={id}</span>
+      <span class="annot">🖱 Click job row to load candidates below</span>
+      <span class="annot">📊 MUI DataGrid (sortable, paginated)</span>
+    </div>
+  </div>
+</div>
+
+<!-- ════ PAGE 3: CREATE JOB ════ -->
+<div id="pg-add-job" class="page">
+  <div class="page-header">
+    <div><div class="ph-title">Create New Job</div><div class="ph-sub">Paste JD to create a vacancy and enable candidate analysis</div></div>
+    <div class="ph-actions">
+      <button class="btn btn-secondary btn-sm" onclick="nav('jobs')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="nav('jobs')">Save Job</button>
+    </div>
+  </div>
+  <div class="content">
+
+    <div class="step-bar">
+      <div class="step done"><div class="step-num">✓</div> Job Details</div>
+      <div class="step-line"></div>
+      <div class="step act"><div class="step-num">2</div> Job Description</div>
+      <div class="step-line"></div>
+      <div class="step"><div class="step-num">3</div> Review & Save</div>
+    </div>
+
+    <div class="row">
+      <!-- Form -->
+      <div style="flex:1.3" class="col">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Job Details</span></div>
+          <div class="card-body">
+            <div class="grid2">
+              <div class="form-group"><label class="form-label">Job Title <span class="req">*</span></label><input class="fi" type="text" value="Senior Backend Engineer" /></div>
+              <div class="form-group"><label class="form-label">Client / Company</label><input class="fi" type="text" value="FinTech Co." /></div>
+            </div>
+            <div class="grid2">
+              <div class="form-group"><label class="form-label">Location</label><input class="fi" type="text" placeholder="e.g. London / Remote" /></div>
+              <div class="form-group"><label class="form-label">Employment Type</label>
+                <select class="fi"><option>Full-time</option><option>Contract</option><option>Part-time</option></select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Job Description (JD) <span class="req">*</span></span>
+            <span class="annot">Paste full JD text here</span>
+          </div>
+          <div class="card-body">
+            <div class="form-hint">Paste the complete job description. DeepHire will extract required capabilities, seniority signals and technical skills automatically.</div>
+            <div style="display:flex;align-items:flex-start;gap:7px;background:#F0F7FF;border:1px solid #BFDBFE;border-radius:6px;padding:8px 11px;margin-top:6px">
+              <span style="font-size:13px;flex-shrink:0;margin-top:1px">🔒</span>
+              <div style="font-size:11px;color:#1E40AF;line-height:1.5"><strong>Do not include any candidate personal information</strong> (names, emails, phone numbers, addresses or other PII) in the job description. DeepHire does not store any personally identifiable information entered in this field.</div>
+            </div>
+            <div style="height:6px"></div>
+            <textarea class="ft" rows="13">Senior Backend Engineer — FinTech Co.
+
+We are looking for a Senior Backend Engineer to join our core payments team. You will design and build scalable, high-performance services processing millions of transactions daily.
+
+Responsibilities:
+• Design and implement RESTful APIs and microservices
+• Collaborate with product and frontend teams
+• Ensure high availability and fault tolerance
+• Mentor junior engineers and conduct code reviews
+
+Requirements:
+• 5+ years backend engineering experience
+• Strong proficiency in Java or Kotlin (Spring Boot)
+• Experience with distributed systems and event-driven architecture
+• Familiarity with AWS, Docker, Kubernetes
+• Prior fintech or regulated environment experience preferred</textarea>
+            <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:11px;color:var(--text-muted)">POST /api/jobs — Spring Boot REST</span>
+              <button class="btn btn-secondary btn-sm">🔍 Preview Extracted Skills</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right panel -->
+      <div style="flex:0 0 220px" class="col">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Extracted Skills Preview</span></div>
+          <div class="card-body" style="padding:12px 16px">
+            <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Technical</div>
+            <div><span class="tag">Java / Kotlin</span><span class="tag">Spring Boot</span><span class="tag">REST API</span><span class="tag">Microservices</span><span class="tag">AWS</span><span class="tag">Docker</span><span class="tag">Kubernetes</span></div>
+            <div class="divider" style="margin:10px 0"></div>
+            <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Soft Skills</div>
+            <div><span class="tag">Mentoring</span><span class="tag">Code Review</span><span class="tag">Collaboration</span></div>
+            <div class="divider" style="margin:10px 0"></div>
+            <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Seniority Signal</div>
+            <span class="badge ba">Senior · 5+ yrs</span>
+          </div>
+        </div>
+
+        <div class="card" style="border-color:#FDE68A">
+          <div class="card-body" style="padding:12px 16px;background:var(--warning-bg);border-radius:var(--radius)">
+            <div style="font-size:12px;font-weight:600;color:var(--warning);margin-bottom:4px">⚠ Tip</div>
+            <div style="font-size:11px;color:#92400E;line-height:1.5">Include measurable outcomes in your JD (e.g. "process 1M transactions/day") for more precise capability scoring.</div>
+          </div>
+        </div>
+
+        <div style="padding:4px 2px">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">After saving you can:</div>
+          <div style="font-size:12px;color:var(--text-secondary);display:flex;flex-direction:column;gap:5px">
+            <span>✓ Add candidates to this job</span>
+            <span>✓ Run CV vs JD analysis</span>
+            <span>✓ Review validation questions</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="annot">📝 MUI TextField + Select</span>
+      <span class="annot">⚡ POST /api/jobs on Save</span>
+      <span class="annot">🔍 Skill extraction from JD text client-side preview</span>
+    </div>
+  </div>
+</div>
+
+<!-- ════ PAGE 4: CANDIDATES LIST ════ -->
+<div id="pg-candidates" class="page">
+  <div class="page-header">
+    <div><div class="ph-title">Candidates</div><div class="ph-sub">All candidates across active jobs</div></div>
+    <div class="ph-actions">
+      <input class="fi" style="width:190px;font-size:12px;padding:6px 10px" type="text" placeholder="🔍 Search candidates…" />
+      <select class="fi" style="width:180px;font-size:12px;padding:6px 10px"><option>All Jobs</option><option>Sr. Backend Engineer</option><option>Product Manager</option></select>
+      <button class="btn btn-primary btn-sm" onclick="nav('add-candidate')">＋ Add Candidate</button>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- Filter chips -->
+    <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
+      <span style="font-size:12px;color:var(--text-muted);font-weight:500">Filter by risk:</span>
+      <button class="btn btn-secondary btn-sm" style="border-color:var(--accent);color:var(--accent)">All (9)</button>
+      <button class="btn btn-secondary btn-sm">High Risk (4)</button>
+      <button class="btn btn-secondary btn-sm">Medium (3)</button>
+      <button class="btn btn-secondary btn-sm">Low (2)</button>
+      <div style="margin-left:auto;font-size:12px;color:var(--text-muted)">9 candidates</div>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead><tr><th>Candidate</th><th>Applied For</th><th>Consistency Score</th><th>Capability Match</th><th>Risk Flags</th><th>Status</th><th>Analysed</th><th></th></tr></thead>
+        <tbody>
+          <tr onclick="nav('analysis')">
+            <td><strong>James Okafor</strong><br><span style="font-size:11px;color:var(--text-muted)"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="89e3e8e4ecfaa7e6e2e8efe6fbc9ece4e8e0e5a7eae6e4">[email&#160;protected]</a></span></td>
+            <td>Sr. Backend Engineer</td>
+            <td><span style="font-weight:600;color:var(--success)">87%</span><div class="pbar-wrap" style="width:70px"><div class="pbar" style="width:87%;background:var(--success)"></div></div></td>
+            <td><span style="font-weight:600;color:var(--warning)">72%</span><div class="pbar-wrap" style="width:70px"><div class="pbar" style="width:72%;background:var(--warning)"></div></div></td>
+            <td><span class="badge bd">2 High</span></td>
+            <td><span class="badge bw">Review</span></td>
+            <td style="color:var(--text-muted)">28 Feb 2026</td>
+            <td><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('analysis')">View Results</button></td>
+          </tr>
+          <tr onclick="nav('analysis')">
+            <td><strong>Priya Mehta</strong><br><span style="font-size:11px;color:var(--text-muted)"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="6717150e1e06490a020f130627020a060e0b4904080a">[email&#160;protected]</a></span></td>
+            <td>Product Manager</td>
+            <td><span style="font-weight:600;color:var(--success)">91%</span><div class="pbar-wrap" style="width:70px"><div class="pbar" style="width:91%;background:var(--success)"></div></div></td>
+            <td><span style="font-weight:600;color:var(--success)">88%</span><div class="pbar-wrap" style="width:70px"><div class="pbar" style="width:88%;background:var(--success)"></div></div></td>
+            <td><span class="badge bw">1 Med</span></td>
+            <td><span class="badge bs">Approved</span></td>
+            <td style="color:var(--text-muted)">27 Feb 2026</td>
+            <td><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('analysis')">View Results</button></td>
+          </tr>
+          <tr onclick="nav('analysis')">
+            <td><strong>Tom Harrington</strong><br><span style="font-size:11px;color:var(--text-muted)"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="23574c4e0d4b63464e424a4f0d404c4e">[email&#160;protected]</a></span></td>
+            <td>Sr. Backend Engineer</td>
+            <td><span style="font-weight:600;color:var(--danger)">54%</span><div class="pbar-wrap" style="width:70px"><div class="pbar" style="width:54%;background:var(--danger)"></div></div></td>
+            <td><span style="font-weight:600;color:var(--warning)">65%</span><div class="pbar-wrap" style="width:70px"><div class="pbar" style="width:65%;background:var(--warning)"></div></div></td>
+            <td><span class="badge bd">3 High</span></td>
+            <td><span class="badge bd">Flagged</span></td>
+            <td style="color:var(--text-muted)">26 Feb 2026</td>
+            <td><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('analysis')">View Results</button></td>
+          </tr>
+          <tr onclick="nav('analysis')">
+            <td><strong>Aisha Kamara</strong><br><span style="font-size:11px;color:var(--text-muted)"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="0869617b60692663486d65696164266b6765">[email&#160;protected]</a></span></td>
+            <td>Product Manager</td>
+            <td><span style="font-weight:600;color:var(--success)">89%</span><div class="pbar-wrap" style="width:70px"><div class="pbar" style="width:89%;background:var(--success)"></div></div></td>
+            <td><span style="font-weight:600;color:var(--success)">85%</span><div class="pbar-wrap" style="width:70px"><div class="pbar" style="width:85%;background:var(--success)"></div></div></td>
+            <td><span class="badge bn">None</span></td>
+            <td><span class="badge bs">Approved</span></td>
+            <td style="color:var(--text-muted)">25 Feb 2026</td>
+            <td><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('analysis')">View Results</button></td>
+          </tr>
+          <tr>
+            <td><strong>Wei Zhang</strong><br><span style="font-size:11px;color:var(--text-muted)"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="7c0b191552063c19111d1510521f1311">[email&#160;protected]</a></span></td>
+            <td>Data Analyst</td>
+            <td style="color:var(--text-muted)">—</td>
+            <td style="color:var(--text-muted)">—</td>
+            <td><span class="badge bn">Pending</span></td>
+            <td><span class="badge ba">Not Run</span></td>
+            <td style="color:var(--text-muted)">28 Feb 2026</td>
+            <td><button class="btn btn-primary btn-sm" onclick="nav('add-candidate')">Run Analysis</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sp"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="annot">⚡ GET /api/candidates?jobId=&amp;riskLevel=</span>
+      <span class="annot">📊 MUI DataGrid (sortable, filterable)</span>
+      <span class="annot">🔍 Filter by job or risk level via query params</span>
+    </div>
+  </div>
+</div>
+
+<!-- ════ PAGE 5: ADD CANDIDATE ════ -->
+<div id="pg-add-candidate" class="page">
+  <div class="page-header">
+    <div><div class="ph-title">Add Candidate</div><div class="ph-sub">Paste CV and LinkedIn for validation analysis</div></div>
+    <div class="ph-actions">
+      <button class="btn btn-secondary btn-sm" onclick="nav('candidates')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="nav('analysis')">🔍 Run Analysis</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="row">
+      <!-- Form -->
+      <div style="flex:1.3" class="col">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Candidate Details</span></div>
+          <div class="card-body">
+            <div class="grid2">
+              <div class="form-group"><label class="form-label">First Name <span class="req">*</span></label><input class="fi" type="text" value="James" /></div>
+              <div class="form-group"><label class="form-label">Last Name <span class="req">*</span></label><input class="fi" type="text" value="Okafor" /></div>
+            </div>
+            <div class="grid2">
+              <div class="form-group"><label class="form-label">Email</label><input class="fi" type="email" value="james.okafor@email.com" /></div>
+              <div class="form-group"><label class="form-label">Phone</label><input class="fi" type="text" placeholder="+44 7000 000000" /></div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Assign to Job <span class="req">*</span></label>
+              <select class="fi"><option>Senior Backend Engineer — FinTech Co.</option><option>Product Manager — HealthStart Ltd</option><option>Data Analyst — Acme Corp</option></select>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">LinkedIn Profile URL <span class="req">*</span></label>
+              <div class="form-hint">Used to validate CV vs LinkedIn consistency</div>
+              <input class="fi" type="url" value="https://linkedin.com/in/jamesokafor" />
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">CV / Resume Text <span class="req">*</span></span>
+            <span class="annot">Paste full CV text</span>
+          </div>
+          <div class="card-body">
+            <div class="form-hint">Copy and paste the candidate's full CV. Plain text preferred for accurate analysis.</div>
+            <div style="display:flex;align-items:flex-start;gap:7px;background:#F0F7FF;border:1px solid #BFDBFE;border-radius:6px;padding:8px 11px;margin-bottom:8px">
+              <span style="font-size:13px;flex-shrink:0;margin-top:1px">🔒</span>
+              <div style="font-size:11px;color:#1E40AF;line-height:1.5"><strong>Do not include any personally identifiable information</strong> (phone numbers, addresses, national ID or other PII) beyond what is needed for analysis. DeepHire does not store any personally identifiable information entered in this field.</div>
+            </div>
+            <textarea class="ft" rows="13">James Okafor — Senior Software Engineer
+james.okafor@email.com | London, UK
+
+EXPERIENCE
+
+Senior Software Engineer — TechBank (2020–Present)
+• Led migration from monolith to microservices architecture
+• Built payment processing services (800K transactions/day)
+• Championed Kotlin + Spring Boot adoption across the team
+• Mentored 3 junior engineers
+
+Software Engineer — DataFlow Ltd (2017–2020)
+• Developed RESTful APIs for logistics management platform
+• Worked with AWS Lambda, S3, RDS
+
+SKILLS
+Java, Kotlin, Spring Boot, REST APIs, AWS, Docker, PostgreSQL, Kafka, Redis, Kubernetes (learning)
+
+EDUCATION
+BSc Computer Science — University of Manchester, 2017</textarea>
+            <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:11px;color:var(--text-muted)">~390 words detected</span>
+              <button class="btn btn-secondary btn-sm">Clear</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right -->
+      <div style="flex:0 0 220px" class="col">
+        <div class="card">
+          <div class="card-head"><span class="card-title">What will be analysed</span></div>
+          <div class="card-body" style="padding:12px 16px;display:flex;flex-direction:column;gap:12px">
+            <div>
+              <div style="font-size:12px;font-weight:600;margin-bottom:3px">🔄 CV vs LinkedIn</div>
+              <div style="font-size:11px;color:var(--text-muted);line-height:1.5">Timeline gaps, title mismatches, employer discrepancies</div>
+            </div>
+            <div class="divider" style="margin:0"></div>
+            <div>
+              <div style="font-size:12px;font-weight:600;margin-bottom:3px">🎯 CV vs JD Alignment</div>
+              <div style="font-size:11px;color:var(--text-muted);line-height:1.5">Technical skills, seniority, experience type match score</div>
+            </div>
+            <div class="divider" style="margin:0"></div>
+            <div>
+              <div style="font-size:12px;font-weight:600;margin-bottom:3px">❓ Validation Questions</div>
+              <div style="font-size:11px;color:var(--text-muted);line-height:1.5">5–8 targeted interview questions from risk flags + gaps</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Pre-flight Checklist</span></div>
+          <div class="card-body" style="padding:12px 16px">
+            <div style="display:flex;flex-direction:column;gap:8px;font-size:12px;margin-bottom:14px">
+              <span style="color:var(--success)">✓ Candidate name entered</span>
+              <span style="color:var(--success)">✓ Job assigned</span>
+              <span style="color:var(--success)">✓ LinkedIn URL provided</span>
+              <span style="color:var(--success)">✓ CV text pasted</span>
+              <span style="color:var(--text-muted)">◦ Optional: Recruiter notes</span>
+            </div>
+            <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="nav('analysis')">🔍 Run Analysis</button>
+            <div style="font-size:10px;color:var(--text-muted);text-align:center;margin-top:6px">POST /api/analysis/run</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Recruiter Notes</span></div>
+          <div class="card-body" style="padding:12px 16px">
+            <textarea class="ft" rows="4" placeholder="Add any notes about this candidate…"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="annot">📋 MUI TextField multiline for CV</span>
+      <span class="annot">⚡ POST /api/candidates → POST /api/analysis/run</span>
+      <span class="annot">🔗 LinkedIn URL validated client-side</span>
+    </div>
+  </div>
+</div>
+
+<!-- ════ PAGE 6: ANALYSIS RESULT ════ -->
+<div id="pg-analysis" class="page">
+  <div class="page-header">
+    <div><div class="ph-title">Analysis Result — James Okafor</div><div class="ph-sub">Sr. Backend Engineer · FinTech Co. · Analysed 28 Feb 2026, 10:42</div></div>
+    <div class="ph-actions">
+      <button class="btn btn-secondary btn-sm" onclick="nav('candidates')">← Back</button>
+      <button class="btn btn-secondary btn-sm">⬇ Export PDF</button>
+      <button class="btn btn-primary btn-sm">🔄 Re-run Analysis</button>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- Scores meta strip -->
+    <div class="meta-strip">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+        <div class="score-circle sc-g">87%</div>
+        <div style="font-size:10px;color:var(--text-muted);font-weight:500;text-align:center">Consistency<br>Score</div>
+      </div>
+      <div style="width:1px;background:var(--border);height:56px"></div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+        <div class="score-circle sc-w">72%</div>
+        <div style="font-size:10px;color:var(--text-muted);font-weight:500;text-align:center">Capability<br>Match</div>
+      </div>
+      <div style="width:1px;background:var(--border);height:56px"></div>
+      <div style="flex:1">
+        <div style="margin-bottom:7px"><div class="mb-lbl">Candidate</div><div class="mb-val">James Okafor</div></div>
+        <div><div class="mb-lbl">Applied For</div><div class="mb-val">Senior Backend Engineer</div></div>
+      </div>
+      <div style="flex:1">
+        <div style="margin-bottom:7px"><div class="mb-lbl">LinkedIn</div><div class="mb-val"><a href="#" style="color:var(--accent)">linkedin.com/in/jamesokafor</a></div></div>
+        <div><div class="mb-lbl">Overall Risk</div><div class="mb-val"><span class="badge bd">High · 2 Flags</span></div></div>
+      </div>
+      <div style="width:1px;background:var(--border);height:56px"></div>
+      <!-- AI Confidence Score -->
+      <div style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:0 6px">
+        <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">AI Confidence</div>
+        <div style="background:var(--success-bg);border:1.5px solid var(--success);border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;color:var(--success)">High</div>
+        <div style="font-size:10px;color:var(--text-muted);text-align:center;line-height:1.4;max-width:120px">Complete LinkedIn data &amp; detailed CV metrics available</div>
+      </div>
+    </div>
+
+    <!-- Content row -->
+    <div class="row">
+      <div style="flex:1.4" class="col">
+
+        <!-- Consistency breakdown -->
+        <div class="card">
+          <div class="card-head"><span class="card-title">CV vs LinkedIn Consistency</span><span class="badge bs">87% Match</span></div>
+          <div class="card-body">
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>Job Titles</span><span style="font-weight:600;color:var(--success)">✓ Match</span></div><div class="pbar-wrap"><div class="pbar" style="width:95%;background:var(--success)"></div></div></div>
+              <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>Employers</span><span style="font-weight:600;color:var(--success)">✓ Match</span></div><div class="pbar-wrap"><div class="pbar" style="width:100%;background:var(--success)"></div></div></div>
+              <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>Date Ranges</span><span style="font-weight:600;color:var(--warning)">⚠ Minor gap detected</span></div><div class="pbar-wrap"><div class="pbar" style="width:68%;background:var(--warning)"></div></div></div>
+              <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span>Education</span><span style="font-weight:600;color:var(--success)">✓ Match</span></div><div class="pbar-wrap"><div class="pbar" style="width:100%;background:var(--success)"></div></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Capability alignment -->
+        <div class="card">
+          <div class="card-head"><span class="card-title">CV vs JD Capability Alignment</span><span class="badge bw">72% Match</span></div>
+          <div class="card-body">
+            <div style="margin-bottom:14px">
+              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:6px">Matched Skills</div>
+              <span class="tag match">Java ✓</span><span class="tag match">Kotlin ✓</span><span class="tag match">Spring Boot ✓</span><span class="tag match">REST API ✓</span><span class="tag match">AWS ✓</span><span class="tag match">Docker ✓</span><span class="tag match">Microservices ✓</span>
+            </div>
+            <div style="margin-bottom:14px">
+              <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:6px">Gaps / Not Evidenced</div>
+              <span class="tag gap">Kubernetes ✗</span><span class="tag gap">Event-driven arch ✗</span><span class="tag gap">Fintech exp ✗</span>
+            </div>
+            <div class="divider"></div>
+            <div class="grid3" style="text-align:center">
+              <div><div style="font-size:20px;font-weight:700;color:var(--success)">7/10</div><div style="font-size:10px;color:var(--text-muted)">Technical Skills</div></div>
+              <div><div style="font-size:20px;font-weight:700;color:var(--success)">✓</div><div style="font-size:10px;color:var(--text-muted)">Seniority</div></div>
+              <div><div style="font-size:20px;font-weight:700;color:var(--warning)">Partial</div><div style="font-size:10px;color:var(--text-muted)">Domain Match</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Capability Matrix Breakdown -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Capability Matrix Breakdown</span>
+            <span class="badge bw">Weighted Score: 72%</span>
+          </div>
+          <div class="card-body" style="padding:0">
+            <table style="width:100%">
+              <thead>
+                <tr>
+                  <th style="padding:8px 16px;width:22%">Capability Area</th>
+                  <th style="padding:8px 14px;width:10%">Weight</th>
+                  <th style="padding:8px 14px;width:22%">Candidate Score</th>
+                  <th style="padding:8px 14px;width:13%">Weighted Impact</th>
+                  <th style="padding:8px 14px">AI Insight</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Row 1 -->
+                <tr>
+                  <td style="padding:10px 16px;font-weight:600;font-size:12px">Backend Architecture</td>
+                  <td style="padding:10px 14px;font-size:12px;color:var(--text-secondary)">30%</td>
+                  <td style="padding:10px 14px">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span style="font-weight:700;color:var(--success);font-size:12px;width:30px">88%</span>
+                      <div class="pbar-wrap" style="flex:1"><div class="pbar" style="width:88%;background:var(--success)"></div></div>
+                    </div>
+                  </td>
+                  <td style="padding:10px 14px;font-weight:700;color:var(--success);font-size:12px">26.4</td>
+                  <td style="padding:10px 14px;font-size:11px;color:var(--text-secondary);line-height:1.4">Strong microservices & payment processing experience evidenced</td>
+                </tr>
+                <!-- Row 2 -->
+                <tr style="background:#FAFBFD">
+                  <td style="padding:10px 16px;font-weight:600;font-size:12px">Cloud & Infrastructure</td>
+                  <td style="padding:10px 14px;font-size:12px;color:var(--text-secondary)">20%</td>
+                  <td style="padding:10px 14px">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span style="font-weight:700;color:var(--success);font-size:12px;width:30px">80%</span>
+                      <div class="pbar-wrap" style="flex:1"><div class="pbar" style="width:80%;background:var(--success)"></div></div>
+                    </div>
+                  </td>
+                  <td style="padding:10px 14px;font-weight:700;color:var(--success);font-size:12px">16.0</td>
+                  <td style="padding:10px 14px;font-size:11px;color:var(--text-secondary);line-height:1.4">AWS, Docker evidenced. Kubernetes claimed but not verified in practice</td>
+                </tr>
+                <!-- Row 3 -->
+                <tr>
+                  <td style="padding:10px 16px;font-weight:600;font-size:12px">Distributed Systems</td>
+                  <td style="padding:10px 14px;font-size:12px;color:var(--text-secondary)">25%</td>
+                  <td style="padding:10px 14px">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span style="font-weight:700;color:var(--warning);font-size:12px;width:30px">60%</span>
+                      <div class="pbar-wrap" style="flex:1"><div class="pbar" style="width:60%;background:var(--warning)"></div></div>
+                    </div>
+                  </td>
+                  <td style="padding:10px 14px;font-weight:700;color:var(--warning);font-size:12px">15.0</td>
+                  <td style="padding:10px 14px;font-size:11px;color:var(--text-secondary);line-height:1.4">No event-driven architecture evidence. JD explicitly requires Kafka/MQ skills</td>
+                </tr>
+                <!-- Row 4 -->
+                <tr style="background:#FAFBFD">
+                  <td style="padding:10px 16px;font-weight:600;font-size:12px">Leadership & Mentorship</td>
+                  <td style="padding:10px 14px;font-size:12px;color:var(--text-secondary)">15%</td>
+                  <td style="padding:10px 14px">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span style="font-weight:700;color:var(--success);font-size:12px;width:30px">85%</span>
+                      <div class="pbar-wrap" style="flex:1"><div class="pbar" style="width:85%;background:var(--success)"></div></div>
+                    </div>
+                  </td>
+                  <td style="padding:10px 14px;font-weight:700;color:var(--success);font-size:12px">12.75</td>
+                  <td style="padding:10px 14px;font-size:11px;color:var(--text-secondary);line-height:1.4">Mentored 3 engineers. Led architecture decisions across team</td>
+                </tr>
+                <!-- Row 5 -->
+                <tr>
+                  <td style="padding:10px 16px;font-weight:600;font-size:12px">Domain (FinTech)</td>
+                  <td style="padding:10px 14px;font-size:12px;color:var(--text-secondary)">10%</td>
+                  <td style="padding:10px 14px">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span style="font-weight:700;color:var(--danger);font-size:12px;width:30px">20%</span>
+                      <div class="pbar-wrap" style="flex:1"><div class="pbar" style="width:20%;background:var(--danger)"></div></div>
+                    </div>
+                  </td>
+                  <td style="padding:10px 14px;font-weight:700;color:var(--danger);font-size:12px">2.0</td>
+                  <td style="padding:10px 14px;font-size:11px;color:var(--text-secondary);line-height:1.4">No regulated/fintech environment mentioned. Role is compliance-sensitive</td>
+                </tr>
+                <!-- Total row -->
+                <tr style="background:#F0F7FF;border-top:2px solid var(--border)">
+                  <td colspan="3" style="padding:11px 16px;font-weight:700;font-size:12px;color:var(--text-primary)">Total Weighted Capability Score</td>
+                  <td style="padding:11px 14px;font-weight:800;font-size:15px;color:var(--warning)">72.15</td>
+                  <td style="padding:11px 14px"><span class="badge bw" style="font-size:11px">Moderate Match — Proceed with targeted screening</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Top Strength Signals -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Top Strength Signals</span>
+            <span style="font-size:11px;color:var(--text-muted)">AI-extracted from CV</span>
+          </div>
+          <div class="card-body">
+            <div style="display:flex;flex-direction:column;gap:0">
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid #F0F2F6">
+                <div style="width:32px;height:32px;border-radius:8px;background:#EEF5FF;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">🏗</div>
+                <div>
+                  <div style="font-size:12.5px;font-weight:600;color:var(--text-primary);margin-bottom:2px">Led monolith-to-microservices migration at scale</div>
+                  <div style="font-size:11px;color:var(--text-muted);line-height:1.4">End-to-end architectural ownership across a live production system — high signal for senior-level execution depth</div>
+                </div>
+                <span class="badge bs" style="font-size:10px;flex-shrink:0;margin-top:2px">Architecture</span>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid #F0F2F6">
+                <div style="width:32px;height:32px;border-radius:8px;background:#F0FDF4;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">⚡</div>
+                <div>
+                  <div style="font-size:12.5px;font-weight:600;color:var(--text-primary);margin-bottom:2px">Processing 800K transactions/day in production</div>
+                  <div style="font-size:11px;color:var(--text-muted);line-height:1.4">Demonstrates real-world high-throughput system experience directly relevant to FinTech Co.'s payment infrastructure</div>
+                </div>
+                <span class="badge bs" style="font-size:10px;flex-shrink:0;margin-top:2px">Scale</span>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid #F0F2F6">
+                <div style="width:32px;height:32px;border-radius:8px;background:#FFF7ED;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">👥</div>
+                <div>
+                  <div style="font-size:12.5px;font-weight:600;color:var(--text-primary);margin-bottom:2px">Mentored 3 junior engineers</div>
+                  <div style="font-size:11px;color:var(--text-muted);line-height:1.4">Active leadership contribution beyond individual contribution — aligns with JD's mentoring requirement</div>
+                </div>
+                <span class="badge ba" style="font-size:10px;flex-shrink:0;margin-top:2px">Leadership</span>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid #F0F2F6">
+                <div style="width:32px;height:32px;border-radius:8px;background:#EEF5FF;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">☕</div>
+                <div>
+                  <div style="font-size:12.5px;font-weight:600;color:var(--text-primary);margin-bottom:2px">Kotlin + Spring Boot adoption champion</div>
+                  <div style="font-size:11px;color:var(--text-muted);line-height:1.4">Drove tech stack modernisation across the team — shows initiative and influence beyond assigned tasks</div>
+                </div>
+                <span class="badge ba" style="font-size:10px;flex-shrink:0;margin-top:2px">Technical</span>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:11px 0">
+                <div style="width:32px;height:32px;border-radius:8px;background:#F0FDF4;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0">🔗</div>
+                <div>
+                  <div style="font-size:12.5px;font-weight:600;color:var(--text-primary);margin-bottom:2px">5+ years continuous backend progression</div>
+                  <div style="font-size:11px;color:var(--text-muted);line-height:1.4">Clear seniority trajectory from Software Engineer to Senior — no unexplained lateral moves detected</div>
+                </div>
+                <span class="badge bs" style="font-size:10px;flex-shrink:0;margin-top:2px">Career Track</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Execution Depth Classification -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Execution Depth Classification</span>
+            <span style="font-size:11px;color:var(--text-muted)">AI-assessed</span>
+          </div>
+          <div class="card-body">
+            <div style="display:flex;gap:0;margin-bottom:14px">
+              <!-- Tiers -->
+              <div style="flex:1;text-align:center;padding:10px 6px;border-radius:6px 0 0 6px;background:#F1F3F7;border:1px solid var(--border)">
+                <div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-bottom:2px">TIER 1</div>
+                <div style="font-size:12px;color:var(--text-muted)">Contributor</div>
+              </div>
+              <div style="flex:1;text-align:center;padding:10px 6px;background:#F1F3F7;border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+                <div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-bottom:2px">TIER 2</div>
+                <div style="font-size:12px;color:var(--text-muted)">Owner</div>
+              </div>
+              <div style="flex:1;text-align:center;padding:10px 6px;background:var(--accent);border:1px solid var(--accent);position:relative">
+                <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.75);margin-bottom:2px">TIER 3 ✓</div>
+                <div style="font-size:12px;color:#fff;font-weight:700">Architect</div>
+              </div>
+              <div style="flex:1;text-align:center;padding:10px 6px;border-radius:0 6px 6px 0;background:#F1F3F7;border:1px solid var(--border)">
+                <div style="font-size:10px;font-weight:600;color:var(--text-muted);margin-bottom:2px">TIER 4</div>
+                <div style="font-size:12px;color:var(--text-muted)">Strategic Lead</div>
+              </div>
+            </div>
+            <div style="background:#EBF2FF;border-radius:6px;padding:10px 14px;font-size:12px;color:#1E3A6E;line-height:1.5">
+              <strong>Classified as Architect (Tier 3).</strong> Candidate demonstrates ownership of architectural decisions, cross-team technical influence, and production system design — consistent with senior individual contributor expectations for this role. Lacks strategic org-level leadership signals required for Tier 4.
+            </div>
+          </div>
+        </div>
+
+        <!-- Risk & Authenticity Analysis -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Risk &amp; Authenticity Analysis</span>
+            <span class="badge bd">Overall: High Risk</span>
+          </div>
+          <div class="card-body">
+            <div style="display:flex;flex-direction:column;gap:0">
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid #F0F2F6">
+                <span class="rdot h" style="margin-top:5px;flex-shrink:0"></span>
+                <div style="flex:1">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                    <span style="font-size:12.5px;font-weight:600">Scale Authenticity Check</span>
+                    <span class="badge bw" style="font-size:10px">Medium Risk</span>
+                  </div>
+                  <div style="font-size:11px;color:var(--text-muted);line-height:1.4">Claim of 800K transactions/day is plausible but not independently verifiable from CV alone. Recommend asking for system architecture context in interview.</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid #F0F2F6">
+                <span class="rdot h" style="margin-top:5px;flex-shrink:0"></span>
+                <div style="flex:1">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                    <span style="font-size:12.5px;font-weight:600">Timeline Gap Detection</span>
+                    <span class="badge bd" style="font-size:10px">High Risk</span>
+                  </div>
+                  <div style="font-size:11px;color:var(--text-muted);line-height:1.4">4-month gap (Mar–Jul 2019) present in CV but completely absent from LinkedIn profile. Requires direct clarification before proceeding.</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:11px 0;border-bottom:1px solid #F0F2F6">
+                <span class="rdot h" style="margin-top:5px;flex-shrink:0"></span>
+                <div style="flex:1">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                    <span style="font-size:12.5px;font-weight:600">Title Inflation Risk</span>
+                    <span class="badge bd" style="font-size:10px">High Risk</span>
+                  </div>
+                  <div style="font-size:11px;color:var(--text-muted);line-height:1.4">Kubernetes listed under Skills section but self-described as "learning" in professional summary within the same CV — direct internal contradiction detected.</div>
+                </div>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:12px;padding:11px 0">
+                <span class="rdot l" style="margin-top:5px;flex-shrink:0"></span>
+                <div style="flex:1">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+                    <span style="font-size:12.5px;font-weight:600">Retention Risk Indicator</span>
+                    <span class="badge bn" style="font-size:10px">Low Risk</span>
+                  </div>
+                  <div style="font-size:11px;color:var(--text-muted);line-height:1.4">Candidate held positions for 3+ years each. No short-tenure pattern detected. Retention risk is low based on career history signals.</div>
+                </div>
+              </div>
+            </div>
+            <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+              <span style="font-size:12px;font-weight:600;color:var(--text-primary)">Overall Risk Assessment</span>
+              <span class="badge bd" style="font-size:12px;padding:4px 12px">⚠ High — Verify before advancing</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- AI-Generated Validation Questions (enhanced) -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">AI-Generated Validation Questions</span>
+            <div style="display:flex;gap:6px"><button class="btn btn-secondary btn-sm">⬇ Export</button><button class="btn btn-secondary btn-sm">📋 Copy All</button></div>
+          </div>
+          <div class="card-body" style="padding:0">
+
+            <!-- Q1 -->
+            <div style="padding:14px 18px;border-bottom:1px solid #F0F2F6">
+              <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px">
+                <div style="width:22px;height:22px;border-radius:50%;background:var(--danger-bg);color:var(--danger);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;margin-top:1px">1</div>
+                <div style="flex:1">
+                  <div style="display:flex;gap:6px;margin-bottom:5px">
+                    <span class="badge bd" style="font-size:10px">Risk</span>
+                    <span class="badge bn" style="font-size:10px">Consistency</span>
+                  </div>
+                  <div style="font-size:13px;font-weight:500;color:var(--text-primary);line-height:1.5">Your CV shows a 4-month gap in early 2019 that does not appear on your LinkedIn — can you walk me through what you were doing during that period?</div>
+                </div>
+              </div>
+              <div style="margin-left:32px;display:flex;gap:10px">
+                <details style="flex:1">
+                  <summary style="font-size:11px;color:var(--accent);cursor:pointer;font-weight:600;list-style:none">▸ Why this question?</summary>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:5px;line-height:1.5;padding:8px;background:var(--bg);border-radius:5px">Timeline discrepancies between CV and LinkedIn are a top authenticity signal. A gap present on one document but absent on another requires explanation — it may indicate contract work, personal circumstances, or embellishment.</div>
+                </details>
+                <details style="flex:1">
+                  <summary style="font-size:11px;color:var(--success);cursor:pointer;font-weight:600;list-style:none">▸ Strong Answer Signals</summary>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:5px;line-height:1.5;padding:8px;background:var(--bg);border-radius:5px">Clear, specific account of the period (e.g. freelance work, study, personal leave). Consistent with any other references provided. No deflection or vagueness.</div>
+                </details>
+              </div>
+            </div>
+
+            <!-- Q2 -->
+            <div style="padding:14px 18px;border-bottom:1px solid #F0F2F6">
+              <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px">
+                <div style="width:22px;height:22px;border-radius:50%;background:var(--danger-bg);color:var(--danger);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;margin-top:1px">2</div>
+                <div style="flex:1">
+                  <div style="display:flex;gap:6px;margin-bottom:5px">
+                    <span class="badge bd" style="font-size:10px">Risk</span>
+                    <span class="badge bn" style="font-size:10px">Skill Inflation</span>
+                  </div>
+                  <div style="font-size:13px;font-weight:500;color:var(--text-primary);line-height:1.5">Your CV lists Kubernetes as a skill but your own summary describes it as "learning" — what is your actual production experience with K8s today?</div>
+                </div>
+              </div>
+              <div style="margin-left:32px;display:flex;gap:10px">
+                <details style="flex:1">
+                  <summary style="font-size:11px;color:var(--accent);cursor:pointer;font-weight:600;list-style:none">▸ Why this question?</summary>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:5px;line-height:1.5;padding:8px;background:var(--bg);border-radius:5px">Internal contradiction within the same CV document is a high authenticity risk. Candidates sometimes list technologies they are aware of rather than have production experience in. The JD requires this skill.</div>
+                </details>
+                <details style="flex:1">
+                  <summary style="font-size:11px;color:var(--success);cursor:pointer;font-weight:600;list-style:none">▸ Strong Answer Signals</summary>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:5px;line-height:1.5;padding:8px;background:var(--bg);border-radius:5px">Specific cluster configurations used. Deployment strategies (Helm, ArgoCD). Honest acknowledgement of learning stage with concrete progression evidence.</div>
+                </details>
+              </div>
+            </div>
+
+            <!-- Q3 -->
+            <div style="padding:14px 18px;border-bottom:1px solid #F0F2F6">
+              <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px">
+                <div style="width:22px;height:22px;border-radius:50%;background:var(--warning-bg);color:var(--warning);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;margin-top:1px">3</div>
+                <div style="flex:1">
+                  <div style="display:flex;gap:6px;margin-bottom:5px">
+                    <span class="badge bw" style="font-size:10px">Technical</span>
+                    <span class="badge bn" style="font-size:10px">Capability Gap</span>
+                  </div>
+                  <div style="font-size:13px;font-weight:500;color:var(--text-primary);line-height:1.5">The role requires event-driven architecture — describe a system you designed or built using Kafka, RabbitMQ or a similar message broker.</div>
+                </div>
+              </div>
+              <div style="margin-left:32px;display:flex;gap:10px">
+                <details style="flex:1">
+                  <summary style="font-size:11px;color:var(--accent);cursor:pointer;font-weight:600;list-style:none">▸ Why this question?</summary>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:5px;line-height:1.5;padding:8px;background:var(--bg);border-radius:5px">Event-driven architecture is explicitly listed in the JD as a requirement and is absent from the candidate's CV entirely. This is a weighted capability gap that accounts for 25% of the scoring matrix.</div>
+                </details>
+                <details style="flex:1">
+                  <summary style="font-size:11px;color:var(--success);cursor:pointer;font-weight:600;list-style:none">▸ Strong Answer Signals</summary>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:5px;line-height:1.5;padding:8px;background:var(--bg);border-radius:5px">Named a specific system, described producer/consumer design, handled failure scenarios (DLQ), discussed throughput or ordering guarantees.</div>
+                </details>
+              </div>
+            </div>
+
+            <!-- Q4 -->
+            <div style="padding:14px 18px;border-bottom:1px solid #F0F2F6">
+              <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px">
+                <div style="width:22px;height:22px;border-radius:50%;background:var(--warning-bg);color:var(--warning);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;margin-top:1px">4</div>
+                <div style="flex:1">
+                  <div style="display:flex;gap:6px;margin-bottom:5px">
+                    <span class="badge bw" style="font-size:10px">Domain</span>
+                    <span class="badge bn" style="font-size:10px">FinTech</span>
+                  </div>
+                  <div style="font-size:13px;font-weight:500;color:var(--text-primary);line-height:1.5">This role is in a regulated fintech environment — describe your exposure to compliance requirements such as PCI-DSS, GDPR, or financial audit trails.</div>
+                </div>
+              </div>
+              <div style="margin-left:32px;display:flex;gap:10px">
+                <details style="flex:1">
+                  <summary style="font-size:11px;color:var(--accent);cursor:pointer;font-weight:600;list-style:none">▸ Why this question?</summary>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:5px;line-height:1.5;padding:8px;background:var(--bg);border-radius:5px">Domain knowledge is the lowest-weighted but highest-risk gap. FinTech Co. operates under financial regulation. Compliance-naïve engineers create audit and security risks.</div>
+                </details>
+                <details style="flex:1">
+                  <summary style="font-size:11px;color:var(--success);cursor:pointer;font-weight:600;list-style:none">▸ Strong Answer Signals</summary>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:5px;line-height:1.5;padding:8px;background:var(--bg);border-radius:5px">Named specific regulatory frameworks. Described how it shaped system design decisions. Aware of data residency, masking, or audit logging requirements.</div>
+                </details>
+              </div>
+            </div>
+
+            <!-- Q5 -->
+            <div style="padding:14px 18px;border-bottom:1px solid #F0F2F6">
+              <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px">
+                <div style="width:22px;height:22px;border-radius:50%;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;margin-top:1px">5</div>
+                <div style="flex:1">
+                  <div style="display:flex;gap:6px;margin-bottom:5px">
+                    <span class="badge ba" style="font-size:10px">Architecture</span>
+                    <span class="badge bn" style="font-size:10px">Deep Dive</span>
+                  </div>
+                  <div style="font-size:13px;font-weight:500;color:var(--text-primary);line-height:1.5">You led a monolith-to-microservices migration — what was the scale of the system, how did you sequence the migration, and what would you do differently?</div>
+                </div>
+              </div>
+              <div style="margin-left:32px;display:flex;gap:10px">
+                <details style="flex:1">
+                  <summary style="font-size:11px;color:var(--accent);cursor:pointer;font-weight:600;list-style:none">▸ Why this question?</summary>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:5px;line-height:1.5;padding:8px;background:var(--bg);border-radius:5px">This is a top strength signal but also an authenticity probe. Genuine architects can articulate sequencing, tradeoffs, and failure learnings. Candidates who overstate ownership struggle to answer this in depth.</div>
+                </details>
+                <details style="flex:1">
+                  <summary style="font-size:11px;color:var(--success);cursor:pointer;font-weight:600;list-style:none">▸ Strong Answer Signals</summary>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:5px;line-height:1.5;padding:8px;background:var(--bg);border-radius:5px">Described strangler fig or similar pattern. Identified specific domain boundaries. Articulated team coordination challenges and data migration strategy.</div>
+                </details>
+              </div>
+            </div>
+
+            <!-- Q6 -->
+            <div style="padding:14px 18px">
+              <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px">
+                <div style="width:22px;height:22px;border-radius:50%;background:#F5F3FF;color:#7C3AED;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;flex-shrink:0;margin-top:1px">6</div>
+                <div style="flex:1">
+                  <div style="display:flex;gap:6px;margin-bottom:5px">
+                    <span style="background:#F5F3FF;color:#7C3AED" class="badge" style="font-size:10px">Behavioral</span>
+                    <span class="badge bn" style="font-size:10px">Leadership</span>
+                  </div>
+                  <div style="font-size:13px;font-weight:500;color:var(--text-primary);line-height:1.5">Tell me about a time you had to push back on a technical decision made by senior stakeholders — what was the situation and what was the outcome?</div>
+                </div>
+              </div>
+              <div style="margin-left:32px;display:flex;gap:10px">
+                <details style="flex:1">
+                  <summary style="font-size:11px;color:var(--accent);cursor:pointer;font-weight:600;list-style:none">▸ Why this question?</summary>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:5px;line-height:1.5;padding:8px;background:var(--bg);border-radius:5px">Mentorship claims are easy to make. This behavioral probe tests whether the candidate operates with genuine Architect-level influence and psychological safety — both critical in the JD's collaborative culture requirement.</div>
+                </details>
+                <details style="flex:1">
+                  <summary style="font-size:11px;color:var(--success);cursor:pointer;font-weight:600;list-style:none">▸ Strong Answer Signals</summary>
+                  <div style="font-size:11px;color:var(--text-muted);margin-top:5px;line-height:1.5;padding:8px;background:var(--bg);border-radius:5px">Specific scenario with named stakes. Used data or prototypes to make the case. Remained constructive when overruled. Shows both confidence and professional maturity.</div>
+                </details>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- Right col -->
+      <div style="flex:0 0 216px" class="col">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Risk Flags</span><span class="badge bd">2 High</span></div>
+          <div class="card-body" style="padding:12px 16px">
+            <div class="risk-item"><span class="rdot h"></span><div><div style="font-size:12px;font-weight:600">LinkedIn date gap</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px;line-height:1.4">4-month gap in 2019 present in CV but absent on LinkedIn</div><span class="badge bd" style="font-size:10px;margin-top:4px">High</span></div></div>
+            <div class="risk-item"><span class="rdot h"></span><div><div style="font-size:12px;font-weight:600">Skill inflation: Kubernetes</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px;line-height:1.4">Listed as skill but described as "learning" in same document</div><span class="badge bd" style="font-size:10px;margin-top:4px">High</span></div></div>
+            <div class="risk-item"><span class="rdot m"></span><div><div style="font-size:12px;font-weight:600">No fintech evidence</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px;line-height:1.4">JD requires regulated environment — no direct evidence in CV</div><span class="badge bw" style="font-size:10px;margin-top:4px">Medium</span></div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Recruiter Notes</span></div>
+          <div class="card-body" style="padding:12px 16px"><textarea class="ft" rows="4" placeholder="Add your notes here…"></textarea><button class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%;justify-content:center">Save Notes</button></div>
+        </div>
+
+        <div class="card" style="border-color:#FDE68A">
+          <div class="card-body" style="padding:14px 16px;background:var(--warning-bg);border-radius:var(--radius)">
+            <div style="font-size:10px;font-weight:600;color:var(--warning);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">AI Verdict</div>
+            <div style="font-size:13px;font-weight:600;color:#78350F;margin-bottom:5px">Proceed with Caution</div>
+            <div style="font-size:11px;color:#92400E;line-height:1.5">Strong technical foundation. Two high-risk flags require direct probing before progressing.</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Actions</span></div>
+          <div class="card-body" style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">
+            <button class="btn btn-primary" style="width:100%;justify-content:center">✓ Approve for Interview</button>
+            <button class="btn btn-secondary" style="width:100%;justify-content:center">✗ Reject Candidate</button>
+            <button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="nav('add-candidate')">🔄 Re-run Analysis</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="annot">⚡ GET /api/analysis/{candidateId}</span>
+      <span class="annot">📊 MUI LinearProgress + Chip components</span>
+      <span class="annot">📤 Export PDF via backend endpoint</span>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /body-wrap -->
+
+<script>
+const ALL_PAGES = ['dashboard','jobs','add-job','candidates','add-candidate','analysis'];
+
+function nav(id) {
+  ALL_PAGES.forEach(function(p) {
+    var el = document.getElementById('pg-' + p);
+    if (el) { el.classList.remove('active'); el.style.display = 'none'; }
+    var pill = document.getElementById('pill-' + p);
+    if (pill) pill.classList.remove('active');
+    var sb = document.getElementById('sb-' + p);
+    if (sb) sb.classList.remove('active');
+  });
+  var target = document.getElementById('pg-' + id);
+  if (target) { target.classList.add('active'); target.style.display = 'flex'; }
+  var pill = document.getElementById('pill-' + id);
+  if (pill) pill.classList.add('active');
+  var sb = document.getElementById('sb-' + id);
+  if (sb) sb.classList.add('active');
+  var c = document.querySelector('#pg-' + id + ' .content');
+  if (c) c.scrollTop = 0;
+}
+
+// Init: hide all except dashboard
+ALL_PAGES.forEach(function(p) {
+  var el = document.getElementById('pg-' + p);
+  if (el) el.style.display = (p === 'dashboard') ? 'flex' : 'none';
+});
+
+// Job row selection
+var JOB_DATA = {
+  1: { title: 'Candidates — Senior Backend Engineer', client: 'FinTech Co.', count: '4 candidates' },
+  2: { title: 'Candidates — Product Manager', client: 'HealthStart Ltd', count: '3 candidates' },
+  3: { title: 'Candidates — Data Analyst', client: 'Acme Corp', count: '2 candidates' }
+};
+
+function selectJob(id) {
+  [1,2,3].forEach(function(i) {
+    var row = document.getElementById('job-row-' + i);
+    if (!row) return;
+    var arrow = row.querySelector('td:first-child');
+    if (i === id) {
+      row.style.background = '#EBF2FF';
+      if (arrow) { arrow.style.color = 'var(--accent)'; arrow.textContent = '▼'; }
+    } else {
+      row.style.background = '';
+      if (arrow) { arrow.style.color = 'var(--text-muted)'; arrow.textContent = '►'; }
+    }
+    var t = document.getElementById('panel-table-' + i);
+    if (t) t.style.display = 'none';
+  });
+  var tgt = document.getElementById('panel-table-' + id);
+  if (tgt) tgt.style.display = 'table';
+  var d = JOB_DATA[id];
+  if (d) {
+    var title = document.getElementById('panel-job-title');
+    var badge = document.getElementById('panel-client-badge');
+    var count = document.getElementById('panel-count');
+    if (title) title.textContent = d.title;
+    if (badge) badge.textContent = d.client;
+    if (count) count.textContent = d.count;
+  }
+}
+</script>
+</body>
+</html>

@@ -4,6 +4,12 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
+  datasource:
+    url: jdbc:postgresql://localhost:5432/depthhire
+    username: depthhire
+    password: depthhirepass
+    driver-class-name: org.postgresql.Driver
 openai:
   api-key: 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
   model: gpt-4o-mini
+  

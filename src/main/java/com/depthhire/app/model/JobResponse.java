@@ -6,6 +6,8 @@ import java.util.List;
 public record JobResponse(
     String id,
     String title,
+    String company,
+    String jobType,
     String seniority,
     String jdText,
     List<String> stackTags,
