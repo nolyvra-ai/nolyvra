@@ -1,14 +1,26 @@
 1. Integration with dB (Done) Next -> create ServiceImpl and DAO. Remove direct service call from controller.
-2. Remove all the static reference from UI -> DB
-3. Fix the UI to match with wireframe
-4. Add/Remove Jobs + candidates
+2. Remove all the static reference from UI -> DB (Analysis page pending)
+3. Fix the UI to match with wireframe (Analysis page pending)
+4. Implement user registration - Name, email, Org
+5. Implement user profile (A recuriter can see only his/her jobs))
+6. Continerize spring Boot
+7. Upload in render.
+8. Integrate with Domain
+
+Good To have feature before onboarding recuriter
+-----
+1. Add/Remove Jobs + candidates
+2. Restrict Number of Job to 3 and candidate 10 per job
+3. Fix the pipeline and Risk Summary on dashboard
+4. On the create job Extracted Skills Preview section shoule be populated
 5. CV upload option
 6. Cadidate report export option ("Do you want to download with question or separately",1 or 2 PDF )
-7. Implement user registration - Name, email, Org
+7. Clicking a job from dashboard or all job should take to create job page populating from DB
 8. Implement logging
-9. Implement user profile (A recuriter can see only his/her jobs))
-10. Continerize spring Boot
-11. Upload in render.
-12. Setup the subcription logic
-13. Payment gateway integration
-14. Integrate with Domain
+
+
+Recuriter onboarding can happen at this stage:
+-----
+1. Setup the subcription logic
+2. Payment gateway integration
+3. Integrate with Domain

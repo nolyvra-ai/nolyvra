@@ -32,6 +32,7 @@ public class JobService {
                 rs.getString("job_type"),
                 null, // seniority not stored yet
                 rs.getString("jd_text"),
+                rs.getString("location"),
                 List.of(), // stackTags not stored yet
                 created != null ? created.toInstant() : null);
     };
@@ -41,14 +42,15 @@ public class JobService {
         String id = "job-" + UUID.randomUUID();
 
         jdbc.update("""
-                insert into jobs (id, title, company, job_type, jd_text)
-                values (?, ?, ?, ?, ?)
+                insert into jobs (id, title, company, job_type, jd_text, location)
+                values (?, ?, ?, ?, ?, ?)
                 """,
                 id,
                 req.title(),
                 req.company(),
                 req.jobType(),
-                req.jdText());
+                req.jdText(),
+                req.location());
 
         return new JobResponse(
                 id,
@@ -57,13 +59,14 @@ public class JobService {
                 req.jobType(),
                 req.seniority(),
                 req.jdText(),
+                req.location(),
                 req.stackTags() != null ? req.stackTags() : List.of(),
                 Instant.now());
     }
 
     public List<JobResponse> listJobs() {
         return jdbc.query("""
-                select id, title, company, job_type, jd_text, created_at
+                select id, title, company, job_type, jd_text, created_at, location
                 from jobs
                 order by created_at desc
                 """, JOB_MAPPER);

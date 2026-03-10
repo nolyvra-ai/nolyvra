@@ -10,6 +10,7 @@ public record JobResponse(
     String jobType,
     String seniority,
     String jdText,
+    String location,
     List<String> stackTags,
     Instant createdAt
 ) {}

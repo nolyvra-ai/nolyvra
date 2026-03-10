@@ -10,6 +10,8 @@ docker ps
 
 docker exec -it depthhire-postgres psql -U depthhire -d depthhire
 
+For a client view download : https://dbeaver.io/download/
+
 ##SQL Scripts##
 -- JOBS
 create table if not exists jobs (
@@ -129,4 +131,21 @@ values
      "notes":"Needs validation of hands-on involvement."
    }'::jsonb
 );
-For a client view download : https://dbeaver.io/download/
+####Addtional Updates
+
+delete from jobs where id='job-4cb0681f-5e68-4265-8b06-86db4e55890a';
+
+ALTER TABLE analyses
+ADD COLUMN candidate_name text;
+
+UPDATE analyses a
+SET candidate_name = c.name
+FROM candidates c
+WHERE c.id = a.candidate_id;
+
+
+ALTER TABLE jobs
+ADD COLUMN location text;
+
+update jobs j set location = 'Sydney'
+where j.id not in ('job-1','job-2','job-3');

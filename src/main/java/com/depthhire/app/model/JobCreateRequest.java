@@ -9,5 +9,6 @@ public record JobCreateRequest(
     @NotBlank String jobType,     // Remote/Hybrid/Onsite etc
     String seniority,
     @NotBlank String jdText,
+    String location,
     List<String> stackTags
 ) {}
