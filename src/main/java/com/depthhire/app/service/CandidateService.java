@@ -32,16 +32,17 @@ public class CandidateService {
                 odt != null ? odt.toInstant() : null);
     };
 
-    public CandidateResponse addCandidate(String jobId, CandidateCreateRequest req) {
+    public CandidateResponse addCandidate(String jobId, CandidateCreateRequest req, String loginId) {
 
         String id = "cand-" + UUID.randomUUID();
 
         jdbc.update("""
-                insert into candidates (id, job_id, name, email, linkedin_url, cv_text)
-                values (?, ?, ?, ?, ?, ?)
+                insert into candidates (id, job_id, job_id, name, email, linkedin_url, cv_text)
+                values (?, ?, ?, ?, ?, ?, ?)
                 """,
                 id,
                 jobId,
+                loginId,
                 req.name(),
                 req.email(),
                 req.linkedinUrl(),
@@ -56,25 +57,27 @@ public class CandidateService {
                 Instant.now());
     }
 
-    public Optional<CandidateResponse> getCandidate(String candidateId) {
+    public Optional<CandidateResponse> getCandidate(String candidateId, String loginId) {
         List<CandidateResponse> rows = jdbc.query("""
                 select id, job_id, name, email, linkedin_url, created_at
                 from candidates
                 where id = ?
-                """, CANDIDATE_MAPPER, candidateId);
+                and login_id = ?
+                """, CANDIDATE_MAPPER, candidateId, loginId);
 
         return rows.stream().findFirst();
     }
 
-    public List<CandidateResponse> getCandidatesByJob(String jobId) {
+    public List<CandidateResponse> getCandidatesByJob(String jobId, String loginId ) {
 
         return jdbc.query("""
                 select id, job_id, name, email, linkedin_url, created_at
                 from candidates
                 where job_id = ?
+                and login_id = ?
                 order by created_at desc
                 """,
                 CANDIDATE_MAPPER,
-                jobId);
+                jobId, loginId);
     }
 }

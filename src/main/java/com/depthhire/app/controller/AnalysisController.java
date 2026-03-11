@@ -23,11 +23,11 @@ public class AnalysisController {
   }
 
   @PostMapping("/candidates/{candidateId}/analyze")
-  public CandidateAnalysisResponse analyze(@PathVariable String candidateId) {
+  public CandidateAnalysisResponse analyze(@PathVariable String candidateId, @RequestParam String loginId) {
 
     String jobId = analysisService.getJobIdForCandidate(candidateId);
 
-    return analysisService.analyze(candidateId, jobId);
+    return analysisService.analyze(candidateId, jobId,loginId);
   }
 
   /*
@@ -42,8 +42,8 @@ public class AnalysisController {
    */
 
   @GetMapping("/analyses/recent")
-  public List<AnalysisResponse> getRecentAnalyses() {
-    return analysisService.getAnalysesFromDb();
+  public List<AnalysisResponse> getRecentAnalyses(@RequestParam String loginId) {
+    return analysisService.getAnalysesFromDb(loginId);
   }
 
 }

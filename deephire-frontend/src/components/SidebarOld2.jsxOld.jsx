@@ -109,7 +109,6 @@ function Section({ label, children }) {
 
 // ─── Main sidebar ─────────────────────────────────────────────────────────────
 export default function Sidebar() {
-  const loginId = localStorage.getItem("name") || "";
   return (
     <Drawer
       variant="permanent"
@@ -230,14 +229,14 @@ export default function Sidebar() {
               flexShrink: 0,
             }}
           >
-            {loginId.slice(0, 2).toUpperCase()}
+            SR
           </Box>
           <Box>
             <Box sx={{ color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 500, lineHeight: 1.3 }}>
-              {loginId}
+              Sarah Reynolds
             </Box>
             <Box sx={{ color: "rgba(255,255,255,0.3)", fontSize: 10, lineHeight: 1.3 }}>
-              Recruiter
+              Senior Recruiter
             </Box>
           </Box>
         </Box>

@@ -101,7 +101,7 @@ public class AnalysisService {
         }
 
         public CandidateAnalysisResponse analyze(String candidateId,
-                        String jobId) {
+                        String jobId, String loginId) {
 
                 String jdText = loadJobDescriptionFromDb(jobId);
                 String cvText = loadCvTextFromDb(candidateId);
@@ -192,7 +192,7 @@ public class AnalysisService {
                                         ai.suggestedQuestions(),
                                         ai.riskFlags(),
                                         ai.recommendation());
-                        persistAnalysisToDb(response);
+                        persistAnalysisToDb(response,loginId);
                         cache.put(candidateId, response);
                         return response;
 
@@ -220,7 +220,7 @@ public class AnalysisService {
                         String recommendation) {
         }
 
-        private void persistAnalysisToDb(CandidateAnalysisResponse response) {
+        private void persistAnalysisToDb(CandidateAnalysisResponse response, String loginId) {
                 try {
                         // store full response as JSONB
                         String analysisJson = objectMapper.writeValueAsString(response);
@@ -243,6 +243,7 @@ public class AnalysisService {
                                         insert into analyses (
                                           candidate_id,
                                           job_id,
+                                          login_id,
                                           analyzed_at,
                                           consistency_score,
                                           capability_score,
@@ -250,10 +251,11 @@ public class AnalysisService {
                                           timeline_match_percent,
                                           analysis_json
                                         )
-                                        values (?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+                                        values (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
                                         """,
                                         response.candidateId(),
                                         response.jobId(),
+                                        loginId,
                                         analyzedAt,
                                         consistencyScore,
                                         capabilityScore,
@@ -292,7 +294,7 @@ public class AnalysisService {
                                 (Integer) rs.getObject("timeline_match_percent"));
         };
 
-        public List<AnalysisResponse> getAnalysesFromDb() {
+        public List<AnalysisResponse> getAnalysesFromDb(String loginId) {
 
                 return jdbc.query("""
                                 select
@@ -306,9 +308,10 @@ public class AnalysisService {
                                   risk_level,
                                   timeline_match_percent
                                 from analyses
+                                where login_id = ?
                                 order by analyzed_at desc
                                 limit 5
                                 """,
-                                ANALYSIS_MAPPER);
+                                ANALYSIS_MAPPER,loginId );
         }
 }

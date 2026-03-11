@@ -2,18 +2,18 @@ import { Box } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
 
 // ─── Style tokens ─────────────────────────────────────────────────────────────
-const BG = "#0F1623";
-const ACCENT = "#1D72E8";
-const BORDER = "rgba(255,255,255,0.05)";
+const BG      = "#0F1623";
+const ACCENT  = "#1D72E8";
+const BORDER  = "rgba(255,255,255,0.05)";
 
 // ─── Page pill definitions ────────────────────────────────────────────────────
 const PILLS = [
-  { num: "①", label: "Dashboard", to: "/dashboard" },
-  { num: "②", label: "Jobs List", to: "/jobs" },
-  { num: "③", label: "Create Job", to: "/jobs/new" },
-  { num: "④", label: "Candidates List", to: "/candidates" },
-  { num: "⑤", label: "Add Candidate", to: "/candidates/new" },
-  { num: "⑥", label: "Analysis Result", to: null }, // no direct route
+  { num: "①", label: "Dashboard",       to: "/dashboard"       },
+  { num: "②", label: "Jobs List",        to: "/jobs"            },
+  { num: "③", label: "Create Job",       to: "/jobs/new"        },
+  { num: "④", label: "Candidates List",  to: "/candidates"      },
+  { num: "⑤", label: "Add Candidate",    to: "/candidates/new"  },
+  { num: "⑥", label: "Analysis Result",  to: null               }, // no direct route
 ];
 
 // ─── Single pill ──────────────────────────────────────────────────────────────
@@ -60,21 +60,14 @@ function Arrow() {
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function TopBar() {
   const { pathname } = useLocation();
-  const nav = useNavigate();
-  const loginId = localStorage.getItem("name") || "";
-
-  function handleLogout() {
-    localStorage.removeItem("loginId");
-    nav("/login");
-  }
 
   // Determine which pill is active based on current route
   function isActive(pill) {
     if (!pill.to) return pathname.includes("/analysis");
     if (pill.to === "/dashboard") return pathname === "/" || pathname === "/dashboard";
-    if (pill.to === "/jobs") return pathname === "/jobs";
-    if (pill.to === "/jobs/new") return pathname === "/jobs/new";
-    if (pill.to === "/candidates") return pathname === "/candidates";
+    if (pill.to === "/jobs")      return pathname === "/jobs";
+    if (pill.to === "/jobs/new")  return pathname === "/jobs/new";
+    if (pill.to === "/candidates")     return pathname === "/candidates";
     if (pill.to === "/candidates/new") return pathname === "/candidates/new";
     return pathname.startsWith(pill.to);
   }
@@ -181,41 +174,10 @@ export default function TopBar() {
         </Box>
       ))}
 
-      {/* ── Logout button ────────────────────────────────────────────── */}
-      <Box
-        onClick={handleLogout}
-        sx={{
-          ml: "auto",
-          display: "flex",
-          alignItems: "center",
-          gap: "6px",
-          px: "12px",
-          py: "4px",
-          borderRadius: "20px",
-          border: `1px solid ${ACCENT}`,
-          color: ACCENT,
-          fontSize: 11,
-          fontWeight: 500,
-          cursor: "pointer",
-          userSelect: "none",
-          flexShrink: 0,
-          transition: "all .15s",
-          "&:hover": {
-            borderColor: "#3D8EFF",
-            color: "#3D8EFF",
-          },
-        }}
-      >
-        <Box component="span" sx={{ color: "rgba(255,255,255,0.25)", mr: "4px" }}>
-          {loginId}
-        </Box>
-        ⎋ Logout
-      </Box>
-
       {/* ── Hint (right-aligned) ─────────────────────────────────────── */}
       <Box
         sx={{
-          ml: 2,
+          ml: "auto",
           fontSize: 10,
           color: "rgba(255,255,255,0.2)",
           whiteSpace: "nowrap",

@@ -20,20 +20,20 @@ public class CandidatesController {
   }
 
   @PostMapping("/jobs/{jobId}/candidates")
-  public CandidateResponse addCandidate(@PathVariable String jobId,
+  public CandidateResponse addCandidate(@PathVariable String jobId, @RequestParam String loginId,
       @Valid @RequestBody CandidateCreateRequest req) {
-    return candidateService.addCandidate(jobId, req);
+    return candidateService.addCandidate(jobId, req,loginId);
   }
 
   @GetMapping("/candidates/{candidateId}")
-  public CandidateResponse getCandidate(@PathVariable String candidateId) {
-    return candidateService.getCandidate(candidateId)
+  public CandidateResponse getCandidate(@PathVariable String candidateId, @RequestParam String loginId) {
+    return candidateService.getCandidate(candidateId,loginId)
         .orElseThrow(() -> new IllegalArgumentException("Candidate not found: " + candidateId));
   }
 
   @GetMapping("/jobs/{jobId}/candidates")
-  public List<CandidateResponse> getCandidatesByJob(@PathVariable String jobId) {
-    return candidateService.getCandidatesByJob(jobId);
+  public List<CandidateResponse> getCandidatesByJob(@PathVariable String jobId, @RequestParam String loginId) {
+    return candidateService.getCandidatesByJob(jobId,loginId);
   }
 
 }

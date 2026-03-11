@@ -149,3 +149,88 @@ ADD COLUMN location text;
 
 update jobs j set location = 'Sydney'
 where j.id not in ('job-1','job-2','job-3');
+
+################## Login Starts ################### 
+
+create table if not exists login (
+  id text primary key,
+  name text not null,
+  company text,
+  email text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+insert into login (id, name, company, email)
+values
+('id1', 'Sayan B', 'GW Ventures', 'sayan@deephire-ai.com');
+
+alter table login
+add column if not exists password_hash text;
+
+alter table login
+add constraint login_email_unique unique (email);
+
+alter table jobs
+add column if not exists login_id text;
+
+alter table candidates
+add column if not exists login_id text;
+
+alter table jobs
+add constraint jobs_login_id_fkey
+foreign key (login_id) references login(id) on delete cascade;
+
+alter table candidates
+add constraint candidates_login_id_fkey
+foreign key (login_id) references login(id) on delete cascade;
+
+create index if not exists idx_jobs_login_id on jobs(login_id);
+create index if not exists idx_candidates_login_id on candidates(login_id);
+create index if not exists idx_login_email on login(email);
+
+update jobs
+set login_id = 'id1'
+where login_id is null;
+
+update candidates
+set login_id = 'id1'
+where login_id is null;
+
+alter table jobs
+alter column login_id set not null;
+
+alter table candidates
+alter column login_id set not null;
+
+alter table analyses
+add column if not exists login_id text;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'analyses_login_id_fkey'
+  ) then
+    alter table analyses
+    add constraint analyses_login_id_fkey
+    foreign key (login_id) references login(id) on delete cascade;
+  end if;
+end $$;
+
+create index if not exists idx_analyses_login_id on analyses(login_id);
+
+update analyses a
+set login_id = c.login_id
+from candidates c
+where a.candidate_id = c.id
+  and a.login_id is null;
+
+alter table analyses
+alter column login_id set not null;
+
+Using SHA-256 encryption (Actual password 123456)
+update login
+set password_hash = '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92'
+where id = 'id1';

@@ -19,18 +19,18 @@ public class JobsController {
   }
 
   @PostMapping
-  public JobResponse createJob(@Valid @RequestBody JobCreateRequest req) {
-    return jobService.createJob(req);
+  public JobResponse createJob(@Valid @RequestBody JobCreateRequest req, @RequestParam String loginId) {
+    return jobService.createJob(req, loginId);
   }
 
   @GetMapping
-  public List<JobResponse> listJobs() {
-    return jobService.listJobs();
+  public List<JobResponse> listJobs(@RequestParam String loginId) {
+    return jobService.listJobs(loginId);
   }
 
   @GetMapping("/{jobId}")
-  public JobResponse getJob(@PathVariable String jobId) {
-    return jobService.getJob(jobId)
+  public JobResponse getJob(@PathVariable String jobId, @RequestParam String loginId) {
+    return jobService.getJob(jobId, loginId)
         .orElseThrow(() -> new IllegalArgumentException("Job not found: " + jobId));
   }
 }

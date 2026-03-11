@@ -22,7 +22,10 @@ import { useNavigate } from "react-router-dom";
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
 async function apiGet(path) {
-  const res = await fetch(`${API_BASE}${path}`);
+  const loginId = localStorage.getItem("loginId") || "";
+  const url = new URL(`${API_BASE}${path}`);
+  url.searchParams.set("loginId", loginId);
+  const res = await fetch(url.toString());
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`${res.status} ${res.statusText} - ${text}`);

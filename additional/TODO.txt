@@ -1,22 +1,23 @@
 1. Integration with dB (Done) Next -> create ServiceImpl and DAO. Remove direct service call from controller.
 2. Remove all the static reference from UI -> DB (Analysis page pending)
 3. Fix the UI to match with wireframe (Analysis page pending)
-4. Implement user registration - Name, email, Org
-5. Implement user profile (A recuriter can see only his/her jobs))
+4. Implement user login (Done)
+5. Implement user profile (A recuriter can see only his/her jobs)) (Done)
 6. Continerize spring Boot
 7. Upload in render.
 8. Integrate with Domain
 
 Good To have feature before onboarding recuriter
 -----
-1. Add/Remove Jobs + candidates
-2. Restrict Number of Job to 3 and candidate 10 per job
+1. Add/Remove Jobs + candidates - Xingyu
+2. Restrict Number of Job to 3 and candidate 10 per job - Xingyu
 3. Fix the pipeline and Risk Summary on dashboard
 4. On the create job Extracted Skills Preview section shoule be populated
-5. CV upload option
-6. Cadidate report export option ("Do you want to download with question or separately",1 or 2 PDF )
-7. Clicking a job from dashboard or all job should take to create job page populating from DB
-8. Implement logging
+5. CV upload option - Xingyu
+6. Cadidate report export option ("Do you want to download with question or separately",1 or 2 PDF ) - Xingyu
+7. Clicking a job from dashboard or all job should take to create job page populating from DB - Xingyu 
+8. In the settings keep a update password option
+9. A loading popup when analysis button is pressed - Xingyu
 
 
 Recuriter onboarding can happen at this stage:
@@ -24,3 +25,5 @@ Recuriter onboarding can happen at this stage:
 1. Setup the subcription logic
 2. Payment gateway integration
 3. Integrate with Domain
+4. Implement user registration - Name, email, Org(Future State/Currently only onboarded from backend)
+5. Implement logging

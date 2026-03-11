@@ -37,7 +37,7 @@ public class JobService {
                 created != null ? created.toInstant() : null);
     };
 
-    public JobResponse createJob(JobCreateRequest req) {
+    public JobResponse createJob(JobCreateRequest req, String loginId) {
 
         String id = "job-" + UUID.randomUUID();
 
@@ -50,7 +50,8 @@ public class JobService {
                 req.company(),
                 req.jobType(),
                 req.jdText(),
-                req.location());
+                req.location(),
+                loginId);
 
         return new JobResponse(
                 id,
@@ -64,21 +65,23 @@ public class JobService {
                 Instant.now());
     }
 
-    public List<JobResponse> listJobs() {
+    public List<JobResponse> listJobs(String loginId) {
         return jdbc.query("""
                 select id, title, company, job_type, jd_text, created_at, location
                 from jobs
+                where login_id = ?
                 order by created_at desc
-                """, JOB_MAPPER);
+                """, JOB_MAPPER, loginId);
     }
 
-    public Optional<JobResponse> getJob(String jobId) {
+    public Optional<JobResponse> getJob(String jobId, String loginId) {
 
         List<JobResponse> rows = jdbc.query("""
                 select id, title, company, job_type, jd_text, created_at
                 from jobs
                 where id = ?
-                """, JOB_MAPPER, jobId);
+                and login_id = ?
+                """, JOB_MAPPER, jobId, loginId);
 
         return rows.stream().findFirst();
     }
