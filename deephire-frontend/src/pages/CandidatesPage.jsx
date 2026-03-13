@@ -21,7 +21,7 @@ import { useNavigate } from "react-router-dom";
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
 async function apiGet(path) {
-  
+
   const loginId = localStorage.getItem("loginId") || "";
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
@@ -34,31 +34,31 @@ async function apiGet(path) {
 }
 
 // ─── Style tokens ─────────────────────────────────────────────────────────────
-const BORDER      = "#E8ECF2";
-const MUTED       = "#9AA3B4";
-const TEXT        = "#0F1623";
-const ACCENT      = "#1D72E8";
-const SUCCESS     = "#16A34A";
-const SUCCESS_BG  = "#F0FDF4";
-const SUCCESS_BR  = "#BBF7D0";
-const WARN        = "#D97706";
-const WARN_BG     = "#FFFBEB";
-const WARN_BR     = "#FDE68A";
-const DANGER      = "#DC2626";
-const DANGER_BG   = "#FEF2F2";
-const DANGER_BR   = "#FECACA";
-const NEUTRAL_BG  = "#F1F3F7";
-const ACCENT_BG   = "#EBF2FF";
-const ACCENT_BR   = "#BFDBFE";
-const SURFACE     = "#FAFBFD";
+const BORDER = "#E8ECF2";
+const MUTED = "#9AA3B4";
+const TEXT = "#0F1623";
+const ACCENT = "#1D72E8";
+const SUCCESS = "#16A34A";
+const SUCCESS_BG = "#F0FDF4";
+const SUCCESS_BR = "#BBF7D0";
+const WARN = "#D97706";
+const WARN_BG = "#FFFBEB";
+const WARN_BR = "#FDE68A";
+const DANGER = "#DC2626";
+const DANGER_BG = "#FEF2F2";
+const DANGER_BR = "#FECACA";
+const NEUTRAL_BG = "#F1F3F7";
+const ACCENT_BG = "#EBF2FF";
+const ACCENT_BR = "#BFDBFE";
+const SURFACE = "#FAFBFD";
 
 // ─── Risk badge ───────────────────────────────────────────────────────────────
 function RiskBadge({ risk }) {
   const cfg = {
-    High:    { bg: DANGER_BG,  border: DANGER_BR,  color: DANGER,  label: "High"    },
-    Medium:  { bg: WARN_BG,    border: WARN_BR,    color: WARN,    label: "Medium"  },
-    Low:     { bg: ACCENT_BG,  border: ACCENT_BR,  color: ACCENT,  label: "Low"     },
-    default: { bg: NEUTRAL_BG, border: BORDER,     color: MUTED,   label: risk || "—" },
+    High: { bg: DANGER_BG, border: DANGER_BR, color: DANGER, label: "High" },
+    Medium: { bg: WARN_BG, border: WARN_BR, color: WARN, label: "Medium" },
+    Low: { bg: ACCENT_BG, border: ACCENT_BR, color: ACCENT, label: "Low" },
+    default: { bg: NEUTRAL_BG, border: BORDER, color: MUTED, label: risk || "—" },
   };
   const s = cfg[risk] ?? cfg.default;
   return (
@@ -96,12 +96,12 @@ function RiskBadge({ risk }) {
 function StatusBadge({ status }) {
   const cfg = {
     Approved: { bg: SUCCESS_BG, border: SUCCESS_BR, color: SUCCESS },
-    Review:   { bg: WARN_BG,    border: WARN_BR,    color: WARN    },
-    Flagged:  { bg: DANGER_BG,  border: DANGER_BR,  color: DANGER  },
-    "Not Run":{ bg: ACCENT_BG,  border: ACCENT_BR,  color: ACCENT  },
-    Pending:  { bg: NEUTRAL_BG, border: BORDER,     color: MUTED   },
+    Review: { bg: WARN_BG, border: WARN_BR, color: WARN },
+    Flagged: { bg: DANGER_BG, border: DANGER_BR, color: DANGER },
+    "Not Run": { bg: ACCENT_BG, border: ACCENT_BR, color: ACCENT },
+    Pending: { bg: NEUTRAL_BG, border: BORDER, color: MUTED },
     Analysed: { bg: SUCCESS_BG, border: SUCCESS_BR, color: SUCCESS },
-    default:  { bg: NEUTRAL_BG, border: BORDER,     color: MUTED   },
+    default: { bg: NEUTRAL_BG, border: BORDER, color: MUTED },
   };
   const s = cfg[status] ?? cfg.default;
   return (
@@ -128,7 +128,7 @@ function StatusBadge({ status }) {
 // ─── Mini score bar ───────────────────────────────────────────────────────────
 function ScoreBar({ value }) {
   if (value == null) return <Typography sx={{ fontSize: 12, color: MUTED }}>—</Typography>;
-  const pct   = Math.min(100, Math.max(0, value));
+  const pct = Math.min(100, Math.max(0, value));
   const color = pct >= 80 ? SUCCESS : pct >= 60 ? WARN : DANGER;
   return (
     <Box>
@@ -181,9 +181,9 @@ function RiskFlagCell({ risk, flagCount }) {
     );
   }
   const cfg = {
-    High:   { bg: DANGER_BG, border: DANGER_BR, color: DANGER },
-    Medium: { bg: WARN_BG,   border: WARN_BR,   color: WARN   },
-    Low:    { bg: ACCENT_BG, border: ACCENT_BR, color: ACCENT },
+    High: { bg: DANGER_BG, border: DANGER_BR, color: DANGER },
+    Medium: { bg: WARN_BG, border: WARN_BR, color: WARN },
+    Low: { bg: ACCENT_BG, border: ACCENT_BR, color: ACCENT },
   };
   const s = cfg[risk] ?? cfg[NEUTRAL_BG];
   const label = flagCount ? `${flagCount} ${risk}` : risk;
@@ -253,10 +253,10 @@ const thSx = {
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function CandidatesPage() {
   const nav = useNavigate();
-  const [jobs, setJobs]             = useState([]);
+  const [jobs, setJobs] = useState([]);
   const [candidates, setCandidates] = useState([]);
-  const [search, setSearch]         = useState("");
-  const [jobFilter, setJobFilter]   = useState("all");
+  const [search, setSearch] = useState("");
+  const [jobFilter, setJobFilter] = useState("all");
   const [riskFilter, setRiskFilter] = useState("All");
 
   // ── Data loading (unchanged) ─────────────────────────────────────────────
@@ -276,9 +276,9 @@ export default function CandidatesPage() {
                 allCandidates.push({
                   ...c,
                   jobTitle: job.title,
-                  consistencyScore: analysis?.scores?.consistencyScore ?? null,
-                  capabilityScore: analysis?.scores?.capabilityScore ?? null,
-                  risk: analysis?.scores?.riskLevel ?? null,
+                  consistencyScore: analysis?.consistencyScore ?? null,
+                  capabilityScore: analysis?.capabilityScore ?? null,
+                  risk: analysis?.riskLevel ?? null,
                   status: "Analysed",
                 });
               } catch {
@@ -306,10 +306,10 @@ export default function CandidatesPage() {
 
   // ── Derived filter counts ────────────────────────────────────────────────
   const counts = {
-    All:    candidates.length,
-    High:   candidates.filter((c) => c.risk === "High").length,
+    All: candidates.length,
+    High: candidates.filter((c) => c.risk === "High").length,
     Medium: candidates.filter((c) => c.risk === "Medium").length,
-    Low:    candidates.filter((c) => c.risk === "Low").length,
+    Low: candidates.filter((c) => c.risk === "Low").length,
   };
 
   // ── Filtered rows ────────────────────────────────────────────────────────
@@ -317,11 +317,29 @@ export default function CandidatesPage() {
     const matchSearch = !search
       || (c.name ?? "").toLowerCase().includes(search.toLowerCase())
       || (c.email ?? "").toLowerCase().includes(search.toLowerCase());
-    const matchJob  = jobFilter === "all" || c.jobId === jobFilter;
+    const matchJob = jobFilter === "all" || c.jobId === jobFilter;
     const matchRisk = riskFilter === "All" || c.risk === riskFilter;
     return matchSearch && matchJob && matchRisk;
   });
 
+  async function handleRunAnalysis(candidateId) {
+    const loginId = localStorage.getItem("loginId") || "";
+    console.log("candidateId = " + candidateId);
+    const url = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
+    url.searchParams.set("loginId", loginId);
+
+    try {
+      await fetch(url.toString(), { method: "POST" });
+      // Refresh candidates list after analysis triggered
+      setCandidates(prev =>
+        prev.map(c =>
+          c.id === candidateId ? { ...c, status: "Analysed" } : c
+        )
+      );
+    } catch (e) {
+      console.error("Failed to run analysis", e);
+    }
+  }
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <Box
@@ -475,8 +493,8 @@ export default function CandidatesPage() {
                 <TableCell sx={{ ...thSx, textAlign: "center" }}>Consistency Score</TableCell>
                 <TableCell sx={{ ...thSx, textAlign: "center" }}>Capability Match</TableCell>
                 <TableCell sx={thSx}>Risk Flags</TableCell>
-                <TableCell sx={thSx}>Status</TableCell>
-                <TableCell sx={thSx}>Analysed</TableCell>
+                <TableCell sx={{ ...thSx, textAlign: "center" }}>Status</TableCell>
+                {/*<TableCell sx={thSx}>Analysed</TableCell>*/}
                 <TableCell sx={{ ...thSx, textAlign: "right" }}></TableCell>
               </TableRow>
             </TableHead>
@@ -545,12 +563,12 @@ export default function CandidatesPage() {
                     </TableCell>
 
                     {/* Status */}
-                    <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
+                    <TableCell sx={{ py: 1.5, px: 2, textAlign: "center", borderBottom: `1px solid ${BORDER}` }}>
                       <StatusBadge status={c.status} />
                     </TableCell>
 
                     {/* Analysed date */}
-                    <TableCell
+                    {/*  <TableCell
                       sx={{
                         py: 1.5,
                         px: 2,
@@ -567,7 +585,7 @@ export default function CandidatesPage() {
                             year: "numeric",
                           })
                         : "—"}
-                    </TableCell>
+                    </TableCell> */}
 
                     {/* Action button */}
                     <TableCell
@@ -578,7 +596,7 @@ export default function CandidatesPage() {
                         size="small"
                         variant="contained"
                         className="row-action"
-                        onClick={() => nav(`/analysis/${c.id}`)}
+                        onClick={() => c.status === "Analysed" ? nav(`/analysis/${c.id}`) : handleRunAnalysis(c.id)}
                         sx={{
                           fontSize: 11,
                           fontWeight: 500,
@@ -603,9 +621,9 @@ export default function CandidatesPage() {
         {/* Annotation strip */}
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
           {[
-            "⚡ GET /api/candidates?jobId=&riskLevel=",
-            "📊 MUI Table (sortable, filterable)",
-            "🔍 Filter by job or risk level via query params",
+            "copyright@ DeepHire",
+            "A product of Golden Wattle Ventures Pvt Ltd",
+            "This AI tool is designed to assist you, not replace professional judgment. Always consult with a qualified expert.",
           ].map((label) => (
             <Chip
               key={label}

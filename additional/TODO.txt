@@ -18,6 +18,7 @@ Good To have feature before onboarding recuriter
 7. Clicking a job from dashboard or all job should take to create job page populating from DB - Xingyu 
 8. In the settings keep a update password option
 9. A loading popup when analysis button is pressed - Xingyu
+10. If Analysis result already exist return that else call the analysis method
 
 
 Recuriter onboarding can happen at this stage:

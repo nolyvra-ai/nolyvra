@@ -25,21 +25,34 @@ public class AnalysisController {
   @PostMapping("/candidates/{candidateId}/analyze")
   public CandidateAnalysisResponse analyze(@PathVariable String candidateId, @RequestParam String loginId) {
 
-    String jobId = analysisService.getJobIdForCandidate(candidateId);
+    CandidateResponse candidateResponse = analysisService.getJobIdNameForCandidate(candidateId);
 
-    return analysisService.analyze(candidateId, jobId,loginId);
+    return analysisService.analyze(candidateId, candidateResponse,loginId);
   }
 
-  /*
-   * @GetMapping("/candidates/{candidateId}/analysis")
-   * public CandidateAnalysisResponse getAnalysis(@PathVariable String
-   * candidateId) {
-   * 
-   * return analysisService.getAnalysisFromDb(candidateId)
-   * .orElseThrow(() -> new IllegalArgumentException(
-   * "No analysis found for candidate: " + candidateId));
-   * }
-   */
+  
+    @GetMapping("/candidates/{candidateId}/analysis")
+    public AnalysisResponse getAnalysis(@PathVariable String
+    candidateId) {
+    
+      System.out.println("Inside AnalysisResponse: candidateId: " + candidateId);
+      List<AnalysisResponse> analysisResponse = analysisService.getAnalysisForCandidate(candidateId);
+      if(!analysisResponse.isEmpty()){
+        System.out.println("The response is " + analysisResponse);
+        return analysisResponse.get(0);
+      }
+      System.out.println("Not Null value");
+      return null;
+    }
+
+    @GetMapping("/candidates/{candidateId}/aianalysis")
+    public CandidateAnalysisResponse getAIAnalysis(@PathVariable String
+    candidateId) {
+    
+      System.out.println("Inside AIAnalysisResponse: candidateId: " + candidateId);
+      return analysisService.getAIAnalysisForCandidate(candidateId);
+    }
+ 
 
   @GetMapping("/analyses/recent")
   public List<AnalysisResponse> getRecentAnalyses(@RequestParam String loginId) {

@@ -2,6 +2,7 @@ package com.depthhire.app.model;
 
 import java.time.Instant;
 
+
 public record CandidateResponse(
     String id,
     String jobId,

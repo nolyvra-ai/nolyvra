@@ -34,23 +34,23 @@ async function apiGet(path) {
 }
 
 // ─── Style tokens ─────────────────────────────────────────────────────────────
-const BORDER     = "#E8ECF2";
-const MUTED      = "#9AA3B4";
-const TEXT       = "#0F1623";
-const ACCENT     = "#1D72E8";
-const SUCCESS    = "#16A34A";
+const BORDER = "#E8ECF2";
+const MUTED = "#9AA3B4";
+const TEXT = "#0F1623";
+const ACCENT = "#1D72E8";
+const SUCCESS = "#16A34A";
 const SUCCESS_BG = "#F0FDF4";
 const SUCCESS_BR = "#BBF7D0";
-const WARN       = "#D97706";
-const WARN_BG    = "#FFFBEB";
-const WARN_BR    = "#FDE68A";
-const DANGER     = "#DC2626";
-const DANGER_BG  = "#FEF2F2";
-const DANGER_BR  = "#FECACA";
-const ACCENT_BG  = "#EBF2FF";
-const ACCENT_BR  = "#BFDBFE";
+const WARN = "#D97706";
+const WARN_BG = "#FFFBEB";
+const WARN_BR = "#FDE68A";
+const DANGER = "#DC2626";
+const DANGER_BG = "#FEF2F2";
+const DANGER_BR = "#FECACA";
+const ACCENT_BG = "#EBF2FF";
+const ACCENT_BR = "#BFDBFE";
 const NEUTRAL_BG = "#F1F3F7";
-const SURFACE    = "#FAFBFD";
+const SURFACE = "#FAFBFD";
 const SELECTED_BG = "#EBF2FF";
 
 // ─── Shared header cell style ────────────────────────────────────────────────
@@ -71,10 +71,10 @@ const thSx = {
 function Badge({ label, variant = "neutral" }) {
   const styles = {
     success: { bg: SUCCESS_BG, border: SUCCESS_BR, color: SUCCESS },
-    warning: { bg: WARN_BG,    border: WARN_BR,    color: WARN    },
-    danger:  { bg: DANGER_BG,  border: DANGER_BR,  color: DANGER  },
-    accent:  { bg: ACCENT_BG,  border: ACCENT_BR,  color: ACCENT  },
-    neutral: { bg: NEUTRAL_BG, border: BORDER,     color: MUTED   },
+    warning: { bg: WARN_BG, border: WARN_BR, color: WARN },
+    danger: { bg: DANGER_BG, border: DANGER_BR, color: DANGER },
+    accent: { bg: ACCENT_BG, border: ACCENT_BR, color: ACCENT },
+    neutral: { bg: NEUTRAL_BG, border: BORDER, color: MUTED },
   };
   const s = styles[variant] ?? styles.neutral;
   return (
@@ -101,13 +101,13 @@ function Badge({ label, variant = "neutral" }) {
 // ─── Status badge helper ─────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const map = {
-    Active:   "success",
+    Active: "success",
     Approved: "success",
-    Review:   "warning",
-    Draft:    "warning",
-    Flagged:  "danger",
-    "Not Run":"accent",
-    Pending:  "neutral",
+    Review: "warning",
+    Draft: "warning",
+    Flagged: "danger",
+    "Not Run": "accent",
+    Pending: "neutral",
     Analysed: "success",
   };
   return <Badge label={status || "Pending"} variant={map[status] ?? "neutral"} />;
@@ -122,7 +122,7 @@ function RiskBadge({ risk }) {
 // ─── Mini score bar ───────────────────────────────────────────────────────────
 function ScoreBar({ value }) {
   if (value == null) return <Typography sx={{ fontSize: 12, color: MUTED }}>—</Typography>;
-  const pct   = Math.min(100, Math.max(0, value));
+  const pct = Math.min(100, Math.max(0, value));
   const color = pct >= 80 ? SUCCESS : pct >= 60 ? WARN : DANGER;
   return (
     <Box>
@@ -169,7 +169,7 @@ function AvgMatch({ value }) {
 }
 
 // ─── Candidate sub-table (shown in the panel below jobs table) ───────────────
-function CandidateSubTable({ candidates, jobTitle }) {
+function CandidateSubTable({ candidates, jobTitle, onRunAnalysis }) {
   const nav = useNavigate();
   if (candidates.length === 0) {
     return (
@@ -189,8 +189,8 @@ function CandidateSubTable({ candidates, jobTitle }) {
           <TableCell sx={{ ...thSx, textAlign: "center" }}>Consistency Score</TableCell>
           <TableCell sx={{ ...thSx, textAlign: "center" }}>Capability Match</TableCell>
           <TableCell sx={thSx}>Risk Flags</TableCell>
-          <TableCell sx={thSx}>Status</TableCell>
-          <TableCell sx={thSx}>Analysed</TableCell>
+          <TableCell sx={{ ...thSx, textAlign: "center" }}>Status</TableCell>
+          {/*  <TableCell sx={thSx}>Analysed</TableCell> */}
           <TableCell sx={{ ...thSx, textAlign: "right" }} />
         </TableRow>
       </TableHead>
@@ -233,11 +233,11 @@ function CandidateSubTable({ candidates, jobTitle }) {
             <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
               <StatusBadge status={c.status} />
             </TableCell>
-            <TableCell sx={{ py: 1.5, px: 2, fontSize: 11, color: MUTED, borderBottom: `1px solid ${BORDER}`, whiteSpace: "nowrap" }}>
+            {/*}     <TableCell sx={{ py: 1.5, px: 2, fontSize: 11, color: MUTED, borderBottom: `1px solid ${BORDER}`, whiteSpace: "nowrap" }}>
               {c.analysedAt
                 ? new Date(c.analysedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
                 : "—"}
-            </TableCell>
+            </TableCell> */}
             <TableCell
               sx={{ py: 1.5, px: 2, textAlign: "right", borderBottom: `1px solid ${BORDER}` }}
               onClick={(e) => e.stopPropagation()}
@@ -245,7 +245,7 @@ function CandidateSubTable({ candidates, jobTitle }) {
               <Button
                 size="small"
                 variant="contained"
-                onClick={() => nav(`/analysis/${c.id}`)}
+                onClick={() => c.status === "Analysed" ? nav(`/analysis/${c.id}`) : onRunAnalysis(c.id)}
                 sx={{
                   fontSize: 11, fontWeight: 500, bgcolor: ACCENT,
                   borderRadius: "6px", textTransform: "none", boxShadow: "none", whiteSpace: "nowrap",
@@ -265,13 +265,13 @@ function CandidateSubTable({ candidates, jobTitle }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function JobsPage() {
   const nav = useNavigate();
-  const [jobs, setJobs]                     = useState([]);
+  const [jobs, setJobs] = useState([]);
   const [candidatesByJob, setCandidatesByJob] = useState(new Map());
-  const [loading, setLoading]               = useState(true);
-  const [err, setErr]                       = useState("");
-  const [selectedJobId, setSelectedJobId]   = useState(null);
-  const [search, setSearch]                 = useState("");
-  const [statusFilter, setStatusFilter]     = useState("All");
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [selectedJobId, setSelectedJobId] = useState(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
 
   // ── Data loading (unchanged) ────────────────────────────────────────────
   useEffect(() => {
@@ -290,16 +290,29 @@ export default function JobsPage() {
           (jobsResp ?? []).map(async (job) => {
             try {
               const candidates = await apiGet(`/api/jobs/${job.id}/candidates`);
-              map.set(
-                job.id,
-                (candidates ?? []).map((c) => ({
-                  ...c,
-                  consistencyScore: null,
-                  capabilityScore: null,
-                  risk: null,
-                  status: "Pending",
-                }))
+              const enriched = await Promise.all(
+                (candidates ?? []).map(async (c) => {
+                  try {
+                    const analysis = await apiGet(`/api/candidates/${c.id}/analysis`);
+                    return {
+                      ...c,
+                      consistencyScore: analysis?.consistencyScore ?? null,
+                      capabilityScore: analysis?.capabilityScore ?? null,
+                      risk: analysis?.riskLevel ?? null,
+                      status: "Analysed",
+                    };
+                  } catch {
+                    return {
+                      ...c,
+                      consistencyScore: null,
+                      capabilityScore: null,
+                      risk: null,
+                      status: "Pending",
+                    };
+                  }
+                })
               );
+              map.set(job.id, enriched);
             } catch (e) {
               map.set(job.id, []);
               console.warn("Failed to load candidates for job", job.id, e);
@@ -328,24 +341,24 @@ export default function JobsPage() {
     () =>
       (jobs ?? []).map((job) => ({
         ...job,
-        company:  job.company  ?? "—",
-        jobType:  job.jobType  ?? "—",
+        company: job.company ?? "—",
+        jobType: job.jobType ?? "—",
         location: job.location ?? "—",
-        status:   job.status   ?? "Active",
+        status: job.status ?? "Active",
       })),
     [jobs]
   );
 
   const statusCounts = useMemo(() => ({
-    All:    jobsWithDefaults.length,
+    All: jobsWithDefaults.length,
     Active: jobsWithDefaults.filter((j) => j.status === "Active").length,
-    Draft:  jobsWithDefaults.filter((j) => j.status === "Draft").length,
+    Draft: jobsWithDefaults.filter((j) => j.status === "Draft").length,
   }), [jobsWithDefaults]);
 
   const visibleJobs = useMemo(() =>
     jobsWithDefaults.filter((j) => {
       const matchSearch = !search
-        || (j.title   ?? "").toLowerCase().includes(search.toLowerCase())
+        || (j.title ?? "").toLowerCase().includes(search.toLowerCase())
         || (j.company ?? "").toLowerCase().includes(search.toLowerCase());
       const matchStatus = statusFilter === "All" || j.status === statusFilter;
       return matchSearch && matchStatus;
@@ -354,7 +367,7 @@ export default function JobsPage() {
   );
 
   // ── Selected job data ────────────────────────────────────────────────────
-  const selectedJob        = jobsWithDefaults.find((j) => j.id === selectedJobId);
+  const selectedJob = jobsWithDefaults.find((j) => j.id === selectedJobId);
   const selectedCandidates = selectedJobId ? (candidatesByJob.get(selectedJobId) ?? []) : [];
   const avgMatch = useMemo(() => {
     const analysed = selectedCandidates.filter((c) => c.capabilityScore != null);
@@ -369,6 +382,38 @@ export default function JobsPage() {
     if (!analysed.length) return null;
     return Math.round(analysed.reduce((s, c) => s + c.capabilityScore, 0) / analysed.length);
   }
+  // ── Run analysis ─────────────────────────────────────────────────────────
+  async function handleRunAnalysis(candidateId) {
+    try {
+      const loginId = localStorage.getItem("loginId") || "";
+      const analyzeUrl = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
+      analyzeUrl.searchParams.set("loginId", loginId);
+      await fetch(analyzeUrl.toString(), { method: "POST" });
+
+      const analysis = await apiGet(`/api/candidates/${candidateId}/analysis`);
+
+      setCandidatesByJob((prev) => {
+        const next = new Map(prev);
+        for (const [jobId, cands] of next.entries()) {
+          next.set(jobId, cands.map((c) =>
+            c.id === candidateId
+              ? {
+                ...c,
+                consistencyScore: analysis?.consistencyScore ?? null,
+                capabilityScore: analysis?.capabilityScore ?? null,
+                risk: analysis?.riskLevel ?? null,
+                status: "Analysed",
+              }
+              : c
+          ));
+        }
+        return next;
+      });
+    } catch (e) {
+      console.error("Failed to run analysis", e);
+    }
+  }
+
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -495,9 +540,9 @@ export default function JobsPage() {
                 </TableRow>
               )}
               {visibleJobs.map((job, idx) => {
-                const isSelected  = job.id === selectedJobId;
-                const candCount   = (candidatesByJob.get(job.id) ?? []).length;
-                const avg         = jobAvg(job.id);
+                const isSelected = job.id === selectedJobId;
+                const candCount = (candidatesByJob.get(job.id) ?? []).length;
+                const avg = jobAvg(job.id);
                 return (
                   <TableRow
                     key={job.id}
@@ -666,6 +711,7 @@ export default function JobsPage() {
             <CandidateSubTable
               candidates={selectedCandidates}
               jobTitle={selectedJob.title}
+              onRunAnalysis={handleRunAnalysis}
             />
           </Paper>
         )}
@@ -673,9 +719,9 @@ export default function JobsPage() {
         {/* ── Annotation strip ───────────────────────────────────────── */}
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
           {[
-            "⚡ GET /api/jobs · GET /api/candidates?jobId={id}",
-            "🖱 Click job row to load candidates below",
-            "📊 MUI Table (sortable, paginated)",
+            "copyright@ DeepHire",
+            "A product of Golden Wattle Ventures Pvt Ltd",
+            "This AI tool is designed to assist you, not replace professional judgment. Always consult with a qualified expert.",
           ].map((label) => (
             <Box
               key={label}

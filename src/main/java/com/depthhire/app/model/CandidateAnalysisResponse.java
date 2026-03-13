@@ -15,7 +15,8 @@ public record CandidateAnalysisResponse(
     List<SuggestedQuestion> suggestedQuestions,
 
     List<String> riskFlags,
-    String recommendation
+    String recommendation,
+    String candidate_name
 ) {
   public record Scores(
       int consistencyScore,   // 0-100

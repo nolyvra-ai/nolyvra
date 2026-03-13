@@ -18,7 +18,7 @@ import StatCard from "../components/StatCard";
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
 async function apiGet(path) {
-  
+
   const loginId = localStorage.getItem("loginId") || "";
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
@@ -37,29 +37,29 @@ function scoreColor(score) {
 }
 
 function riskFlagStyles(level) {
-  if (level === "High")   return { bg: "#FEF2F2", border: "#FECACA", fg: "#DC2626" };
+  if (level === "High") return { bg: "#FEF2F2", border: "#FECACA", fg: "#DC2626" };
   if (level === "Medium") return { bg: "#FFFBEB", border: "#FDE68A", fg: "#D97706" };
-  return                         { bg: "#EBF2FF", border: "#BFDBFE", fg: "#1D72E8" };
+  return { bg: "#EBF2FF", border: "#BFDBFE", fg: "#1D72E8" };
 }
 
 // ─── Style tokens ─────────────────────────────────────────────────────────────
-const BORDER     = "#E8ECF2";
-const MUTED      = "#9AA3B4";
-const TEXT       = "#0F1623";
-const ACCENT     = "#1D72E8";
-const SUCCESS    = "#16A34A";
+const BORDER = "#E8ECF2";
+const MUTED = "#9AA3B4";
+const TEXT = "#0F1623";
+const ACCENT = "#1D72E8";
+const SUCCESS = "#16A34A";
 const SUCCESS_BG = "#F0FDF4";
 const SUCCESS_BR = "#BBF7D0";
-const WARN       = "#D97706";
-const WARN_BG    = "#FFFBEB";
-const WARN_BR    = "#FDE68A";
-const DANGER     = "#DC2626";
-const DANGER_BG  = "#FEF2F2";
-const DANGER_BR  = "#FECACA";
-const ACCENT_BG  = "#EBF2FF";
-const ACCENT_BR  = "#BFDBFE";
+const WARN = "#D97706";
+const WARN_BG = "#FFFBEB";
+const WARN_BR = "#FDE68A";
+const DANGER = "#DC2626";
+const DANGER_BG = "#FEF2F2";
+const DANGER_BR = "#FECACA";
+const ACCENT_BG = "#EBF2FF";
+const ACCENT_BR = "#BFDBFE";
 const NEUTRAL_BG = "#F1F3F7";
-const SURFACE    = "#FAFBFD";
+const SURFACE = "#FAFBFD";
 
 // ─── Shared table header cell ─────────────────────────────────────────────────
 const thSx = {
@@ -79,10 +79,10 @@ const thSx = {
 function Badge({ label, variant = "neutral" }) {
   const styles = {
     success: { bg: SUCCESS_BG, border: SUCCESS_BR, color: SUCCESS },
-    warning: { bg: WARN_BG,    border: WARN_BR,    color: WARN    },
-    danger:  { bg: DANGER_BG,  border: DANGER_BR,  color: DANGER  },
-    accent:  { bg: ACCENT_BG,  border: ACCENT_BR,  color: ACCENT  },
-    neutral: { bg: NEUTRAL_BG, border: BORDER,     color: MUTED   },
+    warning: { bg: WARN_BG, border: WARN_BR, color: WARN },
+    danger: { bg: DANGER_BG, border: DANGER_BR, color: DANGER },
+    accent: { bg: ACCENT_BG, border: ACCENT_BR, color: ACCENT },
+    neutral: { bg: NEUTRAL_BG, border: BORDER, color: MUTED },
   };
   const s = styles[variant] ?? styles.neutral;
   return (
@@ -225,12 +225,12 @@ export default function DashboardPage() {
   const nav = useNavigate();
 
   // ── State (identical to original) ────────────────────────────────────────
-  const [jobs, setJobs]                                         = useState([]);
-  const [candidatesByJob, setCandidatesByJob]                   = useState(new Map());
+  const [jobs, setJobs] = useState([]);
+  const [candidatesByJob, setCandidatesByJob] = useState(new Map());
   const [latestAnalysisByCandidate, setLatestAnalysisByCandidate] = useState(new Map());
-  const [recentAnalyses, setRecentAnalyses]                     = useState([]);
-  const [loading, setLoading]                                   = useState(true);
-  const [err, setErr]                                           = useState("");
+  const [recentAnalyses, setRecentAnalyses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
 
   // ── Data loading (identical to original) ─────────────────────────────────
   useEffect(() => {
@@ -289,36 +289,29 @@ export default function DashboardPage() {
   );
 
   const analysedCount = useMemo(() => {
-    let n = 0;
-    for (const [, a] of latestAnalysisByCandidate.entries()) if (a && a.scores) n += 1;
-    return n;
-  }, [latestAnalysisByCandidate]);
+    return recentAnalyses.length;
+  }, [recentAnalyses]);
 
   const avgMatch = useMemo(() => {
-    const scores = [];
-    for (const [, a] of latestAnalysisByCandidate.entries()) {
-      const cap = a?.scores?.capabilityScore;
-      if (typeof cap === "number") scores.push(cap);
-    }
+    const scores = recentAnalyses
+      .map(a => a?.capabilityScore)
+      .filter(v => typeof v === "number" && v > 0);
     if (!scores.length) return 0;
     return Math.round(scores.reduce((s, x) => s + x, 0) / scores.length);
-  }, [latestAnalysisByCandidate]);
+  }, [recentAnalyses]);
 
   const highRiskCount = useMemo(() => {
-    let n = 0;
-    for (const [, a] of latestAnalysisByCandidate.entries())
-      if (a?.scores?.riskLevel === "High") n += 1;
-    return n;
-  }, [latestAnalysisByCandidate]);
+    return recentAnalyses.filter(a => a?.riskLevel === "High").length;
+  }, [recentAnalyses]);
 
   const recentJobs = useMemo(
     () =>
       (jobs ?? []).slice(0, 5).map((j) => ({
         ...j,
-        company:        j.company  ?? "—",
-        jobType:        j.jobType  ?? "—",
+        company: j.company ?? "—",
+        jobType: j.jobType ?? "—",
         candidateCount: candidatesByJob.get(j.id)?.length ?? 0,
-        status:         j.status   ?? "Active",
+        status: j.status ?? "Active",
       })),
     [jobs, candidatesByJob]
   );
@@ -509,9 +502,20 @@ export default function DashboardPage() {
             <Card>
               <CardHead title="Pipeline" />
               <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
-                <PipelineBar label="High Match ≥80%" count={4} pct={44} color={SUCCESS} />
-                <PipelineBar label="Moderate 60–79%" count={3} pct={33} color={WARN}    />
-                <PipelineBar label="Low Match <60%"  count={2} pct={22} color={DANGER}  />
+                {(() => {
+                  const high = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) >= 80).length;
+                  const medium = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) >= 60 && (a?.capabilityScore ?? 0) < 80).length;
+                  const low = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) < 60).length;
+                  const total = recentAnalyses.length || 1; // avoid divide by zero
+
+                  return (
+                    <>
+                      <PipelineBar label="High Match ≥80%" count={high} pct={Math.round(high / total * 100)} color={SUCCESS} />
+                      <PipelineBar label="Moderate 60–79%" count={medium} pct={Math.round(medium / total * 100)} color={WARN} />
+                      <PipelineBar label="Low Match <60%" count={low} pct={Math.round(low / total * 100)} color={DANGER} />
+                    </>
+                  );
+                })()}
               </Box>
             </Card>
 
@@ -519,9 +523,9 @@ export default function DashboardPage() {
             <Card>
               <CardHead title="Risk Summary" />
               <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.25 }}>
-                <RiskRow dotColor={DANGER} label="High Risk" count={highRiskCount || 4} variant="danger"  />
-                <RiskRow dotColor={WARN}   label="Medium"    count={6}                  variant="warning" />
-                <RiskRow dotColor={ACCENT} label="Low"       count={3}                  variant="accent"  />
+                <RiskRow dotColor={DANGER} label="High Risk" count={recentAnalyses.filter(a => a?.riskLevel === "High").length} variant="danger" />
+                <RiskRow dotColor={WARN} label="Medium" count={recentAnalyses.filter(a => a?.riskLevel === "Medium").length} variant="warning" />
+                <RiskRow dotColor={ACCENT} label="Low" count={recentAnalyses.filter(a => a?.riskLevel === "Low").length} variant="accent" />
               </Box>
             </Card>
 
@@ -547,11 +551,12 @@ export default function DashboardPage() {
             </TableHead>
             <TableBody>
               {recentAnalyses.map((row, idx) => {
+                console.log("analysis row fields:", row);
                 const consistency = row?.consistencyScore ?? 0;
-                const capability  = row?.capabilityScore  ?? 0;
-                const riskLevel   = row?.riskLevel || "Medium";
-                const riskCount   = riskLevel === "High" ? 2 : riskLevel === "Medium" ? 1 : 0;
-                const riskStyle   = riskFlagStyles(riskLevel);
+                const capability = row?.capabilityScore ?? 0;
+                const riskLevel = row?.riskLevel || "Medium";
+                const riskCount = riskLevel === "High" ? 2 : riskLevel === "Medium" ? 1 : 0;
+                const riskStyle = riskFlagStyles(riskLevel);
 
                 return (
                   <TableRow
@@ -632,9 +637,9 @@ export default function DashboardPage() {
         {/* Annotation strip */}
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           {[
-            "⚡ GET /api/dashboard/summary",
-            "📊 MUI Grid + Card + LinearProgress",
-            "📋 MUI DataGrid for tables",
+            "copyright@ DeepHire",
+            "A product of Golden Wattle Ventures Pvt Ltd",
+            "This AI tool is designed to assist you, not replace professional judgment. Always consult with a qualified expert.",
           ].map((label) => (
             <Box
               key={label}

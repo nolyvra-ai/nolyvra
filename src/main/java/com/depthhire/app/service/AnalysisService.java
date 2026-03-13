@@ -101,9 +101,9 @@ public class AnalysisService {
         }
 
         public CandidateAnalysisResponse analyze(String candidateId,
-                        String jobId, String loginId) {
+                        CandidateResponse candidateResponse, String loginId) {
 
-                String jdText = loadJobDescriptionFromDb(jobId);
+                String jdText = loadJobDescriptionFromDb(candidateResponse.jobId());
                 String cvText = loadCvTextFromDb(candidateId);
                 String linkedinUrl = loadLinkedinUrlFromDb(candidateId);
                 try {
@@ -184,15 +184,16 @@ public class AnalysisService {
 
                         CandidateAnalysisResponse response = new CandidateAnalysisResponse(
                                         candidateId,
-                                        jobId,
+                                        candidateResponse.jobId(),
                                         Instant.now(),
                                         ai.scores(),
                                         ai.consistency(),
                                         ai.capabilityMatrix(),
                                         ai.suggestedQuestions(),
                                         ai.riskFlags(),
-                                        ai.recommendation());
-                        persistAnalysisToDb(response,loginId);
+                                        ai.recommendation(),
+                                        candidateResponse.name());
+                        persistAnalysisToDb(response, loginId);
                         cache.put(candidateId, response);
                         return response;
 
@@ -249,9 +250,10 @@ public class AnalysisService {
                                           capability_score,
                                           risk_level,
                                           timeline_match_percent,
+                                          candidate_name,
                                           analysis_json
                                         )
-                                        values (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+                                        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
                                         """,
                                         response.candidateId(),
                                         response.jobId(),
@@ -261,6 +263,7 @@ public class AnalysisService {
                                         capabilityScore,
                                         riskLevel,
                                         timelineMatchPercent,
+                                        response.candidate_name(),
                                         analysisJson);
 
                 } catch (Exception e) {
@@ -268,14 +271,24 @@ public class AnalysisService {
                 }
         }
 
-        public String getJobIdForCandidate(String candidateId) {
+        public CandidateResponse getJobIdNameForCandidate(String candidateId) {
                 return jdbc.query("""
-                                select job_id
+                                select id, job_id, name, email, linkedin_url, created_at
                                 from candidates
                                 where id = ?
                                 """,
-                                (rs, rowNum) -> rs.getString("job_id"),
-                                candidateId).stream().findFirst()
+                                (rs, rowNum) -> new CandidateResponse(
+                                                rs.getString("id"),
+                                                rs.getString("job_id"),
+                                                rs.getString("name"),
+                                                rs.getString("email"),
+                                                rs.getString("linkedin_url"),
+                                                rs.getTimestamp("created_at") != null
+                                                                ? rs.getTimestamp("created_at").toInstant()
+                                                                : null),
+                                candidateId)
+                                .stream()
+                                .findFirst()
                                 .orElseThrow(() -> new IllegalArgumentException("Candidate not found: " + candidateId));
         }
 
@@ -310,8 +323,67 @@ public class AnalysisService {
                                 from analyses
                                 where login_id = ?
                                 order by analyzed_at desc
-                                limit 5
                                 """,
-                                ANALYSIS_MAPPER,loginId );
+                                ANALYSIS_MAPPER, loginId);
+        }
+
+        public List<AnalysisResponse> getAnalysisForCandidate(String candidateId) {
+
+                return jdbc.query("""
+                                select
+                                  id,
+                                  candidate_id,
+                                  candidate_name,
+                                  job_id,
+                                  analyzed_at,
+                                  consistency_score,
+                                  capability_score,
+                                  risk_level,
+                                  timeline_match_percent
+                                from analyses
+                                where candidate_id = ?
+                                order by analyzed_at desc
+                                LIMIT 1
+                                """,
+                                ANALYSIS_MAPPER, candidateId);
+        }
+
+        public CandidateAnalysisResponse getAIAnalysisForCandidate(String candidateId) {
+
+                return jdbc.query("""
+                                SELECT a.candidate_id, a.job_id, a.analyzed_at, a.analysis_json,
+                                       c.name AS candidate_name
+                                FROM analyses a
+                                JOIN candidates c ON c.id = a.candidate_id
+                                WHERE a.candidate_id = ?
+                                ORDER BY a.analyzed_at DESC
+                                LIMIT 1
+                                """,
+                                (rs, rowNum) -> {
+                                        try {
+                                                String json = rs.getString("analysis_json");
+                                                CandidateAnalysisResponse parsed = objectMapper.readValue(
+                                                                json, CandidateAnalysisResponse.class);
+                                                return new CandidateAnalysisResponse(
+                                                                rs.getString("candidate_id"),
+                                                                rs.getString("job_id"),
+                                                                rs.getTimestamp("analyzed_at").toInstant(),
+                                                                parsed.scores(),
+                                                                parsed.consistency(),
+                                                                parsed.capabilityMatrix(),
+                                                                parsed.suggestedQuestions(),
+                                                                parsed.riskFlags(),
+                                                                parsed.recommendation(),
+                                                                rs.getString("candidate_name"));
+                                        } catch (Exception e) {
+                                                throw new RuntimeException(
+                                                                "Failed to parse analysis_json for candidate: "
+                                                                                + candidateId,
+                                                                e);
+                                        }
+                                }, candidateId)
+                                .stream().findFirst()
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                                "No analysis found for candidate: " + candidateId));
         }
 }
