@@ -728,9 +728,9 @@ export default function CreateJobPage() {
           {/* Annotation strip */}
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2, mb: 1 }}>
             {[
-              "📝 MUI TextField + Select",
-              "⚡ POST /api/jobs on Save",
-              "🔍 Skill extraction from JD text client-side preview",
+             "copyright@ DeepHire",
+            "A product of Golden Wattle Ventures Pvt Ltd",
+            "This AI tool is designed to assist you, not replace professional judgment. Always consult with a qualified expert.",
             ].map((label) => (
               <Chip
                 key={label}
