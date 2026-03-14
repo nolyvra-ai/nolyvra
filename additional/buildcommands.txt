@@ -5,3 +5,19 @@ Backend:
 FrontEnd:
 npm run dev
 
+
+Docker Run commands:
+docker run -p 8080:8080 -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/depthhire -e SPRING_DATASOURCE_USERNAME=depthhire -e SPRING_DATASOURCE_PASSWORD=depthhirepass -e OPENAI_API_KEY=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 deephire-app
+
+Docker tag
+docker tag deephire-app sayan1587/deephire-app:latest
+
+docker login
+
+docker push sayan1587/deephire-app:latest
+
+docker build -t deephire-app .
+docker tag deephire-app your-dockerhub-username/deephire-app:latest
+docker push your-dockerhub-username/deephire-app:latest
+=======
+latest: digest: sha256:5299e08608db9b91fb6a332de37f14b409d03b44b7261d6c8988a13ebd0845f7 size: 856
