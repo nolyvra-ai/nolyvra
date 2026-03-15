@@ -10,6 +10,8 @@ docker ps
 
 docker exec -it depthhire-postgres psql -U depthhire -d depthhire
 
+view table: \d analyses
+
 For a client view download : https://dbeaver.io/download/
 
 ##SQL Scripts##
