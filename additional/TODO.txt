@@ -4,7 +4,7 @@
 4. Implement user login (Done)
 5. Implement user profile (A recuriter can see only his/her jobs)) (Done)
 6. Upgrade the Analysis page to v5
-7. Continerize spring Boot
+7. Continerize spring Boot (Done)
 8. Upload in render.
 9. Integrate with Domain
 
@@ -20,6 +20,7 @@ Good To have feature before onboarding recuriter
 8. In the settings keep a update password option
 9. A loading popup when analysis button is pressed - Xingyu
 10. If Analysis result already exist return that else call the analysis method
+11. Create a simple landing page with the details of upcoming event and register event option
 
 Recuriter onboarding can happen at this stage.
 -----

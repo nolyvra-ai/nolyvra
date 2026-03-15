@@ -1,0 +1,2068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepHire — Wireframe MVP2 v1</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F7F8FA;--white:#fff;
+  --sidebar:#0F1623;--sidebar-hover:#1C2537;--sidebar-active:#1B3A6B;
+  --accent:#1D72E8;--accent-light:#EBF2FF;
+  --success:#16A34A;--success-bg:#F0FDF4;
+  --warning:#D97706;--warning-bg:#FFFBEB;
+  --danger:#DC2626;--danger-bg:#FEF2F2;
+  --purple:#7C3AED;--purple-bg:#F5F3FF;
+  --border:#E2E6ED;
+  --text-primary:#0F1623;--text-secondary:#5A6480;--text-muted:#9AA3B4;
+  --shadow:0 1px 4px rgba(0,0,0,0.07);
+  --radius:8px;--sw:224px;
+}
+html,body{height:100%;overflow:hidden;display:flex;flex-direction:column}
+body{font-family:'DM Sans',sans-serif;font-size:13px;color:var(--text-primary);display:flex;flex-direction:column}
+
+/* ── TOP NAV ── */
+.topnav{background:var(--sidebar);display:flex;align-items:center;gap:5px;padding:7px 14px;flex-shrink:0;overflow-x:auto;scrollbar-width:none;}
+.topnav::-webkit-scrollbar{display:none;}
+.topnav-brand{display:flex;align-items:center;gap:8px;margin-right:12px;flex-shrink:0}
+.brand-icon{width:26px;height:26px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff}
+.brand-name{color:#fff;font-size:14px;font-weight:600;letter-spacing:-0.3px}
+.brand-ver{font-size:9px;color:rgba(255,255,255,0.3);letter-spacing:0.5px}
+.nav-pill{padding:4px 11px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;color:rgba(255,255,255,0.45);border:1px solid transparent;transition:all .15s;white-space:nowrap;flex-shrink:0}
+.nav-pill:hover{color:rgba(255,255,255,0.8);border-color:rgba(255,255,255,0.1)}
+.nav-pill.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.nav-arrow{font-size:10px;color:rgba(255,255,255,0.18);flex-shrink:0}
+.nav-hint{margin-left:auto;font-size:10px;color:rgba(255,255,255,0.2);white-space:nowrap;flex-shrink:0}
+.nav-new{background:rgba(124,58,237,0.3);border-color:rgba(124,58,237,0.6);color:rgba(200,180,255,0.9)}
+.nav-new.active{background:var(--purple);border-color:var(--purple)}
+
+/* ── BODY LAYOUT ── */
+.body-wrap{display:flex;flex:1;overflow:hidden}
+
+/* ── SIDEBAR ── */
+.sidebar{width:var(--sw);background:var(--sidebar);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.sb-logo{padding:18px 16px 14px;border-bottom:1px solid rgba(255,255,255,0.06)}
+.sb-section{padding:12px 10px 4px}
+.sb-label{font-size:10px;font-weight:600;color:rgba(255,255,255,0.25);letter-spacing:.8px;text-transform:uppercase;padding:0 8px;margin-bottom:3px}
+.sb-item{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;cursor:pointer;color:rgba(255,255,255,0.5);font-size:12.5px;font-weight:400;transition:all .15s;margin-bottom:1px}
+.sb-item:hover{background:var(--sidebar-hover);color:rgba(255,255,255,0.85)}
+.sb-item.active{background:var(--sidebar-active);color:#fff;font-weight:500}
+.sb-item .ic{width:15px;text-align:center;font-size:13px}
+.sb-badge{margin-left:auto;background:var(--accent);color:#fff;font-size:10px;font-weight:600;padding:1px 6px;border-radius:10px}
+.sb-badge-new{margin-left:auto;background:var(--purple);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px}
+.sb-new-label{font-size:9px;color:rgba(180,160,255,0.7);letter-spacing:.5px;background:rgba(124,58,237,0.2);padding:1px 5px;border-radius:3px;margin-left:4px}
+.sb-footer{margin-top:auto;padding:12px 10px;border-top:1px solid rgba(255,255,255,0.06)}
+.user-row{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:6px;cursor:pointer}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.page-header{background:var(--white);border-bottom:1px solid var(--border);padding:0 24px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.ph-title{font-size:15px;font-weight:600}
+.ph-sub{font-size:11px;color:var(--text-muted);margin-top:1px}
+.ph-actions{display:flex;gap:8px;align-items:center}
+.content{flex:1;overflow-y:auto;padding:22px 24px}
+
+/* ── PAGES ── */
+.page{display:none;flex-direction:column;overflow:hidden}
+.page.active{display:flex;flex:1;overflow:hidden}
+
+/* ── COMPONENTS ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:var(--radius);font-size:12px;font-weight:500;cursor:pointer;border:none;font-family:inherit;transition:all .15s}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:#155ec0}
+.btn-secondary{background:var(--white);color:var(--text-primary);border:1px solid var(--border)}.btn-secondary:hover{background:var(--bg)}
+.btn-success{background:var(--success);color:#fff}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-purple{background:var(--purple);color:#fff}
+.btn-sm{padding:5px 11px;font-size:11px}
+.btn-ghost{background:transparent;color:var(--accent);border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:500;padding:0}
+
+.card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card-head{padding:13px 18px 11px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.card-title{font-size:13px;font-weight:600}
+.card-body{padding:16px 18px}
+.card-new{border-color:#C4B5FD;box-shadow:0 0 0 2px rgba(124,58,237,0.06)}
+.new-tag{display:inline-flex;align-items:center;padding:2px 7px;background:var(--purple-bg);border:1px solid #C4B5FD;border-radius:4px;font-size:10px;font-weight:600;color:var(--purple);margin-left:8px}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+.grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:14px}
+.row{display:flex;gap:16px}.col{display:flex;flex-direction:column;gap:14px}
+
+.stat-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:15px 18px;box-shadow:var(--shadow)}
+.stat-lbl{font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.stat-val{font-size:26px;font-weight:700;margin:4px 0 2px;line-height:1}
+.stat-delta{font-size:11px;color:var(--text-muted)}
+.stat-delta.up{color:var(--success)}
+
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:8px 14px;font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;background:var(--bg);border-bottom:1px solid var(--border)}
+td{padding:10px 14px;font-size:12px;border-bottom:1px solid #F0F2F6;vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tbody tr{cursor:pointer;transition:background .1s}
+tbody tr:hover td{background:#FAFBFD}
+
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:500}
+.bs{background:var(--success-bg);color:var(--success)}
+.bw{background:var(--warning-bg);color:var(--warning)}
+.bd{background:var(--danger-bg);color:var(--danger)}
+.bn{background:#F1F3F7;color:var(--text-secondary)}
+.ba{background:var(--accent-light);color:var(--accent)}
+.bp{background:var(--purple-bg);color:var(--purple)}
+
+.pbar-wrap{background:#EEF0F5;border-radius:4px;height:6px;overflow:hidden;margin-top:4px}
+.pbar{height:100%;border-radius:4px}
+
+.form-group{margin-bottom:14px}
+.form-label{font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:4px;display:block}
+.form-hint{font-size:11px;color:var(--text-muted);margin-bottom:5px}
+.req{color:var(--danger)}
+input.fi,select.fi{width:100%;padding:7px 11px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;font-family:inherit;color:var(--text-primary);background:var(--white);outline:none}
+textarea.ft{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:var(--radius);font-size:12px;font-family:'DM Mono',monospace;color:var(--text-primary);background:#FAFBFD;outline:none;resize:vertical;line-height:1.6}
+
+.divider{height:1px;background:var(--border);margin:14px 0}
+.sp{height:14px}
+.tag{display:inline-block;background:#F1F3F7;color:var(--text-secondary);border-radius:4px;padding:2px 8px;font-size:11px;font-weight:500;margin:2px}
+.tag.match{background:var(--success-bg);color:var(--success)}
+.tag.gap{background:var(--danger-bg);color:var(--danger)}
+
+.risk-item{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid #F0F2F6}
+.risk-item:last-child{border-bottom:none}
+.rdot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:4px}
+.rdot.h{background:var(--danger)}.rdot.m{background:var(--warning)}.rdot.l{background:#60A5FA}
+
+.score-circle{width:72px;height:72px;border-radius:50%;border:3px solid;display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:700}
+.sc-g{border-color:var(--success);color:var(--success)}
+.sc-w{border-color:var(--warning);color:var(--warning)}
+.sc-d{border-color:var(--danger);color:var(--danger)}
+
+.annot{display:inline-flex;align-items:center;font-size:10px;color:var(--text-muted);background:#FFF9E6;border:1px dashed #D4AC0D;padding:2px 8px;border-radius:4px;font-style:italic}
+.annot-new{background:#F5F3FF;border-color:#C4B5FD;color:var(--purple)}
+
+.step-bar{display:flex;align-items:center;gap:6px;margin-bottom:20px}
+.step{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted)}
+.step-num{width:21px;height:21px;border-radius:50%;background:#EEF0F5;color:var(--text-muted);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600}
+.step.done .step-num{background:var(--success);color:#fff}
+.step.act .step-num{background:var(--accent);color:#fff}
+.step.act{color:var(--text-primary);font-weight:500}
+.step-line{flex:1;height:1px;background:var(--border)}
+
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-thumb{background:#D1D5DB;border-radius:4px}
+
+.meta-strip{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:14px 20px;display:flex;gap:22px;align-items:center;flex-wrap:wrap;margin-bottom:16px;box-shadow:var(--shadow)}
+.mb-lbl{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.mb-val{font-size:13px;font-weight:500;margin-top:2px}
+
+/* ── PIPELINE STAGES ── */
+.pipeline{display:flex;gap:0;margin-bottom:16px}
+.stage{flex:1;padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-right:none;font-size:11px;font-weight:500;color:var(--text-muted);text-align:center;position:relative}
+.stage:first-child{border-radius:6px 0 0 6px}
+.stage:last-child{border-radius:0 6px 6px 0;border-right:1px solid var(--border)}
+.stage.active{background:var(--accent-light);color:var(--accent);border-color:var(--accent);font-weight:600}
+.stage-num{display:block;font-size:18px;font-weight:700;margin-bottom:2px}
+
+/* ── CALENDAR ── */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:8px}
+.cal-day{padding:6px 4px;text-align:center;font-size:11px;border-radius:4px;cursor:pointer}
+.cal-day:hover{background:var(--accent-light)}
+.cal-day.today{background:var(--accent);color:#fff;font-weight:600}
+.cal-day.has-event{background:var(--success-bg);color:var(--success);font-weight:600}
+.cal-day.empty{color:transparent}
+
+/* ── EMAIL THREAD ── */
+.email-item{padding:10px 0;border-bottom:1px solid #F0F2F6;display:flex;gap:10px;align-items:flex-start}
+.email-item:last-child{border-bottom:none}
+.email-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);margin-top:4px;flex-shrink:0}
+
+/* ── REMINDER ── */
+.reminder-item{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid #F0F2F6}
+.reminder-item:last-child{border-bottom:none}
+.reminder-check{width:16px;height:16px;border:1.5px solid var(--border);border-radius:3px;flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:9px}
+.reminder-check.done{background:var(--success);border-color:var(--success);color:#fff}
+
+/* ── AI SEARCH ── */
+.search-hero{background:linear-gradient(135deg,#1B3A6B 0%,#0F1623 100%);border-radius:10px;padding:28px 24px;margin-bottom:18px}
+.candidate-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);transition:box-shadow .15s}
+.candidate-card:hover{box-shadow:0 4px 12px rgba(0,0,0,0.1)}
+
+/* ── FRAUD ── */
+.fraud-signal{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #F0F2F6}
+.fraud-signal:last-child{border-bottom:none}
+.fraud-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+
+/* ── GAUGE ── */
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:4px}
+.gauge-bar{width:100%;height:12px;border-radius:6px;background:linear-gradient(90deg,var(--success) 0%,var(--warning) 50%,var(--danger) 100%);position:relative;margin:8px 0}
+.gauge-needle{position:absolute;top:-4px;width:4px;height:20px;background:var(--text-primary);border-radius:2px;transform:translateX(-50%)}
+
+/* workflow profile header */
+.profile-hero{background:linear-gradient(135deg,#1B3A6B 0%,#0F1623 100%);border-radius:10px;padding:20px 24px;margin-bottom:16px;color:#fff;display:flex;gap:18px;align-items:center}
+.profile-avatar-lg{width:52px;height:52px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0}
+
+/* time slots */
+.time-slot{padding:7px 12px;border:1px solid var(--border);border-radius:6px;font-size:12px;cursor:pointer;text-align:center}
+.time-slot:hover{background:var(--accent-light);border-color:var(--accent);color:var(--accent)}
+.time-slot.selected{background:var(--accent);border-color:var(--accent);color:#fff}
+</style>
+</head>
+<body>
+
+<!-- TOP NAV -->
+<div class="topnav">
+  <div class="topnav-brand">
+    <div class="brand-icon">IQ</div>
+    <div><div class="brand-name">DeepHire</div><div class="brand-ver">MVP v2.0</div></div>
+  </div>
+  <span class="nav-arrow">│</span>
+  <span style="font-size:10px;color:rgba(255,255,255,0.25);margin-right:4px">PAGES:</span>
+  <div class="nav-pill active" id="pill-dashboard" onclick="nav('dashboard')">① Dashboard</div>
+  <span class="nav-arrow">›</span>
+  <div class="nav-pill" id="pill-jobs" onclick="nav('jobs')">② Jobs List</div>
+  <span class="nav-arrow">›</span>
+  <div class="nav-pill" id="pill-add-job" onclick="nav('add-job')">③ Create Job</div>
+  <span class="nav-arrow">›</span>
+  <div class="nav-pill" id="pill-candidates" onclick="nav('candidates')">④ Candidates</div>
+  <span class="nav-arrow">›</span>
+  <div class="nav-pill" id="pill-add-candidate" onclick="nav('add-candidate')">⑤ Add Candidate</div>
+  <span class="nav-arrow">›</span>
+  <div class="nav-pill" id="pill-analysis" onclick="nav('analysis')">⑥ Analysis</div>
+  <span class="nav-arrow">›</span>
+  <div class="nav-pill nav-new" id="pill-talent-search" onclick="nav('talent-search')">⑦ AI Talent Search ✦</div>
+  <span class="nav-arrow">›</span>
+  <div class="nav-pill nav-new" id="pill-workflow" onclick="nav('workflow')">⑧ Candidate Workflow ✦</div>
+  <span class="nav-arrow">›</span>
+  <div class="nav-pill nav-new" id="pill-scheduler" onclick="nav('scheduler')">⑨ Scheduler ✦</div>
+  <span class="nav-arrow">›</span>
+  <div class="nav-pill nav-new" id="pill-email" onclick="nav('email')">⑩ Email ✦</div>
+  <span class="nav-arrow">›</span>
+  <div class="nav-pill nav-new" id="pill-reminders" onclick="nav('reminders')">⑪ Reminders ✦</div>
+  <span class="nav-hint">← click tab to switch pages &nbsp;|&nbsp; ✦ = new MVP2 pages</span>
+</div>
+
+<div class="body-wrap">
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sb-logo">
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="brand-icon">IQ</div>
+      <div><div style="color:#fff;font-size:14px;font-weight:600">DeepHire</div><div style="font-size:9px;color:rgba(255,255,255,.3)">MVP v2.0</div></div>
+    </div>
+  </div>
+  <div class="sb-section">
+    <div class="sb-label">Overview</div>
+    <div class="sb-item active" id="sb-dashboard" onclick="nav('dashboard')"><span class="ic">⊞</span> Dashboard</div>
+    <div class="sb-item" id="sb-reminders" onclick="nav('reminders')"><span class="ic">🔔</span> Reminders <span class="sb-badge-new">NEW</span></div>
+  </div>
+  <div class="sb-section">
+    <div class="sb-label">Jobs</div>
+    <div class="sb-item" id="sb-jobs" onclick="nav('jobs')"><span class="ic">📋</span> All Jobs <span class="sb-badge">3</span></div>
+    <div class="sb-item" id="sb-add-job" onclick="nav('add-job')"><span class="ic">＋</span> Create Job</div>
+  </div>
+  <div class="sb-section">
+    <div class="sb-label">Candidates</div>
+    <div class="sb-item" id="sb-candidates" onclick="nav('candidates')"><span class="ic">👤</span> All Candidates <span class="sb-badge">9</span></div>
+    <div class="sb-item" id="sb-add-candidate" onclick="nav('add-candidate')"><span class="ic">＋</span> Add Candidate</div>
+  </div>
+  <div class="sb-section">
+    <div class="sb-label">AI Tools <span class="sb-new-label">NEW</span></div>
+    <div class="sb-item" id="sb-talent-search" onclick="nav('talent-search')"><span class="ic">🔍</span> AI Talent Search</div>
+    <div class="sb-item" id="sb-scheduler" onclick="nav('scheduler')"><span class="ic">📅</span> Interview Scheduler</div>
+    <div class="sb-item" id="sb-email" onclick="nav('email')"><span class="ic">✉</span> Email Centre</div>
+  </div>
+  <div class="sb-section">
+    <div class="sb-label">Settings</div>
+    <div class="sb-item"><span class="ic">⚙</span> Settings</div>
+  </div>
+  <div class="sb-footer">
+    <div class="user-row">
+      <div class="avatar">SR</div>
+      <div><div style="color:rgba(255,255,255,0.7);font-size:12px;font-weight:500">Sarah Reynolds</div><div style="color:rgba(255,255,255,0.3);font-size:10px">Senior Recruiter</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PAGE 1: DASHBOARD (unchanged from MVP1 + new widgets)
+══════════════════════════════════════════════════════════════════ -->
+<div id="pg-dashboard" class="page active">
+  <div class="page-header">
+    <div><div class="ph-title">Dashboard</div><div class="ph-sub">Your recruitment pipeline at a glance</div></div>
+    <div class="ph-actions">
+      <button class="btn btn-secondary btn-sm" onclick="nav('reminders')">🔔 Reminders <span style="background:var(--danger);color:#fff;border-radius:10px;padding:1px 5px;font-size:9px;margin-left:3px">4</span></button>
+      <button class="btn btn-secondary btn-sm">Export Report</button>
+      <button class="btn btn-primary btn-sm" onclick="nav('add-job')">＋ New Job</button>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- KPI Row -->
+    <div class="grid4" style="margin-bottom:16px">
+      <div class="stat-card"><div class="stat-lbl">Active Jobs</div><div class="stat-val">3</div><div class="stat-delta up">↑ 1 this week</div></div>
+      <div class="stat-card"><div class="stat-lbl">Total Candidates</div><div class="stat-val">9</div><div class="stat-delta up">↑ 4 this week</div></div>
+      <div class="stat-card"><div class="stat-lbl">Analyses Run</div><div class="stat-val" style="color:var(--accent)">9</div><div class="stat-delta">All processed</div></div>
+      <div class="stat-card"><div class="stat-lbl">High-Risk Flags</div><div class="stat-val" style="color:var(--danger)">5</div><div class="stat-delta">Requires review</div></div>
+    </div>
+
+    <!-- Row: Today's Tasks (scrollable) + Pipeline Summary + Risk Summary -->
+    <div class="row" style="margin-bottom:16px;align-items:flex-start">
+
+      <!-- Fix 2 & 4: Today's Tasks — horizontally scrollable -->
+      <div style="flex:1;min-width:0">
+        <div class="card card-new">
+          <div class="card-head">
+            <span class="card-title">Today's Tasks <span class="new-tag">NEW</span></span>
+            <button class="btn btn-secondary btn-sm" onclick="nav('reminders')">View All →</button>
+          </div>
+          <div class="card-body" style="padding:10px 16px">
+            <div style="display:flex;gap:16px;overflow-x:auto;padding-bottom:4px">
+              <div style="display:flex;align-items:flex-start;gap:8px;flex-shrink:0;min-width:200px;max-width:220px;border:1px solid var(--border);border-radius:7px;padding:10px 12px;background:var(--bg)">
+                <div class="reminder-check">□</div>
+                <div><div style="font-size:12px;font-weight:500">Review 3 pending candidate analyses</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Due today</div></div>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:8px;flex-shrink:0;min-width:200px;max-width:220px;border:1px solid #BFDBFE;border-radius:7px;padding:10px 12px;background:var(--accent-light)">
+                <div class="reminder-check">□</div>
+                <div><div style="font-size:12px;font-weight:500">Interview with James Okafor at 2:00 PM</div><div style="font-size:11px;color:var(--accent);margin-top:2px">In 3 hours</div></div>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:8px;flex-shrink:0;min-width:200px;max-width:220px;border:1px solid #FDE68A;border-radius:7px;padding:10px 12px;background:var(--warning-bg)">
+                <div class="reminder-check">□</div>
+                <div><div style="font-size:12px;font-weight:500">Follow up with Sarah Lee</div><div style="font-size:11px;color:var(--warning);margin-top:2px">Overdue</div></div>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:8px;flex-shrink:0;min-width:200px;max-width:220px;border:1px solid var(--border);border-radius:7px;padding:10px 12px;background:var(--bg)">
+                <div class="reminder-check">□</div>
+                <div><div style="font-size:12px;font-weight:500">Send offer letter to Priya Mehta</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Due today</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fix 3: Pipeline Summary (from MVP1) -->
+      <div style="flex:0 0 180px">
+        <div class="card" style="height:100%">
+          <div class="card-head"><span class="card-title">Pipeline</span></div>
+          <div class="card-body" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                <span style="font-size:12px;color:var(--text-secondary)">Screening</span>
+                <span style="font-size:12px;font-weight:600">4</span>
+              </div>
+              <div class="pbar-wrap"><div class="pbar" style="width:44%;background:var(--accent)"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                <span style="font-size:12px;color:var(--text-secondary)">Interview</span>
+                <span style="font-size:12px;font-weight:600">2</span>
+              </div>
+              <div class="pbar-wrap"><div class="pbar" style="width:22%;background:var(--warning)"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                <span style="font-size:12px;color:var(--text-secondary)">Offer</span>
+                <span style="font-size:12px;font-weight:600">1</span>
+              </div>
+              <div class="pbar-wrap"><div class="pbar" style="width:11%;background:var(--purple)"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                <span style="font-size:12px;color:var(--text-secondary)">Selected</span>
+                <span style="font-size:12px;font-weight:600">2</span>
+              </div>
+              <div class="pbar-wrap"><div class="pbar" style="width:22%;background:var(--success)"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fix 3: Risk Summary (from MVP1) -->
+      <div style="flex:0 0 160px">
+        <div class="card" style="height:100%">
+          <div class="card-head"><span class="card-title">Risk Summary</span></div>
+          <div class="card-body" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="display:flex;align-items:center;gap:6px;font-size:12px"><span class="rdot h"></span> High</span>
+              <span style="font-size:18px;font-weight:700;color:var(--danger)">5</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="display:flex;align-items:center;gap:6px;font-size:12px"><span class="rdot m"></span> Medium</span>
+              <span style="font-size:18px;font-weight:700;color:var(--warning)">3</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="display:flex;align-items:center;gap:6px;font-size:12px"><span class="rdot l"></span> Low</span>
+              <span style="font-size:18px;font-weight:700;color:var(--accent)">1</span>
+            </div>
+            <div class="divider" style="margin:2px 0"></div>
+            <div style="font-size:11px;color:var(--text-muted);text-align:center">9 candidates analysed</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Fix 2: Recent Jobs (restored from MVP1) -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head">
+        <span class="card-title">Active Jobs</span>
+        <button class="btn btn-secondary btn-sm" onclick="nav('jobs')">View All →</button>
+      </div>
+      <div class="card-body" style="padding:0">
+        <table>
+          <thead><tr><th>Job Title</th><th>Client</th><th>Candidates</th><th>Analysed</th><th>Avg Match</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            <tr onclick="nav('jobs')"><td><strong>Senior Backend Engineer</strong></td><td>FinTech Co.</td><td>4</td><td>3/4</td><td><span style="font-weight:600;color:var(--warning)">71%</span></td><td><span class="badge bs">Active</span></td><td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();nav('candidates')">View Candidates</button></td></tr>
+            <tr onclick="nav('jobs')"><td><strong>Product Manager</strong></td><td>HealthStart Ltd</td><td>3</td><td>2/3</td><td><span style="font-weight:600;color:var(--success)">89%</span></td><td><span class="badge bs">Active</span></td><td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();nav('candidates')">View Candidates</button></td></tr>
+            <tr onclick="nav('jobs')"><td><strong>Data Analyst</strong></td><td>Acme Corp</td><td>2</td><td>0/2</td><td><span style="color:var(--text-muted)">—</span></td><td><span class="badge bw">Pending</span></td><td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();nav('add-candidate')">Run Analysis</button></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Recent Analyses -->
+    <div class="row" style="margin-bottom:16px">
+      <div style="flex:1">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Recent Analyses</span><button class="btn btn-secondary btn-sm" onclick="nav('candidates')">View All</button></div>
+          <div class="card-body" style="padding:0">
+            <table>
+              <thead><tr><th>Candidate</th><th>Job</th><th>Match</th><th>Risk</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                <tr onclick="nav('workflow')"><td><strong>James Okafor</strong></td><td>Sr. Backend Eng.</td><td><span style="color:var(--warning);font-weight:600">72%</span></td><td><span class="badge bd">2 High</span></td><td><span class="badge bw">Review</span></td><td><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('workflow')">Open</button></td></tr>
+                <tr onclick="nav('workflow')"><td><strong>Leon Fischer</strong></td><td>Sr. Backend Eng.</td><td><span style="color:var(--success);font-weight:600">83%</span></td><td><span class="badge bw">1 Med</span></td><td><span class="badge bs">Approved</span></td><td><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('workflow')">Open</button></td></tr>
+                <tr onclick="nav('workflow')"><td><strong>Priya Mehta</strong></td><td>Product Manager</td><td><span style="color:var(--success);font-weight:600">88%</span></td><td><span class="badge bw">1 Med</span></td><td><span class="badge bs">Approved</span></td><td><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('workflow')">Open</button></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="annot">⚡ GET /api/dashboard/summary</span>
+      <span class="annot annot-new">✦ NEW: Reminders widget — GET /api/reminders/today</span>
+      <span class="annot annot-new">✦ Candidate rows now link to Candidate Workflow page</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PAGE 2: JOBS LIST (unchanged)
+══════════════════════════════════════════════════════════════════ -->
+<div id="pg-jobs" class="page">
+  <div class="page-header">
+    <div><div class="ph-title">Jobs</div><div class="ph-sub">All active and draft job vacancies — click a row to view its candidates</div></div>
+    <div class="ph-actions">
+      <input class="fi" style="width:200px;font-size:12px;padding:6px 10px" type="text" placeholder="🔍 Search jobs…" />
+      <button class="btn btn-primary btn-sm" onclick="nav('add-job')">＋ Create Job</button>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- Filter bar -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">
+      <span style="font-size:12px;color:var(--text-muted);font-weight:500">Filter:</span>
+      <button class="btn btn-secondary btn-sm" style="border-color:var(--accent);color:var(--accent)">All (3)</button>
+      <button class="btn btn-secondary btn-sm">Active (2)</button>
+      <button class="btn btn-secondary btn-sm">Draft (1)</button>
+      <div style="margin-left:auto;font-size:12px;color:var(--text-muted)">3 jobs found</div>
+    </div>
+
+    <!-- Jobs table -->
+    <div class="card" style="margin-bottom:16px">
+      <table>
+        <thead><tr><th style="width:28px"></th><th>Job Title</th><th>Client</th><th>Location</th><th>Type</th><th>Candidates</th><th>Avg. Match</th><th>Status</th><th>Created</th><th></th></tr></thead>
+        <tbody>
+          <tr id="job-row-1" class="job-row" onclick="selectJob(1)" style="background:#EBF2FF">
+            <td style="color:var(--accent);font-size:11px;font-weight:700">▼</td>
+            <td><strong>Senior Backend Engineer</strong><br><span style="font-size:11px;color:var(--text-muted)">5+ yrs · Java/Kotlin</span></td>
+            <td>FinTech Co.</td><td>London / Hybrid</td><td><span class="badge bn">Full-time</span></td>
+            <td style="text-align:center"><strong>4</strong></td>
+            <td><span style="font-weight:600;color:var(--warning)">74%</span></td>
+            <td><span class="badge bs">Active</span></td>
+            <td style="color:var(--text-muted)">24 Feb 2026</td>
+            <td style="display:flex;gap:5px">
+              <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('add-candidate')">＋ Candidate</button>
+              <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()">Edit</button>
+              <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" style="border-color:#FECACA;color:var(--danger)">Remove</button>
+            </td>
+          </tr>
+          <tr id="job-row-2" class="job-row" onclick="selectJob(2)">
+            <td style="color:var(--text-muted);font-size:11px">▶</td>
+            <td><strong>Product Manager</strong><br><span style="font-size:11px;color:var(--text-muted)">3+ yrs · B2B SaaS</span></td>
+            <td>HealthStart Ltd</td><td>Remote (UK)</td><td><span class="badge bn">Full-time</span></td>
+            <td style="text-align:center"><strong>3</strong></td>
+            <td><span style="font-weight:600;color:var(--success)">82%</span></td>
+            <td><span class="badge bs">Active</span></td>
+            <td style="color:var(--text-muted)">20 Feb 2026</td>
+            <td style="display:flex;gap:5px">
+              <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('add-candidate')">＋ Candidate</button>
+              <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()">Edit</button>
+              <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" style="border-color:#FECACA;color:var(--danger)">Remove</button>
+            </td>
+          </tr>
+          <tr id="job-row-3" class="job-row" onclick="selectJob(3)">
+            <td style="color:var(--text-muted);font-size:11px">▶</td>
+            <td><strong>Data Analyst</strong><br><span style="font-size:11px;color:var(--text-muted)">2+ yrs · SQL/Python</span></td>
+            <td>Acme Corp</td><td>Manchester</td><td><span class="badge bn">Contract</span></td>
+            <td style="text-align:center"><strong>2</strong></td>
+            <td style="color:var(--text-muted)">—</td>
+            <td><span class="badge bw">Draft</span></td>
+            <td style="color:var(--text-muted)">28 Feb 2026</td>
+            <td style="display:flex;gap:5px">
+              <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('add-candidate')">＋ Candidate</button>
+              <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()">Edit</button>
+              <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" style="border-color:#FECACA;color:var(--danger)">Remove</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Candidates panel — shown when a job row is selected -->
+    <div id="job-candidates-panel" class="card" style="margin-bottom:16px">
+      <div class="card-head" style="background:#F7F9FF;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:3px;height:18px;background:var(--accent);border-radius:2px"></div>
+          <span class="card-title" id="panel-job-title">Candidates — Senior Backend Engineer</span>
+          <span class="badge ba" id="panel-client-badge">FinTech Co.</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:11px;color:var(--text-muted)" id="panel-count">4 candidates</span>
+          <button class="btn btn-primary btn-sm" onclick="nav('add-candidate')">＋ Add Candidate</button>
+        </div>
+      </div>
+
+      <!-- Sr. Backend Engineer candidates -->
+      <table id="panel-table-1">
+        <thead><tr><th>Candidate</th><th>Applied For</th><th>Consistency Score</th><th>Capability Match</th><th>Risk Flags</th><th>Status</th><th>Analysed</th><th></th></tr></thead>
+        <tbody>
+          <tr onclick="nav('workflow')">
+            <td><strong>James Okafor</strong><br><span style="font-size:11px;color:var(--text-muted)">james.okafor@email.com</span></td>
+            <td>Sr. Backend Engineer</td>
+            <td><span style="font-weight:700;color:var(--success)">87%</span><div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:87%;background:var(--success)"></div></div></td>
+            <td><span style="font-weight:700;color:var(--warning)">72%</span><div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:72%;background:var(--warning)"></div></div></td>
+            <td><span class="badge bd">2 High</span></td>
+            <td><span class="badge bw">Review</span></td>
+            <td style="color:var(--text-muted)">28 Feb 2026</td>
+            <td style="display:flex;gap:5px"><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('workflow')">Open Profile</button><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" style="border-color:#FECACA;color:var(--danger)">Remove</button></td>
+          </tr>
+          <tr onclick="nav('workflow')">
+            <td><strong>Tom Harrington</strong><br><span style="font-size:11px;color:var(--text-muted)">tom.h@email.com</span></td>
+            <td>Sr. Backend Engineer</td>
+            <td><span style="font-weight:700;color:var(--danger)">54%</span><div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:54%;background:var(--danger)"></div></div></td>
+            <td><span style="font-weight:700;color:var(--warning)">65%</span><div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:65%;background:var(--warning)"></div></div></td>
+            <td><span class="badge bd">3 High</span></td>
+            <td><span class="badge bd">Flagged</span></td>
+            <td style="color:var(--text-muted)">26 Feb 2026</td>
+            <td style="display:flex;gap:5px"><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('workflow')">Open Profile</button><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" style="border-color:#FECACA;color:var(--danger)">Remove</button></td>
+          </tr>
+          <tr onclick="nav('workflow')">
+            <td><strong>Leon Fischer</strong><br><span style="font-size:11px;color:var(--text-muted)">leon.f@email.com</span></td>
+            <td>Sr. Backend Engineer</td>
+            <td><span style="font-weight:700;color:var(--success)">83%</span><div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:83%;background:var(--success)"></div></div></td>
+            <td><span style="font-weight:700;color:var(--success)">80%</span><div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:80%;background:var(--success)"></div></div></td>
+            <td><span class="badge bw">1 Med</span></td>
+            <td><span class="badge bs">Approved</span></td>
+            <td style="color:var(--text-muted)">25 Feb 2026</td>
+            <td style="display:flex;gap:5px"><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('workflow')">Open Profile</button><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" style="border-color:#FECACA;color:var(--danger)">Remove</button></td>
+          </tr>
+          <tr>
+            <td><strong>Maria Santos</strong><br><span style="font-size:11px;color:var(--text-muted)">maria.s@email.com</span></td>
+            <td>Sr. Backend Engineer</td>
+            <td style="color:var(--text-muted)">—</td>
+            <td style="color:var(--text-muted)">—</td>
+            <td><span class="badge bn">Pending</span></td>
+            <td><span class="badge ba">Not Run</span></td>
+            <td style="color:var(--text-muted)">28 Feb 2026</td>
+            <td style="display:flex;gap:5px"><button class="btn btn-primary btn-sm" onclick="nav('add-candidate')">Run Analysis</button><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" style="border-color:#FECACA;color:var(--danger)">Remove</button></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- PM candidates (hidden by default) -->
+      <table id="panel-table-2" style="display:none">
+        <thead><tr><th>Candidate</th><th>Applied For</th><th>Consistency Score</th><th>Capability Match</th><th>Risk Flags</th><th>Status</th><th>Analysed</th><th></th></tr></thead>
+        <tbody>
+          <tr onclick="nav('workflow')">
+            <td><strong>Priya Mehta</strong><br><span style="font-size:11px;color:var(--text-muted)">priya.m@email.com</span></td>
+            <td>Product Manager</td>
+            <td><span style="font-weight:700;color:var(--success)">91%</span><div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:91%;background:var(--success)"></div></div></td>
+            <td><span style="font-weight:700;color:var(--success)">88%</span><div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:88%;background:var(--success)"></div></div></td>
+            <td><span class="badge bw">1 Med</span></td><td><span class="badge bs">Approved</span></td><td style="color:var(--text-muted)">27 Feb 2026</td>
+            <td style="display:flex;gap:5px"><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('workflow')">Open Profile</button><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" style="border-color:#FECACA;color:var(--danger)">Remove</button></td>
+          </tr>
+          <tr onclick="nav('workflow')">
+            <td><strong>Aisha Kamara</strong><br><span style="font-size:11px;color:var(--text-muted)">aisha.k@email.com</span></td>
+            <td>Product Manager</td>
+            <td><span style="font-weight:700;color:var(--success)">89%</span><div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:89%;background:var(--success)"></div></div></td>
+            <td><span style="font-weight:700;color:var(--success)">85%</span><div class="pbar-wrap" style="width:80px;margin-top:4px"><div class="pbar" style="width:85%;background:var(--success)"></div></div></td>
+            <td><span class="badge bn">None</span></td><td><span class="badge bs">Approved</span></td><td style="color:var(--text-muted)">25 Feb 2026</td>
+            <td style="display:flex;gap:5px"><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('workflow')">Open Profile</button><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" style="border-color:#FECACA;color:var(--danger)">Remove</button></td>
+          </tr>
+          <tr>
+            <td><strong>Omar Siddiqui</strong><br><span style="font-size:11px;color:var(--text-muted)">omar.s@email.com</span></td>
+            <td>Product Manager</td>
+            <td style="color:var(--text-muted)">—</td><td style="color:var(--text-muted)">—</td>
+            <td><span class="badge bn">Pending</span></td><td><span class="badge ba">Not Run</span></td><td style="color:var(--text-muted)">28 Feb 2026</td>
+            <td style="display:flex;gap:5px"><button class="btn btn-primary btn-sm" onclick="nav('add-candidate')">Run Analysis</button><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" style="border-color:#FECACA;color:var(--danger)">Remove</button></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Data Analyst candidates (hidden by default) -->
+      <table id="panel-table-3" style="display:none">
+        <thead><tr><th>Candidate</th><th>Applied For</th><th>Consistency Score</th><th>Capability Match</th><th>Risk Flags</th><th>Status</th><th>Analysed</th><th></th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Wei Zhang</strong><br><span style="font-size:11px;color:var(--text-muted)">wei.z@email.com</span></td>
+            <td>Data Analyst</td>
+            <td style="color:var(--text-muted)">—</td><td style="color:var(--text-muted)">—</td>
+            <td><span class="badge bn">Pending</span></td><td><span class="badge ba">Not Run</span></td><td style="color:var(--text-muted)">28 Feb 2026</td>
+            <td style="display:flex;gap:5px"><button class="btn btn-primary btn-sm" onclick="nav('add-candidate')">Run Analysis</button><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" style="border-color:#FECACA;color:var(--danger)">Remove</button></td>
+          </tr>
+          <tr>
+            <td><strong>Fatima Al-Hassan</strong><br><span style="font-size:11px;color:var(--text-muted)">fatima.a@email.com</span></td>
+            <td>Data Analyst</td>
+            <td style="color:var(--text-muted)">—</td><td style="color:var(--text-muted)">—</td>
+            <td><span class="badge bn">Pending</span></td><td><span class="badge ba">Not Run</span></td><td style="color:var(--text-muted)">27 Feb 2026</td>
+            <td style="display:flex;gap:5px"><button class="btn btn-primary btn-sm" onclick="nav('add-candidate')">Run Analysis</button><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" style="border-color:#FECACA;color:var(--danger)">Remove</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sp"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="annot">⚡ GET /api/jobs · GET /api/candidates?jobId={id}</span>
+      <span class="annot">🖱 Click job row to load candidates below</span>
+      <span class="annot">📊 MUI DataGrid (sortable, paginated)</span>
+      <span class="annot annot-new">✦ "Open Profile" navigates to Candidate Workflow page</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PAGE 3: CREATE JOB — with AI Client Brief Analyzer (NEW)
+══════════════════════════════════════════════════════════════════ -->
+<div id="pg-add-job" class="page">
+  <div class="page-header">
+    <div><div class="ph-title">Create New Job</div><div class="ph-sub">Paste JD or client brief to create a vacancy</div></div>
+    <div class="ph-actions">
+      <button class="btn btn-secondary btn-sm" onclick="nav('jobs')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="nav('jobs')">Save Job</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="step-bar">
+      <div class="step done"><div class="step-num">✓</div> Job Details</div>
+      <div class="step-line"></div>
+      <div class="step act"><div class="step-num">2</div> Job Description</div>
+      <div class="step-line"></div>
+      <div class="step"><div class="step-num">3</div> Review & Save</div>
+    </div>
+
+    <div class="row">
+      <div style="flex:1.3" class="col">
+
+        <!-- Job Details card (unchanged) -->
+        <div class="card">
+          <div class="card-head"><span class="card-title">Job Details</span></div>
+          <div class="card-body">
+            <div class="grid2">
+              <div class="form-group"><label class="form-label">Job Title <span class="req">*</span></label><input class="fi" type="text" value="Senior Backend Engineer" /></div>
+              <div class="form-group"><label class="form-label">Client / Company</label><input class="fi" type="text" value="FinTech Co." /></div>
+            </div>
+            <div class="grid2">
+              <div class="form-group"><label class="form-label">Location</label><input class="fi" type="text" placeholder="e.g. London / Remote" /></div>
+              <div class="form-group"><label class="form-label">Employment Type</label><select class="fi"><option>Full-time</option><option>Contract</option><option>Part-time</option></select></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✦ NEW: AI Client Brief Analyzer — above JD -->
+        <div class="card card-new">
+          <div class="card-head">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:16px">✦</span>
+              <span class="card-title">AI Client Brief Analyzer <span class="new-tag">NEW</span></span>
+            </div>
+            <span class="annot annot-new">POST /api/jobs/analyze-brief</span>
+          </div>
+          <div class="card-body">
+            <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px;line-height:1.6">Paste raw client notes, emails, or an unstructured brief. AI will extract a structured Job Description, required skills, and seniority level automatically.</div>
+            <div class="form-group" style="margin-bottom:10px">
+              <label class="form-label">Paste Client Brief / Raw Notes</label>
+              <textarea class="ft" rows="5" placeholder="e.g. 'We need someone senior in Java, ideally fintech background, team lead experience, working closely with our CTO, startup culture, fast paced, Series B…'"></textarea>
+            </div>
+            <button class="btn btn-purple" style="width:100%;justify-content:center;margin-bottom:14px">✦ Generate Job Description &amp; Skills</button>
+
+            <!-- AI Output Section -->
+            <div style="background:#F8F7FF;border:1px solid #C4B5FD;border-radius:8px;padding:14px">
+              <div style="font-size:10px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">✦ AI Analysis Output — will populate below fields</div>
+              <div class="grid3" style="gap:8px;margin-bottom:10px">
+                <div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+                  <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Seniority Level</div>
+                  <span class="badge ba">Senior · 5+ yrs</span>
+                </div>
+                <div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+                  <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Role Type</div>
+                  <span class="badge bn">Technical Lead</span>
+                </div>
+                <div style="background:#fff;border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+                  <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Industry</div>
+                  <span class="badge bn">FinTech</span>
+                </div>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Extracted Skills Preview</div>
+              <div><span class="tag match">Java</span><span class="tag match">Spring Boot</span><span class="tag match">Microservices</span><span class="tag match">AWS</span><span class="tag">Docker</span><span class="tag">Kubernetes</span><span class="tag">Team Lead</span><span class="tag">FinTech</span></div>
+              <div style="margin-top:10px;font-size:11px;color:var(--text-muted)">↓ Click "Generate" to auto-fill the Job Description field below</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Job Description card (unchanged, auto-filled by AI) -->
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Job Description (JD) <span class="req">*</span></span>
+            <span class="annot">Auto-filled by AI Brief Analyzer above, or paste manually</span>
+          </div>
+          <div class="card-body">
+            <textarea class="ft" rows="11" placeholder="AI will populate this from your client brief above, or paste manually…"></textarea>
+            <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:11px;color:var(--text-muted)">POST /api/jobs — Spring Boot REST</span>
+              <button class="btn btn-secondary btn-sm">🔍 Preview Extracted Skills</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right panel -->
+      <div style="flex:0 0 220px" class="col">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Extracted Skills Preview</span></div>
+          <div class="card-body" style="padding:12px 16px">
+            <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Technical</div>
+            <div><span class="tag">Java / Kotlin</span><span class="tag">Spring Boot</span><span class="tag">REST API</span><span class="tag">Microservices</span><span class="tag">AWS</span><span class="tag">Docker</span><span class="tag">Kubernetes</span></div>
+            <div class="divider" style="margin:10px 0"></div>
+            <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Soft Skills</div>
+            <div><span class="tag">Mentoring</span><span class="tag">Code Review</span><span class="tag">Collaboration</span></div>
+            <div class="divider" style="margin:10px 0"></div>
+            <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;margin-bottom:5px">Seniority Signal</div>
+            <span class="badge ba">Senior · 5+ yrs</span>
+          </div>
+        </div>
+        <div style="padding:4px 2px">
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">After saving you can:</div>
+          <div style="font-size:12px;color:var(--text-secondary);display:flex;flex-direction:column;gap:5px">
+            <span>✓ Add candidates to this job</span>
+            <span>✓ Run CV vs JD analysis</span>
+            <span>✓ Review validation questions</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="annot">📝 MUI TextField + Select</span>
+      <span class="annot">⚡ POST /api/jobs on Save</span>
+      <span class="annot annot-new">✦ NEW: POST /api/jobs/analyze-brief — AI extracts JD + skills from raw brief</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PAGE 4: CANDIDATES LIST (unchanged — rows now link to workflow)
+══════════════════════════════════════════════════════════════════ -->
+<div id="pg-candidates" class="page">
+  <div class="page-header">
+    <div><div class="ph-title">Candidates</div><div class="ph-sub">All candidates across active jobs</div></div>
+    <div class="ph-actions">
+      <input class="fi" style="width:190px;font-size:12px;padding:6px 10px" type="text" placeholder="🔍 Search candidates…" />
+      <select class="fi" style="width:180px;font-size:12px;padding:6px 10px"><option>All Jobs</option><option>Sr. Backend Engineer</option><option>Product Manager</option></select>
+      <button class="btn btn-primary btn-sm" onclick="nav('add-candidate')">＋ Add Candidate</button>
+    </div>
+  </div>
+  <div class="content">
+    <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
+      <span style="font-size:12px;color:var(--text-muted);font-weight:500">Filter by risk:</span>
+      <button class="btn btn-secondary btn-sm" style="border-color:var(--accent);color:var(--accent)">All (9)</button>
+      <button class="btn btn-secondary btn-sm">High Risk (4)</button>
+      <button class="btn btn-secondary btn-sm">Medium (3)</button>
+      <button class="btn btn-secondary btn-sm">Low (2)</button>
+      <div style="margin-left:auto;font-size:12px;color:var(--text-muted)">9 candidates</div>
+    </div>
+    <div class="card">
+      <table>
+        <thead><tr><th>Candidate</th><th>Applied For</th><th>Consistency</th><th>Capability</th><th>Risk</th><th>Status</th><th>Analysed</th><th></th></tr></thead>
+        <tbody>
+          <tr onclick="nav('workflow')"><td><strong>James Okafor</strong><br><span style="font-size:11px;color:var(--text-muted)">james@email.com</span></td><td>Sr. Backend Eng.</td><td><span style="font-weight:600;color:var(--success)">87%</span><div class="pbar-wrap" style="width:70px"><div class="pbar" style="width:87%;background:var(--success)"></div></div></td><td><span style="font-weight:600;color:var(--warning)">72%</span><div class="pbar-wrap" style="width:70px"><div class="pbar" style="width:72%;background:var(--warning)"></div></div></td><td><span class="badge bd">2 High</span></td><td><span class="badge bw">Review</span></td><td style="color:var(--text-muted)">28 Feb</td><td style="display:flex;gap:5px"><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('workflow')">Open Profile</button><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" style="border-color:#FECACA;color:var(--danger)">Remove</button></td></tr>
+          <tr onclick="nav('workflow')"><td><strong>Leon Fischer</strong><br><span style="font-size:11px;color:var(--text-muted)">leon@email.com</span></td><td>Sr. Backend Eng.</td><td><span style="font-weight:600;color:var(--success)">83%</span><div class="pbar-wrap" style="width:70px"><div class="pbar" style="width:83%;background:var(--success)"></div></div></td><td><span style="font-weight:600;color:var(--success)">80%</span><div class="pbar-wrap" style="width:70px"><div class="pbar" style="width:80%;background:var(--success)"></div></div></td><td><span class="badge bw">1 Med</span></td><td><span class="badge bs">Approved</span></td><td style="color:var(--text-muted)">25 Feb</td><td style="display:flex;gap:5px"><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('workflow')">Open Profile</button><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" style="border-color:#FECACA;color:var(--danger)">Remove</button></td></tr>
+          <tr onclick="nav('workflow')"><td><strong>Priya Mehta</strong><br><span style="font-size:11px;color:var(--text-muted)">priya@email.com</span></td><td>Product Manager</td><td><span style="font-weight:600;color:var(--success)">91%</span><div class="pbar-wrap" style="width:70px"><div class="pbar" style="width:91%;background:var(--success)"></div></div></td><td><span style="font-weight:600;color:var(--success)">88%</span><div class="pbar-wrap" style="width:70px"><div class="pbar" style="width:88%;background:var(--success)"></div></div></td><td><span class="badge bw">1 Med</span></td><td><span class="badge bs">Approved</span></td><td style="color:var(--text-muted)">27 Feb</td><td style="display:flex;gap:5px"><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();nav('workflow')">Open Profile</button><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation()" style="border-color:#FECACA;color:var(--danger)">Remove</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="sp"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="annot">⚡ GET /api/candidates?jobId=&riskLevel=</span>
+      <span class="annot annot-new">✦ Rows now navigate to Candidate Workflow page</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PAGE 5: ADD CANDIDATE (unchanged)
+══════════════════════════════════════════════════════════════════ -->
+<div id="pg-add-candidate" class="page">
+  <div class="page-header">
+    <div><div class="ph-title">Add Candidate</div><div class="ph-sub">Paste CV and LinkedIn for validation analysis</div></div>
+    <div class="ph-actions">
+      <button class="btn btn-secondary btn-sm" onclick="nav('candidates')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="nav('analysis')">🔍 Run Analysis</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="row">
+      <div style="flex:1.3" class="col">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Candidate Details</span></div>
+          <div class="card-body">
+            <div class="grid2">
+              <div class="form-group"><label class="form-label">First Name <span class="req">*</span></label><input class="fi" type="text" value="James" /></div>
+              <div class="form-group"><label class="form-label">Last Name <span class="req">*</span></label><input class="fi" type="text" value="Okafor" /></div>
+            </div>
+            <div class="grid2">
+              <div class="form-group"><label class="form-label">Email</label><input class="fi" type="email" value="james.okafor@email.com" /></div>
+              <div class="form-group"><label class="form-label">Phone</label><input class="fi" type="text" placeholder="+44 7000 000000" /></div>
+            </div>
+            <div class="form-group"><label class="form-label">Assign to Job <span class="req">*</span></label><select class="fi"><option>Senior Backend Engineer — FinTech Co.</option><option>Product Manager — HealthStart Ltd</option></select></div>
+            <div class="form-group" style="margin-bottom:0"><label class="form-label">LinkedIn Profile URL <span class="req">*</span></label><div class="form-hint">Used to validate CV vs LinkedIn consistency</div><input class="fi" type="url" value="https://linkedin.com/in/jamesokafor" /></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">CV / Resume <span class="req">*</span></span>
+            <!-- Tab toggle -->
+            <div style="display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:11px;font-weight:500">
+              <div id="tab-paste" onclick="cvTab('paste')" style="padding:4px 12px;background:var(--accent);color:#fff;cursor:pointer">✏ Paste Text</div>
+              <div id="tab-upload" onclick="cvTab('upload')" style="padding:4px 12px;background:var(--white);color:var(--text-muted);cursor:pointer">📎 Upload File</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <!-- PII notice — always visible -->
+            <div style="display:flex;align-items:flex-start;gap:7px;background:#F0F7FF;border:1px solid #BFDBFE;border-radius:6px;padding:8px 11px;margin-bottom:12px">
+              <span style="font-size:13px;flex-shrink:0">🔒</span>
+              <div style="font-size:11px;color:#1E40AF;line-height:1.5"><strong>Do not include PII</strong> beyond what is needed for analysis.</div>
+            </div>
+
+            <!-- Paste panel -->
+            <div id="cv-paste-panel">
+              <textarea class="ft" rows="10" placeholder="Paste full CV text here…"></textarea>
+              <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:11px;color:var(--text-muted)">Plain text preferred for accurate analysis</span>
+                <button class="btn btn-secondary btn-sm">Clear</button>
+              </div>
+            </div>
+
+            <!-- Upload panel (hidden by default) -->
+            <div id="cv-upload-panel" style="display:none">
+              <!-- Drop zone -->
+              <div style="border:2px dashed var(--border);border-radius:8px;padding:32px 16px;text-align:center;background:var(--bg);cursor:pointer;transition:border-color .15s"
+                onmouseover="this.style.borderColor='var(--accent)'"
+                onmouseout="this.style.borderColor='var(--border)'">
+                <div style="font-size:28px;margin-bottom:8px">📄</div>
+                <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:4px">Drag &amp; drop your CV here</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px">Supports PDF and Word (.doc, .docx)</div>
+                <label style="display:inline-flex;align-items:center;gap:5px;padding:7px 16px;background:var(--white);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;font-weight:500;cursor:pointer;font-family:inherit">
+                  📎 Browse File
+                  <input type="file" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" />
+                </label>
+              </div>
+              <!-- File accepted state (shown after upload) -->
+              <div style="margin-top:10px;display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--success-bg);border:1px solid #BBF7D0;border-radius:7px;display:none" id="cv-file-chosen">
+                <span style="font-size:18px">📄</span>
+                <div style="flex:1">
+                  <div style="font-size:12px;font-weight:600;color:var(--text-primary)">james_okafor_cv.pdf</div>
+                  <div style="font-size:11px;color:var(--text-muted)">245 KB · PDF · Text will be extracted automatically</div>
+                </div>
+                <button class="btn btn-secondary btn-sm">✕ Remove</button>
+              </div>
+              <div style="margin-top:8px;font-size:11px;color:var(--text-muted);text-align:center">
+                Max file size 10 MB · Text extracted automatically via backend parser
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="flex:0 0 220px" class="col">
+        <div class="card">
+          <div class="card-head"><span class="card-title">What will be analysed</span></div>
+          <div class="card-body" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+            <div><div style="font-size:12px;font-weight:600;margin-bottom:3px">🔄 CV vs LinkedIn</div><div style="font-size:11px;color:var(--text-muted)">Timeline gaps, title mismatches</div></div>
+            <div class="divider" style="margin:0"></div>
+            <div><div style="font-size:12px;font-weight:600;margin-bottom:3px">🎯 CV vs JD Alignment</div><div style="font-size:11px;color:var(--text-muted)">Skill match, seniority signals</div></div>
+            <div class="divider" style="margin:0"></div>
+            <div><div style="font-size:12px;font-weight:600;margin-bottom:3px">🛡 Fraud Detection</div><div style="font-size:11px;color:var(--text-muted)">AI-generated CV signals, anomalies</div></div>
+            <div class="divider" style="margin:0"></div>
+            <div><div style="font-size:12px;font-weight:600;margin-bottom:3px">📊 Placement Probability</div><div style="font-size:11px;color:var(--text-muted)">Hire likelihood based on pattern data</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Pre-flight Checklist</span></div>
+          <div class="card-body" style="padding:12px 16px">
+            <div style="display:flex;flex-direction:column;gap:8px;font-size:12px;margin-bottom:14px">
+              <span style="color:var(--success)">✓ Candidate name entered</span>
+              <span style="color:var(--success)">✓ Job assigned</span>
+              <span style="color:var(--success)">✓ LinkedIn URL provided</span>
+              <span style="color:var(--success)">✓ CV text pasted</span>
+            </div>
+            <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="nav('analysis')">🔍 Run Analysis</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PAGE 6: ANALYSIS — extended with 3 new sections
+══════════════════════════════════════════════════════════════════ -->
+<div id="pg-analysis" class="page">
+  <div class="page-header">
+    <div><div class="ph-title">Analysis Result — James Okafor</div><div class="ph-sub">Senior Backend Engineer · FinTech Co. · Analysed 28 Feb 2026</div></div>
+    <div class="ph-actions">
+      <button class="btn btn-secondary btn-sm" onclick="nav('candidates')">← Back</button>
+      <button class="btn btn-secondary btn-sm">⬇ Export PDF</button>
+      <button class="btn btn-primary btn-sm" onclick="nav('workflow')">👤 Open Workflow</button>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- Meta strip -->
+    <div class="meta-strip">
+      <div><div class="mb-lbl">Consistency Score</div><div class="score-circle sc-g" style="width:60px;height:60px;font-size:17px;margin-top:5px">87%</div></div>
+      <div style="width:1px;background:var(--border);height:50px;align-self:center"></div>
+      <div><div class="mb-lbl">Capability Match</div><div class="score-circle sc-w" style="width:60px;height:60px;font-size:17px;margin-top:5px">72%</div></div>
+      <div style="width:1px;background:var(--border);height:50px;align-self:center"></div>
+      <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px 24px">
+        <div><div class="mb-lbl">Candidate</div><div class="mb-val">James Okafor</div></div>
+        <div><div class="mb-lbl">LinkedIn</div><div class="mb-val" style="color:var(--accent)">linkedin.com/in/jamesokafor</div></div>
+        <div><div class="mb-lbl">Applied For</div><div class="mb-val">Sr. Backend Engineer</div></div>
+        <div><div class="mb-lbl">Overall Risk</div><div class="mb-val"><span class="badge bd">High · 2 Flags</span></div></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div style="flex:1.4" class="col">
+
+        <!-- ✦ NEW SECTION 1: AI Generated Candidate Summary (ABOVE consistency section) -->
+        <div class="card card-new">
+          <div class="card-head">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:16px">✦</span>
+              <span class="card-title">AI Generated Candidate Summary <span class="new-tag">NEW</span></span>
+            </div>
+            <button class="btn btn-secondary btn-sm">📋 Copy for Client</button>
+          </div>
+          <div class="card-body">
+            <!-- Professional Summary -->
+            <div style="background:#F8F7FF;border:1px solid #C4B5FD;border-radius:7px;padding:12px 14px;margin-bottom:12px">
+              <div style="font-size:10px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Professional Summary</div>
+              <div style="font-size:12px;color:var(--text-primary);line-height:1.7">James is a senior backend engineer with 7+ years of experience specialising in Java/Kotlin microservices within high-throughput fintech environments. He has demonstrated ownership of payment systems processing 800K daily transactions and has a track record of mentoring junior engineers. His technical depth is strong, though some claims around Kubernetes maturity require validation.</div>
+            </div>
+            <div class="grid2" style="gap:10px">
+              <!-- Strengths -->
+              <div style="background:var(--success-bg);border:1px solid #BBF7D0;border-radius:7px;padding:10px 12px">
+                <div style="font-size:10px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">✓ Strengths</div>
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <div style="font-size:11px;color:var(--text-primary)">• Strong Java/Kotlin + Spring Boot depth</div>
+                  <div style="font-size:11px;color:var(--text-primary)">• Fintech domain exposure (payments)</div>
+                  <div style="font-size:11px;color:var(--text-primary)">• Mentorship and team leadership evidence</div>
+                  <div style="font-size:11px;color:var(--text-primary)">• Architecture ownership at scale</div>
+                </div>
+              </div>
+              <!-- Potential Concerns -->
+              <div style="background:var(--warning-bg);border:1px solid #FDE68A;border-radius:7px;padding:10px 12px">
+                <div style="font-size:10px;font-weight:700;color:var(--warning);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">⚠ Potential Concerns</div>
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <div style="font-size:11px;color:var(--text-primary)">• Kubernetes listed but described as "learning"</div>
+                  <div style="font-size:11px;color:var(--text-primary)">• 4-month gap in 2019 unexplained</div>
+                  <div style="font-size:11px;color:var(--text-primary)">• No regulated environment specifics</div>
+                </div>
+              </div>
+            </div>
+            <!-- Suggested Interview Focus -->
+            <div style="margin-top:10px;background:#F0F7FF;border:1px solid #BFDBFE;border-radius:7px;padding:10px 14px">
+              <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px">Suggested Interview Focus Areas</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <span class="badge ba">Kubernetes depth</span>
+                <span class="badge ba">2019 timeline gap</span>
+                <span class="badge ba">Regulated env. experience</span>
+                <span class="badge ba">Team lead scenarios</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CV vs LinkedIn (existing) -->
+        <div class="card">
+          <div class="card-head"><span class="card-title">CV vs LinkedIn Consistency</span><span class="badge bs">87% Match</span></div>
+          <div class="card-body">
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px">Employment Timeline</span><span style="font-size:12px;font-weight:600;color:var(--success)">✓ Match</span></div><div class="pbar-wrap"><div class="pbar" style="width:95%;background:var(--success)"></div></div></div>
+              <div><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px">Job Titles</span><span style="font-size:12px;font-weight:600;color:var(--success)">✓ Match</span></div><div class="pbar-wrap"><div class="pbar" style="width:90%;background:var(--success)"></div></div></div>
+              <div><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px">Skills Listed</span><span style="font-size:12px;font-weight:600;color:var(--warning)">⚠ Partial</span></div><div class="pbar-wrap"><div class="pbar" style="width:75%;background:var(--warning)"></div></div></div>
+              <div><div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px">Education</span><span style="font-size:12px;font-weight:600;color:var(--success)">✓ Match</span></div><div class="pbar-wrap"><div class="pbar" style="width:100%;background:var(--success)"></div></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Capability matrix (existing) -->
+        <div class="card">
+          <div class="card-head"><span class="card-title">CV vs JD Capability Alignment</span><span class="badge bw">72% Match</span></div>
+          <div class="card-body">
+            <table>
+              <thead><tr><th>Capability Area</th><th>Weight</th><th>Score</th><th>Gap Level</th></tr></thead>
+              <tbody>
+                <tr><td>System Design</td><td>25%</td><td><span style="color:var(--warning);font-weight:600">70%</span></td><td><span class="badge bw">Medium</span></td></tr>
+                <tr><td>Cloud / Kubernetes</td><td>25%</td><td><span style="color:var(--danger);font-weight:600">45%</span></td><td><span class="badge bd">High</span></td></tr>
+                <tr><td>FinTech Domain</td><td>25%</td><td><span style="color:var(--warning);font-weight:600">65%</span></td><td><span class="badge bw">Medium</span></td></tr>
+                <tr><td>Leadership</td><td>25%</td><td><span style="color:var(--success);font-weight:600">85%</span></td><td><span class="badge bs">Low</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ✦ NEW SECTION 2: Candidate Authenticity & Fraud Detection -->
+        <div class="card card-new">
+          <div class="card-head">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:16px">🛡</span>
+              <span class="card-title">Candidate Authenticity &amp; Fraud Detection <span class="new-tag">NEW</span></span>
+            </div>
+            <span class="badge bw">Medium Risk</span>
+          </div>
+          <div class="card-body">
+            <!-- Authenticity Score Gauge -->
+            <div style="display:flex;gap:20px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+              <div style="text-align:center">
+                <div class="score-circle sc-w" style="width:64px;height:64px;font-size:16px">74%</div>
+                <div style="font-size:10px;color:var(--text-muted);margin-top:4px">Authenticity<br>Score</div>
+              </div>
+              <div style="flex:1">
+                <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Authenticity Gauge</div>
+                <div style="background:linear-gradient(90deg,var(--danger) 0%,var(--warning) 40%,var(--success) 80%,#22C55E 100%);height:10px;border-radius:5px;position:relative;margin-bottom:6px">
+                  <div style="position:absolute;left:26%;top:-5px;width:3px;height:20px;background:var(--text-primary);border-radius:2px"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted)"><span>High Risk</span><span>Medium</span><span>Low Risk</span></div>
+              </div>
+              <div>
+                <div style="font-size:10px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px">Overall Verdict</div>
+                <span class="badge bw" style="font-size:12px;padding:5px 12px">⚠ Proceed with Caution</span>
+              </div>
+            </div>
+
+            <!-- Signals -->
+            <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Detected Signals</div>
+            <div class="fraud-signal">
+              <div class="fraud-icon" style="background:var(--warning-bg)">🤖</div>
+              <div style="flex:1">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <div style="font-size:12px;font-weight:600">AI-Generated Content Indicators</div>
+                  <span class="badge bw">Medium</span>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px;line-height:1.5">Achievement descriptions follow repetitive AI-generated phrasing patterns. 3 bullet points match known GPT output templates. Human review recommended.</div>
+              </div>
+            </div>
+            <div class="fraud-signal">
+              <div class="fraud-icon" style="background:var(--danger-bg)">📅</div>
+              <div style="flex:1">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <div style="font-size:12px;font-weight:600">Timeline Inconsistency</div>
+                  <span class="badge bd">High</span>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px;line-height:1.5">4-month gap (Mar–Jun 2019) present in CV but completely absent on LinkedIn profile. No explanation provided.</div>
+              </div>
+            </div>
+            <div class="fraud-signal">
+              <div class="fraud-icon" style="background:var(--danger-bg)">📋</div>
+              <div style="flex:1">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <div style="font-size:12px;font-weight:600">Skill Claim Mismatch</div>
+                  <span class="badge bd">High</span>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px;line-height:1.5">Kubernetes listed as a core skill but described as "learning" in the same document. Claim is internally contradictory.</div>
+              </div>
+            </div>
+            <div class="fraud-signal">
+              <div class="fraud-icon" style="background:var(--success-bg)">📈</div>
+              <div style="flex:1">
+                <div style="display:flex;align-items:center;justify-content:space-between">
+                  <div style="font-size:12px;font-weight:600">Career Pattern Analysis</div>
+                  <span class="badge bs">Low Risk</span>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px;line-height:1.5">Career progression follows a natural seniority arc. Average tenure of 3.2 years — no unusual job-hopping detected.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✦ NEW SECTION 3: Placement Probability -->
+        <div class="card card-new">
+          <div class="card-head">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:16px">📊</span>
+              <span class="card-title">Placement Probability <span class="new-tag">NEW</span></span>
+            </div>
+            <span class="annot annot-new">AI · Based on hiring patterns</span>
+          </div>
+          <div class="card-body">
+            <div style="display:flex;gap:20px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+              <!-- Big score -->
+              <div style="text-align:center;flex-shrink:0">
+                <div style="font-size:42px;font-weight:700;color:var(--warning);line-height:1">68%</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:3px">Placement<br>Probability</div>
+              </div>
+              <div style="flex:1;min-width:200px">
+                <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                  <span style="font-size:12px;font-weight:500">Placement Likelihood</span>
+                  <span style="font-size:12px;font-weight:700;color:var(--warning)">68%</span>
+                </div>
+                <div class="pbar-wrap" style="height:10px;margin-bottom:10px"><div class="pbar" style="width:68%;background:var(--warning)"></div></div>
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                  <div style="font-size:11px;color:var(--text-muted)">Confidence Level</div>
+                  <span class="badge bw">Medium Confidence</span>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Based on 142 similar placements in fintech engineering roles.</div>
+              </div>
+            </div>
+
+            <div class="grid2" style="gap:10px">
+              <!-- Positive signals -->
+              <div style="background:var(--success-bg);border:1px solid #BBF7D0;border-radius:7px;padding:10px 12px">
+                <div style="font-size:10px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">✓ Positive Signals</div>
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <div style="font-size:11px;color:var(--text-primary)">• Strong skill match with JD (72%)</div>
+                  <div style="font-size:11px;color:var(--text-primary)">• FinTech hiring pattern match</div>
+                  <div style="font-size:11px;color:var(--text-primary)">• Seniority aligns with role level</div>
+                  <div style="font-size:11px;color:var(--text-primary)">• Payment systems domain overlap</div>
+                </div>
+              </div>
+              <!-- Risk factors -->
+              <div style="background:var(--danger-bg);border:1px solid #FECACA;border-radius:7px;padding:10px 12px">
+                <div style="font-size:10px;font-weight:700;color:var(--danger);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">✗ Risk Factors</div>
+                <div style="display:flex;flex-direction:column;gap:5px">
+                  <div style="font-size:11px;color:var(--text-primary)">• Salary expectations may exceed band</div>
+                  <div style="font-size:11px;color:var(--text-primary)">• Kubernetes gap vs JD requirement</div>
+                  <div style="font-size:11px;color:var(--text-primary)">• No explicit regulatory exposure</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interview Questions (existing) -->
+        <div class="card">
+          <div class="card-head"><span class="card-title">AI-Generated Validation Questions</span><span class="badge ba">6 Questions</span></div>
+          <div class="card-body" style="padding:0 18px">
+            <div style="padding:12px 0;border-bottom:1px solid #F0F2F6">
+              <div style="display:flex;gap:6px;margin-bottom:4px"><span class="badge bd" style="font-size:10px">Risk Probe</span><span class="badge bn" style="font-size:10px">Kubernetes</span></div>
+              <div style="font-size:13px;font-weight:500;line-height:1.5">Walk me through the most complex Kubernetes deployment you've owned end-to-end — what did you configure and what broke?</div>
+            </div>
+            <div style="padding:12px 0;font-size:12px;color:var(--text-muted)">+ 5 more questions available</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right col -->
+      <div style="flex:0 0 216px" class="col">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Risk Flags</span><span class="badge bd">2 High</span></div>
+          <div class="card-body" style="padding:12px 16px">
+            <div class="risk-item"><span class="rdot h"></span><div><div style="font-size:12px;font-weight:600">LinkedIn date gap</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">4-month gap in 2019 on CV, absent on LinkedIn</div><span class="badge bd" style="font-size:10px;margin-top:4px">High</span></div></div>
+            <div class="risk-item"><span class="rdot h"></span><div><div style="font-size:12px;font-weight:600">Skill inflation: Kubernetes</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">Listed as skill but "learning" in same doc</div><span class="badge bd" style="font-size:10px;margin-top:4px">High</span></div></div>
+            <div class="risk-item"><span class="rdot m"></span><div><div style="font-size:12px;font-weight:600">No fintech evidence</div><div style="font-size:11px;color:var(--text-muted);margin-top:2px">JD requires regulated environment</div><span class="badge bw" style="font-size:10px;margin-top:4px">Medium</span></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Recruiter Notes</span></div>
+          <div class="card-body" style="padding:12px 16px"><textarea class="ft" rows="4" placeholder="Add your notes here…"></textarea><button class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%;justify-content:center">Save Notes</button></div>
+        </div>
+        <div class="card" style="border-color:#FDE68A">
+          <div class="card-body" style="padding:14px 16px;background:var(--warning-bg);border-radius:var(--radius)">
+            <div style="font-size:10px;font-weight:600;color:var(--warning);text-transform:uppercase;margin-bottom:5px">AI Verdict</div>
+            <div style="font-size:13px;font-weight:600;color:#78350F;margin-bottom:5px">Proceed with Caution</div>
+            <div style="font-size:11px;color:#92400E;line-height:1.5">Strong technical foundation. Two high-risk flags require direct probing before progressing.</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Actions</span></div>
+          <div class="card-body" style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">
+            <button class="btn btn-primary" style="width:100%;justify-content:center">✓ Approve for Interview</button>
+            <button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="nav('scheduler')">📅 Schedule Interview</button>
+            <button class="btn btn-secondary" style="width:100%;justify-content:center" onclick="nav('workflow')">👤 Open Workflow</button>
+            <button class="btn btn-secondary" style="width:100%;justify-content:center">✗ Reject Candidate</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="annot">⚡ GET /api/analysis/{candidateId}</span>
+      <span class="annot annot-new">✦ NEW: AI Candidate Summary — GET /api/analysis/{id}/summary</span>
+      <span class="annot annot-new">✦ NEW: Fraud Detection — GET /api/analysis/{id}/fraud-signals</span>
+      <span class="annot annot-new">✦ NEW: Placement Probability — GET /api/analysis/{id}/placement-probability</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PAGE 7: AI TALENT SEARCH (NEW)
+══════════════════════════════════════════════════════════════════ -->
+<div id="pg-talent-search" class="page">
+  <div class="page-header">
+    <div><div class="ph-title">AI Talent Search <span class="new-tag">NEW</span></div><div class="ph-sub">Natural language search across your database and CoreSignal market data</div></div>
+    <div class="ph-actions"><button class="btn btn-secondary btn-sm">⚙ Search Settings</button></div>
+  </div>
+  <div class="content">
+
+    <!-- Search hero -->
+    <div class="search-hero">
+      <div style="font-size:11px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">✦ AI Talent Search</div>
+      <div style="position:relative;margin-bottom:12px">
+        <textarea style="width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:14px 16px;font-size:14px;color:#fff;font-family:inherit;resize:none;outline:none;line-height:1.5" rows="2" placeholder="e.g. Find me a Senior Java engineer with fintech experience who worked at a Series B startup">Find me a Senior Java engineer with fintech experience who worked at a Series B startup</textarea>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-purple" style="font-size:13px;padding:9px 20px">✦ Search Talent</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);padding:4px 10px;border-radius:20px;font-size:11px;cursor:pointer">"Senior Java Engineer"</span>
+          <span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);padding:4px 10px;border-radius:20px;font-size:11px;cursor:pointer">"FinTech · Series B"</span>
+          <span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);padding:4px 10px;border-radius:20px;font-size:11px;cursor:pointer">"5+ years backend"</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:600">24 candidates found <span style="font-size:11px;color:var(--text-muted);font-weight:400">— ranked by AI match score</span></div>
+      <div style="display:flex;gap:8px">
+        <select class="fi" style="width:140px;font-size:12px;padding:5px 10px"><option>Sort: Match Score</option><option>Sort: Recent</option></select>
+        <button class="btn btn-secondary btn-sm">⚙ Filter</button>
+      </div>
+    </div>
+
+    <!-- Data sources -->
+    <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
+      <span style="font-size:11px;color:var(--text-muted)">Sources:</span>
+      <span class="badge ba">● Internal DB (6)</span>
+      <span class="badge bp">● CoreSignal Market (18)</span>
+      <span style="font-size:11px;color:var(--text-muted);margin-left:4px">CoreSignal integration required for market results</span>
+    </div>
+
+    <!-- Candidate cards grid -->
+    <div class="grid3" style="gap:12px">
+
+      <div class="candidate-card" onclick="nav('workflow')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div style="display:flex;gap:10px;align-items:center">
+            <div class="avatar" style="width:38px;height:38px;font-size:14px">JO</div>
+            <div><div style="font-size:13px;font-weight:600">James Okafor</div><div style="font-size:11px;color:var(--text-muted)">Sr. Backend Engineer</div></div>
+          </div>
+          <div style="text-align:right"><div style="font-size:20px;font-weight:700;color:var(--success)">94%</div><div style="font-size:10px;color:var(--text-muted)">Match</div></div>
+        </div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px"><span class="tag match">Java</span><span class="tag match">Spring Boot</span><span class="tag match">FinTech</span><span class="tag">Kafka</span></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">TechBank · DataFlow Ltd · 7 yrs exp</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-primary btn-sm" style="flex:1;justify-content:center" onclick="event.stopPropagation();nav('workflow')">View Profile</button>
+          <button class="btn btn-secondary btn-sm" style="flex:1;justify-content:center">+ Pipeline</button>
+          <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();nav('add-candidate')">Analyse</button>
+        </div>
+      </div>
+
+      <div class="candidate-card" onclick="nav('workflow')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div style="display:flex;gap:10px;align-items:center">
+            <div class="avatar" style="width:38px;height:38px;font-size:14px;background:#7C3AED">LF</div>
+            <div><div style="font-size:13px;font-weight:600">Leon Fischer</div><div style="font-size:11px;color:var(--text-muted)">Principal Engineer</div></div>
+          </div>
+          <div style="text-align:right"><div style="font-size:20px;font-weight:700;color:var(--success)">89%</div><div style="font-size:10px;color:var(--text-muted)">Match</div></div>
+        </div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px"><span class="tag match">Java</span><span class="tag match">Microservices</span><span class="tag match">AWS</span><span class="tag">Kubernetes</span></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Revolut · Monzo · 9 yrs exp</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-primary btn-sm" style="flex:1;justify-content:center" onclick="event.stopPropagation();nav('workflow')">View Profile</button>
+          <button class="btn btn-secondary btn-sm" style="flex:1;justify-content:center">+ Pipeline</button>
+          <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();nav('add-candidate')">Analyse</button>
+        </div>
+      </div>
+
+      <div class="candidate-card" onclick="nav('workflow')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <div style="display:flex;gap:10px;align-items:center">
+            <div class="avatar" style="width:38px;height:38px;font-size:14px;background:#059669">SK</div>
+            <div><div style="font-size:13px;font-weight:600">Sasha Kim</div><div style="font-size:11px;color:var(--text-muted)">Senior Software Eng.</div></div>
+          </div>
+          <div style="text-align:right"><div style="font-size:20px;font-weight:700;color:var(--warning)">81%</div><div style="font-size:10px;color:var(--text-muted)">Match</div></div>
+        </div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px"><span class="tag match">Java</span><span class="tag match">Spring Boot</span><span class="tag">Docker</span><span class="tag gap">No FinTech</span></div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">Stripe (Series B) · Adyen · 6 yrs exp</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-primary btn-sm" style="flex:1;justify-content:center" onclick="event.stopPropagation();nav('workflow')">View Profile</button>
+          <button class="btn btn-secondary btn-sm" style="flex:1;justify-content:center">+ Pipeline</button>
+          <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();nav('add-candidate')">Analyse</button>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="text-align:center;margin-top:14px"><button class="btn btn-secondary">Load More Results (21 remaining)</button></div>
+
+    <div class="sp"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="annot annot-new">✦ NEW PAGE: POST /api/talent-search/query</span>
+      <span class="annot annot-new">✦ CoreSignal integration: GET /api/coresignal/search</span>
+      <span class="annot annot-new">✦ Click candidate card → Candidate Workflow page</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PAGE 8: CANDIDATE WORKFLOW (NEW)
+══════════════════════════════════════════════════════════════════ -->
+<div id="pg-workflow" class="page">
+  <div class="page-header">
+    <div><div class="ph-title">Candidate Workflow — James Okafor <span class="new-tag">NEW</span></div><div class="ph-sub">Sr. Backend Engineer · FinTech Co. · Pipeline management</div></div>
+    <div class="ph-actions">
+      <button class="btn btn-secondary btn-sm" onclick="nav('candidates')">← Back to Candidates</button>
+      <button class="btn btn-primary btn-sm" onclick="nav('analysis')">📊 View Analysis</button>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- Profile header -->
+    <div class="profile-hero">
+      <div class="profile-avatar-lg">JO</div>
+      <div style="flex:1">
+        <div style="font-size:18px;font-weight:700;margin-bottom:3px">James Okafor</div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:8px">Senior Backend Engineer · TechBank, London</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8);padding:3px 10px;border-radius:20px;font-size:11px">Java</span>
+          <span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8);padding:3px 10px;border-radius:20px;font-size:11px">Spring Boot</span>
+          <span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8);padding:3px 10px;border-radius:20px;font-size:11px">FinTech</span>
+          <span style="background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.8);padding:3px 10px;border-radius:20px;font-size:11px">Microservices</span>
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Match Score</div>
+        <div style="font-size:36px;font-weight:700;color:#FDE047;line-height:1">72%</div>
+        <div style="margin-top:6px"><span class="badge bd">2 High Risk</span></div>
+      </div>
+    </div>
+
+    <!-- Stage pipeline -->
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Workflow Stage</div>
+      <div class="pipeline">
+        <div class="stage active"><span class="stage-num">①</span>Screening</div>
+        <div class="stage"><span class="stage-num">②</span>Interview</div>
+        <div class="stage"><span class="stage-num">③</span>Assessment</div>
+        <div class="stage"><span class="stage-num">④</span>Offer</div>
+        <div class="stage"><span class="stage-num">⑤</span>Selected</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:12px;color:var(--text-muted)">Move to stage:</span>
+        <select class="fi" style="width:180px;font-size:12px;padding:5px 10px"><option>Screening (current)</option><option>Interview</option><option>Assessment</option><option>Offer</option><option>Selected</option><option>Rejected</option></select>
+        <button class="btn btn-primary btn-sm">Update Stage</button>
+      </div>
+    </div>
+
+    <div class="row">
+      <div style="flex:1.3" class="col">
+
+        <!-- AI Message Generator -->
+        <div class="card card-new">
+          <div class="card-head">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:15px">✦</span>
+              <span class="card-title">AI Message Generator <span class="new-tag">NEW</span></span>
+            </div>
+            <span class="annot annot-new">POST /api/messages/generate</span>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">What message do you need?</label>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+                <button class="btn btn-secondary btn-sm">Interview Invitation</button>
+                <button class="btn btn-secondary btn-sm">Follow-up</button>
+                <button class="btn btn-secondary btn-sm">Rejection</button>
+                <button class="btn btn-secondary btn-sm">Offer</button>
+              </div>
+              <textarea class="ft" rows="2" placeholder="e.g. 'Write a professional interview invite for James, for a technical interview next week at our London office'">Write a professional interview invite for James, for a technical interview next week at our London office</textarea>
+            </div>
+            <button class="btn btn-purple" style="margin-bottom:12px">✦ Generate Message</button>
+
+            <!-- Generated email preview -->
+            <div style="background:#F8F7FF;border:1px solid #C4B5FD;border-radius:7px;padding:12px 14px">
+              <div style="font-size:10px;font-weight:700;color:var(--purple);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">✦ Generated Message — Editable</div>
+              <div class="form-group" style="margin-bottom:8px">
+                <label class="form-label" style="font-size:11px">Subject</label>
+                <input class="fi" type="text" value="Interview Invitation — Senior Backend Engineer, FinTech Co." />
+              </div>
+              <textarea class="ft" rows="6">Dear James,
+
+I hope this message finds you well. Following a review of your profile, I am pleased to invite you to a technical interview for the Senior Backend Engineer position at FinTech Co.
+
+The interview will take place next week at our London office and will last approximately 90 minutes, covering system design, Java/Spring Boot fundamentals, and a brief discussion of your fintech experience.
+
+Please let me know your availability and I will send a confirmed calendar invitation.
+
+Best regards,
+Sarah Reynolds
+Senior Recruiter, DeepHire</textarea>
+              <div style="display:flex;gap:8px;margin-top:10px">
+                <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="nav('email')">✉ Send Email</button>
+                <button class="btn btn-secondary btn-sm">📋 Copy</button>
+                <button class="btn btn-secondary btn-sm">✦ Regenerate</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Activity Timeline -->
+        <div class="card">
+          <div class="card-head"><span class="card-title">Activity Timeline</span></div>
+          <div class="card-body" style="padding:0 18px">
+            <div class="email-item">
+              <div class="email-dot"></div>
+              <div><div style="font-size:12px;font-weight:600">Analysis Run</div><div style="font-size:11px;color:var(--text-muted)">AI analysis completed — 2 high risk flags identified</div><div style="font-size:10px;color:var(--text-muted);margin-top:2px">28 Feb 2026 · 14:32</div></div>
+            </div>
+            <div class="email-item">
+              <div class="email-dot" style="background:var(--success)"></div>
+              <div><div style="font-size:12px;font-weight:600">Candidate Added</div><div style="font-size:11px;color:var(--text-muted)">Added to Sr. Backend Engineer — FinTech Co.</div><div style="font-size:10px;color:var(--text-muted);margin-top:2px">28 Feb 2026 · 10:15</div></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right actions panel -->
+      <div style="flex:0 0 220px" class="col">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Actions</span></div>
+          <div class="card-body" style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">
+            <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center" onclick="nav('email')">✉ Send Email</button>
+            <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center" onclick="nav('scheduler')">📅 Schedule Interview</button>
+            <button class="btn btn-primary btn-sm" style="width:100%;justify-content:center" onclick="nav('analysis')">📊 View Analysis</button>
+            <div class="divider" style="margin:4px 0"></div>
+            <button class="btn btn-success btn-sm" style="width:100%;justify-content:center">✓ Approve</button>
+            <button class="btn btn-danger btn-sm" style="width:100%;justify-content:center">✗ Reject</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Candidate Info</span></div>
+          <div class="card-body" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+            <div><div class="mb-lbl">Email</div><div style="font-size:12px;color:var(--accent)">james.okafor@email.com</div></div>
+            <div><div class="mb-lbl">LinkedIn</div><div style="font-size:12px;color:var(--accent)">linkedin.com/in/jamesokafor</div></div>
+            <div><div class="mb-lbl">Applied For</div><div style="font-size:12px">Sr. Backend Engineer</div></div>
+            <div><div class="mb-lbl">Stage</div><div style="margin-top:3px"><span class="badge ba">Screening</span></div></div>
+            <div><div class="mb-lbl">Match Score</div><div style="font-size:16px;font-weight:700;color:var(--warning)">72%</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Recruiter Notes</span></div>
+          <div class="card-body" style="padding:12px 16px"><textarea class="ft" rows="4" placeholder="Add notes…"></textarea><button class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%;justify-content:center">Save</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="annot annot-new">✦ NEW PAGE: GET /api/candidates/{id}/workflow</span>
+      <span class="annot annot-new">✦ Stage update: PATCH /api/candidates/{id}/stage</span>
+      <span class="annot annot-new">✦ AI Message: POST /api/messages/generate</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PAGE 9: INTERVIEW SCHEDULER (NEW)
+══════════════════════════════════════════════════════════════════ -->
+<div id="pg-scheduler" class="page">
+  <div class="page-header">
+    <div><div class="ph-title">Interview Scheduler <span class="new-tag">NEW</span></div><div class="ph-sub">Schedule and manage candidate interviews</div></div>
+    <div class="ph-actions">
+      <button class="btn btn-secondary btn-sm">Sync Google Calendar</button>
+      <button class="btn btn-secondary btn-sm">Sync Outlook</button>
+      <button class="btn btn-primary btn-sm">+ New Interview</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="row">
+
+      <!-- Scheduler form -->
+      <div style="flex:1.2" class="col">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Schedule Interview</span><span class="annot annot-new">POST /api/interviews/schedule</span></div>
+          <div class="card-body">
+            <div class="grid2">
+              <div class="form-group">
+                <label class="form-label">Candidate <span class="req">*</span></label>
+                <select class="fi"><option>James Okafor</option><option>Leon Fischer</option><option>Priya Mehta</option></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Job Role</label>
+                <input class="fi" type="text" value="Sr. Backend Engineer — FinTech Co." readonly />
+              </div>
+            </div>
+            <div class="grid2">
+              <div class="form-group">
+                <label class="form-label">Interviewer</label>
+                <select class="fi"><option>Sarah Reynolds (you)</option><option>Mike Thompson</option><option>Tech Lead — Tom Harris</option></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Interview Type</label>
+                <select class="fi"><option>Technical (90 min)</option><option>HR Screening (30 min)</option><option>Final Round (60 min)</option></select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Location / Platform</label>
+              <select class="fi"><option>Google Meet (auto-link)</option><option>Zoom</option><option>In Office — London</option><option>Phone Call</option></select>
+            </div>
+
+            <!-- Calendar -->
+            <div class="form-group">
+              <label class="form-label">Select Date</label>
+              <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                  <button class="btn btn-secondary btn-sm">‹</button>
+                  <span style="font-size:13px;font-weight:600">March 2026</span>
+                  <button class="btn btn-secondary btn-sm">›</button>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:4px">
+                  <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text-muted);padding:4px">M</div>
+                  <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text-muted);padding:4px">T</div>
+                  <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text-muted);padding:4px">W</div>
+                  <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text-muted);padding:4px">T</div>
+                  <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text-muted);padding:4px">F</div>
+                  <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text-muted);padding:4px">S</div>
+                  <div style="text-align:center;font-size:10px;font-weight:600;color:var(--text-muted);padding:4px">S</div>
+                </div>
+                <div class="cal-grid">
+                  <div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day empty"></div><div class="cal-day">1</div><div class="cal-day">2</div><div class="cal-day">3</div>
+                  <div class="cal-day">4</div><div class="cal-day">5</div><div class="cal-day">6</div><div class="cal-day has-event">7</div><div class="cal-day">8</div><div class="cal-day">9</div><div class="cal-day">10</div>
+                  <div class="cal-day">11</div><div class="cal-day today">12</div><div class="cal-day">13</div><div class="cal-day">14</div><div class="cal-day has-event">15</div><div class="cal-day">16</div><div class="cal-day">17</div>
+                  <div class="cal-day">18</div><div class="cal-day">19</div><div class="cal-day">20</div><div class="cal-day">21</div><div class="cal-day">22</div><div class="cal-day">23</div><div class="cal-day">24</div>
+                  <div class="cal-day">25</div><div class="cal-day">26</div><div class="cal-day">27</div><div class="cal-day">28</div><div class="cal-day">29</div><div class="cal-day">30</div><div class="cal-day">31</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Time slots -->
+            <div class="form-group">
+              <label class="form-label">Available Time Slots — 12 March</label>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+                <div class="time-slot">9:00 AM</div>
+                <div class="time-slot">10:00 AM</div>
+                <div class="time-slot selected">11:00 AM</div>
+                <div class="time-slot">2:00 PM</div>
+                <div class="time-slot">3:00 PM</div>
+                <div class="time-slot">4:00 PM</div>
+                <div class="time-slot" style="opacity:.4;cursor:not-allowed;font-size:10px">12:00 PM<br>(Busy)</div>
+                <div class="time-slot" style="opacity:.4;cursor:not-allowed;font-size:10px">1:00 PM<br>(Busy)</div>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Notes for candidate invite</label>
+              <textarea class="ft" rows="2" placeholder="e.g. Please bring examples of past system design work…"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Send invite confirmation -->
+        <div style="background:var(--success-bg);border:1px solid #BBF7D0;border-radius:8px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:13px;font-weight:600;color:var(--success)">Ready to Send Interview Invite</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">James Okafor · 12 March · 11:00 AM · Google Meet · Tech interview 90 min</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-secondary btn-sm">Preview Invite</button>
+            <button class="btn btn-success btn-sm">📅 Send Calendar Invite</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Upcoming interviews -->
+      <div style="flex:0 0 240px" class="col">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Upcoming Interviews</span></div>
+          <div class="card-body" style="padding:0 16px">
+            <div style="padding:10px 0;border-bottom:1px solid #F0F2F6">
+              <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+                <span style="font-size:12px;font-weight:600">James Okafor</span>
+                <span class="badge ba" style="font-size:10px">Today</span>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted)">Technical · 2:00 PM · Google Meet</div>
+              <div style="font-size:11px;color:var(--text-muted)">Sr. Backend Eng. — FinTech Co.</div>
+            </div>
+            <div style="padding:10px 0;border-bottom:1px solid #F0F2F6">
+              <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+                <span style="font-size:12px;font-weight:600">Priya Mehta</span>
+                <span class="badge bn" style="font-size:10px">15 Mar</span>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted)">Final Round · 10:00 AM · In Office</div>
+              <div style="font-size:11px;color:var(--text-muted)">Product Manager — HealthStart</div>
+            </div>
+            <div style="padding:10px 0">
+              <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+                <span style="font-size:12px;font-weight:600">Leon Fischer</span>
+                <span class="badge bn" style="font-size:10px">18 Mar</span>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted)">HR Screening · 3:00 PM · Zoom</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span class="card-title">Calendar Integrations</span></div>
+          <div class="card-body" style="padding:12px 16px;display:flex;flex-direction:column;gap:8px">
+            <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center">🗓 Connect Google Calendar</button>
+            <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center">📆 Connect Outlook Calendar</button>
+            <div style="font-size:11px;color:var(--text-muted);text-align:center;margin-top:4px">Invites sent to both recruiter and candidate calendars automatically</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="annot annot-new">✦ NEW: POST /api/interviews/schedule</span>
+      <span class="annot annot-new">✦ Google Calendar API: POST /api/integrations/gcal/event</span>
+      <span class="annot annot-new">✦ Outlook: POST /api/integrations/outlook/event</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PAGE 10: EMAIL CENTRE (NEW)
+══════════════════════════════════════════════════════════════════ -->
+<div id="pg-email" class="page">
+  <div class="page-header">
+    <div><div class="ph-title">Email Centre <span class="new-tag">NEW</span></div><div class="ph-sub">Candidate communication history and templates</div></div>
+    <div class="ph-actions">
+      <button class="btn btn-secondary btn-sm">⚙ Email Settings</button>
+      <button class="btn btn-primary btn-sm">✉ New Email</button>
+    </div>
+  </div>
+  <div class="content">
+    <div class="row">
+
+      <!-- Compose panel -->
+      <div style="flex:1.4" class="col">
+        <div class="card">
+          <div class="card-head"><span class="card-title">Compose Email</span><span class="annot annot-new">POST /api/emails/send</span></div>
+          <div class="card-body">
+            <div class="grid2">
+              <div class="form-group">
+                <label class="form-label">Candidate</label>
+                <select class="fi"><option>James Okafor</option><option>Leon Fischer</option><option>Priya Mehta</option></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email Template</label>
+                <select class="fi"><option>Interview Invitation</option><option>Follow-up</option><option>Rejection</option><option>Offer Letter</option><option>Custom</option></select>
+              </div>
+            </div>
+            <div class="form-group"><label class="form-label">To</label><input class="fi" type="text" value="james.okafor@email.com" /></div>
+            <div class="form-group"><label class="form-label">Subject</label><input class="fi" type="text" value="Interview Invitation — Senior Backend Engineer, FinTech Co." /></div>
+
+            <!-- AI Message Generator -->
+            <div style="background:#F8F7FF;border:1px solid #C4B5FD;border-radius:8px;padding:12px 14px;margin-bottom:14px">
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+                <span style="font-size:13px">✦</span>
+                <span style="font-size:12px;font-weight:600;color:var(--purple)">AI Message Generator</span>
+                <span class="new-tag">NEW</span>
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+                <button class="btn btn-secondary btn-sm" style="font-size:11px">Interview Invite</button>
+                <button class="btn btn-secondary btn-sm" style="font-size:11px">Follow-up</button>
+                <button class="btn btn-secondary btn-sm" style="font-size:11px">Rejection</button>
+                <button class="btn btn-secondary btn-sm" style="font-size:11px">Offer</button>
+              </div>
+              <div style="display:flex;gap:8px">
+                <input class="fi" type="text" placeholder="e.g. Write a professional interview invite for James for next Tuesday at 11am…" style="flex:1;font-size:12px" />
+                <button class="btn btn-purple btn-sm" style="white-space:nowrap;flex-shrink:0">✦ Generate</button>
+              </div>
+              <div style="font-size:10px;color:var(--purple);margin-top:6px;opacity:.8">Generated message will populate the field below — you can edit before sending</div>
+            </div>
+
+            <div class="form-group"><label class="form-label">Message</label>
+              <textarea class="ft" rows="9">Dear James,
+
+I hope this message finds you well. Following a review of your profile, I am pleased to invite you to a technical interview for the Senior Backend Engineer position at FinTech Co.
+
+The interview will take place on 12 March at 11:00 AM via Google Meet and will last approximately 90 minutes.
+
+Please confirm your availability by replying to this email.
+
+Best regards,
+Sarah Reynolds
+Senior Recruiter, DeepHire</textarea>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-secondary btn-sm">📎 Attach</button>
+                <button class="btn btn-secondary btn-sm">👁 Preview</button>
+              </div>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-secondary btn-sm">Save Draft</button>
+                <button class="btn btn-primary">✉ Send Email</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: History & Templates -->
+      <div style="flex:0 0 260px" class="col">
+
+        <!-- Email History -->
+        <div class="card">
+          <div class="card-head"><span class="card-title">Email History — James Okafor</span></div>
+          <div class="card-body" style="padding:0 16px">
+            <div class="email-item">
+              <div class="email-dot" style="background:var(--success)"></div>
+              <div>
+                <div style="font-size:12px;font-weight:600">Interview Invitation Sent</div>
+                <div style="font-size:11px;color:var(--text-muted)">Technical interview — 12 Mar</div>
+                <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Today · 10:32 AM · Opened ✓</div>
+              </div>
+            </div>
+            <div class="email-item">
+              <div class="email-dot"></div>
+              <div>
+                <div style="font-size:12px;font-weight:600">Application Received</div>
+                <div style="font-size:11px;color:var(--text-muted)">Welcome email with next steps</div>
+                <div style="font-size:10px;color:var(--text-muted);margin-top:2px">28 Feb · Opened ✓</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Email Templates -->
+        <div class="card">
+          <div class="card-head"><span class="card-title">Templates</span><button class="btn btn-secondary btn-sm">+ New</button></div>
+          <div class="card-body" style="padding:0 16px;display:flex;flex-direction:column">
+            <div style="padding:9px 0;border-bottom:1px solid #F0F2F6;cursor:pointer">
+              <div style="font-size:12px;font-weight:500">Interview Invitation</div>
+              <div style="font-size:11px;color:var(--text-muted)">Technical / HR / Final round variants</div>
+            </div>
+            <div style="padding:9px 0;border-bottom:1px solid #F0F2F6;cursor:pointer">
+              <div style="font-size:12px;font-weight:500">Follow-up After Interview</div>
+              <div style="font-size:11px;color:var(--text-muted)">Feedback request template</div>
+            </div>
+            <div style="padding:9px 0;border-bottom:1px solid #F0F2F6;cursor:pointer">
+              <div style="font-size:12px;font-weight:500">Rejection Email</div>
+              <div style="font-size:11px;color:var(--text-muted)">Professional, empathetic tone</div>
+            </div>
+            <div style="padding:9px 0;cursor:pointer">
+              <div style="font-size:12px;font-weight:500">Offer Letter Email</div>
+              <div style="font-size:11px;color:var(--text-muted)">Includes offer summary</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="sp"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="annot annot-new">✦ NEW: POST /api/emails/send</span>
+      <span class="annot annot-new">✦ GET /api/emails/history?candidateId={id}</span>
+      <span class="annot annot-new">✦ GET /api/emails/templates</span>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PAGE 11: REMINDERS / TASK MODULE (NEW)
+══════════════════════════════════════════════════════════════════ -->
+<div id="pg-reminders" class="page">
+  <div class="page-header">
+    <div><div class="ph-title">Reminders &amp; Tasks <span class="new-tag">NEW</span></div><div class="ph-sub">Automated and manual task tracking for your pipeline</div></div>
+    <div class="ph-actions">
+      <button class="btn btn-secondary btn-sm">Mark All Done</button>
+      <button class="btn btn-primary btn-sm">+ Add Reminder</button>
+    </div>
+  </div>
+  <div class="content">
+
+    <!-- Summary strip -->
+    <div class="grid4" style="margin-bottom:16px">
+      <div class="stat-card"><div class="stat-lbl">Today's Tasks</div><div class="stat-val" style="color:var(--accent)">4</div><div class="stat-delta">2 overdue</div></div>
+      <div class="stat-card"><div class="stat-lbl">Upcoming</div><div class="stat-val">7</div><div class="stat-delta">Next 7 days</div></div>
+      <div class="stat-card"><div class="stat-lbl">Interviews Today</div><div class="stat-val" style="color:var(--success)">1</div><div class="stat-delta">James Okafor · 2PM</div></div>
+      <div class="stat-card"><div class="stat-lbl">Completed This Week</div><div class="stat-val" style="color:var(--success)">12</div><div class="stat-delta up">↑ 4 vs last week</div></div>
+    </div>
+
+    <div class="row">
+      <div style="flex:1.3" class="col">
+
+        <!-- Today's Tasks -->
+        <div class="card">
+          <div class="card-head"><span class="card-title">Today's Tasks</span><span class="badge bd">2 Overdue</span></div>
+          <div class="card-body" style="padding:0 18px">
+            <div class="reminder-item">
+              <div class="reminder-check">□</div>
+              <div style="flex:1">
+                <div style="display:flex;justify-content:space-between">
+                  <div style="font-size:12px;font-weight:600">Review 3 pending candidate analyses</div>
+                  <span class="badge bd" style="font-size:10px">Overdue</span>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Maria Santos, Wei Zhang, Fatima Al-Hassan — analysis not run</div>
+                <div style="font-size:10px;color:var(--danger);margin-top:2px">Was due yesterday</div>
+              </div>
+            </div>
+            <div class="reminder-item">
+              <div class="reminder-check">□</div>
+              <div style="flex:1">
+                <div style="display:flex;justify-content:space-between">
+                  <div style="font-size:12px;font-weight:600">Interview with James Okafor — Technical</div>
+                  <span class="badge ba" style="font-size:10px">2:00 PM today</span>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Sr. Backend Engineer · Google Meet · 90 minutes</div>
+                <div style="margin-top:5px"><button class="btn btn-secondary btn-sm" onclick="nav('scheduler')">📅 View Details</button></div>
+              </div>
+            </div>
+            <div class="reminder-item">
+              <div class="reminder-check">□</div>
+              <div style="flex:1">
+                <div style="display:flex;justify-content:space-between">
+                  <div style="font-size:12px;font-weight:600">Follow-up: Sarah Lee — awaiting client feedback</div>
+                  <span class="badge bw" style="font-size:10px">Overdue</span>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Candidate has been in screening for 8 days — follow up required</div>
+              </div>
+            </div>
+            <div class="reminder-item">
+              <div class="reminder-check">□</div>
+              <div style="flex:1">
+                <div style="display:flex;justify-content:space-between">
+                  <div style="font-size:12px;font-weight:600">Send offer letter to Priya Mehta</div>
+                  <span class="badge bn" style="font-size:10px">Today</span>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Product Manager role — HealthStart Ltd approved</div>
+                <div style="margin-top:5px"><button class="btn btn-secondary btn-sm" onclick="nav('email')">✉ Draft Email</button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Upcoming -->
+        <div class="card">
+          <div class="card-head"><span class="card-title">Upcoming (Next 7 Days)</span></div>
+          <div class="card-body" style="padding:0 18px">
+            <div class="reminder-item">
+              <div class="reminder-check">□</div>
+              <div style="flex:1">
+                <div style="display:flex;justify-content:space-between">
+                  <div style="font-size:12px;font-weight:600">Interview — Priya Mehta · Final Round</div>
+                  <span class="badge bn" style="font-size:10px">15 Mar · 10:00 AM</span>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Product Manager · In Office · 60 min</div>
+              </div>
+            </div>
+            <div class="reminder-item">
+              <div class="reminder-check">□</div>
+              <div style="flex:1">
+                <div style="display:flex;justify-content:space-between">
+                  <div style="font-size:12px;font-weight:600">Interview — Leon Fischer · HR Screening</div>
+                  <span class="badge bn" style="font-size:10px">18 Mar · 3:00 PM</span>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Sr. Backend Engineer · Zoom · 30 min</div>
+              </div>
+            </div>
+            <div class="reminder-item">
+              <div class="reminder-check">□</div>
+              <div>
+                <div style="font-size:12px;font-weight:600">Weekly pipeline review</div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px">Review all candidates in screening stage</div>
+                <div style="font-size:10px;color:var(--text-muted);margin-top:2px">Every Monday · Recurring</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Completed -->
+        <div class="card">
+          <div class="card-head"><span class="card-title">Completed This Week</span><span class="badge bs">12 done</span></div>
+          <div class="card-body" style="padding:0 18px">
+            <div class="reminder-item">
+              <div class="reminder-check done">✓</div>
+              <div style="opacity:.6"><div style="font-size:12px;font-weight:500;text-decoration:line-through">Run analysis for Leon Fischer</div><div style="font-size:10px;color:var(--text-muted)">Completed 10 Mar · 2:14 PM</div></div>
+            </div>
+            <div class="reminder-item">
+              <div class="reminder-check done">✓</div>
+              <div style="opacity:.6"><div style="font-size:12px;font-weight:500;text-decoration:line-through">Send interview confirmation to Priya Mehta</div><div style="font-size:10px;color:var(--text-muted)">Completed 9 Mar · 11:30 AM</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Add manual reminder -->
+      <div style="flex:0 0 240px" class="col">
+        <div class="card card-new">
+          <div class="card-head"><span class="card-title">Add Manual Reminder <span class="new-tag">NEW</span></span></div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">Reminder Title</label>
+              <input class="fi" type="text" placeholder="e.g. Call James about availability" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Link to Candidate (optional)</label>
+              <select class="fi"><option value="">None</option><option>James Okafor</option><option>Leon Fischer</option><option>Priya Mehta</option></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Due Date</label>
+              <input class="fi" type="date" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Due Time</label>
+              <input class="fi" type="time" value="09:00" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Priority</label>
+              <select class="fi"><option>Normal</option><option>High</option><option>Low</option></select>
+            </div>
+            <button class="btn btn-primary" style="width:100%;justify-content:center">+ Add Reminder</button>
+          </div>
+        </div>
+
+        <!-- Automated Reminders info -->
+        <div class="card">
+          <div class="card-head"><span class="card-title">Auto-Scan Rules</span></div>
+          <div class="card-body" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">Platform automatically creates reminders for:</div>
+            <div style="display:flex;gap:8px;align-items:flex-start">
+              <span style="color:var(--accent)">⚡</span>
+              <div style="font-size:11px;color:var(--text-secondary)">Analysis pending &gt; 24h</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-start">
+              <span style="color:var(--accent)">⚡</span>
+              <div style="font-size:11px;color:var(--text-secondary)">Candidate in screening &gt; 5 days</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-start">
+              <span style="color:var(--accent)">⚡</span>
+              <div style="font-size:11px;color:var(--text-secondary)">Upcoming interview within 2 hours</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-start">
+              <span style="color:var(--accent)">⚡</span>
+              <div style="font-size:11px;color:var(--text-secondary)">Follow-up email not sent after interview</div>
+            </div>
+            <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center;margin-top:4px">⚙ Configure Rules</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sp"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="annot annot-new">✦ NEW: GET /api/reminders?date=today</span>
+      <span class="annot annot-new">✦ POST /api/reminders (manual)</span>
+      <span class="annot annot-new">✦ PATCH /api/reminders/{id}/complete</span>
+      <span class="annot annot-new">✦ Auto-scan: cron job scans pipeline state every 30 min</span>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /body-wrap -->
+
+<script>
+const ALL_PAGES = ['dashboard','jobs','add-job','candidates','add-candidate','analysis','talent-search','workflow','scheduler','email','reminders'];
+
+function nav(id) {
+  ALL_PAGES.forEach(function(p) {
+    var el = document.getElementById('pg-' + p);
+    if (el) { el.classList.remove('active'); el.style.display = 'none'; }
+    var pill = document.getElementById('pill-' + p);
+    if (pill) pill.classList.remove('active');
+    var sb = document.getElementById('sb-' + p);
+    if (sb) sb.classList.remove('active');
+  });
+  var target = document.getElementById('pg-' + id);
+  if (target) { target.classList.add('active'); target.style.display = 'flex'; }
+  var pill = document.getElementById('pill-' + id);
+  if (pill) pill.classList.add('active');
+  var sb = document.getElementById('sb-' + id);
+  if (sb) sb.classList.add('active');
+  var c = document.querySelector('#pg-' + id + ' .content');
+  if (c) c.scrollTop = 0;
+}
+
+ALL_PAGES.forEach(function(p) {
+  var el = document.getElementById('pg-' + p);
+  if (el) el.style.display = (p === 'dashboard') ? 'flex' : 'none';
+});
+
+var JOB_DATA = {
+  1: { title: 'Candidates — Senior Backend Engineer', client: 'FinTech Co.', count: '4 candidates' },
+  2: { title: 'Candidates — Product Manager', client: 'HealthStart Ltd', count: '3 candidates' },
+  3: { title: 'Candidates — Data Analyst', client: 'Acme Corp', count: '2 candidates' }
+};
+
+function cvTab(tab) {
+  var pastePanel  = document.getElementById('cv-paste-panel');
+  var uploadPanel = document.getElementById('cv-upload-panel');
+  var tabPaste    = document.getElementById('tab-paste');
+  var tabUpload   = document.getElementById('tab-upload');
+  if (tab === 'paste') {
+    pastePanel.style.display  = 'block';
+    uploadPanel.style.display = 'none';
+    tabPaste.style.background  = 'var(--accent)';  tabPaste.style.color  = '#fff';
+    tabUpload.style.background = 'var(--white)';   tabUpload.style.color = 'var(--text-muted)';
+  } else {
+    pastePanel.style.display  = 'none';
+    uploadPanel.style.display = 'block';
+    tabUpload.style.background = 'var(--accent)';  tabUpload.style.color  = '#fff';
+    tabPaste.style.background  = 'var(--white)';   tabPaste.style.color  = 'var(--text-muted)';
+  }
+}
+
+function selectJob(id) {
+  [1,2,3].forEach(function(i) {
+    var row = document.getElementById('job-row-' + i);
+    if (!row) return;
+    var arrow = row.querySelector('td:first-child');
+    if (i === id) {
+      row.style.background = '#EBF2FF';
+      if (arrow) { arrow.style.color = 'var(--accent)'; arrow.textContent = '▼'; }
+    } else {
+      row.style.background = '';
+      if (arrow) { arrow.style.color = 'var(--text-muted)'; arrow.textContent = '►'; }
+    }
+    var t = document.getElementById('panel-table-' + i);
+    if (t) t.style.display = 'none';
+  });
+  var tgt = document.getElementById('panel-table-' + id);
+  if (tgt) tgt.style.display = 'table';
+  var d = JOB_DATA[id];
+  if (d) {
+    var title = document.getElementById('panel-job-title');
+    var badge = document.getElementById('panel-client-badge');
+    var count = document.getElementById('panel-count');
+    if (title) title.textContent = d.title;
+    if (badge) badge.textContent = d.client;
+    if (count) count.textContent = d.count;
+  }
+}
+</script>
+</body>
+</html>
