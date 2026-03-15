@@ -14,7 +14,10 @@ import { useNavigate } from "react-router-dom";
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
 async function apiPost(path, body) {
-  const res = await fetch(`${API_BASE}${path}`, {
+  const loginId = localStorage.getItem("loginId") || "";
+  const url = new URL(`${API_BASE}${path}`);
+  url.searchParams.set("loginId", loginId);
+  const res = await fetch(url.toString(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -27,19 +30,19 @@ async function apiPost(path, body) {
 }
 
 // ─── Shared style tokens ──────────────────────────────────────────────────────
-const BORDER     = "#E8ECF2";
-const MUTED      = "#9AA3B4";
-const TEXT       = "#0F1623";
-const ACCENT     = "#1D72E8";
-const WARN_BG    = "#F0F7FF";
+const BORDER = "#E8ECF2";
+const MUTED = "#9AA3B4";
+const TEXT = "#0F1623";
+const ACCENT = "#1D72E8";
+const WARN_BG = "#F0F7FF";
 const WARN_BORDER = "#BFDBFE";
-const WARN_TEXT  = "#1E40AF";
-const SURFACE    = "#FAFBFD";
+const WARN_TEXT = "#1E40AF";
+const SURFACE = "#FAFBFD";
 const CARD_SHADOW = "0 1px 3px rgba(0,0,0,0.05)";
-const WARNING_BG  = "#FFFBEB";
+const WARNING_BG = "#FFFBEB";
 const WARNING_BORDER = "#FDE68A";
-const WARNING_TEXT   = "#D97706";
-const WARNING_BODY   = "#92400E";
+const WARNING_TEXT = "#D97706";
+const WARNING_BODY = "#92400E";
 
 const cardSx = {
   border: `1px solid ${BORDER}`,
@@ -154,9 +157,9 @@ export default function CreateJobPage() {
 
   // ── Derived checklist / step state ─────────────────────────────────────────
   const hasDetails = form.title.trim().length > 0;
-  const hasJd      = form.jdText.trim().length > 0;
-  const allReady   = hasDetails && hasJd;
-  const wordCount  = form.jdText.trim() ? form.jdText.trim().split(/\s+/).length : 0;
+  const hasJd = form.jdText.trim().length > 0;
+  const allReady = hasDetails && hasJd;
+  const wordCount = form.jdText.trim() ? form.jdText.trim().split(/\s+/).length : 0;
 
   // ── Submit ──────────────────────────────────────────────────────────────────
   async function onSubmit(e) {
@@ -179,8 +182,8 @@ export default function CreateJobPage() {
   }
 
   // ── Extracted skills (derived from JD text or tags field) ──────────────────
-  const techSkills  = ["Java / Kotlin", "Spring Boot", "REST API", "Microservices", "AWS", "Docker", "Kubernetes"];
-  const softSkills  = ["Mentoring", "Code Review", "Collaboration"];
+  const techSkills = ["Java / Kotlin", "Spring Boot", "REST API", "Microservices", "AWS", "Docker", "Kubernetes"];
+  const softSkills = ["Mentoring", "Code Review", "Collaboration"];
 
   // ─────────────────────────────────────────────────────────────────────────────
   return (
@@ -273,18 +276,18 @@ export default function CreateJobPage() {
           const circleColor = step.done
             ? "#16A34A"
             : step.active
-            ? ACCENT
-            : SURFACE;
+              ? ACCENT
+              : SURFACE;
           const circleBorder = step.done
             ? "none"
             : step.active
-            ? "none"
-            : `1.5px solid ${BORDER}`;
+              ? "none"
+              : `1.5px solid ${BORDER}`;
           const textColor = step.done
             ? "#16A34A"
             : step.active
-            ? TEXT
-            : MUTED;
+              ? TEXT
+              : MUTED;
           return (
             <Box
               key={step.label}
@@ -728,9 +731,9 @@ export default function CreateJobPage() {
           {/* Annotation strip */}
           <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2, mb: 1 }}>
             {[
-             "copyright@ DeepHire",
-            "A product of Golden Wattle Ventures Pvt Ltd",
-            "This AI tool is designed to assist you, not replace professional judgment. Always consult with a qualified expert.",
+              "copyright@ DeepHire",
+              "A product of Golden Wattle Ventures Pvt Ltd",
+              "This AI tool is designed to assist you, not replace professional judgment. Always consult with a qualified expert.",
             ].map((label) => (
               <Chip
                 key={label}

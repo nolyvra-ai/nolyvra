@@ -37,7 +37,7 @@ public class CandidateService {
         String id = "cand-" + UUID.randomUUID();
 
         jdbc.update("""
-                insert into candidates (id, job_id, job_id, name, email, linkedin_url, cv_text)
+                insert into candidates (id, job_id, login_id, name, email, linkedin_url, cv_text)
                 values (?, ?, ?, ?, ?, ?, ?)
                 """,
                 id,
@@ -68,7 +68,7 @@ public class CandidateService {
         return rows.stream().findFirst();
     }
 
-    public List<CandidateResponse> getCandidatesByJob(String jobId, String loginId ) {
+    public List<CandidateResponse> getCandidatesByJob(String jobId, String loginId) {
 
         return jdbc.query("""
                 select id, job_id, name, email, linkedin_url, created_at

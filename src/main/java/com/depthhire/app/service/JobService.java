@@ -42,8 +42,8 @@ public class JobService {
         String id = "job-" + UUID.randomUUID();
 
         jdbc.update("""
-                insert into jobs (id, title, company, job_type, jd_text, location)
-                values (?, ?, ?, ?, ?, ?)
+                insert into jobs (id, title, company, job_type, jd_text, location, login_id)
+                values (?, ?, ?, ?, ?, ?, ?)
                 """,
                 id,
                 req.title(),

@@ -196,13 +196,31 @@ export default function AddCandidatePage() {
     }
   }
 
-  // ── Run analysis (MVP: navigate directly) ────────────────────────────────
-  function onSubmit(e) {
+  async function onSubmit(e) {
     e.preventDefault();
-    // MVP: no API call yet. Later:
-    // 1) POST /api/jobs/{jobId}/candidates
-    // 2) POST /api/candidates/{candidateId}/analyze
-    nav(`/analysis/cand-123`);
+    try {
+      // Step 1: Save candidate and get back the candidateId
+      const candidate = await apiPost(`/api/jobs/${form.jobId}/candidates`, {
+        name: form.name,
+        email: form.email,
+        linkedinUrl: form.linkedinUrl,
+        cvText: form.cvText,
+      });
+
+      const candidateId = candidate.id;
+
+      // Step 2: Trigger analysis using the returned candidateId
+      const loginId = localStorage.getItem("loginId") || "";
+      const analyzeUrl = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
+      analyzeUrl.searchParams.set("loginId", loginId);
+      await fetch(analyzeUrl.toString(), { method: "POST" });
+
+      // Step 3: Navigate to analysis result page
+      nav(`/analysis/${candidateId}`);
+    } catch (err) {
+      console.error("Failed to save or analyse candidate", err);
+      alert("Failed: " + err.message);
+    }
   }
 
   // ── Derived checklist state ───────────────────────────────────────────────
@@ -726,7 +744,7 @@ export default function AddCandidatePage() {
         {/* Annotation strip */}
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2, mb: 1 }}>
           {[
-           "copyright@ DeepHire",
+            "copyright@ DeepHire",
             "A product of Golden Wattle Ventures Pvt Ltd",
             "This AI tool is designed to assist you, not replace professional judgment. Always consult with a qualified expert.",
           ].map((label) => (
