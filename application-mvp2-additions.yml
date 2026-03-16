@@ -1,0 +1,60 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# DeepHire MVP2 — application.yml additions
+# Add these blocks to your existing application.yml
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Spring Mail (JavaMailSender) ──────────────────────────────────────────────
+spring:
+  mail:
+    host: smtp.gmail.com          # Change to smtp.office365.com for Outlook
+    port: 587
+    username: your-email@gmail.com
+    password: your-app-password   # Use Gmail App Password, NOT your account password
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+# ── CoreSignal integration ────────────────────────────────────────────────────
+coresignal:
+  api-key: ${CORESIGNAL_API_KEY:}    # Set via env var or replace here
+  base-url: https://api.coresignal.com/cdapi/v1
+
+# ── Scheduling (required for ReminderService auto-scan) ──────────────────────
+# Add @EnableScheduling to your main Spring Boot Application class:
+#
+#   @SpringBootApplication
+#   @EnableScheduling               ← ADD THIS
+#   public class DeepHireApplication { ... }
+#
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Full application.yml reference (merge with your existing file)
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# server:
+#   port: 8080
+#
+# spring:
+#   datasource:
+#     url: jdbc:postgresql://localhost:5432/deephire
+#     username: your_db_user
+#     password: your_db_password
+#   mail:                           ← NEW
+#     host: smtp.gmail.com
+#     port: 587
+#     username: your-email@gmail.com
+#     password: your-app-password
+#     properties:
+#       mail.smtp.auth: true
+#       mail.smtp.starttls.enable: true
+#
+# openai:
+#   api-key: ${OPENAI_API_KEY}
+#   model: gpt-4o-mini
+#
+# coresignal:                       ← NEW
+#   api-key: ${CORESIGNAL_API_KEY:}
+#   base-url: https://api.coresignal.com/cdapi/v1

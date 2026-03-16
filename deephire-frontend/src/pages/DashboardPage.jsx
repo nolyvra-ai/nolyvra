@@ -1,16 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Box,
-  Paper,
-  Typography,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  Button,
-  LinearProgress,
-  Alert,
+  Box, Paper, Typography, Table, TableHead, TableRow,
+  TableCell, TableBody, Button, Alert,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import StatCard from "../components/StatCard";
@@ -18,64 +9,27 @@ import StatCard from "../components/StatCard";
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
 async function apiGet(path) {
-
   const loginId = localStorage.getItem("loginId") || "";
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
   const res = await fetch(url.toString());
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`${res.status} ${res.statusText} - ${text}`);
-  }
+  if (!res.ok) { const t = await res.text().catch(() => ""); throw new Error(`${res.status} - ${t}`); }
   return res.json();
 }
 
-function scoreColor(score) {
-  if (score >= 85) return "#16A34A";
-  if (score >= 70) return "#D97706";
-  return "#DC2626";
-}
+const BORDER = "#E8ECF2", MUTED = "#9AA3B4", TEXT = "#0F1623", ACCENT = "#1D72E8";
+const SUCCESS = "#16A34A", SUCCESS_BG = "#F0FDF4", SUCCESS_BR = "#BBF7D0";
+const WARN = "#D97706", WARN_BG = "#FFFBEB", WARN_BR = "#FDE68A";
+const DANGER = "#DC2626", DANGER_BG = "#FEF2F2", DANGER_BR = "#FECACA";
+const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE", NEUTRAL_BG = "#F1F3F7", SURFACE = "#FAFBFD";
+const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
 
-function riskFlagStyles(level) {
-  if (level === "High") return { bg: "#FEF2F2", border: "#FECACA", fg: "#DC2626" };
-  if (level === "Medium") return { bg: "#FFFBEB", border: "#FDE68A", fg: "#D97706" };
-  return { bg: "#EBF2FF", border: "#BFDBFE", fg: "#1D72E8" };
-}
-
-// ─── Style tokens ─────────────────────────────────────────────────────────────
-const BORDER = "#E8ECF2";
-const MUTED = "#9AA3B4";
-const TEXT = "#0F1623";
-const ACCENT = "#1D72E8";
-const SUCCESS = "#16A34A";
-const SUCCESS_BG = "#F0FDF4";
-const SUCCESS_BR = "#BBF7D0";
-const WARN = "#D97706";
-const WARN_BG = "#FFFBEB";
-const WARN_BR = "#FDE68A";
-const DANGER = "#DC2626";
-const DANGER_BG = "#FEF2F2";
-const DANGER_BR = "#FECACA";
-const ACCENT_BG = "#EBF2FF";
-const ACCENT_BR = "#BFDBFE";
-const NEUTRAL_BG = "#F1F3F7";
-const SURFACE = "#FAFBFD";
-
-// ─── Shared table header cell ─────────────────────────────────────────────────
 const thSx = {
-  fontSize: 10,
-  fontWeight: 700,
-  color: MUTED,
-  textTransform: "uppercase",
-  letterSpacing: "0.5px",
-  borderBottom: `1px solid ${BORDER}`,
-  bgcolor: SURFACE,
-  py: 1.25,
-  px: 2,
-  whiteSpace: "nowrap",
+  fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase",
+  letterSpacing: "0.5px", borderBottom: `1px solid ${BORDER}`, bgcolor: SURFACE,
+  py: 1.25, px: 2, whiteSpace: "nowrap"
 };
 
-// ─── Generic pill badge ───────────────────────────────────────────────────────
 function Badge({ label, variant = "neutral" }) {
   const styles = {
     success: { bg: SUCCESS_BG, border: SUCCESS_BR, color: SUCCESS },
@@ -83,41 +37,35 @@ function Badge({ label, variant = "neutral" }) {
     danger: { bg: DANGER_BG, border: DANGER_BR, color: DANGER },
     accent: { bg: ACCENT_BG, border: ACCENT_BR, color: ACCENT },
     neutral: { bg: NEUTRAL_BG, border: BORDER, color: MUTED },
+    purple: { bg: PURPLE_BG, border: PURPLE_BR, color: PURPLE },
   };
   const s = styles[variant] ?? styles.neutral;
   return (
-    <Box
-      sx={{
-        display: "inline-flex", alignItems: "center",
-        bgcolor: s.bg, border: `1px solid ${s.border}`,
-        borderRadius: "20px", px: 1.25, py: 0.25,
-        fontSize: 11, fontWeight: 600, color: s.color,
-        whiteSpace: "nowrap",
-      }}
-    >
+    <Box sx={{
+      display: "inline-flex", alignItems: "center", bgcolor: s.bg,
+      border: `1px solid ${s.border}`, borderRadius: "20px", px: 1.25, py: 0.25,
+      fontSize: 11, fontWeight: 600, color: s.color, whiteSpace: "nowrap"
+    }}>
       {label}
     </Box>
   );
 }
 
-// ─── KPI Stat card ────────────────────────────────────────────────────────────
 function KpiCard({ label, value, delta, deltaUp, valueColor }) {
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        border: `1px solid ${BORDER}`, borderRadius: "10px",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-        p: 2.25, bgcolor: "#fff",
-        display: "flex", flexDirection: "column", gap: 0.5,
-      }}
-    >
-      <Typography sx={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.6px" }}>
-        {label}
-      </Typography>
-      <Typography sx={{ fontSize: 28, fontWeight: 800, color: valueColor ?? TEXT, lineHeight: 1.1, my: 0.5 }}>
-        {value ?? 0}
-      </Typography>
+    <Paper elevation={0} sx={{
+      border: `1px solid ${BORDER}`, borderRadius: "10px",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.05)", p: 2.25, bgcolor: "#fff",
+      display: "flex", flexDirection: "column", gap: 0.5
+    }}>
+      <Typography sx={{
+        fontSize: 10, fontWeight: 700, color: MUTED,
+        textTransform: "uppercase", letterSpacing: "0.6px"
+      }}>{label}</Typography>
+      <Typography sx={{
+        fontSize: 28, fontWeight: 800, color: valueColor ?? TEXT,
+        lineHeight: 1.1, my: 0.5
+      }}>{value ?? 0}</Typography>
       {delta && (
         <Typography sx={{ fontSize: 11, fontWeight: 500, color: deltaUp ? SUCCESS : MUTED }}>
           {deltaUp ? "↑ " : ""}{delta}
@@ -127,7 +75,6 @@ function KpiCard({ label, value, delta, deltaUp, valueColor }) {
   );
 }
 
-// ─── Pipeline bar row ─────────────────────────────────────────────────────────
 function PipelineBar({ label, count, pct, color }) {
   return (
     <Box>
@@ -142,7 +89,6 @@ function PipelineBar({ label, count, pct, color }) {
   );
 }
 
-// ─── Risk summary row ─────────────────────────────────────────────────────────
 function RiskRow({ dotColor, label, count, variant }) {
   return (
     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -155,506 +101,405 @@ function RiskRow({ dotColor, label, count, variant }) {
   );
 }
 
-// ─── Score bar cell ───────────────────────────────────────────────────────────
-function ScoreCell({ value, showBar = false }) {
-  if (value == null || value === 0)
-    return <Typography sx={{ fontSize: 12, color: MUTED }}>—</Typography>;
-  const color = scoreColor(value);
+function ScoreCell({ value }) {
+  if (!value) return <Typography sx={{ fontSize: 12, color: MUTED }}>—</Typography>;
+  const color = value >= 85 ? SUCCESS : value >= 70 ? WARN : DANGER;
   return (
     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
       <Typography sx={{ fontSize: 12, fontWeight: 700, color }}>{value}%</Typography>
-      {showBar && (
-        <Box sx={{ width: 60, height: 5, bgcolor: "#F0F2F6", borderRadius: "3px", overflow: "hidden" }}>
-          <Box sx={{ width: `${value}%`, height: "100%", bgcolor: color, borderRadius: "3px" }} />
-        </Box>
-      )}
+      <Box sx={{ width: 60, height: 5, bgcolor: "#F0F2F6", borderRadius: "3px", overflow: "hidden" }}>
+        <Box sx={{ width: `${value}%`, height: "100%", bgcolor: color, borderRadius: "3px" }} />
+      </Box>
     </Box>
   );
 }
 
-// ─── Ghost link button ────────────────────────────────────────────────────────
-function GhostBtn({ onClick, children }) {
+function Card({ children, sx = {}, isNew = false }) {
   return (
-    <Box
-      onClick={onClick}
-      sx={{
-        fontSize: 12, fontWeight: 600, color: ACCENT,
-        cursor: "pointer", userSelect: "none",
-        "&:hover": { textDecoration: "underline" },
-      }}
-    >
-      {children}
-    </Box>
+    <Paper elevation={0} sx={{
+      border: `1px solid ${isNew ? PURPLE_BR : BORDER}`,
+      borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+      overflow: "hidden", bgcolor: "#fff",
+      ...(isNew && { boxShadow: `0 0 0 2px rgba(124,58,237,0.06)` }),
+      ...sx,
+    }}>{children}</Paper>
   );
 }
 
-// ─── Card wrapper ─────────────────────────────────────────────────────────────
-function Card({ children, sx = {} }) {
+function CardHead({ title, action, isNew = false }) {
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        border: `1px solid ${BORDER}`, borderRadius: "10px",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-        overflow: "hidden", bgcolor: "#fff",
-        ...sx,
-      }}
-    >
-      {children}
-    </Paper>
-  );
-}
-
-function CardHead({ title, action }) {
-  return (
-    <Box
-      sx={{
-        px: 2.25, py: 1.75,
-        borderBottom: `1px solid ${BORDER}`,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-      }}
-    >
-      <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{title}</Typography>
+    <Box sx={{
+      px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`,
+      display: "flex", alignItems: "center", justifyContent: "space-between", bgcolor: "#fff"
+    }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{title}</Typography>
+        {isNew && (
+          <Box sx={{
+            display: "inline-flex", alignItems: "center", px: "7px", py: "2px",
+            bgcolor: PURPLE_BG, border: `1px solid ${PURPLE_BR}`,
+            borderRadius: "4px", fontSize: 10, fontWeight: 600, color: PURPLE
+          }}>NEW</Box>
+        )}
+      </Box>
       {action}
     </Box>
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
+function GhostBtn({ onClick, children }) {
+  return (
+    <Box onClick={onClick} sx={{
+      fontSize: 12, fontWeight: 600, color: ACCENT,
+      cursor: "pointer", userSelect: "none", "&:hover": { textDecoration: "underline" }
+    }}>
+      {children}
+    </Box>
+  );
+}
+
+// ── Task card for Today's Tasks strip ────────────────────────────────────────
+function TaskCard({ title, subtitle, urgency }) {
+  const cfg = {
+    overdue: { border: WARN_BR, bg: WARN_BG, color: WARN, },
+    upcoming: { border: ACCENT_BR, bg: ACCENT_BG, color: ACCENT, },
+    nudge: { border: WARN_BR, bg: WARN_BG, color: WARN, }, // ← amber like overdue but not alarming
+    normal: { border: BORDER, bg: "#F7F8FA", color: MUTED, },
+  };
+  const c = cfg[urgency] ?? cfg.normal;
+
+  return (
+    <Box sx={{
+      display: "flex", flexDirection: "column",
+      justifyContent: "space-between",
+      flexShrink: 0, minWidth: 200, maxWidth: 230, minHeight: 88,
+      border: `1px solid ${c.border}`, borderRadius: "7px",
+      p: 1.5, bgcolor: c.bg,
+    }}>
+      <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+        <Box sx={{
+          width: 14, height: 14,
+          border: `1.5px solid ${urgency === "normal" ? BORDER : c.border}`,
+          borderRadius: "3px", flexShrink: 0, mt: "2px",
+        }} />
+        <Typography sx={{ fontSize: 12, fontWeight: 500, color: TEXT, lineHeight: 1.4 }}>
+          {title}
+        </Typography>
+      </Box>
+      <Typography sx={{ fontSize: 11, fontWeight: 500, color: c.color, mt: 1, pl: "22px" }}>
+        {subtitle}
+      </Typography>
+    </Box>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function DashboardPage() {
   const nav = useNavigate();
+  const loginId = localStorage.getItem("loginId") || "";
 
-  // ── State (identical to original) ────────────────────────────────────────
-  const [jobs, setJobs] = useState([]);
-  const [candidatesByJob, setCandidatesByJob] = useState(new Map());
-  const [latestAnalysisByCandidate, setLatestAnalysisByCandidate] = useState(new Map());
+  const [recentJobs, setRecentJobs] = useState([]);
   const [recentAnalyses, setRecentAnalyses] = useState([]);
+  const [reminders, setReminders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
+  const [error, setError] = useState(null);
 
-  // ── Data loading (identical to original) ─────────────────────────────────
   useEffect(() => {
-    let cancelled = false;
+    setLoading(true);
+    Promise.all([
+      apiGet("/api/jobs"),
+      apiGet("/api/analyses/recent"),
+      apiGet("/api/reminders?filter=today"),
+    ])
+      .then(([jobs, analyses, rems]) => {
+        setRecentJobs(jobs.slice(0, 3));
+        setRecentAnalyses(analyses);
+        setReminders(rems);
+      })
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
+  }, [loginId]);
 
-    async function load() {
-      setLoading(true);
-      setErr("");
-      try {
-        const jobsResp = await apiGet("/api/jobs");
-        if (cancelled) return;
-        setJobs(jobsResp ?? []);
+  const todayTasks = reminders.filter(r => !r.isCompleted);
+  const overdueCount = todayTasks.filter(r => new Date(r.dueAt) < new Date()).length;
 
-        const jobList = jobsResp ?? [];
-        const candMap = new Map();
-        await Promise.all(
-          jobList.map(async (j) => {
-            try {
-              const cands = await apiGet(`/api/jobs/${j.id}/candidates`);
-              candMap.set(j.id, cands ?? []);
-            } catch (e) {
-              candMap.set(j.id, []);
-              console.warn("Failed to load candidates for job", j.id, e);
-            }
-          })
-        );
-        if (cancelled) return;
-        setCandidatesByJob(candMap);
+  const high = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) >= 80).length;
+  const medium = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) >= 60 && (a?.capabilityScore ?? 0) < 80).length;
+  const low = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) < 60).length;
+  const total = recentAnalyses.length || 1;
 
-        try {
-          const analyses = await apiGet(`/api/analyses/recent`);
-          if (cancelled) return;
-          setRecentAnalyses(analyses ?? []);
-          setLatestAnalysisByCandidate(new Map());
-        } catch (e) {
-          console.warn("Failed to load recent analyses", e);
-          setRecentAnalyses([]);
-          setLatestAnalysisByCandidate(new Map());
-        }
-      } catch (e) {
-        if (cancelled) return;
-        setErr(e?.message || "Failed to load dashboard");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    load();
-    return () => { cancelled = true; };
-  }, []);
-
-  // ── Derived stats (identical to original) ────────────────────────────────
-  const totalCandidates = useMemo(
-    () => Array.from(candidatesByJob.values()).reduce((sum, arr) => sum + (arr?.length ?? 0), 0),
-    [candidatesByJob]
-  );
-
-  const analysedCount = useMemo(() => {
-    return recentAnalyses.length;
-  }, [recentAnalyses]);
-
-  const avgMatch = useMemo(() => {
-    const scores = recentAnalyses
-      .map(a => a?.capabilityScore)
-      .filter(v => typeof v === "number" && v > 0);
-    if (!scores.length) return 0;
-    return Math.round(scores.reduce((s, x) => s + x, 0) / scores.length);
-  }, [recentAnalyses]);
-
-  const highRiskCount = useMemo(() => {
-    return recentAnalyses.filter(a => a?.riskLevel === "High").length;
-  }, [recentAnalyses]);
-
-  const recentJobs = useMemo(
-    () =>
-      (jobs ?? []).slice(0, 5).map((j) => ({
-        ...j,
-        company: j.company ?? "—",
-        jobType: j.jobType ?? "—",
-        candidateCount: candidatesByJob.get(j.id)?.length ?? 0,
-        status: j.status ?? "Active",
-      })),
-    [jobs, candidatesByJob]
-  );
-
-  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <Box
-      sx={{
-        display: "flex", flexDirection: "column", height: "100%",
-        overflow: "hidden", bgcolor: "#F7F8FA",
-      }}
-    >
-      {/* ── Page header ─────────────────────────────────────────────────── */}
-      <Box
-        sx={{
-          bgcolor: "#fff", borderBottom: `1px solid ${BORDER}`,
-          px: 3, py: 1.5,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          flexShrink: 0,
-        }}
-      >
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+      {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
+
+      {/* ── Page header ───────────────────────────────────────────── */}
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
         <Box>
-          <Typography sx={{ fontSize: 14, fontWeight: 700, color: TEXT, letterSpacing: "-0.2px" }}>
-            Dashboard
-          </Typography>
-          <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
-            Your recruitment pipeline at a glance
-          </Typography>
+          <Typography sx={{ fontSize: 15, fontWeight: 600, color: TEXT }}>Dashboard</Typography>
+          <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>Your recruitment pipeline at a glance</Typography>
         </Box>
-        <Box sx={{ display: "flex", gap: 1 }}>
-          <Button
-            size="small" variant="outlined"
+        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+          {/* ── MVP2: Reminders bell button ── */}
+          <Button variant="outlined" size="small"
+            onClick={() => nav("/reminders")}
             sx={{
-              fontSize: 12, fontWeight: 500, borderColor: BORDER, color: TEXT,
+              fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
               borderRadius: "6px", textTransform: "none",
-              "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE },
-            }}
-          >
+              "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE }
+            }}>
+            🔔 Reminders
+            {todayTasks.length > 0 && (
+              <Box component="span" sx={{
+                ml: 0.75, bgcolor: DANGER, color: "#fff",
+                borderRadius: "10px", px: "5px", py: "1px", fontSize: 9, fontWeight: 700
+              }}>
+                {todayTasks.length}
+              </Box>
+            )}
+          </Button>
+          <Button variant="outlined" size="small"
+            sx={{
+              fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
+              borderRadius: "6px", textTransform: "none"
+            }}>
             Export Report
           </Button>
-          <Button
-            size="small" variant="contained"
-            onClick={() => nav("/jobs/new")}
+          <Button variant="contained" size="small" onClick={() => nav("/jobs/new")}
             sx={{
-              fontSize: 12, fontWeight: 500, bgcolor: ACCENT,
+              fontSize: 11, fontWeight: 500, bgcolor: ACCENT,
               borderRadius: "6px", textTransform: "none", boxShadow: "none",
-              "&:hover": { bgcolor: "#1660CC", boxShadow: "none" },
-            }}
-          >
+              "&:hover": { bgcolor: "#1660CC", boxShadow: "none" }
+            }}>
             ＋ New Job
           </Button>
         </Box>
       </Box>
 
-      {/* ── Scrollable content ─────────────────────────────────────────── */}
-      <Box sx={{ flex: 1, overflow: "auto", p: 2.5 }}>
+      {/* ── KPI row ───────────────────────────────────────────────── */}
+      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 1.75 }}>
+        <KpiCard label="Active Jobs" value={recentJobs.length} delta="from jobs table" />
+        <KpiCard label="Total Candidates" value={recentAnalyses.length} delta="all analysed" />
+        <KpiCard label="Analyses Run" value={recentAnalyses.length} valueColor={ACCENT} />
+        <KpiCard label="High-Risk Flags"
+          value={recentAnalyses.filter(a => a?.riskLevel === "High").length}
+          valueColor={DANGER} delta="Needs review" />
+      </Box>
 
-        {err && <Alert severity="error" sx={{ mb: 2, borderRadius: "8px" }}>{err}</Alert>}
-
-        {loading && (
-          <Card sx={{ p: 2.5, mb: 2 }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT, mb: 1 }}>
-              Loading dashboard…
+      {/* ── MVP2: Today's Tasks strip ─────────────────────────────── */}
+      <Card isNew>
+        <CardHead
+          title="Today's Tasks"
+          isNew
+          action={<GhostBtn onClick={() => nav("/reminders")}>View All →</GhostBtn>}
+        />
+        <Box sx={{ p: 1.75 }}>
+          {todayTasks.length === 0 ? (
+            <Typography sx={{ fontSize: 12, color: MUTED, py: 1 }}>
+              No tasks for today. 🎉
             </Typography>
-            <LinearProgress sx={{ borderRadius: "4px" }} />
-          </Card>
-        )}
+          ) : (
+            <Box sx={{
+              display: "flex", gap: 2, overflowX: "auto", pb: 0.5,
+              "&::-webkit-scrollbar": { height: 4 },
+              "&::-webkit-scrollbar-thumb": { bgcolor: "#D1D5DB", borderRadius: 4 }
+            }}>
+              {todayTasks.slice(0, 6).map(r => {
+                const dueDate = new Date(r.dueAt);
+                const now = new Date();
 
-        {/* ── KPI cards ─────────────────────────────────────────────── */}
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 1.5,
-            mb: 1.75,
-          }}
-        >
-          <KpiCard
-            label="Active Jobs"
-            value={jobs.length}
-            delta="↑ 1 this week"
-            deltaUp
-          />
-          <KpiCard
-            label="Total Candidates"
-            value={totalCandidates}
-            delta="↑ 4 this week"
-            deltaUp
-          />
-          <KpiCard
-            label="Analyses Run"
-            value={analysedCount}
-            delta={avgMatch ? `Avg match ${avgMatch}%` : "All processed"}
-            valueColor={ACCENT}
-          />
-          <KpiCard
-            label="High-Risk Flags"
-            value={highRiskCount}
-            delta="Needs review"
-            valueColor={DANGER}
-          />
-        </Box>
+                const nudgeTypes = ["AUTO_SCREENING_STUCK", "AUTO_ANALYSIS_PENDING"];
+                const isNudge = nudgeTypes.includes(r.reminderType);
+                const isOverdue = !isNudge && dueDate < now;
+                const isUpcoming = r.reminderType === "AUTO_INTERVIEW_UPCOMING";
 
-        {/* ── Middle row: Recent Jobs + Pipeline + Risk ──────────────── */}
-        <Box sx={{ display: "flex", gap: 1.5, mb: 1.75, alignItems: "flex-start" }}>
+                // ── Fix 1: human-readable subtitle instead of raw time ──────────────────
+                let subtitle;
+                if (isOverdue) {
+                  subtitle = "Overdue";
+                } else if (isUpcoming) {
+                  // Show "In X hours" for upcoming interviews
+                  const diffMs = dueDate - now;
+                  const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+                  subtitle = diffHours <= 1 ? "In less than 1 hour"
+                    : diffHours === 1 ? "In 1 hour"
+                      : `In ${diffHours} hours`;
+                } else if (isNudge) {
+                  subtitle = "Due today";   // ← was falling through to toLocaleTimeString()
+                } else {
+                  // Manual reminder — check if due today or future
+                  const isToday = dueDate.toDateString() === now.toDateString();
+                  subtitle = isToday ? "Due today" : dueDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                }
 
-          {/* Recent Jobs table */}
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Card>
-              <CardHead
-                title="Recent Jobs"
-                action={<GhostBtn onClick={() => nav("/jobs")}>View All →</GhostBtn>}
-              />
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={thSx}>Job Title</TableCell>
-                    <TableCell sx={thSx}>Client</TableCell>
-                    <TableCell sx={{ ...thSx, textAlign: "center" }}>Candidates</TableCell>
-                    <TableCell sx={thSx}>Status</TableCell>
-                    <TableCell sx={{ ...thSx, textAlign: "right" }} />
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {recentJobs.map((j, idx) => (
-                    <TableRow
-                      key={j.id}
-                      onClick={() => nav("/jobs")}
-                      sx={{
-                        bgcolor: idx % 2 === 1 ? SURFACE : "#fff",
-                        cursor: "pointer",
-                        "&:hover": { bgcolor: "#F0F4FF" },
-                        "&:last-child td": { borderBottom: "none" },
-                      }}
-                    >
-                      <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
-                        <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT }}>
-                          {j.title}
-                        </Typography>
-                      </TableCell>
-                      <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, color: TEXT, borderBottom: `1px solid ${BORDER}` }}>
-                        {j.company}
-                      </TableCell>
-                      <TableCell sx={{ py: 1.5, px: 2, textAlign: "center", borderBottom: `1px solid ${BORDER}` }}>
-                        <Badge label={String(j.candidateCount)} variant="neutral" />
-                      </TableCell>
-                      <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
-                        <Badge
-                          label={j.status}
-                          variant={j.status === "Draft" ? "warning" : "success"}
-                        />
-                      </TableCell>
-                      <TableCell
-                        sx={{ py: 1.5, px: 2, textAlign: "right", borderBottom: `1px solid ${BORDER}` }}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Button
-                          size="small" variant="outlined"
-                          onClick={() => nav("/jobs")}
-                          sx={{
-                            fontSize: 11, fontWeight: 500,
-                            borderColor: BORDER, color: TEXT,
-                            borderRadius: "6px", textTransform: "none",
-                            "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE },
-                          }}
-                        >
-                          View
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {!loading && recentJobs.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} sx={{ py: 4, textAlign: "center", fontSize: 12, color: MUTED }}>
-                        No jobs yet. Create your first job to start analysing candidates.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </Card>
-          </Box>
-
-          {/* Right col: Pipeline + Risk Summary */}
-          <Box sx={{ flex: "0 0 210px", display: "flex", flexDirection: "column", gap: 1.5 }}>
-
-            {/* Pipeline funnel */}
-            <Card>
-              <CardHead title="Pipeline" />
-              <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
-                {(() => {
-                  const high = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) >= 80).length;
-                  const medium = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) >= 60 && (a?.capabilityScore ?? 0) < 80).length;
-                  const low = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) < 60).length;
-                  const total = recentAnalyses.length || 1; // avoid divide by zero
-
-                  return (
-                    <>
-                      <PipelineBar label="High Match ≥80%" count={high} pct={Math.round(high / total * 100)} color={SUCCESS} />
-                      <PipelineBar label="Moderate 60–79%" count={medium} pct={Math.round(medium / total * 100)} color={WARN} />
-                      <PipelineBar label="Low Match <60%" count={low} pct={Math.round(low / total * 100)} color={DANGER} />
-                    </>
-                  );
-                })()}
-              </Box>
-            </Card>
-
-            {/* Risk Summary */}
-            <Card>
-              <CardHead title="Risk Summary" />
-              <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.25 }}>
-                <RiskRow dotColor={DANGER} label="High Risk" count={recentAnalyses.filter(a => a?.riskLevel === "High").length} variant="danger" />
-                <RiskRow dotColor={WARN} label="Medium" count={recentAnalyses.filter(a => a?.riskLevel === "Medium").length} variant="warning" />
-                <RiskRow dotColor={ACCENT} label="Low" count={recentAnalyses.filter(a => a?.riskLevel === "Low").length} variant="accent" />
-              </Box>
-            </Card>
-
-          </Box>
-        </Box>
-
-        {/* ── Recent Candidate Analyses ──────────────────────────────── */}
-        <Card sx={{ mb: 1.75 }}>
-          <CardHead
-            title="Recent Candidate Analyses"
-            action={<GhostBtn onClick={() => nav("/candidates")}>View All →</GhostBtn>}
-          />
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={thSx}>Candidate</TableCell>
-                <TableCell sx={thSx}>Job</TableCell>
-                <TableCell sx={thSx}>Consistency Score</TableCell>
-                <TableCell sx={thSx}>Capability Match</TableCell>
-                <TableCell sx={thSx}>Risk Flags</TableCell>
-                <TableCell sx={{ ...thSx, textAlign: "right" }} />
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {recentAnalyses.map((row, idx) => {
-                console.log("analysis row fields:", row);
-                const consistency = row?.consistencyScore ?? 0;
-                const capability = row?.capabilityScore ?? 0;
-                const riskLevel = row?.riskLevel || "Medium";
-                const riskCount = riskLevel === "High" ? 2 : riskLevel === "Medium" ? 1 : 0;
-                const riskStyle = riskFlagStyles(riskLevel);
+                // ── Fix 2: nudge types get amber, not grey ───────────────────────────────
+                const urgency = isOverdue ? "overdue"
+                  : isUpcoming ? "upcoming"
+                    : isNudge ? "nudge"     // ← new urgency type
+                      : "normal";
 
                 return (
-                  <TableRow
-                    key={row.id}
-                    onClick={() => nav(`/analysis/${row.candidateId}`)}
-                    sx={{
-                      bgcolor: idx % 2 === 1 ? SURFACE : "#fff",
-                      cursor: "pointer",
-                      "&:hover": { bgcolor: "#F0F4FF" },
-                      "&:last-child td": { borderBottom: "none" },
-                    }}
-                  >
-                    <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
-                      <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT }}>
-                        {row.candidate_name}
-                      </Typography>
-                    </TableCell>
-
-                    <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, color: MUTED, fontWeight: 600, borderBottom: `1px solid ${BORDER}` }}>
-                      {row.jobId}
-                    </TableCell>
-
-                    <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
-                      <ScoreCell value={consistency} showBar />
-                    </TableCell>
-
-                    <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
-                      <ScoreCell value={capability} />
-                    </TableCell>
-
-                    <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
-                      <Box
-                        sx={{
-                          display: "inline-flex", alignItems: "center",
-                          bgcolor: riskStyle.bg, border: `1px solid ${riskStyle.border}`,
-                          borderRadius: "20px", px: 1.25, py: 0.25,
-                          fontSize: 11, fontWeight: 600, color: riskStyle.fg,
-                          gap: 0.5,
-                        }}
-                      >
-                        <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: riskStyle.fg }} />
-                        {riskCount} {riskLevel}
-                      </Box>
-                    </TableCell>
-
-                    <TableCell
-                      sx={{ py: 1.5, px: 2, textAlign: "right", borderBottom: `1px solid ${BORDER}` }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Button
-                        size="small" variant="outlined"
-                        onClick={() => nav(`/analysis/${row.candidateId}`)}
-                        sx={{
-                          fontSize: 11, fontWeight: 500,
-                          borderColor: BORDER, color: TEXT,
-                          borderRadius: "6px", textTransform: "none",
-                          "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE },
-                        }}
-                      >
-                        Results
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                  <TaskCard
+                    key={r.id}
+                    title={r.title}
+                    subtitle={subtitle}
+                    urgency={urgency}
+                  />
                 );
               })}
-
-              {!loading && recentAnalyses.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} sx={{ py: 4, textAlign: "center", fontSize: 12, color: MUTED }}>
-                    No analyses yet. Run analysis on a candidate to see results here.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </Card>
-
-        {/* Annotation strip */}
-        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-          {[
-            "copyright@ DeepHire",
-            "A product of Golden Wattle Ventures Pvt Ltd",
-            "This AI tool is designed to assist you, not replace professional judgment. Always consult with a qualified expert.",
-          ].map((label) => (
-            <Box
-              key={label}
-              sx={{
-                display: "inline-flex", alignItems: "center",
-                bgcolor: "#F0F2F6", border: `1px solid ${BORDER}`,
-                borderRadius: "5px", px: 1, py: 0.25,
-                fontSize: 10, fontWeight: 500, color: MUTED,
-              }}
-            >
-              {label}
             </Box>
-          ))}
+          )}
+        </Box>
+      </Card>
+
+      {/* ── Middle row: Recent Jobs + Pipeline + Risk ─────────────── */}
+      <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+        <Box sx={{ flex: 1 }}>
+          <Card>
+            <CardHead title="Recent Jobs" action={<GhostBtn onClick={() => nav("/jobs")}>View All →</GhostBtn>} />
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={thSx}>Job Title</TableCell>
+                  <TableCell sx={thSx}>Client</TableCell>
+                  <TableCell sx={thSx}>Candidates</TableCell>
+                  <TableCell sx={thSx}>Status</TableCell>
+                  <TableCell sx={{ ...thSx, textAlign: "right" }} />
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {recentJobs.map(j => (
+                  <TableRow key={j.id} onClick={() => nav("/jobs")} sx={{
+                    cursor: "pointer", "&:hover": { bgcolor: "#F0F4FF" },
+                    "&:last-child td": { borderBottom: "none" }
+                  }}>
+                    <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{j.title}</Typography>
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, color: MUTED, borderBottom: `1px solid ${BORDER}` }}>
+                      {j.company}
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5, px: 2, textAlign: "center", borderBottom: `1px solid ${BORDER}` }}>
+                      <Badge label="—" variant="neutral" />
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
+                      <Badge label="Active" variant="success" />
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5, px: 2, textAlign: "right", borderBottom: `1px solid ${BORDER}` }}
+                      onClick={e => e.stopPropagation()}>
+                      <Button size="small" variant="outlined" onClick={() => nav("/jobs")}
+                        sx={{
+                          fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
+                          borderRadius: "6px", textTransform: "none",
+                          "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE }
+                        }}>View</Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!loading && recentJobs.length === 0 && (
+                  <TableRow><TableCell colSpan={5} sx={{ py: 4, textAlign: "center", fontSize: 12, color: MUTED }}>
+                    No jobs yet. Create your first job to start.
+                  </TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Card>
         </Box>
 
+        <Box sx={{ flex: "0 0 210px", display: "flex", flexDirection: "column", gap: 1.5 }}>
+          <Card>
+            <CardHead title="Pipeline" />
+            <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
+              <PipelineBar label="High Match ≥80%" count={high} pct={Math.round(high / total * 100)} color={SUCCESS} />
+              <PipelineBar label="Moderate 60–79%" count={medium} pct={Math.round(medium / total * 100)} color={WARN} />
+              <PipelineBar label="Low Match <60%" count={low} pct={Math.round(low / total * 100)} color={DANGER} />
+            </Box>
+          </Card>
+          <Card>
+            <CardHead title="Risk Summary" />
+            <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.25 }}>
+              <RiskRow dotColor={DANGER} label="High Risk" count={recentAnalyses.filter(a => a?.riskLevel === "High").length} variant="danger" />
+              <RiskRow dotColor={WARN} label="Medium" count={recentAnalyses.filter(a => a?.riskLevel === "Medium").length} variant="warning" />
+              <RiskRow dotColor={ACCENT} label="Low" count={recentAnalyses.filter(a => a?.riskLevel === "Low").length} variant="accent" />
+            </Box>
+          </Card>
+        </Box>
+      </Box>
+
+      {/* ── Recent Candidate Analyses ─────────────────────────────── */}
+      <Card sx={{ mb: 1.75 }}>
+        <CardHead title="Recent Candidate Analyses"
+          action={<GhostBtn onClick={() => nav("/candidates")}>View All →</GhostBtn>} />
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell sx={thSx}>Candidate</TableCell>
+              <TableCell sx={thSx}>Job</TableCell>
+              <TableCell sx={thSx}>Consistency</TableCell>
+              <TableCell sx={thSx}>Capability</TableCell>
+              <TableCell sx={thSx}>Risk</TableCell>
+              <TableCell sx={{ ...thSx, textAlign: "right" }} />
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {recentAnalyses.map((row, idx) => (
+              <TableRow key={row.id}
+                onClick={() => nav(`/candidates/${row.candidateId}/workflow`)}
+                sx={{
+                  bgcolor: idx % 2 === 1 ? SURFACE : "#fff", cursor: "pointer",
+                  "&:hover": { bgcolor: "#F0F4FF" }, "&:last-child td": { borderBottom: "none" }
+                }}>
+                <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
+                  <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{row.candidate_name}</Typography>
+                </TableCell>
+                <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, color: MUTED, fontWeight: 600, borderBottom: `1px solid ${BORDER}` }}>
+                  {row.jobId}
+                </TableCell>
+                <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
+                  <ScoreCell value={row?.consistencyScore} />
+                </TableCell>
+                <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
+                  <ScoreCell value={row?.capabilityScore} />
+                </TableCell>
+                <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
+                  <Badge label={row?.riskLevel || "—"}
+                    variant={row?.riskLevel === "High" ? "danger" : row?.riskLevel === "Medium" ? "warning" : "accent"} />
+                </TableCell>
+                <TableCell sx={{ py: 1.5, px: 2, textAlign: "right", borderBottom: `1px solid ${BORDER}` }}
+                  onClick={e => e.stopPropagation()}>
+                  {/* MVP2: navigates to Workflow */}
+                  <Button size="small" variant="outlined"
+                    onClick={() => nav(`/candidates/${row.candidateId}/workflow`)}
+                    sx={{
+                      fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
+                      borderRadius: "6px", textTransform: "none",
+                      "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE }
+                    }}>
+                    Open Profile
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+            {!loading && recentAnalyses.length === 0 && (
+              <TableRow><TableCell colSpan={6} sx={{ py: 4, textAlign: "center", fontSize: 12, color: MUTED }}>
+                No analyses yet. Run analysis on a candidate to see results here.
+              </TableCell></TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </Card>
+
+      {/* Footer */}
+      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+        {["copyright@ DeepHire", "A product of Golden Wattle Ventures Pvt Ltd",
+          "This AI tool is designed to assist you, not replace professional judgment."]
+          .map(label => (
+            <Box key={label} sx={{
+              display: "inline-flex", alignItems: "center",
+              bgcolor: "#F0F2F6", border: `1px solid ${BORDER}`, borderRadius: "5px",
+              px: 1, py: 0.25, fontSize: 10, fontWeight: 500, color: MUTED
+            }}>{label}</Box>
+          ))}
       </Box>
     </Box>
   );

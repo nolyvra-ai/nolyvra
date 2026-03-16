@@ -159,12 +159,48 @@ export default function AddCandidatePage() {
     email: "",
     linkedinUrl: "",
     cvText: "",
+    recruiterNotes: "",
     jobId: "job-1",
   });
-  const [jobs, setJobs] = useState([]);
+  const [jobs,          setJobs]          = useState([]);
+  const [cvFile,        setCvFile]        = useState(null);   // Change 1: uploaded file name
+  const [cvUploading,   setCvUploading]   = useState(false);  // Change 1: extraction in progress
+  const [cvUploadError, setCvUploadError] = useState(null);   // Change 1: extraction error
+  const [validationErr, setValidationErr] = useState("");
 
   function setField(k, v) {
     setForm((p) => ({ ...p, [k]: v }));
+  }
+
+  // ── Change 1: CV file upload — sends to backend for text extraction ────────
+  async function handleCvUpload(file) {
+    if (!file) return;
+    const allowed = ["application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/msword"];
+    if (!allowed.includes(file.type)) {
+      setCvUploadError("Only PDF and Word (.docx / .doc) files are supported.");
+      return;
+    }
+    setCvFile(file.name);
+    setCvUploading(true);
+    setCvUploadError(null);
+    try {
+      const loginId = localStorage.getItem("loginId") || "";
+      const formData = new FormData();
+      formData.append("file", file);
+      const url = new URL(`${API_BASE}/api/cv/extract`);
+      url.searchParams.set("loginId", loginId);
+      const res = await fetch(url.toString(), { method: "POST", body: formData });
+      if (!res.ok) throw new Error(await res.text());
+      const { text } = await res.json();
+      setField("cvText", text);
+    } catch (e) {
+      setCvUploadError("Failed to extract text: " + e.message);
+      setCvFile(null);
+    } finally {
+      setCvUploading(false);
+    }
   }
 
   useEffect(() => {
@@ -182,12 +218,17 @@ export default function AddCandidatePage() {
   // ── Save candidate (no analysis) ──────────────────────────────────────────
   async function onSave(e) {
     e.preventDefault();
+    // Change 3: validate mandatory fields
+    if (!hasName) { setValidationErr("Candidate name is required."); return; }
+    if (!hasCv)   { setValidationErr("CV text is required. Please paste or upload a CV."); return; }
+    setValidationErr("");
     try {
       await apiPost(`/api/jobs/${form.jobId}/candidates`, {
-        name: form.name,
-        email: form.email,
-        linkedinUrl: form.linkedinUrl,
-        cvText: form.cvText,
+        name:           form.name,
+        email:          form.email,
+        linkedinUrl:    form.linkedinUrl,
+        cvText:         form.cvText,
+        recruiterNotes: form.recruiterNotes,  // Change 2: include notes
       });
       nav("/candidates");
     } catch (e) {
@@ -198,13 +239,18 @@ export default function AddCandidatePage() {
 
   async function onSubmit(e) {
     e.preventDefault();
+    // Change 3: validate mandatory fields
+    if (!hasName) { setValidationErr("Candidate name is required."); return; }
+    if (!hasCv)   { setValidationErr("CV text is required. Please paste or upload a CV."); return; }
+    setValidationErr("");
     try {
       // Step 1: Save candidate and get back the candidateId
       const candidate = await apiPost(`/api/jobs/${form.jobId}/candidates`, {
-        name: form.name,
-        email: form.email,
-        linkedinUrl: form.linkedinUrl,
-        cvText: form.cvText,
+        name:           form.name,
+        email:          form.email,
+        linkedinUrl:    form.linkedinUrl,
+        cvText:         form.cvText,
+        recruiterNotes: form.recruiterNotes,  // Change 2: include notes
       });
 
       const candidateId = candidate.id;
@@ -223,7 +269,6 @@ export default function AddCandidatePage() {
     }
   }
 
-  // ── Derived checklist state ───────────────────────────────────────────────
   const [firstName = "", ...rest] = (form.name ?? "").trim().split(" ");
   const hasName = firstName.length > 0;
   const hasJob = !!form.jobId;
@@ -232,7 +277,7 @@ export default function AddCandidatePage() {
   const wordCount = form.cvText.trim()
     ? form.cvText.trim().split(/\s+/).length
     : 0;
-  const allReady = hasName && hasJob && hasLinkedin && hasCv;
+  const allReady = hasName && hasJob && hasCv;
 
   // ── Step indicator ────────────────────────────────────────────────────────
   const steps = ["Candidate Details", "CV / Resume", "Review & Run"];
@@ -368,6 +413,20 @@ export default function AddCandidatePage() {
 
       {/* ── Scrollable content ────────────────────────────────────────────── */}
       <Box sx={{ flex: 1, overflow: "auto", p: 2.5 }}>
+
+        {/* Change 3: validation error banner */}
+        {validationErr && (
+          <Box sx={{ mb: 2, p: "10px 14px", bgcolor: "#FEF2F2",
+            border: "1px solid #FECACA", borderRadius: "8px",
+            display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <Typography sx={{ fontSize: 12, color: "#DC2626", fontWeight: 500 }}>
+              ⚠ {validationErr}
+            </Typography>
+            <Box onClick={() => setValidationErr("")}
+              sx={{ cursor: "pointer", fontSize: 14, color: "#DC2626", opacity: 0.6,
+                "&:hover": { opacity: 1 }, ml: 2, flexShrink: 0 }}>×</Box>
+          </Box>
+        )}
         <Box sx={{ display: "flex", gap: 1.75, alignItems: "flex-start" }}>
 
           {/* ── LEFT: Form ────────────────────────────────────────────────── */}
@@ -517,6 +576,81 @@ export default function AddCandidatePage() {
                 <Typography sx={{ fontSize: 11, color: MUTED, mb: 1, lineHeight: 1.6 }}>
                   Copy and paste the candidate's full CV. Plain text preferred for accurate analysis.
                 </Typography>
+
+                {/* Change 1: CV upload section */}
+                <Box sx={{ mb: 1.75 }}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT, mb: 0.75 }}>
+                    Upload CV (PDF or Word)
+                  </Typography>
+                  <Box
+                    component="label"
+                    htmlFor="cv-file-input"
+                    sx={{
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexDirection: "column", gap: 0.75,
+                      border: `2px dashed ${cvFile ? "#BBF7D0" : BORDER}`,
+                      borderRadius: "8px", p: "18px 16px",
+                      bgcolor: cvFile ? "#F0FDF4" : SURFACE,
+                      cursor: "pointer", transition: "all .15s",
+                      "&:hover": { borderColor: ACCENT, bgcolor: "#EBF2FF" },
+                    }}>
+                    <Typography sx={{ fontSize: 20 }}>
+                      {cvUploading ? "⏳" : cvFile ? "✅" : "📎"}
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, fontWeight: 500,
+                      color: cvFile ? SUCCESS : TEXT, textAlign: "center" }}>
+                      {cvUploading
+                        ? "Extracting text…"
+                        : cvFile
+                          ? cvFile
+                          : "Click to upload PDF or Word document"}
+                    </Typography>
+                    {!cvFile && !cvUploading && (
+                      <Typography sx={{ fontSize: 11, color: MUTED }}>
+                        .pdf · .docx · .doc — text will auto-fill below
+                      </Typography>
+                    )}
+                    {cvFile && !cvUploading && (
+                      <Typography sx={{ fontSize: 11, color: SUCCESS }}>
+                        Text extracted and filled below
+                      </Typography>
+                    )}
+                    <Box
+                      id="cv-file-input"
+                      component="input"
+                      type="file"
+                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) handleCvUpload(f); e.target.value = ""; }}
+                      sx={{ display: "none" }}
+                    />
+                  </Box>
+                  {cvUploadError && (
+                    <Typography sx={{ fontSize: 11, color: "#DC2626", mt: 0.75 }}>
+                      ⚠ {cvUploadError}
+                    </Typography>
+                  )}
+                  {cvFile && (
+                    <Box sx={{ mt: 0.75, display: "flex", alignItems: "center",
+                      justifyContent: "space-between" }}>
+                      <Typography sx={{ fontSize: 11, color: MUTED }}>
+                        Or edit extracted text manually below
+                      </Typography>
+                      <Box onClick={() => { setCvFile(null); setField("cvText", ""); }}
+                        sx={{ fontSize: 11, color: "#DC2626", cursor: "pointer",
+                          "&:hover": { textDecoration: "underline" } }}>
+                        Remove file
+                      </Box>
+                    </Box>
+                  )}
+                </Box>
+
+                <Box sx={{ mb: 1.25, display: "flex", alignItems: "center", gap: 1 }}>
+                  <Box sx={{ flex: 1, height: 1, bgcolor: BORDER }} />
+                  <Typography sx={{ fontSize: 11, color: MUTED, px: 1, flexShrink: 0 }}>
+                    or paste manually
+                  </Typography>
+                  <Box sx={{ flex: 1, height: 1, bgcolor: BORDER }} />
+                </Box>
 
                 {/* PII disclaimer */}
                 <Box
@@ -686,14 +820,16 @@ export default function AddCandidatePage() {
                 </Typography>
               </Box>
               <Box sx={{ p: 2 }}>
+                {/* Change 2: wired to form state; no Save Notes button — saves with candidate */}
                 <TextField
                   fullWidth
                   multiline
                   rows={4}
                   placeholder="Add any notes about this candidate…"
+                  value={form.recruiterNotes}
+                  onChange={e => setField("recruiterNotes", e.target.value)}
                   sx={{
                     ...fieldSx,
-                    mb: 1,
                     "& .MuiOutlinedInput-root": {
                       ...fieldSx["& .MuiOutlinedInput-root"],
                       fontSize: 12,
@@ -701,21 +837,9 @@ export default function AddCandidatePage() {
                     },
                   }}
                 />
-                <Button
-                  fullWidth
-                  variant="outlined"
-                  sx={{
-                    fontSize: 12,
-                    fontWeight: 500,
-                    borderColor: BORDER,
-                    color: TEXT,
-                    borderRadius: "7px",
-                    textTransform: "none",
-                    "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE },
-                  }}
-                >
-                  Save Notes
-                </Button>
+                <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.75 }}>
+                  Notes are saved automatically with the candidate record
+                </Typography>
               </Box>
             </Paper>
 

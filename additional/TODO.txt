@@ -10,17 +10,21 @@
 
 Good To have feature before onboarding recuriter
 -----
-1. Add/Remove Jobs + candidates - Xingyu
+1. Add/Remove Jobs + candidates - Done in MVP 2
 2. Restrict Number of Job to 3 and candidate 10 per job - Xingyu
 3. Fix the pipeline and Risk Summary on dashboard (Done)
-4. On the create job Extracted Skills Preview section should be populated
-5. CV upload option - Xingyu
+4. On the create job Extracted Skills Preview section should be populated - Done in MVP 2
+5. CV upload option - Done in MVP 2
 6. Cadidate report export option ("Do you want to download with question or separately",1 or 2 PDF ) - Xingyu
-7. Clicking a job from dashboard or all job should take to create job page populating from DB - Xingyu 
-8. In the settings keep a update password option
+7. job edit from dashboard or all job should take to create job page populating from DB - Done in MVP 2 
+8. In the settings keep a update password and logout option
 9. A loading popup when analysis button is pressed - Xingyu
 10. If Analysis result already exist return that else call the analysis method
 11. Create a simple landing page with the details of upcoming event and register event option
+12. Email Integration
+13. Connecting https://apify.com/ for linkedIn profile finding
+14. Implement Claude Co worker type feature
+15. Job workflow - Opening date, number of candidate applied, number of candidate in what stage and closed job also.
 
 Recuriter onboarding can happen at this stage.
 -----
