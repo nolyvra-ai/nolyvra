@@ -60,43 +60,90 @@ public class AnalysisService {
                 .orElseThrow(() -> new IllegalArgumentException("Candidate not found: " + candidateId));
     }
 
-    // ─── Core analysis (unchanged from MVP1) ─────────────────────────────────
+    // ─── Core analysis ────────────────────────────────────────────────────────
+    // MVP2: expanded OpenAI prompt now returns all fields in one call.
+    // No extra API calls needed for matchedSkills, strengthSignals, aiVerdict etc.
 
     public CandidateAnalysisResponse analyze(String candidateId,
             CandidateResponse candidateResponse, String loginId) {
 
-        String jdText      = loadJobDescriptionFromDb(candidateResponse.jobId());
-        String cvText      = loadCvTextFromDb(candidateId);
+        String jdText = loadJobDescriptionFromDb(candidateResponse.jobId());
+        String cvText = loadCvTextFromDb(candidateId);
         String linkedinUrl = loadLinkedinUrlFromDb(candidateId);
 
         try {
             String systemPrompt = """
-                    You are an expert technical recruiter + senior software architect.
-                    Return EXACTLY ONE JSON object. No markdown. No extra keys.
+                                        You are an expert technical recruiter and senior software architect.
+                                        Return EXACTLY ONE JSON object. No markdown. No extra keys.
 
-                    {
-                      "scores": { "consistencyScore": 0-100, "capabilityScore": 0-100, "riskLevel": "Low|Medium|High" },
-                      "consistency": {
-                        "timelineMatchPercent": 0-100,
-                        "flags": [ { "severity": "Low|Medium|High", "type": "DATE_MISMATCH|TITLE_MISMATCH|MISSING_ROLE|OTHER", "message": "..." } ]
-                      },
-                      "capabilityMatrix": {
-                        "rows": [ { "capability": "...", "weightPercent": int, "scorePercent": 0-100, "gapLevel": "Low|Medium|High" } ],
-                        "weights": { "System Design": int, "Cloud Architecture": int, "Leadership": int, "Domain Knowledge": int }
-                      },
-                      "suggestedQuestions": [
-                        { "order": 1, "type": "system_design|architecture|behavioral|debugging|leadership|domain", "intent": "...", "question": "..." }
-                      ],
-                      "riskFlags": ["..."],
-                      "recommendation": "..."
-                    }
+                                        {
+                                          "scores": {
+                                            "consistencyScore": 0-100,
+                                            "capabilityScore": 0-100,
+                                            "riskLevel": "Low|Medium|High"
+                                          },
 
-                    Hard requirements:
-                    - weights must sum to 100 and include: System Design, Cloud Architecture, Leadership, Domain Knowledge.
-                    - capabilityMatrix.rows must have exactly those 4 capabilities.
-                    - suggestedQuestions: exactly 6 items, order 1-6.
-                    - riskFlags: 3-6 items.
-                    """;
+                                          "consistency": {
+                                            "timelineMatchPercent": 0-100,
+                                            "flags": [
+                                              { "severity": "Low|Medium|High", "type": "DATE_MISMATCH|TITLE_MISMATCH|MISSING_ROLE|OTHER", "message": "..." }
+                                            ]
+                                          },
+
+                                          "consistencyBreakdown": [
+                                            { "label": "Employment Timeline", "match": true,  "note": null, "score": 95 },
+                                            { "label": "Job Titles",          "match": true,  "note": null, "score": 90 },
+                                            { "label": "Skills Listed",       "match": false, "note": "Partial overlap", "score": 70 },
+                                            { "label": "Education",           "match": true,  "note": null, "score": 100 }
+                                          ],
+
+                                          "capabilityMatrix": {
+                                            "rows": [
+                                              { "capability": "...", "weightPercent": 25, "scorePercent": 0-100, "gapLevel": "Low|Medium|High" }
+                                            ],
+                                            "weights": { "System Design": 25, "Cloud Architecture": 25, "Leadership": 25, "Domain Knowledge": 25 }
+                                          },
+
+                                          "matchedSkills": ["skill1", "skill2"],
+                                          "missingSkills": ["skill1", "skill2"],
+
+                                          "strengthSignals": [
+                                            { "icon": "⭐", "title": "...", "description": "...", "tag": "optional badge label" }
+                                          ],
+
+                                          "executionTier": 1,
+                                          "executionTierNote": "...",
+
+                                          "suggestedQuestions": [
+                                            {
+                                                "order": 1,
+                                                "type": "system_design|architecture|behavioral|debugging|leadership|domain",
+                                                "intent": "2-4 sentence explanation of exactly what this question is probing for, why it is relevant to this specific candidate's risk flags or gaps, and what a strong vs weak answer would reveal about their suitability for this role.",
+                                                "question": "..."
+                                            }
+                                            ],
+
+                                          "riskFlags": ["..."],
+                                          "recommendation": "...",
+
+                                          "aiVerdict": { "title": "Strong Hire|Proceed with Caution|Do Not Progress", "summary": "1-2 sentences." },
+                                          "aiConfidence": "Low|Medium|High",
+                                          "aiConfidenceNote": "Brief reason for this confidence level"
+                                        }
+
+                                        Hard requirements:
+                                        - weights must sum to 100: System Design, Cloud Architecture, Leadership, Domain Knowledge.
+                                        - capabilityMatrix.rows must have exactly those 4 capabilities.
+                                        - suggestedQuestions: exactly 6 items, order 1-6.
+                                        - intent: must be 2-4 sentences. Explain specifically what competency or risk is being probed, why it matters for this role, and what the interviewer should listen for in the response.
+                                        - riskFlags: 3-6 items.
+                                        - matchedSkills: skills from JD evidenced in CV. Max 10.
+                                        - missingSkills: skills from JD absent or weak in CV. Max 8.
+                                        - consistencyBreakdown: exactly 4 items covering Employment Timeline, Job Titles, Skills Listed, Education.
+                                        - strengthSignals: 3-5 items. Use relevant emojis for icon.
+                                        - executionTier: integer 1 (Contributor), 2 (Owner), 3 (Architect), 4 (Strategic Lead).
+                                        - aiVerdict.title must be exactly one of: "Strong Hire", "Proceed with Caution", "Do Not Progress".
+                                        """;
 
             String userPrompt = """
                     JOB DESCRIPTION:
@@ -125,13 +172,29 @@ public class AnalysisService {
             String content = completion.choices().getFirst().message().content()
                     .orElseThrow(() -> new IllegalStateException("Model returned empty content"));
 
-            AiAnalysisResult ai = objectMapper.readValue(content, AiAnalysisResult.class);
+            AiAnalysisResult ai = objectMapper.readValue(cleanJson(content), AiAnalysisResult.class);
 
             CandidateAnalysisResponse response = new CandidateAnalysisResponse(
-                    candidateId, candidateResponse.jobId(), Instant.now(),
-                    ai.scores(), ai.consistency(), ai.capabilityMatrix(),
-                    ai.suggestedQuestions(), ai.riskFlags(), ai.recommendation(),
-                    candidateResponse.name());
+                    candidateId,
+                    candidateResponse.jobId(),
+                    Instant.now(),
+                    ai.scores(),
+                    ai.consistency(),
+                    ai.capabilityMatrix(),
+                    ai.suggestedQuestions(),
+                    ai.riskFlags(),
+                    ai.recommendation(),
+                    candidateResponse.name(),
+                    // MVP2 new fields — null-safe fallbacks
+                    ai.matchedSkills() != null ? ai.matchedSkills() : List.of(),
+                    ai.missingSkills() != null ? ai.missingSkills() : List.of(),
+                    ai.consistencyBreakdown() != null ? ai.consistencyBreakdown() : List.of(),
+                    ai.strengthSignals() != null ? ai.strengthSignals() : List.of(),
+                    ai.aiVerdict(),
+                    ai.aiConfidence(),
+                    ai.aiConfidenceNote(),
+                    ai.executionTier(),
+                    ai.executionTierNote());
 
             persistAnalysisToDb(response, loginId);
             cache.put(candidateId, response);
@@ -143,26 +206,25 @@ public class AnalysisService {
     }
 
     // ─── MVP2: AI Candidate Summary ──────────────────────────────────────────
-    // GET /api/candidates/{id}/analysis/summary
-    // Checks the DB column first; generates + stores on cache miss.
 
     public CandidateSummaryResponse getCandidateSummary(String candidateId, String loginId) {
-        // 1. Check if already stored
-        String stored = jdbc.query("""
+        // Fix: list + get(0) avoids NPE when column value is null
+        List<String> summaryRows = jdbc.query("""
                 select ai_summary_json from analyses
                 where candidate_id = ?
                 order by analyzed_at desc limit 1
                 """,
                 (rs, r) -> rs.getString("ai_summary_json"),
-                candidateId).stream().findFirst().orElse(null);
+                candidateId);
+        String stored = summaryRows.isEmpty() ? null : summaryRows.get(0);
 
         if (stored != null && !stored.isBlank() && !stored.equals("null")) {
             try {
                 return objectMapper.readValue(stored, CandidateSummaryResponse.class);
-            } catch (Exception ignored) { /* fall through to regenerate */ }
+            } catch (Exception ignored) {
+            }
         }
 
-        // 2. Generate from OpenAI
         String cvText = loadCvTextFromDb(candidateId);
         String jdText = getJdForCandidate(candidateId);
         String candidateName = getCandidateName(candidateId);
@@ -196,36 +258,42 @@ public class AnalysisService {
 
         String content = callOpenAI(systemPrompt, userPrompt);
         try {
-            CandidateSummaryResponse result = objectMapper.readValue(cleanJson(content), CandidateSummaryResponse.class);
-            // 3. Store back into the analyses row
+            CandidateSummaryResponse result = objectMapper.readValue(
+                    cleanJson(content), CandidateSummaryResponse.class);
+            // Fix: re-serialize the parsed object — guarantees clean JSON for ::jsonb cast
+            String cleanContent = objectMapper.writeValueAsString(result);
             jdbc.update("""
                     update analyses set ai_summary_json = ?::jsonb
                     where candidate_id = ? and id = (
                         select id from analyses where candidate_id = ? order by analyzed_at desc limit 1
                     )
-                    """, content, candidateId, candidateId);
+                    """, cleanContent, candidateId, candidateId);
             return result;
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse candidate summary: " + e.getMessage(), e);
         }
     }
 
+    // ─── MVP2: Fraud Detection
+
     // ─── MVP2: Fraud Detection ────────────────────────────────────────────────
-    // GET /api/candidates/{id}/analysis/fraud-signals
 
     public FraudSignalResponse getFraudSignals(String candidateId, String loginId) {
-        String stored = jdbc.query("""
+        // Fix: list + get(0) avoids NPE when column value is null
+        List<String> fraudRows = jdbc.query("""
                 select fraud_signals_json from analyses
                 where candidate_id = ?
                 order by analyzed_at desc limit 1
                 """,
                 (rs, r) -> rs.getString("fraud_signals_json"),
-                candidateId).stream().findFirst().orElse(null);
+                candidateId);
+        String stored = fraudRows.isEmpty() ? null : fraudRows.get(0);
 
         if (stored != null && !stored.isBlank() && !stored.equals("null")) {
             try {
                 return objectMapper.readValue(stored, FraudSignalResponse.class);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
 
         String cvText = loadCvTextFromDb(candidateId);
@@ -261,17 +329,21 @@ public class AnalysisService {
                 CANDIDATE ID: %s
                 CV TEXT: %s
                 LINKEDIN URL / DATA: %s
-                """.formatted(candidateId, safeTrim(cvText, 8000), safeTrim(linkedinUrl, 2000));
+                """.formatted(candidateId,
+                safeTrim(cvText, 8000), safeTrim(linkedinUrl, 2000));
 
         String content = callOpenAI(systemPrompt, userPrompt);
         try {
-            FraudSignalResponse result = objectMapper.readValue(cleanJson(content), FraudSignalResponse.class);
+            FraudSignalResponse result = objectMapper.readValue(
+                    cleanJson(content), FraudSignalResponse.class);
+            // Fix: re-serialize the parsed object — guarantees clean JSON for ::jsonb cast
+            String cleanContent = objectMapper.writeValueAsString(result);
             jdbc.update("""
                     update analyses set fraud_signals_json = ?::jsonb
                     where candidate_id = ? and id = (
                         select id from analyses where candidate_id = ? order by analyzed_at desc limit 1
                     )
-                    """, content, candidateId, candidateId);
+                    """, cleanContent, candidateId, candidateId);
             return result;
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse fraud signals: " + e.getMessage(), e);
@@ -279,21 +351,23 @@ public class AnalysisService {
     }
 
     // ─── MVP2: Placement Probability ─────────────────────────────────────────
-    // GET /api/candidates/{id}/analysis/placement-probability
 
     public PlacementProbabilityResponse getPlacementProbability(String candidateId, String loginId) {
-        String stored = jdbc.query("""
+        // Fix: list + get(0) avoids NPE when column value is null
+        List<String> placementRows = jdbc.query("""
                 select placement_prob_json from analyses
                 where candidate_id = ?
                 order by analyzed_at desc limit 1
                 """,
                 (rs, r) -> rs.getString("placement_prob_json"),
-                candidateId).stream().findFirst().orElse(null);
+                candidateId);
+        String stored = placementRows.isEmpty() ? null : placementRows.get(0);
 
         if (stored != null && !stored.isBlank() && !stored.equals("null")) {
             try {
                 return objectMapper.readValue(stored, PlacementProbabilityResponse.class);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
 
         String cvText = loadCvTextFromDb(candidateId);
@@ -325,17 +399,21 @@ public class AnalysisService {
                 CANDIDATE ID: %s
                 CV TEXT: %s
                 JOB DESCRIPTION: %s
-                """.formatted(candidateId, safeTrim(cvText, 8000), safeTrim(jdText, 4000));
+                """.formatted(candidateId,
+                safeTrim(cvText, 8000), safeTrim(jdText, 4000));
 
         String content = callOpenAI(systemPrompt, userPrompt);
         try {
-            PlacementProbabilityResponse result = objectMapper.readValue(cleanJson(content), PlacementProbabilityResponse.class);
+            PlacementProbabilityResponse result = objectMapper.readValue(
+                    cleanJson(content), PlacementProbabilityResponse.class);
+            // Fix: re-serialize the parsed object — guarantees clean JSON for ::jsonb cast
+            String cleanContent = objectMapper.writeValueAsString(result);
             jdbc.update("""
                     update analyses set placement_prob_json = ?::jsonb
                     where candidate_id = ? and id = (
                         select id from analyses where candidate_id = ? order by analyzed_at desc limit 1
                     )
-                    """, content, candidateId, candidateId);
+                    """, cleanContent, candidateId, candidateId);
             return result;
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse placement probability: " + e.getMessage(), e);
@@ -358,7 +436,8 @@ public class AnalysisService {
                         rs.getString("name"), rs.getString("email"),
                         rs.getString("linkedin_url"),
                         rs.getTimestamp("created_at") != null
-                                ? rs.getTimestamp("created_at").toInstant() : null),
+                                ? rs.getTimestamp("created_at").toInstant()
+                                : null),
                 candidateId).stream().findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Candidate not found: " + candidateId));
     }
@@ -407,21 +486,37 @@ public class AnalysisService {
                 (rs, rowNum) -> {
                     try {
                         String json = rs.getString("analysis_json");
-                        CandidateAnalysisResponse parsed =
-                                objectMapper.readValue(json, CandidateAnalysisResponse.class);
+                        CandidateAnalysisResponse parsed = objectMapper.readValue(json,
+                                CandidateAnalysisResponse.class);
                         return new CandidateAnalysisResponse(
-                                rs.getString("candidate_id"), rs.getString("job_id"),
+                                rs.getString("candidate_id"),
+                                rs.getString("job_id"),
                                 rs.getTimestamp("analyzed_at").toInstant(),
-                                parsed.scores(), parsed.consistency(),
-                                parsed.capabilityMatrix(), parsed.suggestedQuestions(),
-                                parsed.riskFlags(), parsed.recommendation(),
-                                rs.getString("candidate_name"));
+                                parsed.scores(),
+                                parsed.consistency(),
+                                parsed.capabilityMatrix(),
+                                parsed.suggestedQuestions(),
+                                parsed.riskFlags(),
+                                parsed.recommendation(),
+                                rs.getString("candidate_name"),
+                                // MVP2 new fields — null-safe for old rows
+                                parsed.matchedSkills() != null ? parsed.matchedSkills() : List.of(),
+                                parsed.missingSkills() != null ? parsed.missingSkills() : List.of(),
+                                parsed.consistencyBreakdown() != null ? parsed.consistencyBreakdown() : List.of(),
+                                parsed.strengthSignals() != null ? parsed.strengthSignals() : List.of(),
+                                parsed.aiVerdict(),
+                                parsed.aiConfidence(),
+                                parsed.aiConfidenceNote(),
+                                parsed.executionTier(),
+                                parsed.executionTierNote());
                     } catch (Exception e) {
-                        throw new RuntimeException("Failed to parse analysis_json: " + e.getMessage(), e);
+                        throw new RuntimeException(
+                                "Failed to parse analysis_json: " + e.getMessage(), e);
                     }
                 }, candidateId)
                 .stream().findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("No analysis found for: " + candidateId));
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "No analysis found for: " + candidateId));
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -447,7 +542,8 @@ public class AnalysisService {
     }
 
     private static String safeTrim(String s, int max) {
-        if (s == null) return "";
+        if (s == null)
+            return "";
         return s.length() <= max ? s : s.substring(0, max);
     }
 
@@ -470,10 +566,12 @@ public class AnalysisService {
     private void persistAnalysisToDb(CandidateAnalysisResponse response, String loginId) {
         try {
             String analysisJson = objectMapper.writeValueAsString(response);
-            Integer consistencyScore  = response.scores() != null ? response.scores().consistencyScore()  : null;
-            Integer capabilityScore   = response.scores() != null ? response.scores().capabilityScore()   : null;
-            String  riskLevel         = response.scores() != null ? response.scores().riskLevel()         : null;
-            Integer timelineMatch     = response.consistency() != null ? response.consistency().timelineMatchPercent() : null;
+            Integer consistencyScore = response.scores() != null ? response.scores().consistencyScore() : null;
+            Integer capabilityScore = response.scores() != null ? response.scores().capabilityScore() : null;
+            String riskLevel = response.scores() != null ? response.scores().riskLevel() : null;
+            Integer timelineMatch = response.consistency() != null
+                    ? response.consistency().timelineMatchPercent()
+                    : null;
 
             OffsetDateTime analyzedAt = response.analyzedAt() != null
                     ? OffsetDateTime.ofInstant(response.analyzedAt(), ZoneOffset.UTC)
@@ -495,12 +593,26 @@ public class AnalysisService {
         }
     }
 
-    // Inner record kept for backward compatibility with Jackson deserialization
+    // ─── Inner record — updated to include all MVP2 fields ───────────────────
+    // Jackson deserialises the OpenAI JSON response into this,
+    // then it is mapped into CandidateAnalysisResponse.
+
     public record AiAnalysisResult(
             CandidateAnalysisResponse.Scores scores,
             CandidateAnalysisResponse.Consistency consistency,
             CandidateAnalysisResponse.CapabilityMatrix capabilityMatrix,
-            java.util.List<CandidateAnalysisResponse.SuggestedQuestion> suggestedQuestions,
-            java.util.List<String> riskFlags,
-            String recommendation) {}
+            List<CandidateAnalysisResponse.SuggestedQuestion> suggestedQuestions,
+            List<String> riskFlags,
+            String recommendation,
+            // MVP2 additions
+            List<String> matchedSkills,
+            List<String> missingSkills,
+            List<CandidateAnalysisResponse.ConsistencyBreakdownItem> consistencyBreakdown,
+            List<CandidateAnalysisResponse.StrengthSignal> strengthSignals,
+            CandidateAnalysisResponse.AiVerdict aiVerdict,
+            String aiConfidence,
+            String aiConfidenceNote,
+            Integer executionTier,
+            String executionTierNote) {
+    }
 }

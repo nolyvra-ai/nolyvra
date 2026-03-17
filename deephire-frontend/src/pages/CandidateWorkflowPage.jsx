@@ -106,8 +106,10 @@ export default function CandidateWorkflowPage() {
   const [selectedStage, setSelectedStage] = useState("");
   const [stageLoading,  setStageLoading]  = useState(false);
   const [notes,         setNotes]         = useState("");
-  const [notesSaving,   setNotesSaving]   = useState(false);
-  const [notesSaved,    setNotesSaved]    = useState(false);
+  const [notesSaving,      setNotesSaving]      = useState(false);
+  const [notesSaved,       setNotesSaved]       = useState(false);
+  const [analysisRunning,  setAnalysisRunning]  = useState(false); // Change 1
+  const [analysisError,    setAnalysisError]    = useState(null);  // Change 1
 
   // AI Message Generator state
   const [msgType,      setMsgType]      = useState("INTERVIEW_INVITE");
@@ -142,6 +144,22 @@ export default function CandidateWorkflowPage() {
     finally { setNotesSaving(false); }
   }
 
+  // Change 2: run analysis handler
+  async function handleRunAnalysis() {
+    setAnalysisRunning(true); setAnalysisError(null);
+    try {
+      const url = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
+      url.searchParams.set("loginId", loginId);
+      await fetch(url.toString(), { method: "POST" });
+      // Refresh workflow to pick up new scores
+      const updated = await apiGet(`/api/candidates/${candidateId}/workflow`);
+      setWorkflow(updated);
+      // Navigate to analysis result page after completion
+      nav(`/analysis/${candidateId}`);
+    } catch(e) { setAnalysisError(e.message); }
+    finally { setAnalysisRunning(false); }
+  }
+
   async function handleGenerateMessage() {
     setMsgLoading(true); setMsgError(null); setMsgResult(null);
     try {
@@ -158,10 +176,14 @@ export default function CandidateWorkflowPage() {
   if (error)   return <Alert severity="error">{error}</Alert>;
   if (!workflow) return null;
 
-  const scoreColor = s => s >= 80 ? SUCCESS : s >= 60 ? WARN : DANGER;
+  const isAnalysed = workflow.capabilityScore != null;
 
   return (
     <Box sx={{display:"flex",flexDirection:"column",gap:2}}>
+      {/* Change 3: analysis error banner */}
+      {analysisError && (
+        <Alert severity="error" onClose={() => setAnalysisError(null)}>{analysisError}</Alert>
+      )}
       {/* Header */}
       <Box sx={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <Box>
@@ -180,11 +202,23 @@ export default function CandidateWorkflowPage() {
             sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
             ← Back to Candidates
           </Button>
-          <Button variant="contained" size="small" onClick={() => nav(`/analysis/${candidateId}`)}
-            sx={{fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",
-              boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>
-            📊 View Analysis
-          </Button>
+          {/* Change 3: show Run Analysis or View Analysis based on isAnalysed */}
+          {isAnalysed ? (
+            <Button variant="contained" size="small" onClick={() => nav(`/analysis/${candidateId}`)}
+              sx={{fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",
+                boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>
+              📊 View Analysis
+            </Button>
+          ) : (
+            <Button variant="contained" size="small" onClick={handleRunAnalysis}
+              disabled={analysisRunning}
+              sx={{fontSize:11,bgcolor:PURPLE,borderRadius:"6px",textTransform:"none",
+                boxShadow:"none","&:hover":{bgcolor:"#6D28D9",boxShadow:"none"}}}>
+              {analysisRunning
+                ? <><CircularProgress size={12} sx={{color:"#fff",mr:0.75}}/> Running…</>
+                : "🔍 Run Analysis"}
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -370,10 +404,21 @@ export default function CandidateWorkflowPage() {
                 sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none",justifyContent:"flex-start"}}>
                 📅 Schedule Interview
               </Button>
-              <Button fullWidth variant="contained" size="small" onClick={() => nav(`/analysis/${candidateId}`)}
-                sx={{fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",boxShadow:"none",justifyContent:"flex-start","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>
-                📊 View Analysis
-              </Button>
+              {/* Change 3: show Run Analysis or View Analysis in Actions panel */}
+              {isAnalysed ? (
+                <Button fullWidth variant="contained" size="small" onClick={() => nav(`/analysis/${candidateId}`)}
+                  sx={{fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",boxShadow:"none",justifyContent:"flex-start","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>
+                  📊 View Analysis
+                </Button>
+              ) : (
+                <Button fullWidth variant="contained" size="small" onClick={handleRunAnalysis}
+                  disabled={analysisRunning}
+                  sx={{fontSize:11,bgcolor:PURPLE,borderRadius:"6px",textTransform:"none",boxShadow:"none",justifyContent:"flex-start","&:hover":{bgcolor:"#6D28D9",boxShadow:"none"}}}>
+                  {analysisRunning
+                    ? <><CircularProgress size={12} sx={{color:"#fff",mr:0.75}}/> Running…</>
+                    : "🔍 Run Analysis"}
+                </Button>
+              )}
               <Box sx={{height:1,bgcolor:BORDER,my:0.5}} />
               <Button fullWidth variant="contained" size="small"
                 sx={{fontSize:11,bgcolor:SUCCESS,borderRadius:"6px",textTransform:"none",boxShadow:"none",justifyContent:"flex-start","&:hover":{bgcolor:"#15803D",boxShadow:"none"}}}>

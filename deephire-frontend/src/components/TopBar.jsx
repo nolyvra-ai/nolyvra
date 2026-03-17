@@ -89,7 +89,7 @@ export default function TopBar() {
       scrollbarWidth: "none",
     }}>
       {/* Brand */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mr: 1.5, flexShrink: 0 }}>
+    {/*   <Box sx={{ display: "flex", alignItems: "center", gap: 1, mr: 1.5, flexShrink: 0 }}>
         <Box sx={{ width: 26, height: 26, bgcolor: ACCENT, borderRadius: "6px",
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: 11, fontWeight: 700, color: "#fff", flexShrink: 0 }}>IQ</Box>
@@ -101,7 +101,7 @@ export default function TopBar() {
             MVP v2.0
           </Box>
         </Box>
-      </Box>
+      </Box>*/}
 
       <Box component="span" sx={{ fontSize: 14, color: "rgba(255,255,255,0.15)", mr: 0.5, userSelect: "none", flexShrink: 0 }}>│</Box>
       <Box component="span" sx={{ fontSize: 10, color: "rgba(255,255,255,0.25)", mr: "4px", whiteSpace: "nowrap", userSelect: "none", flexShrink: 0 }}>

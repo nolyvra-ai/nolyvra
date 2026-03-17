@@ -11,7 +11,6 @@ public record CandidateCreateRequest(
 
     String email,
 
-    @NotBlank
     String linkedinUrl,
 
     @NotBlank

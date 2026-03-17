@@ -3,7 +3,7 @@
 3. Fix the UI to match with wireframe (Done)
 4. Implement user login (Done)
 5. Implement user profile (A recuriter can see only his/her jobs)) (Done)
-6. Upgrade the Analysis page to v5
+6. Upgrade the Analysis page to v5 (Done in MVP 2)
 7. Continerize spring Boot (Done)
 8. Upload in render.
 9. Integrate with Domain
@@ -15,16 +15,22 @@ Good To have feature before onboarding recuriter
 3. Fix the pipeline and Risk Summary on dashboard (Done)
 4. On the create job Extracted Skills Preview section should be populated - Done in MVP 2
 5. CV upload option - Done in MVP 2
-6. Cadidate report export option ("Do you want to download with question or separately",1 or 2 PDF ) - Xingyu
+6. Cadidate report export option ("Do you want to download with question or separately",1 or 2 PDF ) - Done in MVP 2
 7. job edit from dashboard or all job should take to create job page populating from DB - Done in MVP 2 
 8. In the settings keep a update password and logout option
 9. A loading popup when analysis button is pressed - Xingyu
 10. If Analysis result already exist return that else call the analysis method
 11. Create a simple landing page with the details of upcoming event and register event option
 12. Email Integration
-13. Connecting https://apify.com/ for linkedIn profile finding
+13. Connecting https://apify.com/ for linkedIn profile finding (or better option: AI-assisted 
+search by using an LLM (like GPT-4o) to translate a user's natural language request 
+into a structured JSON query that can be sent to standard LinkedIn Search API endpoints)
 14. Implement Claude Co worker type feature
 15. Job workflow - Opening date, number of candidate applied, number of candidate in what stage and closed job also.
+16. Bulk import candidate (csv, json) can be without job
+17. Video Interview
+18. Messages
+
 
 Recuriter onboarding can happen at this stage.
 -----

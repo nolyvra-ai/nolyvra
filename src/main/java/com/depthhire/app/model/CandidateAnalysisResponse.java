@@ -13,15 +13,28 @@ public record CandidateAnalysisResponse(
     Consistency consistency,
     CapabilityMatrix capabilityMatrix,
     List<SuggestedQuestion> suggestedQuestions,
-
     List<String> riskFlags,
     String recommendation,
-    String candidate_name
+    String candidate_name,
+
+    // ── MVP2 additions ────────────────────────────────────────────────────
+    List<String> matchedSkills,
+    List<String> missingSkills,
+    List<ConsistencyBreakdownItem> consistencyBreakdown,
+    List<StrengthSignal> strengthSignals,
+    AiVerdict aiVerdict,
+    String aiConfidence,
+    String aiConfidenceNote,
+    Integer executionTier,
+    String executionTierNote
+
 ) {
+  // ── Existing nested records (unchanged) ──────────────────────────────────
+
   public record Scores(
-      int consistencyScore,   // 0-100
-      int capabilityScore,    // 0-100
-      String riskLevel        // Low/Medium/High
+      int consistencyScore,
+      int capabilityScore,
+      String riskLevel
   ) {}
 
   public record Consistency(
@@ -29,28 +42,49 @@ public record CandidateAnalysisResponse(
       List<Flag> flags
   ) {
     public record Flag(
-        String severity,     // Low/Medium/High
-        String type,         // DATE_MISMATCH, TITLE_MISMATCH, MISSING_ROLE...
+        String severity,
+        String type,
         String message
     ) {}
   }
 
   public record CapabilityMatrix(
       List<Row> rows,
-      Map<String, Integer> weights // optional
+      Map<String, Integer> weights
   ) {
     public record Row(
         String capability,
         int weightPercent,
         int scorePercent,
-        String gapLevel       // Low/Medium/High
+        String gapLevel
     ) {}
   }
 
   public record SuggestedQuestion(
       int order,
-      String type,            // system_design/architecture/behavioral/debugging
-      String intent,          // what we're probing
+      String type,
+      String intent,
       String question
+  ) {}
+
+  // ── MVP2 new nested records ───────────────────────────────────────────────
+
+  public record ConsistencyBreakdownItem(
+      String label,
+      boolean match,
+      String note,       // shown when match = false, e.g. "Partial overlap"
+      Integer score      // 0-100, used for the progress bar width
+  ) {}
+
+  public record StrengthSignal(
+      String icon,        // emoji, e.g. "⭐"
+      String title,
+      String description,
+      String tag          // optional badge label
+  ) {}
+
+  public record AiVerdict(
+      String title,       // e.g. "Proceed with Caution"
+      String summary      // 1-2 sentence summary
   ) {}
 }
