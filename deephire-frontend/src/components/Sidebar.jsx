@@ -129,7 +129,7 @@ export default function Sidebar() {
         </Section>
 
         <Section label="Settings">
-          <NavItem icon="⚙" label="Settings" />
+          <NavItem to="/settings" icon="⚙" label="Settings" />
         </Section>
       </Box>
 

@@ -43,7 +43,7 @@ public class ReminderService {
 
     public List<ReminderResponse> getReminders(String loginId, String filter) {
         String whereClause = switch (filter != null ? filter : "all") {
-            case "today"    -> "and r.due_at::date = now()::date";
+            case "today"    -> "and (r.due_at::date = now()::date or (r.due_at < now() and r.is_completed = false))";
             case "upcoming" -> "and r.due_at > now() and r.due_at <= now() + interval '7 days'";
             case "overdue"  -> "and r.due_at < now() and r.is_completed = false";
             default         -> "";

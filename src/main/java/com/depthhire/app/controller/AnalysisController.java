@@ -24,6 +24,10 @@ public class AnalysisController {
     public CandidateAnalysisResponse analyze(
             @PathVariable String candidateId,
             @RequestParam String loginId) {
+        CandidateAnalysisResponse candidateAnalysisResponse = analysisService.getAIAnalysisForCandidate(candidateId);
+        if (null != candidateAnalysisResponse) {
+            return candidateAnalysisResponse;
+        }
         CandidateResponse candidate = analysisService.getJobIdNameForCandidate(candidateId);
         return analysisService.analyze(candidateId, candidate, loginId);
     }

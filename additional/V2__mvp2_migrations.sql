@@ -138,3 +138,28 @@ ALTER TABLE jobs
     ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
 
 CREATE INDEX IF NOT EXISTS idx_jobs_is_active ON jobs(is_active);
+
+-- 1. Create plans table
+CREATE TABLE IF NOT EXISTS plans (
+    id             VARCHAR(20)  PRIMARY KEY,
+    name           VARCHAR(50)  NOT NULL,
+    max_jobs       INTEGER      NOT NULL,
+    max_candidates INTEGER      NOT NULL,
+    created_at     TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+ 
+-- 2. Seed the 3 plans
+INSERT INTO plans (id, name, max_jobs, max_candidates) VALUES
+    ('plan-free',   'Free',   7,   10),
+    ('plan-silver', 'Silver', 20,  50),
+    ('plan-gold',   'Gold',   100, 500)
+ON CONFLICT (id) DO NOTHING;
+ 
+-- 3. Add plan_id to login table, defaulting every existing user to Free
+ALTER TABLE login
+    ADD COLUMN IF NOT EXISTS plan_id VARCHAR(20)
+        NOT NULL DEFAULT 'plan-free'
+        REFERENCES plans(id);
+ 
+-- 4. Index for fast plan lookups
+CREATE INDEX IF NOT EXISTS idx_logins_plan_id ON login(plan_id);

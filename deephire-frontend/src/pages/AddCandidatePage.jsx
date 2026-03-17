@@ -7,9 +7,15 @@ import {
   Paper,
   Chip,
   Divider,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePlanLimit } from "../hooks/usePlanLimit";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -153,6 +159,8 @@ function AnalysisItem({ icon, title, description, divider }) {
 // ─── Main component ──────────────────────────────────────────────────────────
 export default function AddCandidatePage() {
   const nav = useNavigate();
+  const { checkCandidateLimit, usage } = usePlanLimit();
+  const [limitDialog, setLimitDialog] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -218,6 +226,7 @@ export default function AddCandidatePage() {
   // ── Save candidate (no analysis) ──────────────────────────────────────────
   async function onSave(e) {
     e.preventDefault();
+    if (!checkCandidateLimit()) { setLimitDialog(true); return; }
     // Change 3: validate mandatory fields
     if (!hasName) { setValidationErr("Candidate name is required."); return; }
     if (!hasCv)   { setValidationErr("CV text is required. Please paste or upload a CV."); return; }
@@ -239,6 +248,7 @@ export default function AddCandidatePage() {
 
   async function onSubmit(e) {
     e.preventDefault();
+    if (!checkCandidateLimit()) { setLimitDialog(true); return; }
     // Change 3: validate mandatory fields
     if (!hasName) { setValidationErr("Candidate name is required."); return; }
     if (!hasCv)   { setValidationErr("CV text is required. Please paste or upload a CV."); return; }
@@ -889,6 +899,34 @@ export default function AddCandidatePage() {
           ))}
         </Box>
       </Box>
+
+      {/* Plan limit dialog */}
+      <Dialog open={limitDialog} onClose={() => setLimitDialog(false)} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { borderRadius: "12px" } }}>
+        <DialogTitle sx={{ fontSize: 14, fontWeight: 600, pb: 1 }}>
+          Candidate Limit Reached
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: 13, color: "#9AA3B4", lineHeight: 1.6 }}>
+            You have used all <strong>{usage?.currentCandidates ?? 0} / {usage?.maxCandidates ?? 0}</strong> candidate
+            slots on your <strong>{usage?.planName ?? "Free"}</strong> plan.
+          </Typography>
+          <Typography sx={{ fontSize: 13, color: "#9AA3B4", mt: 1, lineHeight: 1.6 }}>
+            To add more candidates, please upgrade your plan or remove an existing candidate.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button variant="outlined" size="small" onClick={() => setLimitDialog(false)}
+            sx={{ fontSize: 12, borderColor: "#E8ECF2", color: "#0F1623", borderRadius: "6px", textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button variant="contained" size="small" onClick={() => setLimitDialog(false)}
+            sx={{ fontSize: 12, bgcolor: "#1D72E8", borderRadius: "6px", textTransform: "none",
+              boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
+            Upgrade Plan
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

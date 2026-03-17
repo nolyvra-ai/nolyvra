@@ -161,10 +161,10 @@ function GhostBtn({ onClick, children }) {
 // ── Task card for Today's Tasks strip ────────────────────────────────────────
 function TaskCard({ title, subtitle, urgency }) {
   const cfg = {
-    overdue: { border: WARN_BR, bg: WARN_BG, color: WARN, },
-    upcoming: { border: ACCENT_BR, bg: ACCENT_BG, color: ACCENT, },
-    nudge: { border: WARN_BR, bg: WARN_BG, color: WARN, }, // ← amber like overdue but not alarming
-    normal: { border: BORDER, bg: "#F7F8FA", color: MUTED, },
+    overdue: { border: DANGER_BR, bg: DANGER_BG, color: DANGER, }, // red
+    upcoming: { border: SUCCESS_BR, bg: SUCCESS_BG, color: SUCCESS, }, // green
+    nudge: { border: WARN_BR, bg: WARN_BG, color: WARN, }, // yellow (due today)
+    normal: { border: WARN_BR, bg: WARN_BG, color: WARN, }, // yellow (due today)
   };
   const c = cfg[urgency] ?? cfg.normal;
 
@@ -213,7 +213,7 @@ export default function DashboardPage() {
       apiGet("/api/reminders?filter=today"),
     ])
       .then(([jobs, analyses, rems]) => {
-        setRecentJobs(jobs.slice(0, 3));
+        setRecentJobs(jobs.slice(0, 6));
         setRecentAnalyses(analyses);
         setReminders(rems);
       })
@@ -287,7 +287,7 @@ export default function DashboardPage() {
       </Box>
 
       {/* ── MVP2: Today's Tasks strip ─────────────────────────────── */}
-      <Card isNew>
+      <Card isNew sx={{ overflow: "unset" }}>
         <CardHead
           title="Today's Tasks"
           isNew

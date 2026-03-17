@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import {
   Box, Paper, Typography, Button, TextField, MenuItem,
-  Alert, CircularProgress
+  Alert, CircularProgress, Dialog, DialogTitle,
+  DialogContent, DialogActions,
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
+import { usePlanLimit } from "../hooks/usePlanLimit";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -115,6 +117,8 @@ export default function CreateJobPage() {
   const { jobId } = useParams();
   const isEditMode = !!jobId;
   const loginId = localStorage.getItem("loginId") || "";
+  const { checkJobLimit, usage } = usePlanLimit();
+  const [limitDialog, setLimitDialog] = useState(false);
 
   const [form, setForm] = useState({ title: "", company: "", location: "", jobType: "Full-time", jdText: "" });
   const [briefText, setBriefText] = useState("");
@@ -189,6 +193,8 @@ export default function CreateJobPage() {
   }
 
   async function handleSave() {
+    // Plan limit check — only on create, not edit
+    if (!isEditMode && !checkJobLimit()) { setLimitDialog(true); return; }
     if (!form.title || !form.jdText) { setError("Job title and description are required."); return; }
     setSaving(true); setError(null);
     try {
@@ -228,6 +234,7 @@ export default function CreateJobPage() {
   }
 
   return (
+    <>
     <Box sx={{ display: "flex", flexDirection: "column", gap: 0 }}>
 
       {/* Header */}
@@ -587,5 +594,34 @@ export default function CreateJobPage() {
         </Box>
       </Box>
     </Box>
+
+    {/* Plan limit dialog */}
+    <Dialog open={limitDialog} onClose={() => setLimitDialog(false)} maxWidth="xs" fullWidth
+      PaperProps={{ sx: { borderRadius: "12px" } }}>
+      <DialogTitle sx={{ fontSize: 14, fontWeight: 600, color: TEXT, pb: 1 }}>
+        Job Limit Reached
+      </DialogTitle>
+      <DialogContent>
+        <Typography sx={{ fontSize: 13, color: MUTED, lineHeight: 1.6 }}>
+          You have used all <strong>{usage?.currentJobs ?? 0} / {usage?.maxJobs ?? 0}</strong> job
+          slots on your <strong>{usage?.planName ?? "Free"}</strong> plan.
+        </Typography>
+        <Typography sx={{ fontSize: 13, color: MUTED, mt: 1, lineHeight: 1.6 }}>
+          To create more jobs, please upgrade your plan or remove an existing job.
+        </Typography>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+        <Button variant="outlined" size="small" onClick={() => setLimitDialog(false)}
+          sx={{ fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none" }}>
+          Cancel
+        </Button>
+        <Button variant="contained" size="small" onClick={() => setLimitDialog(false)}
+          sx={{ fontSize: 12, bgcolor: ACCENT, borderRadius: "6px", textTransform: "none",
+            boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
+          Upgrade Plan
+        </Button>
+      </DialogActions>
+    </Dialog>
+    </>
   );
 }

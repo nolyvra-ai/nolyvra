@@ -45,4 +45,23 @@ public class LoginService {
 
         return rows.stream().findFirst();
     }
+
+    public boolean changePassword(String loginId, String currentPassword, String newPassword) {
+    // Verify current password matches what's stored
+    List<String> rows = jdbc.query(
+            "select id from logins where id = ? and password = ?",
+            (rs, r) -> rs.getString("id"),
+            loginId, currentPassword);
+
+    if (rows.isEmpty()) {
+        return false; // current password is wrong
+    }
+
+    // Update to new password
+    jdbc.update(
+            "update logins set password = ? where id = ?",
+            newPassword, loginId);
+
+    return true;
+}
 }
