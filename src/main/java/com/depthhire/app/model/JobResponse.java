@@ -12,5 +12,6 @@ public record JobResponse(
     String jdText,
     String location,
     List<String> stackTags,
-    Instant createdAt
+    Instant createdAt,
+    String status
 ) {}

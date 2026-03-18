@@ -10,5 +10,6 @@ public record JobCreateRequest(
     String seniority,
     @NotBlank String jdText,
     String location,
-    List<String> stackTags
+    List<String> stackTags,
+    String jobStatus
 ) {}

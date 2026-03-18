@@ -160,7 +160,8 @@ function AnalysisItem({ icon, title, description, divider }) {
 export default function AddCandidatePage() {
   const nav = useNavigate();
   const { checkCandidateLimit, usage } = usePlanLimit();
-  const [limitDialog, setLimitDialog] = useState(false);
+  const [limitDialog,    setLimitDialog]    = useState(false);
+  const [analysisDialog, setAnalysisDialog] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -260,19 +261,20 @@ export default function AddCandidatePage() {
         email:          form.email,
         linkedinUrl:    form.linkedinUrl,
         cvText:         form.cvText,
-        recruiterNotes: form.recruiterNotes,  // Change 2: include notes
+        recruiterNotes: form.recruiterNotes,
       });
 
       const candidateId = candidate.id;
 
-      // Step 2: Trigger analysis using the returned candidateId
+      // Step 2: Show popup immediately, then trigger analysis in background
+      setAnalysisDialog(true);
       const loginId = localStorage.getItem("loginId") || "";
       const analyzeUrl = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
       analyzeUrl.searchParams.set("loginId", loginId);
-      await fetch(analyzeUrl.toString(), { method: "POST" });
+      fetch(analyzeUrl.toString(), { method: "POST" })
+        .then(() => nav(`/analysis/${candidateId}`))
+        .catch(err => console.error("Analysis failed", err));
 
-      // Step 3: Navigate to analysis result page
-      nav(`/analysis/${candidateId}`);
     } catch (err) {
       console.error("Failed to save or analyse candidate", err);
       alert("Failed: " + err.message);
@@ -924,6 +926,29 @@ export default function AddCandidatePage() {
             sx={{ fontSize: 12, bgcolor: "#1D72E8", borderRadius: "6px", textTransform: "none",
               boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
             Upgrade Plan
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Analysis in progress dialog */}
+      <Dialog open={analysisDialog} onClose={() => setAnalysisDialog(false)} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { borderRadius: "12px" } }}>
+        <DialogTitle sx={{ fontSize: 14, fontWeight: 600, color: "#0F1623", pb: 1 }}>
+          🔍 Analysis In Progress
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: 13, color: "#9AA3B4", lineHeight: 1.6 }}>
+            Your candidate analysis is being generated. This may take a moment.
+          </Typography>
+          <Typography sx={{ fontSize: 13, color: "#9AA3B4", mt: 1, lineHeight: 1.6 }}>
+            You will be taken to the results page once it is complete.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button variant="contained" size="small" onClick={() => setAnalysisDialog(false)}
+            sx={{ fontSize: 12, bgcolor: "#1D72E8", borderRadius: "6px", textTransform: "none",
+              boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
+            OK, Got It
           </Button>
         </DialogActions>
       </Dialog>

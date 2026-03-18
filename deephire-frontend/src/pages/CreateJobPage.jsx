@@ -120,7 +120,7 @@ export default function CreateJobPage() {
   const { checkJobLimit, usage } = usePlanLimit();
   const [limitDialog, setLimitDialog] = useState(false);
 
-  const [form, setForm] = useState({ title: "", company: "", location: "", jobType: "Full-time", jdText: "" });
+  const [form, setForm] = useState({ title: "", company: "", location: "", jobType: "Full-time", jdText: "", jobStatus: "Fulfilling" });
   const [briefText, setBriefText] = useState("");
   const [briefResult, setBriefResult] = useState(null);
   const [briefLoading, setBriefLoading] = useState(false);
@@ -160,6 +160,7 @@ export default function CreateJobPage() {
           location: job.location ?? "",
           jobType: job.jobType ?? "Full-time",
           jdText: job.jdText ?? "",
+          jobStatus: job.jobStatus ?? "Fulfilling",
         });
         if (job.jdText) setPreviewSkills(extractSkillsFromJd(job.jdText));
       })
@@ -318,6 +319,21 @@ export default function CreateJobPage() {
                   </TextField>
                 </Box>
               </Box>
+
+              {/* Change 3: Job Status dropdown — only visible in edit mode */}
+              {isEditMode && (
+                <Box sx={{ mt: 1.75 }}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT, mb: 0.5 }}>
+                    Job Status
+                  </Typography>
+                  <TextField select fullWidth size="small" value={form.jobStatus}
+                    onChange={e => updateForm("jobStatus", e.target.value)}
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}>
+                    {["Fulfilling", "Complete"].map(o =>
+                      <MenuItem key={o} value={o} sx={{ fontSize: 12 }}>{o}</MenuItem>)}
+                  </TextField>
+                </Box>
+              )}
             </Box>
           </Paper>
 

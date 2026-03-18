@@ -50,7 +50,8 @@ public class JobService {
                 rs.getString("jd_text"),
                 rs.getString("location"),
                 List.of(),
-                created != null ? created.toInstant() : null);
+                created != null ? created.toInstant() : null,
+                rs.getString("status"));
     };
 
     // ─── Create ───────────────────────────────────────────────────────────────
@@ -69,14 +70,14 @@ public class JobService {
                 id, req.title(), req.company(), req.jobType(),
                 req.seniority(), req.jdText(), req.location(),
                 req.stackTags() != null ? req.stackTags() : List.of(),
-                Instant.now());
+                Instant.now(), req.jobStatus());
     }
 
     // ─── List ─────────────────────────────────────────────────────────────────
 
     public List<JobResponse> listJobs(String loginId) {
         return jdbc.query("""
-                select id, title, company, job_type, jd_text, created_at, location
+                select id, title, company, job_type, jd_text, created_at, location, status
                 from jobs
                 where login_id = ?
                   and is_active = true
@@ -88,7 +89,7 @@ public class JobService {
 
     public Optional<JobResponse> getJob(String jobId, String loginId) {
         return jdbc.query("""
-                select id, title, company, job_type, jd_text, created_at, location
+                select id, title, company, job_type, jd_text, created_at, location, status
                 from jobs
                 where id = ?
                   and login_id = ?
@@ -102,13 +103,13 @@ public class JobService {
         int updated = jdbc.update("""
                 update jobs
                 set title = ?, company = ?, job_type = ?, jd_text = ?,
-                    location = ?, updated_at = now()
+                    location = ?, status = ?, updated_at = now()
                 where id = ?
                   and login_id = ?
                   and is_active = true
                 """,
                 req.title(), req.company(), req.jobType(), req.jdText(),
-                req.location(), jobId, loginId);
+                req.location(), req.jobStatus() != null ? req.jobStatus() : "Fulfilling", jobId, loginId);
         if (updated == 0)
             return Optional.empty();
         return getJob(jobId, loginId);

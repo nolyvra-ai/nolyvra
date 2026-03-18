@@ -1,7 +1,5 @@
-1. Fix export dashboard
-2. All jobs - clicking the edit button of a job should take to the job page.
-3. Add a dropdown in job page with fulfilling and complete state. 
-4. On Clicking the analysis page it should populate Your candidate analysis is being generated, you can view it once complete.
+1. Create a simple landing page with the details of upcoming event and register event option
+2. For admin(use plan Id field) add one section in settings user registration with a Name, email Id, Org Field. 
 5. Setup the subcription logic
 6. Payment gateway integration 
 7. Upload in render
@@ -9,23 +7,20 @@
 
 Good To have feature before onboarding recuriter
 -----
-
-1. Create a simple landing page with the details of upcoming event and register event option
-2. Implement Claude Co worker type feature
-3. For admin(use plan Id field) add one section in settings user registration with a Name, email Id, Org Field.
+ 
+1. Implement Claude Co worker type feature
+2. In the settings add a choose coworker type
+3. Bulk upload option
 4. Improve the PDF generated
-5. Bulk upload option
 
 
 
 
 Recuriter onboarding can happen at this stage.
 -----
-1. Setup the subcription logic
-2. Payment gateway integration
-3. Implement user registration - Name, email, Org(Future State/Currently only onboarded from backend)
-4. Implement logging
-5. Create ServiceImpl and DAO. Remove direct service call from controller.
+1. Implement user registration - Name, email, Org(Future State/Currently only onboarded from backend)
+2. Implement logging
+3. Create ServiceImpl and DAO. Remove direct service call from controller.
 
 Rel 2
 

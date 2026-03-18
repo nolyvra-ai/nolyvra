@@ -252,8 +252,38 @@ export default function DashboardPage() {
   const low    = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) < 60).length;
   const total  = recentAnalyses.length || 1;
 
+  // ── Change 1: Export dashboard as PDF using print stylesheet ─────────────
+  function handleExportPdf() {
+    const styleId = "dashboard-print-style";
+    document.getElementById(styleId)?.remove();
+    const style = document.createElement("style");
+    style.id = styleId;
+    style.innerHTML = `
+      @media print {
+        @page { margin: 14mm 12mm; size: A4 portrait; }
+        body * { visibility: hidden; }
+        #dashboard-print-root,
+        #dashboard-print-root * { visibility: visible; }
+        #dashboard-print-root {
+          position: absolute; left: 0; top: 0;
+          width: 100%; overflow: visible !important; background: #fff;
+        }
+        #dashboard-print-root .MuiPaper-root {
+          box-shadow: none !important; border: 1px solid #E8ECF2 !important;
+          break-inside: avoid; page-break-inside: avoid;
+        }
+        #dashboard-print-root button { visibility: hidden; }
+      }
+    `;
+    document.head.appendChild(style);
+    requestAnimationFrame(() => {
+      window.print();
+      setTimeout(() => document.getElementById(styleId)?.remove(), 1500);
+    });
+  }
+
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+    <Box id="dashboard-print-root" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
 
       {/* Page header */}
@@ -275,10 +305,10 @@ export default function DashboardPage() {
               }}>{todayTasks.length}</Box>
             )}
           </Button>
-          <Button variant="outlined" size="small"
+          <Button variant="outlined" size="small" onClick={handleExportPdf}
             sx={{ fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
               borderRadius: "6px", textTransform: "none" }}>
-            Export Report
+            ⬇ Export PDF
           </Button>
           <Button variant="contained" size="small" onClick={() => nav("/jobs/new")}
             sx={{ fontSize: 11, fontWeight: 500, bgcolor: ACCENT,
@@ -382,7 +412,10 @@ export default function DashboardPage() {
                       />
                     </TableCell>
                     <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
-                      <Badge label="Active" variant="success" />
+                      <Badge
+                        label={j.status ?? "Active"}
+                        variant={j.status === "Complete" ? "neutral" : j.status === "Fulfilling" ? "warning" : "success"}
+                      />
                     </TableCell>
                     <TableCell sx={{ py: 1.5, px: 2, textAlign: "right", borderBottom: `1px solid ${BORDER}` }}
                       onClick={e => e.stopPropagation()}>

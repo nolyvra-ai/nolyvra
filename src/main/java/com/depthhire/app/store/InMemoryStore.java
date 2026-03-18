@@ -14,9 +14,9 @@ public class InMemoryStore {
   private final Map<String, CandidateResponse> candidates = new ConcurrentHashMap<>();
   private final Map<String, String> candidateToJob = new ConcurrentHashMap<>();
 
-  public JobResponse saveJob(String title, String company, String jobType, String seniority, String jdText, String location, List<String> stackTags) {
+  public JobResponse saveJob(String title, String company, String jobType, String seniority, String jdText, String location, List<String> stackTags, String jobStatus) {
     String id = UUID.randomUUID().toString();
-    JobResponse job = new JobResponse(id, title, company, jobType, seniority, jdText,location,stackTags, Instant.now());
+    JobResponse job = new JobResponse(id, title, company, jobType, seniority, jdText,location,stackTags, Instant.now(), jobStatus);
     jobs.put(id, job);
     return job;
   }

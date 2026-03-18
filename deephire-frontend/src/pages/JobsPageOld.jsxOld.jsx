@@ -1,7 +1,7 @@
 import {
   Box, Paper, Typography, Table, TableHead, TableRow,
   TableCell, TableBody, Button, TextField, InputAdornment,
-  Alert, LinearProgress, Dialog, DialogTitle, DialogContent, DialogActions,
+  Alert, LinearProgress,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
@@ -63,18 +63,10 @@ function Badge({ label, variant = "neutral" }) {
 
 function StatusBadge({ status }) {
   const map = {
-    Active:      "success",
-    Approved:    "success",
-    Fulfilling:  "warning",
-    Complete:    "neutral",
-    Review:      "warning",
-    Draft:       "warning",
-    Flagged:     "danger",
-    "Not Run":   "accent",
-    Pending:     "neutral",
-    Analysed:    "success",
+    Active: "success", Approved: "success", Review: "warning",
+    Draft: "warning", Flagged: "danger", "Not Run": "accent", Pending: "neutral", Analysed: "success"
   };
-  return <Badge label={status || "Active"} variant={map[status] ?? "neutral"} />;
+  return <Badge label={status || "Pending"} variant={map[status] ?? "neutral"} />;
 }
 
 function ScoreBar({ value }) {
@@ -122,7 +114,7 @@ function StageBadge({ stage }) {
   return <Badge label={c.label} variant={c.variant} />;
 }
 // ─── Candidate sub-table ──────────────────────────────────────────────────────
-function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandidate, onAnalysisStarted }) {
+function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandidate }) {
   const nav = useNavigate();
 
   if (candidates.length === 0) {
@@ -197,7 +189,7 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
                   </Button>
                 ) : (
                   <Button size="small" variant="contained"
-                    onClick={() => { onRunAnalysis(c.id); onAnalysisStarted(); }}
+                    onClick={() => onRunAnalysis(c.id)}
                     sx={{
                       fontSize: 11, fontWeight: 500, bgcolor: ACCENT, borderRadius: "6px",
                       textTransform: "none", boxShadow: "none", whiteSpace: "nowrap",
@@ -235,7 +227,6 @@ export default function JobsPage() {
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
-  const [analysisDialog, setAnalysisDialog] = useState(false); // Change 4
   // ── Removed: editJob, editOpen state — no longer needed ──────────────────
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -299,11 +290,9 @@ export default function JobsPage() {
     })), [jobs]);
 
   const statusCounts = useMemo(() => ({
-    All:        jobsWithDefaults.length,
-    Active:     jobsWithDefaults.filter(j => j.status === "Active").length,
-    Fulfilling: jobsWithDefaults.filter(j => j.status === "Fulfilling").length,
-    Complete:   jobsWithDefaults.filter(j => j.status === "Complete").length,
-    Draft:      jobsWithDefaults.filter(j => j.status === "Draft").length,
+    All: jobsWithDefaults.length,
+    Active: jobsWithDefaults.filter(j => j.status === "Active").length,
+    Draft: jobsWithDefaults.filter(j => j.status === "Draft").length,
   }), [jobsWithDefaults]);
 
   const visibleJobs = useMemo(() =>
@@ -442,7 +431,7 @@ export default function JobsPage() {
         {/* Filter chips */}
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.75 }}>
           <Typography sx={{ fontSize: 12, color: MUTED, fontWeight: 500 }}>Filter:</Typography>
-          {["All", "Active", "Fulfilling", "Complete", "Draft"].map(s => (
+          {["All", "Active", "Draft"].map(s => (
             <FilterChip key={s} label={`${s} (${statusCounts[s] ?? 0})`}
               active={statusFilter === s} onClick={() => setStatusFilter(s)} />
           ))}
@@ -617,7 +606,6 @@ export default function JobsPage() {
               jobTitle={selectedJob.title}
               onRunAnalysis={handleRunAnalysis}
               onRemoveCandidate={handleRemoveCandidate}
-              onAnalysisStarted={() => setAnalysisDialog(true)}
             />
           </Paper>
         )}
@@ -638,29 +626,6 @@ export default function JobsPage() {
         </Box>
       </Box>
       {/* ── Removed: EditJobDialog — replaced by /jobs/:jobId/edit route ────── */}
-
-      {/* Change 4: Analysis in progress dialog */}
-      <Dialog open={analysisDialog} onClose={() => setAnalysisDialog(false)} maxWidth="xs" fullWidth
-        PaperProps={{ sx: { borderRadius: "12px" } }}>
-        <DialogTitle sx={{ fontSize: 14, fontWeight: 600, color: TEXT, pb: 1 }}>
-          🔍 Analysis In Progress
-        </DialogTitle>
-        <DialogContent>
-          <Typography sx={{ fontSize: 13, color: MUTED, lineHeight: 1.6 }}>
-            Your candidate analysis is being generated. This may take a moment.
-          </Typography>
-          <Typography sx={{ fontSize: 13, color: MUTED, mt: 1, lineHeight: 1.6 }}>
-            You can view it once complete from the candidate's profile.
-          </Typography>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          <Button variant="contained" size="small" onClick={() => setAnalysisDialog(false)}
-            sx={{ fontSize: 12, bgcolor: ACCENT, borderRadius: "6px", textTransform: "none",
-              boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
-            OK, Got It
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }
