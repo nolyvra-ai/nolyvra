@@ -85,7 +85,7 @@ export function TalentSearchPage() {
             <Typography sx={{fontSize:15,fontWeight:600,color:TEXT}}>AI Talent Search</Typography>
             <Box sx={{display:"inline-flex",alignItems:"center",px:"7px",py:"2px",bgcolor:PURPLE_BG,border:`1px solid ${PURPLE_BR}`,borderRadius:"4px",fontSize:10,fontWeight:600,color:PURPLE}}>NEW</Box>
           </Box>
-          <Typography sx={{fontSize:11,color:MUTED,mt:0.25}}>Natural language search across your database and CoreSignal market data</Typography>
+          <Typography sx={{fontSize:11,color:MUTED,mt:0.25}}>Natural language search across your database and public profile data</Typography>
         </Box>
         <Button variant="outlined" size="small" sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>⚙ Search Settings</Button>
       </Box>
@@ -124,7 +124,7 @@ export function TalentSearchPage() {
             </Typography>
             <Box sx={{display:"flex",gap:1,alignItems:"center"}}>
               <Badge label={`● Internal DB (${result.internalCount})`} variant="accent" />
-              <Badge label={`● CoreSignal Market (${result.coreSignalCount})`} variant="purple" />
+              <Badge label={`● Current Active Profile (${result.coreSignalCount})`} variant="purple" />
             </Box>
           </Box>
 
@@ -156,7 +156,7 @@ export function TalentSearchPage() {
                   </Box>
                   <Typography sx={{fontSize:11,color:MUTED,mb:1.25}}>
                     {c.currentCompany}{c.yearsExperience ? ` · ${c.yearsExperience} yrs exp` : ""}
-                    {c.source==="CORESIGNAL" && " · 🔗 CoreSignal"}
+                    {c.source==="CORESIGNAL" && " · 🔗 Active Profiles in Market"}
                   </Typography>
                   <Box sx={{display:"flex",gap:0.75}} onClick={e => e.stopPropagation()}>
                     <Button size="small" variant="contained" onClick={() => c.candidateId && nav(`/candidates/${c.candidateId}/workflow`)}

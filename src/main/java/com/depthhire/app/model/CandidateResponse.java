@@ -9,5 +9,6 @@ public record CandidateResponse(
     String name,
     String email,
     String linkedinUrl,
-    Instant createdAt
+    Instant createdAt,
+    String stage
 ) {}

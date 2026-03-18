@@ -428,7 +428,7 @@ public class AnalysisService {
 
     public CandidateResponse getJobIdNameForCandidate(String candidateId) {
         return jdbc.query("""
-                select id, job_id, name, email, linkedin_url, created_at
+                select id, job_id, name, email, linkedin_url, created_at, stage
                 from candidates where id = ?
                 """,
                 (rs, r) -> new CandidateResponse(
@@ -437,7 +437,8 @@ public class AnalysisService {
                         rs.getString("linkedin_url"),
                         rs.getTimestamp("created_at") != null
                                 ? rs.getTimestamp("created_at").toInstant()
-                                : null),
+                                : null,
+                        rs.getString("stage")), // ← ADD
                 candidateId).stream().findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Candidate not found: " + candidateId));
     }

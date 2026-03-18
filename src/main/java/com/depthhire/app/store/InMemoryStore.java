@@ -31,9 +31,9 @@ public class InMemoryStore {
         .toList();
   }
 
-  public CandidateResponse saveCandidate(String jobId, String name, String email, String linkedinUrl) {
+  public CandidateResponse saveCandidate(String jobId, String name, String email, String linkedinUrl, String stage) {
     String id = UUID.randomUUID().toString();
-    CandidateResponse c = new CandidateResponse(id, jobId, name, email, linkedinUrl, Instant.now());
+    CandidateResponse c = new CandidateResponse(id, jobId, name, email, linkedinUrl, Instant.now(), stage);
     candidates.put(id, c);
     candidateToJob.put(id, jobId);
     return c;

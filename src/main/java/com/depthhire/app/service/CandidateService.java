@@ -30,7 +30,8 @@ public class CandidateService {
                 rs.getString("name"),
                 rs.getString("email"),
                 rs.getString("linkedin_url"),
-                odt != null ? odt.toInstant() : null);
+                odt != null ? odt.toInstant() : null,
+                rs.getString("stage"));
     };
 
     // ─── Create ───────────────────────────────────────────────────────────────
@@ -46,14 +47,14 @@ public class CandidateService {
                 req.name(), req.email(), req.linkedinUrl(), req.cvText());
 
         return new CandidateResponse(id, jobId, req.name(), req.email(),
-                req.linkedinUrl(), Instant.now());
+                req.linkedinUrl(), Instant.now(), "Screening");
     }
 
     // ─── Read ─────────────────────────────────────────────────────────────────
 
     public Optional<CandidateResponse> getCandidate(String candidateId, String loginId) {
         return jdbc.query("""
-                select id, job_id, name, email, linkedin_url, created_at
+                select id, job_id, name, email, linkedin_url, created_at, stage
                 from candidates
                 where id = ?
                   and login_id = ?
@@ -63,7 +64,7 @@ public class CandidateService {
 
     public List<CandidateResponse> getCandidatesByJob(String jobId, String loginId) {
         return jdbc.query("""
-                select id, job_id, name, email, linkedin_url, created_at
+                select id, job_id, name, email, linkedin_url, created_at, stage
                 from candidates
                 where job_id = ?
                   and login_id = ?
@@ -74,7 +75,7 @@ public class CandidateService {
 
     public List<CandidateResponse> getAllCandidates(String loginId) {
         return jdbc.query("""
-                select id, job_id, name, email, linkedin_url, created_at
+                select id, job_id, name, email, linkedin_url, created_at, stage
                 from candidates
                 where login_id = ?
                   and is_active = true

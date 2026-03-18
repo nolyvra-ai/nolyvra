@@ -101,6 +101,18 @@ function AvgMatch({ value }) {
   return <Typography sx={{ fontSize: 13, fontWeight: 700, color }}>{value}%</Typography>;
 }
 
+function StageBadge({ stage }) {
+  const cfg = {
+    Screening: { variant: "accent", label: "Screening" },
+    Interview: { variant: "warning", label: "Interview" },
+    Assessment: { variant: "warning", label: "Assessment" },
+    Offer: { variant: "success", label: "Offer" },
+    Selected: { variant: "success", label: "Selected" },
+    Rejected: { variant: "danger", label: "Rejected" },
+  };
+  const c = cfg[stage] ?? { variant: "neutral", label: stage ?? "—" };
+  return <Badge label={c.label} variant={c.variant} />;
+}
 // ─── Candidate sub-table ──────────────────────────────────────────────────────
 function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandidate }) {
   const nav = useNavigate();
@@ -119,6 +131,7 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
         <TableRow>
           <TableCell sx={thSx}>Candidate</TableCell>
           <TableCell sx={thSx}>Applied For</TableCell>
+          <TableCell sx={thSx}>Stage</TableCell>
           <TableCell sx={{ ...thSx, textAlign: "center" }}>Consistency Score</TableCell>
           <TableCell sx={{ ...thSx, textAlign: "center" }}>Capability Match</TableCell>
           <TableCell sx={thSx}>Risk Flags</TableCell>
@@ -143,6 +156,9 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
             </TableCell>
             <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, color: TEXT, borderBottom: `1px solid ${BORDER}` }}>
               {jobTitle}
+            </TableCell>
+            <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
+              <StageBadge stage={c.stage} />
             </TableCell>
             <TableCell sx={{ py: 1.5, px: 2, textAlign: "center", borderBottom: `1px solid ${BORDER}` }}>
               <Box sx={{ display: "inline-block", textAlign: "left" }}><ScoreBar value={c.consistencyScore} /></Box>

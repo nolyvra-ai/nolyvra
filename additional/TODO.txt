@@ -1,21 +1,22 @@
-1. Integration with dB (Done) Next -> create ServiceImpl and DAO. Remove direct service call from controller.
-2. In the dashboard candidate section change the table as per wireframe
-3.Upload in render
-4. Integrate with Domain
+1. Fix export dashboard
+2. All jobs - clicking the edit button of a job should take to the job page.
+3. Add a dropdown in job page with fulfilling and complete state. 
+4. On Clicking the analysis page it should populate Your candidate analysis is being generated, you can view it once complete.
+5. Setup the subcription logic
+6. Payment gateway integration 
+7. Upload in render
+8. Integrate with Domain
 
 Good To have feature before onboarding recuriter
 -----
 
-4. Create a simple landing page with the details of upcoming event and register event option
-5. Email Integration
-6. Connecting https://apify.com/ for linkedIn profile finding (or better option: AI-assisted 
-search by using an LLM (like GPT-4o) to translate a user's natural language request 
-into a structured JSON query that can be sent to standard LinkedIn Search API endpoints)
-7. Implement Claude Co worker type feature
-8. Job workflow - Opening date, number of candidate applied, number of candidate in what stage and closed job also.
-9. Bulk import candidate (csv, json) can be without job
-10. Video Interview
-11. Messages
+1. Create a simple landing page with the details of upcoming event and register event option
+2. Implement Claude Co worker type feature
+3. For admin(use plan Id field) add one section in settings user registration with a Name, email Id, Org Field.
+4. Improve the PDF generated
+5. Bulk upload option
+
+
 
 
 Recuriter onboarding can happen at this stage.
@@ -24,3 +25,12 @@ Recuriter onboarding can happen at this stage.
 2. Payment gateway integration
 3. Implement user registration - Name, email, Org(Future State/Currently only onboarded from backend)
 4. Implement logging
+5. Create ServiceImpl and DAO. Remove direct service call from controller.
+
+Rel 2
+
+2. Email Integration - Rel 2
+3. Connecting https://apify.com/ or Lobstr.io - Rel 2
+5. Bulk import candidate (csv, json) can be without job - Rel 2
+7. Messages - Rel 2
+6. Video Interview - Rel 2
