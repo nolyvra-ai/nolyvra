@@ -1,6 +1,7 @@
 1. Integration with dB (Done) Next -> create ServiceImpl and DAO. Remove direct service call from controller.
-2. Upload in render
-3. Integrate with Domain
+2. In the dashboard candidate section change the table as per wireframe
+3.Upload in render
+4. Integrate with Domain
 
 Good To have feature before onboarding recuriter
 -----

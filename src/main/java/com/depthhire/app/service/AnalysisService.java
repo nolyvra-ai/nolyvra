@@ -73,77 +73,77 @@ public class AnalysisService {
 
         try {
             String systemPrompt = """
-                                        You are an expert technical recruiter and senior software architect.
-                                        Return EXACTLY ONE JSON object. No markdown. No extra keys.
+                    You are an expert technical recruiter and senior software architect.
+                    Return EXACTLY ONE JSON object. No markdown. No extra keys.
 
-                                        {
-                                          "scores": {
-                                            "consistencyScore": 0-100,
-                                            "capabilityScore": 0-100,
-                                            "riskLevel": "Low|Medium|High"
-                                          },
+                    {
+                      "scores": {
+                        "consistencyScore": 0-100,
+                        "capabilityScore": 0-100,
+                        "riskLevel": "Low|Medium|High"
+                      },
 
-                                          "consistency": {
-                                            "timelineMatchPercent": 0-100,
-                                            "flags": [
-                                              { "severity": "Low|Medium|High", "type": "DATE_MISMATCH|TITLE_MISMATCH|MISSING_ROLE|OTHER", "message": "..." }
-                                            ]
-                                          },
+                      "consistency": {
+                        "timelineMatchPercent": 0-100,
+                        "flags": [
+                          { "severity": "Low|Medium|High", "type": "DATE_MISMATCH|TITLE_MISMATCH|MISSING_ROLE|OTHER", "message": "..." }
+                        ]
+                      },
 
-                                          "consistencyBreakdown": [
-                                            { "label": "Employment Timeline", "match": true,  "note": null, "score": 95 },
-                                            { "label": "Job Titles",          "match": true,  "note": null, "score": 90 },
-                                            { "label": "Skills Listed",       "match": false, "note": "Partial overlap", "score": 70 },
-                                            { "label": "Education",           "match": true,  "note": null, "score": 100 }
-                                          ],
+                      "consistencyBreakdown": [
+                        { "label": "Employment Timeline", "match": true,  "note": null, "score": 95 },
+                        { "label": "Job Titles",          "match": true,  "note": null, "score": 90 },
+                        { "label": "Skills Listed",       "match": false, "note": "Partial overlap", "score": 70 },
+                        { "label": "Education",           "match": true,  "note": null, "score": 100 }
+                      ],
 
-                                          "capabilityMatrix": {
-                                            "rows": [
-                                              { "capability": "...", "weightPercent": 25, "scorePercent": 0-100, "gapLevel": "Low|Medium|High" }
-                                            ],
-                                            "weights": { "System Design": 25, "Cloud Architecture": 25, "Leadership": 25, "Domain Knowledge": 25 }
-                                          },
+                      "capabilityMatrix": {
+                        "rows": [
+                          { "capability": "...", "weightPercent": 25, "scorePercent": 0-100, "gapLevel": "Low|Medium|High" }
+                        ],
+                        "weights": { "System Design": 25, "Cloud Architecture": 25, "Leadership": 25, "Domain Knowledge": 25 }
+                      },
 
-                                          "matchedSkills": ["skill1", "skill2"],
-                                          "missingSkills": ["skill1", "skill2"],
+                      "matchedSkills": ["skill1", "skill2"],
+                      "missingSkills": ["skill1", "skill2"],
 
-                                          "strengthSignals": [
-                                            { "icon": "⭐", "title": "...", "description": "...", "tag": "optional badge label" }
-                                          ],
+                      "strengthSignals": [
+                        { "icon": "⭐", "title": "...", "description": "...", "tag": "optional badge label" }
+                      ],
 
-                                          "executionTier": 1,
-                                          "executionTierNote": "...",
+                      "executionTier": 1,
+                      "executionTierNote": "...",
 
-                                          "suggestedQuestions": [
-                                            {
-                                                "order": 1,
-                                                "type": "system_design|architecture|behavioral|debugging|leadership|domain",
-                                                "intent": "2-4 sentence explanation of exactly what this question is probing for, why it is relevant to this specific candidate's risk flags or gaps, and what a strong vs weak answer would reveal about their suitability for this role.",
-                                                "question": "..."
-                                            }
-                                            ],
+                      "suggestedQuestions": [
+                        {
+                            "order": 1,
+                            "type": "system_design|architecture|behavioral|debugging|leadership|domain",
+                            "intent": "2-4 sentence explanation of exactly what this question is probing for, why it is relevant to this specific candidate's risk flags or gaps, and what a strong vs weak answer would reveal about their suitability for this role.",
+                            "question": "..."
+                        }
+                        ],
 
-                                          "riskFlags": ["..."],
-                                          "recommendation": "...",
+                      "riskFlags": ["..."],
+                      "recommendation": "...",
 
-                                          "aiVerdict": { "title": "Strong Hire|Proceed with Caution|Do Not Progress", "summary": "1-2 sentences." },
-                                          "aiConfidence": "Low|Medium|High",
-                                          "aiConfidenceNote": "Brief reason for this confidence level"
-                                        }
+                      "aiVerdict": { "title": "Strong Hire|Proceed with Caution|Do Not Progress", "summary": "1-2 sentences." },
+                      "aiConfidence": "Low|Medium|High",
+                      "aiConfidenceNote": "Brief reason for this confidence level"
+                    }
 
-                                        Hard requirements:
-                                        - weights must sum to 100: System Design, Cloud Architecture, Leadership, Domain Knowledge.
-                                        - capabilityMatrix.rows must have exactly those 4 capabilities.
-                                        - suggestedQuestions: exactly 6 items, order 1-6.
-                                        - intent: must be 2-4 sentences. Explain specifically what competency or risk is being probed, why it matters for this role, and what the interviewer should listen for in the response.
-                                        - riskFlags: 3-6 items.
-                                        - matchedSkills: skills from JD evidenced in CV. Max 10.
-                                        - missingSkills: skills from JD absent or weak in CV. Max 8.
-                                        - consistencyBreakdown: exactly 4 items covering Employment Timeline, Job Titles, Skills Listed, Education.
-                                        - strengthSignals: 3-5 items. Use relevant emojis for icon.
-                                        - executionTier: integer 1 (Contributor), 2 (Owner), 3 (Architect), 4 (Strategic Lead).
-                                        - aiVerdict.title must be exactly one of: "Strong Hire", "Proceed with Caution", "Do Not Progress".
-                                        """;
+                    Hard requirements:
+                    - weights must sum to 100: System Design, Cloud Architecture, Leadership, Domain Knowledge.
+                    - capabilityMatrix.rows must have exactly those 4 capabilities.
+                    - suggestedQuestions: exactly 6 items, order 1-6.
+                    - intent: must be 2-4 sentences. Explain specifically what competency or risk is being probed, why it matters for this role, and what the interviewer should listen for in the response.
+                    - riskFlags: 3-6 items.
+                    - matchedSkills: skills from JD evidenced in CV. Max 10.
+                    - missingSkills: skills from JD absent or weak in CV. Max 8.
+                    - consistencyBreakdown: exactly 4 items covering Employment Timeline, Job Titles, Skills Listed, Education.
+                    - strengthSignals: 3-5 items. Use relevant emojis for icon.
+                    - executionTier: integer 1 (Contributor), 2 (Owner), 3 (Architect), 4 (Strategic Lead).
+                    - aiVerdict.title must be exactly one of: "Strong Hire", "Proceed with Caution", "Do Not Progress".
+                    """;
 
             String userPrompt = """
                     JOB DESCRIPTION:
@@ -475,7 +475,7 @@ public class AnalysisService {
     }
 
     public CandidateAnalysisResponse getAIAnalysisForCandidate(String candidateId) {
-        return jdbc.query("""
+        List<CandidateAnalysisResponse> results = jdbc.query("""
                 select a.candidate_id, a.job_id, a.analyzed_at, a.analysis_json,
                        c.name as candidate_name
                 from analyses a
@@ -513,10 +513,10 @@ public class AnalysisService {
                         throw new RuntimeException(
                                 "Failed to parse analysis_json: " + e.getMessage(), e);
                     }
-                }, candidateId)
-                .stream().findFirst()
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "No analysis found for: " + candidateId));
+                }, candidateId);
+
+        // ── Change: return null instead of throwing when no analysis exists ──
+        return results.isEmpty() ? null : results.get(0);
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────

@@ -158,23 +158,19 @@ function GhostBtn({ onClick, children }) {
   );
 }
 
-// ── Task card for Today's Tasks strip ────────────────────────────────────────
 function TaskCard({ title, subtitle, urgency }) {
   const cfg = {
-    overdue: { border: DANGER_BR, bg: DANGER_BG, color: DANGER, }, // red
-    upcoming: { border: SUCCESS_BR, bg: SUCCESS_BG, color: SUCCESS, }, // green
-    nudge: { border: WARN_BR, bg: WARN_BG, color: WARN, }, // yellow (due today)
-    normal: { border: WARN_BR, bg: WARN_BG, color: WARN, }, // yellow (due today)
+    overdue:  { border: DANGER_BR,  bg: DANGER_BG,  color: DANGER  },
+    upcoming: { border: SUCCESS_BR, bg: SUCCESS_BG, color: SUCCESS },
+    nudge:    { border: WARN_BR,    bg: WARN_BG,    color: WARN    },
+    normal:   { border: WARN_BR,    bg: WARN_BG,    color: WARN    },
   };
   const c = cfg[urgency] ?? cfg.normal;
-
   return (
     <Box sx={{
-      display: "flex", flexDirection: "column",
-      justifyContent: "space-between",
+      display: "flex", flexDirection: "column", justifyContent: "space-between",
       flexShrink: 0, minWidth: 200, maxWidth: 230, minHeight: 88,
-      border: `1px solid ${c.border}`, borderRadius: "7px",
-      p: 1.5, bgcolor: c.bg,
+      border: `1px solid ${c.border}`, borderRadius: "7px", p: 1.5, bgcolor: c.bg,
     }}>
       <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
         <Box sx={{
@@ -193,158 +189,157 @@ function TaskCard({ title, subtitle, urgency }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
 export default function DashboardPage() {
   const nav = useNavigate();
   const loginId = localStorage.getItem("loginId") || "";
 
-  const [recentJobs, setRecentJobs] = useState([]);
-  const [recentAnalyses, setRecentAnalyses] = useState([]);
-  const [reminders, setReminders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [recentJobs,         setRecentJobs]         = useState([]);
+  const [recentAnalyses,     setRecentAnalyses]     = useState([]);
+  const [reminders,          setReminders]          = useState([]);
+  const [candidateCountByJob,setCandidateCountByJob]= useState({}); // ← Change 1
+  const [loading,            setLoading]            = useState(true);
+  const [error,              setError]              = useState(null);
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([
-      apiGet("/api/jobs"),
-      apiGet("/api/analyses/recent"),
-      apiGet("/api/reminders?filter=today"),
-    ])
-      .then(([jobs, analyses, rems]) => {
-        setRecentJobs(jobs.slice(0, 6));
-        setRecentAnalyses(analyses);
-        setReminders(rems);
-      })
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+
+    async function load() {
+      try {
+        // ── Change 2: fetch jobs + candidates + analyses + reminders together ──
+        const [jobs, analyses, rems] = await Promise.all([
+          apiGet("/api/jobs"),
+          apiGet("/api/analyses/recent"),
+          apiGet("/api/reminders?filter=today"),
+        ]);
+        if (cancelled) return;
+
+        const jobList = jobs ?? [];
+
+        // Fetch candidate counts for each job in parallel
+        const countMap = {};
+        await Promise.all(
+          jobList.map(async (j) => {
+            try {
+              const cands = await apiGet(`/api/jobs/${j.id}/candidates`);
+              countMap[j.id] = (cands ?? []).length;
+            } catch {
+              countMap[j.id] = 0;
+            }
+          })
+        );
+        if (cancelled) return;
+
+        // Set all state together so renders are consistent
+        setRecentJobs(jobList.slice(0, 6));
+        setRecentAnalyses(analyses ?? []);
+        setReminders(rems ?? []);
+        setCandidateCountByJob(countMap);
+      } catch (e) {
+        if (!cancelled) setError(e.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
   }, [loginId]);
 
-  const todayTasks = reminders.filter(r => !r.isCompleted);
-  const overdueCount = todayTasks.filter(r => new Date(r.dueAt) < new Date()).length;
-
-  const high = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) >= 80).length;
+  const todayTasks   = reminders.filter(r => !r.isCompleted);
+  const high   = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) >= 80).length;
   const medium = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) >= 60 && (a?.capabilityScore ?? 0) < 80).length;
-  const low = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) < 60).length;
-  const total = recentAnalyses.length || 1;
+  const low    = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) < 60).length;
+  const total  = recentAnalyses.length || 1;
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
 
-      {/* ── Page header ───────────────────────────────────────────── */}
+      {/* Page header */}
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
         <Box>
           <Typography sx={{ fontSize: 15, fontWeight: 600, color: TEXT }}>Dashboard</Typography>
           <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>Your recruitment pipeline at a glance</Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-          {/* ── MVP2: Reminders bell button ── */}
-          <Button variant="outlined" size="small"
-            onClick={() => nav("/reminders")}
-            sx={{
-              fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
+          <Button variant="outlined" size="small" onClick={() => nav("/reminders")}
+            sx={{ fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
               borderRadius: "6px", textTransform: "none",
-              "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE }
-            }}>
+              "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE } }}>
             🔔 Reminders
             {todayTasks.length > 0 && (
               <Box component="span" sx={{
                 ml: 0.75, bgcolor: DANGER, color: "#fff",
                 borderRadius: "10px", px: "5px", py: "1px", fontSize: 9, fontWeight: 700
-              }}>
-                {todayTasks.length}
-              </Box>
+              }}>{todayTasks.length}</Box>
             )}
           </Button>
           <Button variant="outlined" size="small"
-            sx={{
-              fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
-              borderRadius: "6px", textTransform: "none"
-            }}>
+            sx={{ fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
+              borderRadius: "6px", textTransform: "none" }}>
             Export Report
           </Button>
           <Button variant="contained" size="small" onClick={() => nav("/jobs/new")}
-            sx={{
-              fontSize: 11, fontWeight: 500, bgcolor: ACCENT,
+            sx={{ fontSize: 11, fontWeight: 500, bgcolor: ACCENT,
               borderRadius: "6px", textTransform: "none", boxShadow: "none",
-              "&:hover": { bgcolor: "#1660CC", boxShadow: "none" }
-            }}>
+              "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
             ＋ New Job
           </Button>
         </Box>
       </Box>
 
-      {/* ── KPI row ───────────────────────────────────────────────── */}
+      {/* KPI row */}
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 1.75 }}>
-        <KpiCard label="Active Jobs" value={recentJobs.length} delta="from jobs table" />
-        <KpiCard label="Total Candidates" value={recentAnalyses.length} delta="all analysed" />
-        <KpiCard label="Analyses Run" value={recentAnalyses.length} valueColor={ACCENT} />
+        <KpiCard label="Active Jobs"       value={recentJobs.length}      delta="from jobs table" />
+        <KpiCard label="Total Candidates"  value={recentAnalyses.length}  delta="all analysed" />
+        <KpiCard label="Analyses Run"      value={recentAnalyses.length}  valueColor={ACCENT} />
         <KpiCard label="High-Risk Flags"
           value={recentAnalyses.filter(a => a?.riskLevel === "High").length}
           valueColor={DANGER} delta="Needs review" />
       </Box>
 
-      {/* ── MVP2: Today's Tasks strip ─────────────────────────────── */}
+      {/* Today's Tasks strip */}
       <Card isNew sx={{ overflow: "unset" }}>
-        <CardHead
-          title="Today's Tasks"
-          isNew
-          action={<GhostBtn onClick={() => nav("/reminders")}>View All →</GhostBtn>}
-        />
+        <CardHead title="Today's Tasks" isNew
+          action={<GhostBtn onClick={() => nav("/reminders")}>View All →</GhostBtn>} />
         <Box sx={{ p: 1.75 }}>
           {todayTasks.length === 0 ? (
-            <Typography sx={{ fontSize: 12, color: MUTED, py: 1 }}>
-              No tasks for today. 🎉
-            </Typography>
+            <Typography sx={{ fontSize: 12, color: MUTED, py: 1 }}>No tasks for today. 🎉</Typography>
           ) : (
-            <Box sx={{
-              display: "flex", gap: 2, overflowX: "auto", pb: 0.5,
+            <Box sx={{ display: "flex", gap: 2, overflowX: "auto", pb: 0.5,
               "&::-webkit-scrollbar": { height: 4 },
-              "&::-webkit-scrollbar-thumb": { bgcolor: "#D1D5DB", borderRadius: 4 }
-            }}>
+              "&::-webkit-scrollbar-thumb": { bgcolor: "#D1D5DB", borderRadius: 4 } }}>
               {todayTasks.slice(0, 6).map(r => {
                 const dueDate = new Date(r.dueAt);
                 const now = new Date();
-
                 const nudgeTypes = ["AUTO_SCREENING_STUCK", "AUTO_ANALYSIS_PENDING"];
-                const isNudge = nudgeTypes.includes(r.reminderType);
-                const isOverdue = !isNudge && dueDate < now;
+                const isNudge    = nudgeTypes.includes(r.reminderType);
+                const isOverdue  = !isNudge && dueDate < now;
                 const isUpcoming = r.reminderType === "AUTO_INTERVIEW_UPCOMING";
 
-                // ── Fix 1: human-readable subtitle instead of raw time ──────────────────
                 let subtitle;
                 if (isOverdue) {
                   subtitle = "Overdue";
                 } else if (isUpcoming) {
-                  // Show "In X hours" for upcoming interviews
-                  const diffMs = dueDate - now;
-                  const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+                  const diffHours = Math.round((dueDate - now) / (1000 * 60 * 60));
                   subtitle = diffHours <= 1 ? "In less than 1 hour"
-                    : diffHours === 1 ? "In 1 hour"
-                      : `In ${diffHours} hours`;
+                    : diffHours === 1 ? "In 1 hour" : `In ${diffHours} hours`;
                 } else if (isNudge) {
-                  subtitle = "Due today";   // ← was falling through to toLocaleTimeString()
+                  subtitle = "Due today";
                 } else {
-                  // Manual reminder — check if due today or future
                   const isToday = dueDate.toDateString() === now.toDateString();
-                  subtitle = isToday ? "Due today" : dueDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                  subtitle = isToday ? "Due today"
+                    : dueDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
                 }
 
-                // ── Fix 2: nudge types get amber, not grey ───────────────────────────────
                 const urgency = isOverdue ? "overdue"
                   : isUpcoming ? "upcoming"
-                    : isNudge ? "nudge"     // ← new urgency type
-                      : "normal";
+                  : isNudge    ? "nudge"
+                  : "normal";
 
                 return (
-                  <TaskCard
-                    key={r.id}
-                    title={r.title}
-                    subtitle={subtitle}
-                    urgency={urgency}
-                  />
+                  <TaskCard key={r.id} title={r.title} subtitle={subtitle} urgency={urgency} />
                 );
               })}
             </Box>
@@ -352,11 +347,12 @@ export default function DashboardPage() {
         </Box>
       </Card>
 
-      {/* ── Middle row: Recent Jobs + Pipeline + Risk ─────────────── */}
+      {/* Middle row: Recent Jobs + Pipeline + Risk */}
       <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
         <Box sx={{ flex: 1 }}>
           <Card>
-            <CardHead title="Recent Jobs" action={<GhostBtn onClick={() => nav("/jobs")}>View All →</GhostBtn>} />
+            <CardHead title="Recent Jobs"
+              action={<GhostBtn onClick={() => nav("/jobs")}>View All →</GhostBtn>} />
             <Table>
               <TableHead>
                 <TableRow>
@@ -371,16 +367,19 @@ export default function DashboardPage() {
                 {recentJobs.map(j => (
                   <TableRow key={j.id} onClick={() => nav("/jobs")} sx={{
                     cursor: "pointer", "&:hover": { bgcolor: "#F0F4FF" },
-                    "&:last-child td": { borderBottom: "none" }
-                  }}>
+                    "&:last-child td": { borderBottom: "none" } }}>
                     <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
                       <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{j.title}</Typography>
                     </TableCell>
                     <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, color: MUTED, borderBottom: `1px solid ${BORDER}` }}>
                       {j.company}
                     </TableCell>
+                    {/* ── Change 3: show real candidate count from candidateCountByJob ── */}
                     <TableCell sx={{ py: 1.5, px: 2, textAlign: "center", borderBottom: `1px solid ${BORDER}` }}>
-                      <Badge label="—" variant="neutral" />
+                      <Badge
+                        label={String(candidateCountByJob[j.id] ?? 0)}
+                        variant={candidateCountByJob[j.id] > 0 ? "accent" : "neutral"}
+                      />
                     </TableCell>
                     <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
                       <Badge label="Active" variant="success" />
@@ -388,11 +387,11 @@ export default function DashboardPage() {
                     <TableCell sx={{ py: 1.5, px: 2, textAlign: "right", borderBottom: `1px solid ${BORDER}` }}
                       onClick={e => e.stopPropagation()}>
                       <Button size="small" variant="outlined" onClick={() => nav("/jobs")}
-                        sx={{
-                          fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
+                        sx={{ fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
                           borderRadius: "6px", textTransform: "none",
-                          "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE }
-                        }}>View</Button>
+                          "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE } }}>
+                        View
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -410,23 +409,23 @@ export default function DashboardPage() {
           <Card>
             <CardHead title="Pipeline" />
             <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
-              <PipelineBar label="High Match ≥80%" count={high} pct={Math.round(high / total * 100)} color={SUCCESS} />
-              <PipelineBar label="Moderate 60–79%" count={medium} pct={Math.round(medium / total * 100)} color={WARN} />
-              <PipelineBar label="Low Match <60%" count={low} pct={Math.round(low / total * 100)} color={DANGER} />
+              <PipelineBar label="High Match ≥80%"  count={high}   pct={Math.round(high   / total * 100)} color={SUCCESS} />
+              <PipelineBar label="Moderate 60–79%"  count={medium} pct={Math.round(medium / total * 100)} color={WARN}    />
+              <PipelineBar label="Low Match <60%"   count={low}    pct={Math.round(low    / total * 100)} color={DANGER}  />
             </Box>
           </Card>
           <Card>
             <CardHead title="Risk Summary" />
             <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.25 }}>
-              <RiskRow dotColor={DANGER} label="High Risk" count={recentAnalyses.filter(a => a?.riskLevel === "High").length} variant="danger" />
-              <RiskRow dotColor={WARN} label="Medium" count={recentAnalyses.filter(a => a?.riskLevel === "Medium").length} variant="warning" />
-              <RiskRow dotColor={ACCENT} label="Low" count={recentAnalyses.filter(a => a?.riskLevel === "Low").length} variant="accent" />
+              <RiskRow dotColor={DANGER} label="High Risk" count={recentAnalyses.filter(a => a?.riskLevel === "High").length}   variant="danger"  />
+              <RiskRow dotColor={WARN}   label="Medium"    count={recentAnalyses.filter(a => a?.riskLevel === "Medium").length} variant="warning" />
+              <RiskRow dotColor={ACCENT} label="Low"       count={recentAnalyses.filter(a => a?.riskLevel === "Low").length}    variant="accent"  />
             </Box>
           </Card>
         </Box>
       </Box>
 
-      {/* ── Recent Candidate Analyses ─────────────────────────────── */}
+      {/* Recent Candidate Analyses */}
       <Card sx={{ mb: 1.75 }}>
         <CardHead title="Recent Candidate Analyses"
           action={<GhostBtn onClick={() => nav("/candidates")}>View All →</GhostBtn>} />
@@ -445,10 +444,8 @@ export default function DashboardPage() {
             {recentAnalyses.map((row, idx) => (
               <TableRow key={row.id}
                 onClick={() => nav(`/candidates/${row.candidateId}/workflow`)}
-                sx={{
-                  bgcolor: idx % 2 === 1 ? SURFACE : "#fff", cursor: "pointer",
-                  "&:hover": { bgcolor: "#F0F4FF" }, "&:last-child td": { borderBottom: "none" }
-                }}>
+                sx={{ bgcolor: idx % 2 === 1 ? SURFACE : "#fff", cursor: "pointer",
+                  "&:hover": { bgcolor: "#F0F4FF" }, "&:last-child td": { borderBottom: "none" } }}>
                 <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
                   <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{row.candidate_name}</Typography>
                 </TableCell>
@@ -467,14 +464,11 @@ export default function DashboardPage() {
                 </TableCell>
                 <TableCell sx={{ py: 1.5, px: 2, textAlign: "right", borderBottom: `1px solid ${BORDER}` }}
                   onClick={e => e.stopPropagation()}>
-                  {/* MVP2: navigates to Workflow */}
                   <Button size="small" variant="outlined"
                     onClick={() => nav(`/candidates/${row.candidateId}/workflow`)}
-                    sx={{
-                      fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
+                    sx={{ fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
                       borderRadius: "6px", textTransform: "none",
-                      "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE }
-                    }}>
+                      "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE } }}>
                     Open Profile
                   </Button>
                 </TableCell>
@@ -494,11 +488,9 @@ export default function DashboardPage() {
         {["copyright@ DeepHire", "A product of Golden Wattle Ventures Pvt Ltd",
           "This AI tool is designed to assist you, not replace professional judgment."]
           .map(label => (
-            <Box key={label} sx={{
-              display: "inline-flex", alignItems: "center",
+            <Box key={label} sx={{ display: "inline-flex", alignItems: "center",
               bgcolor: "#F0F2F6", border: `1px solid ${BORDER}`, borderRadius: "5px",
-              px: 1, py: 0.25, fontSize: 10, fontWeight: 500, color: MUTED
-            }}>{label}</Box>
+              px: 1, py: 0.25, fontSize: 10, fontWeight: 500, color: MUTED }}>{label}</Box>
           ))}
       </Box>
     </Box>
