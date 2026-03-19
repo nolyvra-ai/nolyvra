@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepHire — Pricing</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --dark:#0F1623;
+  --dark2:#1C2537;
+  --dark3:#1B3A6B;
+  --accent:#1D72E8;
+  --accent-light:#EBF2FF;
+  --accent-bright:#3B8BFF;
+  --border:#E2E6ED;
+  --text:#0F1623;
+  --muted:#9AA3B4;
+  --surface:#F7F8FA;
+  --white:#fff;
+  --success:#16A34A;
+  --success-bg:#F0FDF4;
+  --warn:#D97706;
+  --gold:#F59E0B;
+  --gold-bg:#FFFBEB;
+  --silver:#64748B;
+  --silver-bg:#F1F5F9;
+}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;color:var(--text);background:var(--white);overflow-x:hidden}
+
+/* ── NAV ── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  background:rgba(15,22,35,0.96);
+  backdrop-filter:blur(12px);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 48px;height:64px;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.nav-logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.nav-logo-text{display:flex;flex-direction:column;line-height:1}
+.nav-logo-name{color:#fff;font-size:17px;font-weight:700;letter-spacing:-0.4px}
+.nav-logo-tag{color:rgba(255,255,255,0.3);font-size:9px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
+.nav-links{display:flex;gap:28px}
+.nav-links a{color:rgba(255,255,255,0.5);font-size:13px;font-weight:500;text-decoration:none;transition:color .15s}
+.nav-links a:hover{color:#fff}
+.nav-links a.active{color:#fff}
+.nav-ctas{display:flex;gap:10px;align-items:center}
+.btn-nav-login{padding:7px 18px;border-radius:7px;font-size:13px;font-weight:500;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);background:transparent;cursor:pointer;font-family:inherit;transition:all .15s}
+.btn-nav-login:hover{border-color:rgba(255,255,255,0.5);color:#fff}
+.btn-nav-register{padding:7px 18px;border-radius:7px;font-size:13px;font-weight:600;background:var(--accent);color:#fff;border:none;cursor:pointer;font-family:inherit;transition:all .15s}
+.btn-nav-register:hover{background:var(--accent-bright)}
+
+/* ── HERO ── */
+.pricing-hero{
+  padding:120px 48px 64px;
+  background:linear-gradient(160deg,#0F1623 0%,#1B2A4A 60%,#0F1623 100%);
+  text-align:center;position:relative;overflow:hidden;
+}
+.pricing-hero::before{
+  content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(29,114,232,0.05) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(29,114,232,0.05) 1px,transparent 1px);
+  background-size:60px 60px;pointer-events:none;
+}
+.hero-glow{
+  position:absolute;top:-100px;left:50%;transform:translateX(-50%);
+  width:700px;height:400px;
+  background:radial-gradient(ellipse,rgba(29,114,232,0.15) 0%,transparent 70%);
+  pointer-events:none;
+}
+.pricing-hero-inner{position:relative;z-index:1;max-width:700px;margin:0 auto}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;background:rgba(29,114,232,0.12);border:1px solid rgba(29,114,232,0.3);border-radius:20px;padding:5px 14px;margin-bottom:24px}
+.eyebrow-dot{width:6px;height:6px;border-radius:50%;background:var(--accent-bright);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.eyebrow span{font-size:12px;font-weight:600;color:var(--accent-bright);letter-spacing:.3px}
+.hero-title{font-size:48px;font-weight:700;color:#fff;letter-spacing:-1.2px;line-height:1.1;margin-bottom:14px}
+.hero-title em{font-style:normal;background:linear-gradient(135deg,#3B8BFF,#60A5FA);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.hero-sub{font-size:17px;color:rgba(255,255,255,0.5);line-height:1.6;font-weight:300;margin-bottom:40px}
+
+/* ── BILLING TOGGLE ── */
+.billing-toggle{
+  display:inline-flex;align-items:center;gap:14px;
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(255,255,255,0.1);
+  border-radius:40px;padding:6px 6px 6px 18px;
+  margin-bottom:16px;
+}
+.billing-label{font-size:13px;font-weight:500;color:rgba(255,255,255,0.5);cursor:pointer;transition:color .15s;user-select:none}
+.billing-label.active{color:#fff;font-weight:600}
+.toggle-track{
+  width:48px;height:26px;border-radius:13px;
+  background:var(--accent);cursor:pointer;position:relative;
+  transition:background .2s;flex-shrink:0;
+  border:none;outline:none;
+}
+.toggle-thumb{
+  position:absolute;top:3px;left:3px;
+  width:20px;height:20px;border-radius:50%;background:#fff;
+  transition:transform .2s;box-shadow:0 1px 4px rgba(0,0,0,0.2);
+}
+.toggle-thumb.right{transform:translateX(22px)}
+.billing-toggle .billing-label:last-child{padding-right:12px}
+.savings-badge{
+  display:inline-flex;align-items:center;
+  background:rgba(22,163,74,0.15);border:1px solid rgba(22,163,74,0.3);
+  border-radius:20px;padding:3px 10px;
+  font-size:11px;font-weight:600;color:#4ADE80;
+  margin-bottom:48px;
+}
+
+/* ── PRICING GRID ── */
+.pricing-section{
+  padding:0 48px 96px;
+  background:var(--surface);
+}
+.pricing-grid{
+  max-width:1200px;margin:0 auto;
+  display:grid;grid-template-columns:repeat(5,1fr);
+  gap:16px;align-items:stretch;
+}
+
+/* ── PLAN CARD ── */
+.plan-card{
+  background:var(--white);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:28px 24px;
+  display:flex;flex-direction:column;
+  position:relative;
+  transition:box-shadow .2s,transform .2s;
+  box-shadow:0 2px 8px rgba(0,0,0,0.05);
+}
+.plan-card:hover{box-shadow:0 8px 32px rgba(0,0,0,0.1);transform:translateY(-3px)}
+.plan-card.featured{
+  border-color:var(--accent);
+  border-width:2px;
+  box-shadow:0 0 0 4px rgba(29,114,232,0.08),0 8px 32px rgba(29,114,232,0.15);
+  transform:translateY(-6px);
+}
+.plan-card.featured:hover{transform:translateY(-9px)}
+
+/* Popular badge */
+.popular-badge{
+  position:absolute;top:-13px;left:50%;transform:translateX(-50%);
+  background:linear-gradient(135deg,var(--accent),var(--accent-bright));
+  color:#fff;font-size:11px;font-weight:700;
+  padding:4px 14px;border-radius:20px;
+  white-space:nowrap;letter-spacing:.3px;
+  box-shadow:0 2px 8px rgba(29,114,232,0.4);
+}
+
+/* Plan tier badge */
+.tier-badge{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:4px 10px;border-radius:20px;
+  font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+  margin-bottom:14px;align-self:flex-start;
+}
+.tier-free{background:#F1F5F9;color:#64748B;border:1px solid #CBD5E1}
+.tier-bronze{background:#FEF3C7;color:#92400E;border:1px solid #FDE68A}
+.tier-silver{background:#F1F5F9;color:#475569;border:1px solid #CBD5E1}
+.tier-gold{background:#FEF3C7;color:#78350F;border:1px solid #FCD34D}
+.tier-enterprise{background:#F5F3FF;color:#5B21B6;border:1px solid #C4B5FD}
+
+/* Plan name & desc */
+.plan-name{font-size:18px;font-weight:700;color:var(--text);letter-spacing:-0.3px;margin-bottom:5px}
+.plan-desc{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:20px;min-height:36px}
+
+/* Pricing block */
+.plan-pricing{margin-bottom:20px}
+.price-original{
+  font-size:13px;color:var(--muted);
+  text-decoration:line-through;margin-bottom:2px;
+  min-height:20px;
+}
+.price-main{display:flex;align-items:baseline;gap:3px;margin-bottom:2px}
+.price-amount{font-size:36px;font-weight:700;color:var(--text);letter-spacing:-1px;line-height:1}
+.price-currency{font-size:18px;font-weight:600;color:var(--text);margin-top:4px}
+.price-period{font-size:12px;color:var(--muted);font-weight:400}
+.price-saving{
+  display:inline-flex;align-items:center;
+  background:var(--success-bg);border:1px solid #BBF7D0;
+  border-radius:4px;padding:2px 7px;
+  font-size:11px;font-weight:600;color:var(--success);
+  margin-top:5px;
+}
+.price-free-label{font-size:32px;font-weight:700;color:var(--text);letter-spacing:-0.8px;line-height:1.2}
+.price-free-sub{font-size:12px;color:var(--muted);margin-top:3px}
+
+/* Divider */
+.plan-divider{height:1px;background:var(--border);margin:18px 0}
+
+/* Feature list */
+.plan-features{display:flex;flex-direction:column;gap:9px;flex:1;margin-bottom:22px}
+.plan-feature{display:flex;align-items:flex-start;gap:8px;font-size:12.5px;color:#3D4A63;line-height:1.4}
+.feat-check{
+  width:16px;height:16px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;margin-top:0px;
+}
+.feat-check.green{background:var(--success-bg);border:1px solid #BBF7D0}
+.feat-check.blue{background:var(--accent-light);border:1px solid #BFDBFE}
+.feat-check.gold{background:#FEF3C7;border:1px solid #FDE68A}
+.feat-check.purple{background:#F5F3FF;border:1px solid #C4B5FD}
+.feat-check svg{display:block}
+
+/* Limits strip */
+.limits-strip{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:8px;margin-bottom:20px;
+}
+.limit-item{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:7px;padding:8px 10px;text-align:center;
+}
+.limit-val{font-size:15px;font-weight:700;color:var(--text);line-height:1}
+.limit-lbl{font-size:10px;color:var(--muted);margin-top:2px;font-weight:500;text-transform:uppercase;letter-spacing:.4px}
+
+/* CTA button */
+.plan-btn{
+  width:100%;padding:11px;border-radius:8px;
+  font-size:13px;font-weight:600;cursor:pointer;
+  font-family:'DM Sans',sans-serif;transition:all .15s;
+  border:none;
+}
+.plan-btn-free{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+.plan-btn-free:hover{background:var(--border)}
+.plan-btn-primary{background:var(--accent);color:#fff}
+.plan-btn-primary:hover{background:var(--accent-bright)}
+.plan-btn-enterprise{background:var(--dark);color:#fff}
+.plan-btn-enterprise:hover{background:var(--dark2)}
+
+/* First year ribbon */
+.first-year-note{
+  font-size:10px;color:var(--success);font-weight:600;
+  text-align:center;margin-top:8px;
+  display:flex;align-items:center;justify-content:center;gap:4px;
+}
+
+/* ── ENTERPRISE CARD special ── */
+.enterprise-inner{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;text-align:center;flex:1;gap:14px;
+  padding:20px 0;
+}
+.enterprise-icon{font-size:36px;margin-bottom:4px}
+.enterprise-title{font-size:16px;font-weight:600;color:var(--text)}
+.enterprise-desc{font-size:12px;color:var(--muted);line-height:1.6}
+.enterprise-features{display:flex;flex-direction:column;gap:7px;margin-top:4px;text-align:left;width:100%}
+
+/* ── FAQ / TOKEN INFO ── */
+.info-section{padding:64px 48px;background:var(--white)}
+.info-inner{max-width:1200px;margin:0 auto}
+.info-title{font-size:24px;font-weight:700;color:var(--text);letter-spacing:-.4px;margin-bottom:32px;text-align:center}
+.info-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.info-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px}
+.info-card-icon{font-size:24px;margin-bottom:10px}
+.info-card-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px}
+.info-card-body{font-size:13px;color:var(--muted);line-height:1.7}
+
+/* ── COMPARE TABLE ── */
+.compare-section{padding:0 48px 80px;background:var(--surface)}
+.compare-inner{max-width:1200px;margin:0 auto}
+.compare-title{font-size:24px;font-weight:700;color:var(--text);letter-spacing:-.4px;margin-bottom:24px;text-align:center}
+.compare-table{width:100%;border-collapse:collapse;background:var(--white);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.04)}
+.compare-table th{padding:12px 16px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;background:var(--surface);border-bottom:1px solid var(--border);text-align:center}
+.compare-table th:first-child{text-align:left}
+.compare-table td{padding:12px 16px;font-size:13px;border-bottom:1px solid #F4F6FA;text-align:center;color:#3D4A63}
+.compare-table td:first-child{text-align:left;font-weight:500;color:var(--text)}
+.compare-table tr:last-child td{border-bottom:none}
+.compare-table tr:nth-child(even) td{background:#FAFBFD}
+.check-yes{color:var(--success);font-size:15px}
+.check-no{color:#CBD5E1;font-size:15px}
+.col-highlight{background:rgba(29,114,232,0.04) !important}
+
+/* ── CTA ── */
+.cta-section{
+  background:linear-gradient(135deg,#0F1623 0%,#1B3A6B 100%);
+  padding:80px 48px;text-align:center;
+}
+.cta-title{font-size:36px;font-weight:700;color:#fff;letter-spacing:-.8px;margin-bottom:12px}
+.cta-sub{font-size:16px;color:rgba(255,255,255,0.45);margin-bottom:32px;max-width:480px;margin-left:auto;margin-right:auto;line-height:1.6}
+.btn-hero-primary{padding:13px 30px;border-radius:8px;font-size:14px;font-weight:600;background:var(--accent);color:#fff;border:none;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;box-shadow:0 4px 24px rgba(29,114,232,0.4)}
+.btn-hero-primary:hover{background:var(--accent-bright);transform:translateY(-1px)}
+.btn-hero-secondary{padding:13px 30px;border-radius:8px;font-size:14px;font-weight:500;background:transparent;color:rgba(255,255,255,0.7);border:1px solid rgba(255,255,255,0.2);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s}
+.btn-hero-secondary:hover{border-color:rgba(255,255,255,.5);color:#fff}
+
+/* ── FOOTER ── */
+footer{background:var(--dark);padding:36px 48px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.06)}
+.footer-logo{display:flex;align-items:center;gap:10px}
+.footer-logo-name{color:rgba(255,255,255,.6);font-size:14px;font-weight:600}
+.footer-tagline{font-size:11px;color:rgba(255,255,255,.2);font-style:italic}
+.footer-copy{font-size:12px;color:rgba(255,255,255,.25)}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="deephire-landing-v1.html">
+    <img src="deephire_logo.png" alt="DeepHire" style="height:38px;width:38px;border-radius:8px;object-fit:cover" />
+    <div class="nav-logo-text">
+      <div class="nav-logo-name">DeepHire</div>
+      <div class="nav-logo-tag">Talent Runs Deep</div>
+    </div>
+  </a>
+  <div class="nav-links">
+    <a href="deephire-landing-v1.html">Home</a>
+    <a href="deephire-landing-v1.html#features">Features</a>
+    <a href="#" class="active">Pricing</a>
+    <a href="deephire-landing-v1.html#how">How It Works</a>
+  </div>
+  <div class="nav-ctas">
+    <button class="btn-nav-login">Login</button>
+    <button class="btn-nav-register">Register Interest</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<div class="pricing-hero">
+  <div class="hero-glow"></div>
+  <div class="pricing-hero-inner">
+    <div class="eyebrow"><div class="eyebrow-dot"></div><span>Simple, Transparent Pricing</span></div>
+    <h1 class="hero-title">Invest in <em>smarter hiring.</em><br>Not more headcount.</h1>
+    <p class="hero-sub">Start free. Scale as you grow. Every plan includes full AI analysis, risk detection and candidate insights.</p>
+
+    <!-- Billing toggle -->
+    <div class="billing-toggle">
+      <span class="billing-label active" id="lbl-yearly" onclick="setBilling('yearly')">Yearly</span>
+      <button class="toggle-track" onclick="toggleBilling()" id="toggle-btn" aria-label="Toggle billing period">
+        <div class="toggle-thumb right" id="toggle-thumb"></div>
+      </button>
+      <span class="billing-label" id="lbl-monthly" onclick="setBilling('monthly')">Monthly</span>
+    </div>
+    <div id="savings-note" style="display:block;margin-bottom:16px">
+      <span class="savings-badge">🎉 Save up to 34% with yearly billing · First year launch pricing</span>
+    </div>
+    <div id="monthly-note" style="display:none;margin-bottom:16px">
+      <span class="savings-badge" style="background:rgba(29,114,232,0.12);border-color:rgba(29,114,232,0.3);color:var(--accent-bright)">💡 Switch to Yearly and save up to 34%</span>
+    </div>
+  </div>
+</div>
+
+<!-- PRICING CARDS -->
+<div class="pricing-section">
+  <div class="pricing-grid">
+
+    <!-- FREE -->
+    <div class="plan-card">
+      <span class="tier-badge tier-free">🆓 Free</span>
+      <div class="plan-name">Free Trial</div>
+      <div class="plan-desc">Try DeepHire free for 1 month. No credit card required.</div>
+
+      <div class="plan-pricing">
+        <div class="price-original" style="min-height:20px">&nbsp;</div>
+        <div class="price-free-label">$0</div>
+        <div class="price-free-sub">1 month trial · No card needed</div>
+      </div>
+
+      <div class="limits-strip">
+        <div class="limit-item"><div class="limit-val">3</div><div class="limit-lbl">Candidates</div></div>
+        <div class="limit-item"><div class="limit-val">10</div><div class="limit-lbl">Jobs</div></div>
+        <div class="limit-item"><div class="limit-val">100</div><div class="limit-lbl">Tokens</div></div>
+        <div class="limit-item"><div class="limit-val">1</div><div class="limit-lbl">User</div></div>
+      </div>
+
+      <div class="plan-divider"></div>
+      <div class="plan-features">
+        <div class="plan-feature"><div class="feat-check green"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#16A34A" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>AI Candidate Analysis</div>
+        <div class="plan-feature"><div class="feat-check green"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#16A34A" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>CV vs LinkedIn Scoring</div>
+        <div class="plan-feature"><div class="feat-check green"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#16A34A" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Risk Flag Detection</div>
+        <div class="plan-feature"><div class="feat-check green"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#16A34A" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Fraud Detection</div>
+        <div class="plan-feature"><div class="feat-check green"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#16A34A" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Placement Probability</div>
+        <div class="plan-feature"><div class="feat-check green"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#16A34A" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>AI Email Generator</div>
+        <div class="plan-feature"><div class="feat-check green"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#16A34A" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Interview Scheduler</div>
+        <div class="plan-feature" style="opacity:.4"><div class="feat-check" style="background:#F1F5F9;border:1px solid #CBD5E1"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M2 2l4 4M6 2l-4 4" stroke="#94A3B8" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg></div>Advanced Analytics</div>
+        <div class="plan-feature" style="opacity:.4"><div class="feat-check" style="background:#F1F5F9;border:1px solid #CBD5E1"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M2 2l4 4M6 2l-4 4" stroke="#94A3B8" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg></div>Dedicated Support</div>
+        <div class="plan-feature" style="opacity:.4"><div class="feat-check" style="background:#F1F5F9;border:1px solid #CBD5E1"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M2 2l4 4M6 2l-4 4" stroke="#94A3B8" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg></div>Custom Integrations</div>
+        <div class="plan-feature" style="opacity:.4"><div class="feat-check" style="background:#F1F5F9;border:1px solid #CBD5E1"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M2 2l4 4M6 2l-4 4" stroke="#94A3B8" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg></div>SLA Guarantee</div>
+      </div>
+      <button class="plan-btn plan-btn-free">Start Free Trial</button>
+    </div>
+
+    <!-- SOLOPRENEUR (BRONZE) -->
+    <div class="plan-card">
+      <span class="tier-badge tier-bronze">🥉 Bronze</span>
+      <div class="plan-name">Solopreneur</div>
+      <div class="plan-desc">Perfect for independent recruiters managing their own desk.</div>
+
+      <div class="plan-pricing">
+        <!-- MONTHLY -->
+        <div id="bronze-monthly" style="display:none">
+          <div class="price-original">$199 / month</div>
+          <div class="price-main">
+            <span class="price-currency">$</span>
+            <span class="price-amount">149</span>
+            <span class="price-period">/ month</span>
+          </div>
+          <div class="price-saving">Save $50/mo · Launch pricing</div>
+        </div>
+        <!-- YEARLY -->
+        <div id="bronze-yearly">
+          <div class="price-original">$149 / month</div>
+          <div class="price-main">
+            <span class="price-currency">$</span>
+            <span class="price-amount">99</span>
+            <span class="price-period">/ month · billed yearly</span>
+          </div>
+          <div class="price-saving">Save $600/yr · First year pricing</div>
+        </div>
+      </div>
+
+      <div class="limits-strip">
+        <div class="limit-item"><div class="limit-val">100</div><div class="limit-lbl">Candidates</div></div>
+        <div class="limit-item"><div class="limit-val">50</div><div class="limit-lbl">Jobs</div></div>
+        <div class="limit-item"><div class="limit-val">500</div><div class="limit-lbl">Tokens/mo</div></div>
+        <div class="limit-item"><div class="limit-val">1</div><div class="limit-lbl">User</div></div>
+      </div>
+
+      <div class="plan-divider"></div>
+      <div class="plan-features">
+        <div class="plan-feature"><div class="feat-check green"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#16A34A" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Everything in Free</div>
+        <div class="plan-feature"><div class="feat-check blue"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#1D72E8" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>AI Talent Search</div>
+        <div class="plan-feature"><div class="feat-check blue"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#1D72E8" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Interview Scheduler</div>
+        <div class="plan-feature"><div class="feat-check blue"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#1D72E8" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Client Brief Analyzer</div>
+        <div class="plan-feature"><div class="feat-check blue"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#1D72E8" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Limited Email Support</div>
+        <div class="plan-feature" style="opacity:.4"><div class="feat-check" style="background:#F1F5F9;border:1px solid #CBD5E1"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M2 2l4 4M6 2l-4 4" stroke="#94A3B8" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg></div>Advanced AI Model</div>
+        <div class="plan-feature" style="opacity:.4"><div class="feat-check" style="background:#F1F5F9;border:1px solid #CBD5E1"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M2 2l4 4M6 2l-4 4" stroke="#94A3B8" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg></div>Email Integration</div>
+        <div class="plan-feature" style="opacity:.4"><div class="feat-check" style="background:#F1F5F9;border:1px solid #CBD5E1"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M2 2l4 4M6 2l-4 4" stroke="#94A3B8" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg></div>Multi-user Access</div>
+      </div>
+      <button class="plan-btn plan-btn-primary">Get Started</button>
+      <div class="first-year-note">✦ First year launch pricing</div>
+    </div>
+
+    <!-- SMALL ENTERPRISE (SILVER) — FEATURED -->
+    <div class="plan-card featured">
+      <div class="popular-badge">⭐ Most Popular</div>
+      <span class="tier-badge tier-silver">🥈 Silver</span>
+      <div class="plan-name">Small Enterprise</div>
+      <div class="plan-desc">For growing recruitment teams managing multiple clients.</div>
+
+      <div class="plan-pricing">
+        <!-- MONTHLY -->
+        <div id="silver-monthly" style="display:none">
+          <div class="price-original">$349 / month</div>
+          <div class="price-main">
+            <span class="price-currency">$</span>
+            <span class="price-amount">249</span>
+            <span class="price-period">/ month</span>
+          </div>
+          <div class="price-saving">Save $100/mo · Launch pricing</div>
+        </div>
+        <!-- YEARLY -->
+        <div id="silver-yearly">
+          <div class="price-original">$299 / month</div>
+          <div class="price-main">
+            <span class="price-currency">$</span>
+            <span class="price-amount">199</span>
+            <span class="price-period">/ month · billed yearly</span>
+          </div>
+          <div class="price-saving">Save $1,200/yr · First year pricing</div>
+        </div>
+      </div>
+
+      <div class="limits-strip">
+        <div class="limit-item"><div class="limit-val">500</div><div class="limit-lbl">Candidates</div></div>
+        <div class="limit-item"><div class="limit-val">250</div><div class="limit-lbl">Jobs</div></div>
+        <div class="limit-item"><div class="limit-val">750</div><div class="limit-lbl">Tokens/mo</div></div>
+        <div class="limit-item"><div class="limit-val">5</div><div class="limit-lbl">Users</div></div>
+      </div>
+
+      <div class="plan-divider"></div>
+      <div class="plan-features">
+        <div class="plan-feature"><div class="feat-check green"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#16A34A" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Everything in Bronze</div>
+        <div class="plan-feature"><div class="feat-check blue"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#1D72E8" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Advanced AI Model</div>
+        <div class="plan-feature"><div class="feat-check blue"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#1D72E8" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Email Integration</div>
+        <div class="plan-feature"><div class="feat-check blue"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#1D72E8" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Chat Integration</div>
+        <div class="plan-feature"><div class="feat-check blue"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#1D72E8" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>LinkedIn / Indeed / Seek Search</div>
+        <div class="plan-feature" style="opacity:.4"><div class="feat-check" style="background:#F1F5F9;border:1px solid #CBD5E1"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M2 2l4 4M6 2l-4 4" stroke="#94A3B8" stroke-width="1.2" fill="none" stroke-linecap="round"/></svg></div>Video Interview</div>
+        <div class="plan-feature"><div class="feat-check blue"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#1D72E8" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>5 Team Members</div>
+        <div class="plan-feature"><div class="feat-check blue"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#1D72E8" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Priority Support</div>
+      </div>
+      <button class="plan-btn plan-btn-primary">Get Started</button>
+      <div class="first-year-note">✦ First year launch pricing</div>
+    </div>
+
+    <!-- MEDIUM ENTERPRISE (GOLD) -->
+    <div class="plan-card">
+      <span class="tier-badge tier-gold">🥇 Gold</span>
+      <div class="plan-name">Medium Enterprise</div>
+      <div class="plan-desc">For established agencies with high-volume hiring needs.</div>
+
+      <div class="plan-pricing">
+        <!-- MONTHLY -->
+        <div id="gold-monthly" style="display:none">
+          <div class="price-original">$499 / month</div>
+          <div class="price-main">
+            <span class="price-currency">$</span>
+            <span class="price-amount">399</span>
+            <span class="price-period">/ month</span>
+          </div>
+          <div class="price-saving">Save $100/mo · Launch pricing</div>
+        </div>
+        <!-- YEARLY -->
+        <div id="gold-yearly">
+          <div class="price-original">$449 / month</div>
+          <div class="price-main">
+            <span class="price-currency">$</span>
+            <span class="price-amount">299</span>
+            <span class="price-period">/ month · billed yearly</span>
+          </div>
+          <div class="price-saving">Save $1,800/yr · First year pricing</div>
+        </div>
+      </div>
+
+      <div class="limits-strip">
+        <div class="limit-item"><div class="limit-val">1,500</div><div class="limit-lbl">Candidates</div></div>
+        <div class="limit-item"><div class="limit-val">750</div><div class="limit-lbl">Jobs</div></div>
+        <div class="limit-item"><div class="limit-val">3,000</div><div class="limit-lbl">Tokens/mo</div></div>
+        <div class="limit-item"><div class="limit-val">15</div><div class="limit-lbl">Users</div></div>
+      </div>
+
+      <div class="plan-divider"></div>
+      <div class="plan-features">
+        <div class="plan-feature"><div class="feat-check green"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#16A34A" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Everything in Silver</div>
+        <div class="plan-feature"><div class="feat-check gold"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#D97706" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Premium AI Engine</div>
+        <div class="plan-feature"><div class="feat-check gold"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#D97706" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Video Interview</div>
+        <div class="plan-feature"><div class="feat-check gold"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#D97706" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Advanced Analytics</div>
+        <div class="plan-feature"><div class="feat-check gold"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#D97706" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>15 Team Members</div>
+        <div class="plan-feature"><div class="feat-check gold"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#D97706" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Dedicated Support</div>
+      </div>
+      <button class="plan-btn plan-btn-primary">Get Started</button>
+      <div class="first-year-note">✦ First year launch pricing</div>
+    </div>
+
+    <!-- LARGE ENTERPRISE -->
+    <div class="plan-card">
+      <span class="tier-badge tier-enterprise">💎 Enterprise</span>
+      <div class="plan-name">Large Enterprise</div>
+      <div class="plan-desc">Custom solutions for large-scale recruitment operations.</div>
+
+      <div class="plan-pricing" style="margin-bottom:8px">
+        <div class="price-original" style="min-height:20px">&nbsp;</div>
+        <div class="price-free-label" style="font-size:24px;letter-spacing:-.4px;color:#5B21B6">Custom<br>Pricing</div>
+        <div class="price-free-sub" style="margin-top:6px">Tailored to your organisation</div>
+      </div>
+
+      <div class="limits-strip">
+        <div class="limit-item"><div class="limit-val">∞</div><div class="limit-lbl">Candidates</div></div>
+        <div class="limit-item"><div class="limit-val">∞</div><div class="limit-lbl">Jobs</div></div>
+        <div class="limit-item"><div class="limit-val">Custom</div><div class="limit-lbl">Tokens</div></div>
+        <div class="limit-item"><div class="limit-val">∞</div><div class="limit-lbl">Users</div></div>
+      </div>
+
+      <div class="plan-divider"></div>
+      <div class="plan-features">
+        <div class="plan-feature"><div class="feat-check green"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#16A34A" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Everything in Gold</div>
+        <div class="plan-feature"><div class="feat-check purple"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#7C3AED" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Dedicated Account Manager</div>
+        <div class="plan-feature"><div class="feat-check purple"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#7C3AED" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>Custom Integrations</div>
+        <div class="plan-feature"><div class="feat-check purple"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#7C3AED" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>SLA &amp; Uptime Guarantee</div>
+        <div class="plan-feature"><div class="feat-check purple"><svg width="8" height="8" viewBox="0 0 8 8"><path d="M1 4l2 2 4-3" stroke="#7C3AED" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div>White-label Options</div>
+      </div>
+      <button class="plan-btn plan-btn-enterprise">Contact Sales →</button>
+    </div>
+
+  </div><!-- /pricing-grid -->
+</div><!-- /pricing-section -->
+
+<!-- TOKEN INFO -->
+<div class="info-section">
+  <div class="info-inner">
+    <div class="info-title">Frequently Asked Questions</div>
+    <div class="info-grid">
+      <div class="info-card">
+        <div class="info-card-icon">🪙</div>
+        <div class="info-card-title">What is a Token?</div>
+        <div class="info-card-body">Tokens power AI analysis. Each candidate analysis consumes tokens for CV scoring, fraud detection, interview question generation and placement probability. 1 full analysis ≈ 10 tokens.</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-icon">🔄</div>
+        <div class="info-card-title">Do tokens roll over?</div>
+        <div class="info-card-body">Tokens reset monthly. Unused tokens do not roll over to the next month. Additional token packs can be purchased any time from your account settings.</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-icon">💳</div>
+        <div class="info-card-title">Can I change my plan?</div>
+        <div class="info-card-body">Yes. You can upgrade or downgrade at any time. Upgrades take effect immediately. Downgrades take effect at the start of your next billing cycle.</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-icon">🔒</div>
+        <div class="info-card-title">Is my data secure?</div>
+        <div class="info-card-body">All candidate and job data is encrypted at rest and in transit. DeepHire does not store PII beyond what is needed for analysis and never shares data with third parties.</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-icon">🎁</div>
+        <div class="info-card-title">What is launch pricing?</div>
+        <div class="info-card-body">Our first-year launch pricing is a special discount for early adopters. Prices shown are locked in for your first full year — no surprise increases after signup.</div>
+      </div>
+      <div class="info-card">
+        <div class="info-card-icon">🏢</div>
+        <div class="info-card-title">Need more users?</div>
+        <div class="info-card-body">Each plan has a user limit. If you need more seats than your plan allows, contact us to discuss a custom arrangement or upgrade to the Enterprise plan.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COMPARE TABLE -->
+<div class="compare-section">
+  <div class="compare-inner">
+    <div class="compare-title">Full Feature Comparison</div>
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th style="width:28%">Feature</th>
+          <th>Free</th>
+          <th style="background:rgba(29,114,232,0.04)">Bronze</th>
+          <th style="background:rgba(29,114,232,0.08)">Silver ⭐</th>
+          <th>Gold</th>
+          <th>Enterprise</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Candidates / month</td><td>3</td><td class="col-highlight">100</td><td class="col-highlight">500</td><td>1,500</td><td>Unlimited</td></tr>
+        <tr><td>Jobs</td><td>10</td><td class="col-highlight">50</td><td class="col-highlight">250</td><td>750</td><td>Unlimited</td></tr>
+        <tr><td>AI Tokens / month</td><td>100</td><td class="col-highlight">500</td><td class="col-highlight">750</td><td>3,000</td><td>Custom</td></tr>
+        <tr><td>Users</td><td>1</td><td class="col-highlight">1</td><td class="col-highlight">5</td><td>15</td><td>Unlimited</td></tr>
+        <tr><td>AI Candidate Analysis</td><td><span class="check-yes">✓</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td></tr>
+        <tr><td>CV vs LinkedIn Scoring</td><td><span class="check-yes">✓</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td></tr>
+        <tr><td>Risk Flag Detection</td><td><span class="check-yes">✓</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td></tr>
+        <tr><td>Fraud Detection</td><td><span class="check-yes">✓</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td></tr>
+        <tr><td>Placement Probability</td><td><span class="check-yes">✓</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td></tr>
+        <tr><td>AI Email Generator</td><td><span class="check-yes">✓</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td></tr>
+        <tr><td>AI Talent Search</td><td><span class="check-no">—</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td></tr>
+        <tr><td>Interview Scheduler</td><td><span class="check-no">—</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td></tr>
+        <tr><td>Client Brief Analyzer</td><td><span class="check-no">—</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td></tr>
+        <tr><td>Advanced AI Model</td><td><span class="check-no">—</span></td><td class="col-highlight"><span class="check-no">—</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td></tr>
+        <tr><td>Email Integration</td><td><span class="check-no">—</span></td><td class="col-highlight"><span class="check-no">—</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td></tr>
+        <tr><td>Chat Integration</td><td><span class="check-no">—</span></td><td class="col-highlight"><span class="check-no">—</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td></tr>
+        <tr><td>LinkedIn / Indeed / Seek Search</td><td><span class="check-no">—</span></td><td class="col-highlight"><span class="check-no">—</span></td><td class="col-highlight"><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td></tr>
+        <tr><td>Video Interview</td><td><span class="check-no">—</span></td><td class="col-highlight"><span class="check-no">—</span></td><td class="col-highlight"><span class="check-no">—</span></td><td><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td></tr>
+        <tr><td>Advanced Analytics</td><td><span class="check-no">—</span></td><td class="col-highlight"><span class="check-no">—</span></td><td class="col-highlight"><span class="check-no">—</span></td><td><span class="check-yes">✓</span></td><td><span class="check-yes">✓</span></td></tr>
+        <tr><td>Support</td><td><span class="check-no">—</span></td><td class="col-highlight">Limited Email</td><td class="col-highlight">Priority</td><td>Dedicated</td><td>Account Manager</td></tr>
+        <tr><td>Custom Integrations</td><td><span class="check-no">—</span></td><td class="col-highlight"><span class="check-no">—</span></td><td class="col-highlight"><span class="check-no">—</span></td><td><span class="check-no">—</span></td><td><span class="check-yes">✓</span></td></tr>
+        <tr><td>SLA Guarantee</td><td><span class="check-no">—</span></td><td class="col-highlight"><span class="check-no">—</span></td><td class="col-highlight"><span class="check-no">—</span></td><td><span class="check-no">—</span></td><td><span class="check-yes">✓</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- CTA -->
+<div class="cta-section">
+  <div style="max-width:600px;margin:0 auto">
+    <div style="font-size:11px;font-weight:700;color:var(--accent-bright);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:12px">Ready to get started?</div>
+    <div class="cta-title">Start free. Scale with confidence.</div>
+    <div class="cta-sub">No credit card required for the free trial. Join the waitlist for early access to paid plans.</div>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <button class="btn-hero-primary">Start Free Trial</button>
+      <button class="btn-hero-secondary">Contact Sales →</button>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">
+    <img src="deephire_logo.png" alt="DeepHire" style="height:32px;width:32px;border-radius:6px;object-fit:cover" />
+    <div>
+      <div class="footer-logo-name">DeepHire</div>
+      <div class="footer-tagline">Talent Runs Deep</div>
+    </div>
+  </div>
+  <div class="footer-copy">© 2026 Golden Wattle Ventures Pvt Ltd · All rights reserved</div>
+  <div style="font-size:12px;color:rgba(255,255,255,0.2)">Prices shown include applicable taxes.</div>
+</footer>
+
+<script>
+let isYearly = true;
+
+function toggleBilling() {
+  isYearly = !isYearly;
+  applyBilling();
+}
+
+function setBilling(mode) {
+  isYearly = (mode === 'yearly');
+  applyBilling();
+}
+
+function applyBilling() {
+  const thumb = document.getElementById('toggle-thumb');
+  const lblMonthly = document.getElementById('lbl-monthly');
+  const lblYearly = document.getElementById('lbl-yearly');
+  const savingsNote = document.getElementById('savings-note');
+  const monthlyNote = document.getElementById('monthly-note');
+
+  const plans = ['bronze','silver','gold'];
+
+  if (isYearly) {
+    thumb.classList.add('right');
+    lblYearly.classList.add('active');
+    lblMonthly.classList.remove('active');
+    savingsNote.style.display = 'block';
+    monthlyNote.style.display = 'none';
+    plans.forEach(p => {
+      document.getElementById(p+'-monthly').style.display = 'none';
+      document.getElementById(p+'-yearly').style.display = 'block';
+    });
+  } else {
+    thumb.classList.remove('right');
+    lblMonthly.classList.add('active');
+    lblYearly.classList.remove('active');
+    savingsNote.style.display = 'none';
+    monthlyNote.style.display = 'block';
+    plans.forEach(p => {
+      document.getElementById(p+'-monthly').style.display = 'block';
+      document.getElementById(p+'-yearly').style.display = 'none';
+    });
+  }
+}
+</script>
+</body>
+</html>

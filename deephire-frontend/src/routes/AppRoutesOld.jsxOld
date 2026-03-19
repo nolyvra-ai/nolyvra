@@ -1,6 +1,4 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import LandingPage         from "../pages/LandingPage";
-import PricingPage         from "../pages/PricingPage";
 import LoginPage           from "../pages/LoginPage";
 import DashboardPage       from "../pages/DashboardPage";
 import JobsPage            from "../pages/JobsPage";
@@ -8,6 +6,7 @@ import CreateJobPage       from "../pages/CreateJobPage";
 import CandidatesPage      from "../pages/CandidatesPage";
 import AddCandidatePage    from "../pages/AddCandidatePage";
 import AnalysisPage        from "../pages/AnalysisPage";
+// MVP2 new pages
 import TalentSearchPage    from "../pages/TalentSearchPage";
 import CandidateWorkflowPage from "../pages/CandidateWorkflowPage";
 import SchedulerPage       from "../pages/SchedulerPage";
@@ -19,12 +18,8 @@ import CoWorkerPage        from "../pages/CoWorkerPage";
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* Public pages — no sidebar/topbar */}
-      <Route path="/"                                   element={<LandingPage />} />
-      <Route path="/pricing"                            element={<PricingPage />} />
       <Route path="/login"                              element={<LoginPage />} />
-
-      {/* App pages */}
+      <Route path="/"                                   element={<Navigate to="/dashboard" replace />} />
       <Route path="/dashboard"                          element={<DashboardPage />} />
       <Route path="/jobs"                               element={<JobsPage />} />
       <Route path="/jobs/new"                           element={<CreateJobPage />} />
@@ -32,6 +27,7 @@ export default function AppRoutes() {
       <Route path="/candidates"                         element={<CandidatesPage />} />
       <Route path="/candidates/new"                     element={<AddCandidatePage />} />
       <Route path="/analysis/:candidateId"              element={<AnalysisPage />} />
+      {/* MVP2 */}
       <Route path="/talent-search"                      element={<TalentSearchPage />} />
       <Route path="/candidates/:candidateId/workflow"   element={<CandidateWorkflowPage />} />
       <Route path="/scheduler"                          element={<SchedulerPage />} />
@@ -39,7 +35,7 @@ export default function AppRoutes() {
       <Route path="/reminders"                          element={<RemindersPage />} />
       <Route path="/settings"                           element={<SettingsPage />} />
       <Route path="/coworker"                           element={<CoWorkerPage />} />
-      <Route path="*"                                   element={<Navigate to="/" replace />} />
+      <Route path="*"                                   element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }

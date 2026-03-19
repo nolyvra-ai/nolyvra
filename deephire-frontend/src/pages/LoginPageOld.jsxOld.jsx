@@ -137,29 +137,29 @@ export default function LoginPage() {
     try {
       const encryptedPassword = await encryptPassword(password);
 
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:8080"}/api/login`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ loginId: email.trim(), password: encryptedPassword }),
-        }
-      );
+      // Pass emailId and encrypted password as URL query params
+      const url = new URL("http://localhost:8080/api/login");
+      url.searchParams.set("emailId", email.trim());
+      url.searchParams.set("password", encryptedPassword);
 
-      const data = await res.json();
-
-      // Free plan expiry check
-      if (data.expired) {
-        setApiError(data.error || "Your free trial has expired. Please contact us to update your plan.");
-        return;
-      }
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
 
       if (!res.ok) {
-        throw new Error(data.error || `Login failed (${res.status})`);
+        const body = await res.text().catch(() => "");
+        throw new Error(body || `Login failed (${res.status})`);
       }
 
+      // Success — optionally parse a token and store it
+      // const data = await res.json();
+      // localStorage.setItem("token", data.token);
+
+      setSuccess(true);
+      const data = await res.json();
       localStorage.setItem("loginId", data.id);
-      localStorage.setItem("name",    data.name);
+      localStorage.setItem("name", data.name);
       setSuccess(true);
       nav("/dashboard");
     } catch (err) {

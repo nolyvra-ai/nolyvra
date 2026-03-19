@@ -190,3 +190,15 @@ SET tokens_remaining = p.max_tokens
 FROM plans p
 WHERE l.plan_id = p.id;
 
+
+ALTER TABLE login ADD COLUMN IF NOT EXISTS phone_number TEXT;
+ 
+-- 2. Add 'registered' and 'admin' as special plan_id values
+--    These are not real plans — they are status markers for unboarded/admin users.
+--    We insert them as plan rows so the FK constraint is satisfied.
+INSERT INTO plans (id, name, max_jobs, max_candidates, max_tokens)
+VALUES
+    ('registered', 'Registered', 0, 0, 0),
+    ('admin',      'Admin',      0, 0, 0)
+ON CONFLICT (id) DO NOTHING;
+

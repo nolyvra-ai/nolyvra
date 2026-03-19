@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepHire — Talent Runs Deep</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --dark:#0F1623;
+  --dark2:#1C2537;
+  --dark3:#1B3A6B;
+  --accent:#1D72E8;
+  --accent-light:#EBF2FF;
+  --accent-bright:#3B8BFF;
+  --border:#E2E6ED;
+  --text:#0F1623;
+  --muted:#9AA3B4;
+  --surface:#F7F8FA;
+  --white:#fff;
+}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;color:var(--text);background:var(--white);overflow-x:hidden}
+
+/* ── NAV ── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  background:rgba(15,22,35,0.96);
+  backdrop-filter:blur(12px);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 48px;height:64px;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.nav-logo{display:flex;align-items:center;gap:10px}
+.nav-logo-icon{
+  width:36px;height:36px;background:var(--accent);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:800;color:#fff;letter-spacing:-0.5px;
+}
+.nav-logo-text{display:flex;flex-direction:column;line-height:1}
+.nav-logo-name{color:#fff;font-size:17px;font-weight:700;letter-spacing:-0.4px}
+.nav-logo-tag{color:rgba(255,255,255,0.3);font-size:9px;font-weight:500;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
+.nav-links{display:flex;gap:28px}
+.nav-links a{color:rgba(255,255,255,0.5);font-size:13px;font-weight:500;text-decoration:none;transition:color .15s}
+.nav-links a:hover{color:#fff}
+.nav-ctas{display:flex;gap:10px;align-items:center}
+.btn-nav-login{
+  padding:7px 18px;border-radius:7px;font-size:13px;font-weight:500;
+  border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.8);
+  background:transparent;cursor:pointer;font-family:inherit;transition:all .15s;
+}
+.btn-nav-login:hover{border-color:rgba(255,255,255,0.5);color:#fff}
+.btn-nav-register{
+  padding:7px 18px;border-radius:7px;font-size:13px;font-weight:600;
+  background:var(--accent);color:#fff;border:none;cursor:pointer;font-family:inherit;
+  transition:all .15s;
+}
+.btn-nav-register:hover{background:var(--accent-bright)}
+
+/* ── HERO ── */
+.hero{
+  min-height:100vh;
+  background:linear-gradient(160deg, #0F1623 0%, #1B2A4A 50%, #0F1623 100%);
+  display:flex;align-items:center;justify-content:center;
+  padding:100px 48px 80px;
+  position:relative;overflow:hidden;
+}
+.hero-bg-grid{
+  position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(29,114,232,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(29,114,232,0.06) 1px, transparent 1px);
+  background-size:60px 60px;
+}
+.hero-bg-glow{
+  position:absolute;top:-200px;left:50%;transform:translateX(-50%);
+  width:800px;height:600px;
+  background:radial-gradient(ellipse, rgba(29,114,232,0.18) 0%, transparent 70%);
+  pointer-events:none;
+}
+.hero-inner{max-width:960px;margin:0 auto;text-align:center;position:relative;z-index:1}
+.hero-eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(29,114,232,0.12);border:1px solid rgba(29,114,232,0.3);
+  border-radius:20px;padding:5px 14px;margin-bottom:28px;
+}
+.hero-eyebrow-dot{width:6px;height:6px;border-radius:50%;background:var(--accent-bright);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.hero-eyebrow span{font-size:12px;font-weight:600;color:var(--accent-bright);letter-spacing:0.3px}
+.hero-headline{
+  font-size:58px;font-weight:700;color:#fff;line-height:1.1;
+  letter-spacing:-1.5px;margin-bottom:12px;
+}
+.hero-headline em{
+  font-style:normal;
+  background:linear-gradient(135deg,#3B8BFF,#60A5FA);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.hero-sub-headline{
+  font-size:22px;font-weight:300;color:rgba(255,255,255,0.55);
+  letter-spacing:-0.3px;margin-bottom:32px;line-height:1.5;
+}
+.hero-body{
+  max-width:680px;margin:0 auto 40px;
+  font-size:15px;color:rgba(255,255,255,0.45);line-height:1.8;font-weight:300;
+}
+.hero-ctas{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:56px}
+.btn-hero-primary{
+  padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;
+  background:var(--accent);color:#fff;border:none;cursor:pointer;font-family:inherit;
+  transition:all .2s;box-shadow:0 4px 24px rgba(29,114,232,0.4);
+}
+.btn-hero-primary:hover{background:var(--accent-bright);transform:translateY(-1px);box-shadow:0 6px 32px rgba(29,114,232,0.5)}
+.btn-hero-secondary{
+  padding:14px 32px;border-radius:8px;font-size:15px;font-weight:500;
+  background:transparent;color:rgba(255,255,255,0.75);
+  border:1px solid rgba(255,255,255,0.2);cursor:pointer;font-family:inherit;transition:all .2s;
+}
+.btn-hero-secondary:hover{border-color:rgba(255,255,255,0.5);color:#fff}
+.hero-stats{
+  display:flex;gap:0;justify-content:center;
+  border:1px solid rgba(255,255,255,0.08);border-radius:12px;
+  background:rgba(255,255,255,0.03);backdrop-filter:blur(8px);
+  overflow:hidden;max-width:680px;margin:0 auto;
+}
+.hero-stat{
+  flex:1;padding:20px 24px;text-align:center;
+  border-right:1px solid rgba(255,255,255,0.08);
+}
+.hero-stat:last-child{border-right:none}
+.hero-stat-val{font-size:28px;font-weight:700;color:#fff;letter-spacing:-0.5px;line-height:1}
+.hero-stat-val span{font-size:16px;color:var(--accent-bright)}
+.hero-stat-lbl{font-size:11px;color:rgba(255,255,255,0.35);margin-top:5px;font-weight:500;text-transform:uppercase;letter-spacing:0.5px}
+
+/* ── SECTION BASE ── */
+section{padding:96px 48px}
+.section-inner{max-width:1100px;margin:0 auto}
+.section-eyebrow{
+  display:inline-block;font-size:11px;font-weight:700;color:var(--accent);
+  text-transform:uppercase;letter-spacing:1.2px;margin-bottom:12px;
+}
+.section-title{font-size:36px;font-weight:700;color:var(--text);letter-spacing:-0.8px;line-height:1.2;margin-bottom:14px}
+.section-sub{font-size:16px;color:var(--muted);line-height:1.7;max-width:600px}
+
+/* ── PROBLEM SECTION ── */
+.problem-section{background:var(--white)}
+.problem-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;margin-top:56px}
+.problem-text p{font-size:15px;color:#3D4A63;line-height:1.9;margin-bottom:16px}
+.problem-text p:last-child{margin-bottom:0}
+.problem-highlight{
+  background:linear-gradient(135deg,#EBF2FF,#F0F4FF);
+  border:1px solid #BFDBFE;border-radius:12px;padding:28px;
+  margin-top:0;
+}
+.problem-highlight-title{font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px;margin-bottom:16px}
+.problem-stat-item{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(191,219,254,0.5)}
+.problem-stat-item:last-child{border-bottom:none}
+.problem-stat-num{font-size:26px;font-weight:700;color:var(--accent);min-width:64px;line-height:1}
+.problem-stat-text{font-size:13px;color:#3D4A63;line-height:1.5}
+
+/* ── DATA / CHARTS SECTION ── */
+.data-section{background:var(--surface)}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-top:48px}
+.chart-card{
+  background:var(--white);border:1px solid var(--border);border-radius:12px;
+  padding:24px;box-shadow:0 1px 4px rgba(0,0,0,0.05);
+}
+.chart-card-title{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+.chart-card-val{font-size:32px;font-weight:700;color:var(--text);letter-spacing:-0.8px;line-height:1.1;margin-bottom:4px}
+.chart-card-sub{font-size:12px;color:var(--muted);margin-bottom:20px}
+.chart-card-delta{
+  display:inline-flex;align-items:center;gap:4px;
+  background:#F0FDF4;border:1px solid #BBF7D0;border-radius:20px;
+  padding:2px 8px;font-size:11px;font-weight:600;color:#16A34A;
+}
+
+/* Bar chart */
+.bar-chart{display:flex;align-items:flex-end;gap:8px;height:100px;margin-top:12px}
+.bar-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+.bar{border-radius:4px 4px 0 0;width:100%;transition:height .3s;min-height:4px}
+.bar-lbl{font-size:9px;color:var(--muted);text-align:center;line-height:1.2}
+
+/* Line chart SVG */
+.line-chart-wrap{margin-top:12px;position:relative}
+.line-chart-labels{display:flex;justify-content:space-between;margin-top:4px}
+.line-chart-labels span{font-size:9px;color:var(--muted)}
+
+/* Donut chart */
+.donut-wrap{display:flex;gap:16px;align-items:center;margin-top:12px}
+.donut-legend{display:flex;flex-direction:column;gap:8px;flex:1}
+.donut-legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:#3D4A63}
+.donut-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+/* Wide chart */
+.chart-card-wide{grid-column:span 3}
+.wide-bar-chart{display:flex;align-items:flex-end;gap:12px;height:120px;margin-top:16px}
+.wide-bar-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+.wide-bar{border-radius:5px 5px 0 0;width:100%;min-height:4px}
+.wide-bar-lbl{font-size:10px;color:var(--muted);text-align:center}
+.wide-bar-val{font-size:10px;font-weight:600;color:var(--text);text-align:center}
+
+/* ── FEATURES SECTION ── */
+.features-section{background:var(--white)}
+.features-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:48px}
+.feature-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:28px;transition:box-shadow .2s,transform .2s;
+}
+.feature-card:hover{box-shadow:0 8px 32px rgba(0,0,0,0.08);transform:translateY(-2px)}
+.feature-icon{
+  width:44px;height:44px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;margin-bottom:16px;
+}
+.feature-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:8px}
+.feature-desc{font-size:13px;color:var(--muted);line-height:1.7}
+
+/* ── HOW IT WORKS ── */
+.how-section{
+  background:linear-gradient(160deg,#0F1623 0%,#1B2A4A 100%);
+  position:relative;overflow:hidden;
+}
+.how-section::before{
+  content:'';position:absolute;inset:0;
+  background-image:linear-gradient(rgba(29,114,232,0.04) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(29,114,232,0.04) 1px,transparent 1px);
+  background-size:50px 50px;
+}
+.how-section .section-title{color:#fff}
+.how-section .section-sub{color:rgba(255,255,255,0.45)}
+.how-section .section-eyebrow{color:var(--accent-bright)}
+.steps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin-top:56px;position:relative;z-index:1}
+.step-item{text-align:center;padding:0 20px;position:relative}
+.step-item::after{
+  content:'→';position:absolute;right:-8px;top:28px;
+  font-size:18px;color:rgba(255,255,255,0.15);
+}
+.step-item:last-child::after{display:none}
+.step-num{
+  width:56px;height:56px;border-radius:50%;
+  border:2px solid rgba(29,114,232,0.4);
+  background:rgba(29,114,232,0.1);
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:700;color:var(--accent-bright);
+  margin:0 auto 16px;
+}
+.step-title{font-size:14px;font-weight:600;color:#fff;margin-bottom:8px}
+.step-desc{font-size:12px;color:rgba(255,255,255,0.4);line-height:1.6}
+
+/* ── INSIGHT SECTION ── */
+.insight-section{background:var(--white)}
+.insight-body{
+  max-width:800px;margin:48px auto 0;
+  font-size:16px;color:#3D4A63;line-height:1.9;font-weight:300;
+}
+.insight-body p{margin-bottom:20px}
+.insight-body p:last-child{margin-bottom:0}
+.insight-quote{
+  border-left:3px solid var(--accent);
+  padding:16px 24px;margin:28px 0;
+  background:var(--accent-light);border-radius:0 8px 8px 0;
+  font-size:17px;font-style:italic;color:var(--dark3);font-weight:400;line-height:1.7;
+}
+
+/* ── CTA SECTION ── */
+.cta-section{
+  background:linear-gradient(135deg,#0F1623 0%,#1B3A6B 100%);
+  text-align:center;padding:96px 48px;
+}
+.cta-title{font-size:42px;font-weight:700;color:#fff;letter-spacing:-1px;margin-bottom:16px}
+.cta-sub{font-size:17px;color:rgba(255,255,255,0.5);margin-bottom:40px;max-width:560px;margin-left:auto;margin-right:auto;line-height:1.6}
+
+/* ── FOOTER ── */
+footer{
+  background:var(--dark);padding:40px 48px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-top:1px solid rgba(255,255,255,0.06);
+}
+.footer-logo{display:flex;align-items:center;gap:10px}
+.footer-logo-icon{width:30px;height:30px;background:var(--accent);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff}
+.footer-logo-name{color:rgba(255,255,255,0.6);font-size:14px;font-weight:600}
+.footer-copy{font-size:12px;color:rgba(255,255,255,0.25)}
+.footer-tagline{font-size:11px;color:rgba(255,255,255,0.2);font-style:italic}
+
+/* ── MODAL ── */
+.modal-overlay{
+  display:none;position:fixed;inset:0;z-index:1000;
+  background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);
+  align-items:center;justify-content:center;
+}
+.modal-overlay.open{display:flex}
+.modal{
+  background:#fff;border-radius:16px;padding:40px;
+  width:100%;max-width:460px;position:relative;
+  box-shadow:0 24px 64px rgba(0,0,0,0.3);
+  animation:modalIn .2s ease;
+}
+@keyframes modalIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.modal-close{
+  position:absolute;top:16px;right:16px;width:32px;height:32px;
+  border-radius:50%;background:var(--surface);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;font-size:16px;color:var(--muted);transition:all .15s;
+}
+.modal-close:hover{background:var(--border);color:var(--text)}
+.modal-title{font-size:22px;font-weight:700;color:var(--text);letter-spacing:-0.4px;margin-bottom:6px}
+.modal-sub{font-size:13px;color:var(--muted);margin-bottom:28px;line-height:1.5}
+.form-group{margin-bottom:16px}
+.form-label{display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:5px}
+.form-input{
+  width:100%;padding:10px 13px;border:1px solid var(--border);border-radius:8px;
+  font-size:13px;font-family:'DM Sans',sans-serif;color:var(--text);
+  background:var(--surface);outline:none;transition:border-color .15s;
+}
+.form-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(29,114,232,0.1)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.btn-submit{
+  width:100%;padding:12px;border-radius:8px;font-size:14px;font-weight:600;
+  background:var(--accent);color:#fff;border:none;cursor:pointer;
+  font-family:'DM Sans',sans-serif;transition:all .15s;margin-top:4px;
+}
+.btn-submit:hover{background:var(--accent-bright)}
+.success-msg{
+  display:none;text-align:center;padding:24px 0 8px;
+}
+.success-icon{font-size:48px;margin-bottom:12px}
+.success-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:8px}
+.success-text{font-size:14px;color:var(--muted);line-height:1.6}
+
+/* ── BADGE ── */
+.badge-accent{
+  display:inline-flex;align-items:center;
+  background:var(--accent-light);border:1px solid #BFDBFE;
+  border-radius:20px;padding:3px 10px;
+  font-size:11px;font-weight:600;color:var(--accent);
+}
+</style>
+</head>
+<body>
+
+<!-- ══ NAVIGATION ══ -->
+<nav>
+  <div class="nav-logo">
+    <img src="deephire_logo.png" alt="DeepHire" style="height:38px;width:38px;border-radius:8px;object-fit:cover" />
+    <div class="nav-logo-text">
+      <div class="nav-logo-name">DeepHire</div>
+      <div class="nav-logo-tag">Talent Runs Deep</div>
+    </div>
+  </div>
+  <div class="nav-links">
+    <a href="#problem">Why DeepHire</a>
+    <a href="#data">AI in Recruitment</a>
+    <a href="#features">Features</a>
+    <a href="#how">How It Works</a>
+  </div>
+  <div class="nav-ctas">
+    <button class="btn-nav-login" onclick="window.location.href='login-wireframe_v3.html'">Login</button>
+    <button class="btn-nav-register" onclick="openModal()">Register Interest</button>
+  </div>
+</nav>
+
+<!-- ══ HERO ══ -->
+<section class="hero" id="hero">
+  <div class="hero-bg-grid"></div>
+  <div class="hero-bg-glow"></div>
+  <div class="hero-inner">
+    <div class="hero-eyebrow">
+      <div class="hero-eyebrow-dot"></div>
+      <span>AI-Powered Recruitment Intelligence</span>
+    </div>
+    <h1 class="hero-headline">
+      Recruitment is human-intensive.<br>
+      It's time to make it <em>human-centric.</em>
+    </h1>
+    <p class="hero-sub-headline">
+      DeepHire uses AI to analyse candidates, detect risk signals<br>
+      and surface insights — so recruiters can focus on people.
+    </p>
+    <div class="hero-ctas">
+      <button class="btn-hero-primary" onclick="openModal()">✦ Register Your Interest</button>
+      <button class="btn-hero-secondary" onclick="window.location.href='login-wireframe_v3.html'">Login to Platform →</button>
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="hero-stat-val">73<span>%</span></div>
+        <div class="hero-stat-lbl">Recruiter time on manual review</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-val">4<span>×</span></div>
+        <div class="hero-stat-lbl">Faster candidate screening with AI</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-val">$8.5<span>B</span></div>
+        <div class="hero-stat-lbl">AI recruitment market by 2027</div>
+      </div>
+      <div class="hero-stat">
+        <div class="hero-stat-val">68<span>%</span></div>
+        <div class="hero-stat-lbl">Of firms plan AI hiring tools</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PROBLEM SECTION ══ -->
+<section class="problem-section" id="problem">
+  <div class="section-inner">
+    <div style="text-align:center;margin-bottom:0">
+      <span class="section-eyebrow">The Problem</span>
+      <h2 class="section-title" style="max-width:700px;margin:0 auto 12px">Recruitment is drowning in data. Insights are scarce.</h2>
+      <p class="section-sub" style="margin:0 auto;text-align:center">Despite digital tools, most candidate evaluation remains manual — costing agencies time, money and quality hires.</p>
+    </div>
+    <div class="problem-grid">
+      <div class="problem-text">
+        <p>Artificial Intelligence is redefining how organisations identify, evaluate and hire talent. It has transitioned from research innovation to operational capability.</p>
+        <p>Companies across industries are integrating AI to automate workflows, analyse data and augment decision-making.</p>
+        <p>Recruitment remains one of the most human-intensive business functions despite digital tools. Recruitment agencies manage large volumes of candidate data across multiple roles and clients.</p>
+        <p>Despite advancements in applicant tracking systems, the majority of recruiters' time is spent reviewing resumes and coordinating interviews — rather than engaging strategically with candidates.</p>
+      </div>
+      <div class="problem-highlight">
+        <div class="problem-highlight-title">Industry Reality Check</div>
+        <div class="problem-stat-item">
+          <div class="problem-stat-num">73%</div>
+          <div class="problem-stat-text">of a recruiter's working week is spent on manual resume review and coordination tasks</div>
+        </div>
+        <div class="problem-stat-item">
+          <div class="problem-stat-num">250+</div>
+          <div class="problem-stat-text">average applications received per corporate job opening, mostly unscreened</div>
+        </div>
+        <div class="problem-stat-item">
+          <div class="problem-stat-num">$14k</div>
+          <div class="problem-stat-text">average cost of a bad hire — not including productivity and team impact</div>
+        </div>
+        <div class="problem-stat-item">
+          <div class="problem-stat-num">42 days</div>
+          <div class="problem-stat-text">average time-to-hire for professional roles in the current market</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ DATA / CHARTS SECTION ══ -->
+<section class="data-section" id="data">
+  <div class="section-inner">
+    <span class="section-eyebrow">AI in Recruitment — Market Intelligence</span>
+    <h2 class="section-title">The data is clear. AI adoption is accelerating.</h2>
+    <p class="section-sub">Global investment in AI-powered HR tech is surging. Organisations integrating AI into hiring workflows report significant gains in speed, quality and cost efficiency.</p>
+
+    <div class="charts-grid" style="margin-top:40px">
+
+      <!-- Card 1: AI HR Market Size -->
+      <div class="chart-card">
+        <div class="chart-card-title">AI HR Tech Market Size</div>
+        <div class="chart-card-val">$8.5B</div>
+        <div class="chart-card-sub">Projected by 2027 · USD</div>
+        <div class="chart-card-delta">↑ 35% CAGR</div>
+        <div class="bar-chart" style="margin-top:16px">
+          <div class="bar-wrap">
+            <div class="bar" style="height:30px;background:#BFDBFE"></div>
+            <div class="bar-lbl">2022<br>$2.3B</div>
+          </div>
+          <div class="bar-wrap">
+            <div class="bar" style="height:42px;background:#93C5FD"></div>
+            <div class="bar-lbl">2023<br>$3.1B</div>
+          </div>
+          <div class="bar-wrap">
+            <div class="bar" style="height:58px;background:#60A5FA"></div>
+            <div class="bar-lbl">2024<br>$4.3B</div>
+          </div>
+          <div class="bar-wrap">
+            <div class="bar" style="height:72px;background:#3B82F6"></div>
+            <div class="bar-lbl">2025<br>$5.8B</div>
+          </div>
+          <div class="bar-wrap">
+            <div class="bar" style="height:88px;background:#1D72E8"></div>
+            <div class="bar-lbl">2026<br>$7.0B</div>
+          </div>
+          <div class="bar-wrap">
+            <div class="bar" style="height:100px;background:#1D4ED8"></div>
+            <div class="bar-lbl">2027<br>$8.5B</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Screening time reduction -->
+      <div class="chart-card">
+        <div class="chart-card-title">Screening Time Reduction</div>
+        <div class="chart-card-val">75%</div>
+        <div class="chart-card-sub">Avg. reduction in initial screening time</div>
+        <div class="chart-card-delta">↑ with AI tools</div>
+        <div class="donut-wrap">
+          <svg width="90" height="90" viewBox="0 0 90 90" style="flex-shrink:0;margin-top:12px">
+            <circle cx="45" cy="45" r="35" fill="none" stroke="#F0F2F6" stroke-width="12"/>
+            <circle cx="45" cy="45" r="35" fill="none" stroke="#1D72E8" stroke-width="12"
+              stroke-dasharray="165 220" stroke-dashoffset="55" stroke-linecap="round"
+              transform="rotate(-90 45 45)"/>
+            <text x="45" y="50" text-anchor="middle" font-size="14" font-weight="700" fill="#0F1623">75%</text>
+          </svg>
+          <div class="donut-legend">
+            <div class="donut-legend-item"><div class="donut-dot" style="background:#1D72E8"></div>With AI (25% time)</div>
+            <div class="donut-legend-item"><div class="donut-dot" style="background:#F0F2F6"></div>Manual (75% time saved)</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5">Sourced from LinkedIn Talent Trends 2024</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Adoption Rate -->
+      <div class="chart-card">
+        <div class="chart-card-title">AI Hiring Tool Adoption</div>
+        <div class="chart-card-val">68%</div>
+        <div class="chart-card-sub">Firms planning AI integration by 2026</div>
+        <div class="chart-card-delta">↑ 22pts vs 2022</div>
+        <div class="bar-chart" style="margin-top:16px;gap:6px">
+          <div class="bar-wrap">
+            <div class="bar" style="height:38px;background:#BBF7D0"></div>
+            <div class="bar-lbl">Small<br>52%</div>
+          </div>
+          <div class="bar-wrap">
+            <div class="bar" style="height:60px;background:#34D399"></div>
+            <div class="bar-lbl">Mid<br>71%</div>
+          </div>
+          <div class="bar-wrap">
+            <div class="bar" style="height:82px;background:#10B981"></div>
+            <div class="bar-lbl">Large<br>84%</div>
+          </div>
+          <div class="bar-wrap">
+            <div class="bar" style="height:96px;background:#059669"></div>
+            <div class="bar-lbl">Ent.<br>91%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wide chart: Recruiter time breakdown -->
+      <div class="chart-card chart-card-wide">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
+          <div>
+            <div class="chart-card-title">Where Recruiters Spend Their Time — Before vs After AI</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px">Hours per week on each activity · Average across 500 agencies · Source: SHRM / Deloitte 2024</div>
+          </div>
+          <div style="display:flex;gap:16px;align-items:center">
+            <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)"><div style="width:12px;height:12px;background:#BFDBFE;border-radius:3px"></div>Before AI</div>
+            <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)"><div style="width:12px;height:12px;background:#1D72E8;border-radius:3px"></div>After AI</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:20px;margin-top:20px">
+          <!-- Before bars -->
+          <div style="flex:1">
+            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Before AI Integration</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px;color:#3D4A63">Resume Screening</span><span style="font-size:12px;font-weight:700;color:#DC2626">18 hrs</span></div>
+                <div style="height:7px;background:#F0F2F6;border-radius:4px;overflow:hidden"><div style="width:90%;height:100%;background:#FECACA;border-radius:4px"></div></div>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px;color:#3D4A63">Interview Scheduling</span><span style="font-size:12px;font-weight:700;color:#D97706">10 hrs</span></div>
+                <div style="height:7px;background:#F0F2F6;border-radius:4px;overflow:hidden"><div style="width:50%;height:100%;background:#FDE68A;border-radius:4px"></div></div>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px;color:#3D4A63">Candidate Outreach</span><span style="font-size:12px;font-weight:700;color:#D97706">8 hrs</span></div>
+                <div style="height:7px;background:#F0F2F6;border-radius:4px;overflow:hidden"><div style="width:40%;height:100%;background:#FDE68A;border-radius:4px"></div></div>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px;color:#3D4A63">Strategic Engagement</span><span style="font-size:12px;font-weight:700;color:#16A34A">4 hrs</span></div>
+                <div style="height:7px;background:#F0F2F6;border-radius:4px;overflow:hidden"><div style="width:20%;height:100%;background:#BBF7D0;border-radius:4px"></div></div>
+              </div>
+            </div>
+          </div>
+          <div style="width:1px;background:var(--border)"></div>
+          <!-- After bars -->
+          <div style="flex:1">
+            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">After AI Integration</div>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px;color:#3D4A63">Resume Screening</span><span style="font-size:12px;font-weight:700;color:#16A34A">4 hrs</span></div>
+                <div style="height:7px;background:#F0F2F6;border-radius:4px;overflow:hidden"><div style="width:20%;height:100%;background:#1D72E8;border-radius:4px"></div></div>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px;color:#3D4A63">Interview Scheduling</span><span style="font-size:12px;font-weight:700;color:#16A34A">3 hrs</span></div>
+                <div style="height:7px;background:#F0F2F6;border-radius:4px;overflow:hidden"><div style="width:15%;height:100%;background:#1D72E8;border-radius:4px"></div></div>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px;color:#3D4A63">Candidate Outreach</span><span style="font-size:12px;font-weight:700;color:#D97706">6 hrs</span></div>
+                <div style="height:7px;background:#F0F2F6;border-radius:4px;overflow:hidden"><div style="width:30%;height:100%;background:#1D72E8;border-radius:4px"></div></div>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-size:12px;color:#3D4A63">Strategic Engagement</span><span style="font-size:12px;font-weight:700;color:#16A34A">16 hrs</span></div>
+                <div style="height:7px;background:#F0F2F6;border-radius:4px;overflow:hidden"><div style="width:80%;height:100%;background:#1D72E8;border-radius:4px"></div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ══ FEATURES SECTION ══ -->
+<section class="features-section" id="features">
+  <div class="section-inner">
+    <span class="section-eyebrow">Platform Capabilities</span>
+    <h2 class="section-title">Everything a modern recruiter needs.</h2>
+    <p class="section-sub">DeepHire combines AI analysis, risk detection and workflow management in one unified platform built for recruitment agencies.</p>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#EBF2FF">🔍</div>
+        <div class="feature-title">AI Candidate Analysis</div>
+        <div class="feature-desc">CV vs LinkedIn consistency scoring, capability matrix and risk flag detection — all automated in seconds.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#F5F3FF">🛡</div>
+        <div class="feature-title">Fraud Detection</div>
+        <div class="feature-desc">AI-generated resume detection, timeline inconsistency flags and skill inflation signals to protect hiring quality.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#F0FDF4">📊</div>
+        <div class="feature-title">Placement Probability</div>
+        <div class="feature-desc">Predict hire likelihood using AI pattern matching across historical placements and candidate profiles.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#FFFBEB">✦</div>
+        <div class="feature-title">AI Talent Search</div>
+        <div class="feature-desc">Natural language search across your internal database and market data to surface the best-fit candidates instantly.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#FEF2F2">📅</div>
+        <div class="feature-title">Interview Scheduling</div>
+        <div class="feature-desc">Integrated calendar scheduling with Google Calendar and Outlook sync — send invites in one click.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon" style="background:#EBF2FF">✉</div>
+        <div class="feature-title">AI Email Generator</div>
+        <div class="feature-desc">Generate professional candidate communications instantly — interview invites, follow-ups and offer letters.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ HOW IT WORKS ══ -->
+<section class="how-section" id="how">
+  <div class="section-inner" style="position:relative;z-index:1">
+    <span class="section-eyebrow">How It Works</span>
+    <h2 class="section-title">From CV to insight in minutes.</h2>
+    <p class="section-sub">DeepHire's agentic AI analyses candidates end-to-end so your team focuses on relationships, not repetition.</p>
+    <div class="steps-grid">
+      <div class="step-item">
+        <div class="step-num">1</div>
+        <div class="step-title">Post a Job</div>
+        <div class="step-desc">Paste a job description. AI extracts required skills, seniority signals and capability criteria automatically.</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <div class="step-title">Add Candidate</div>
+        <div class="step-desc">Paste a CV or upload a PDF. Provide the LinkedIn URL for cross-validation.</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <div class="step-title">Run AI Analysis</div>
+        <div class="step-desc">AI scores consistency, capability match, fraud signals and generates interview questions in seconds.</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">4</div>
+        <div class="step-title">Hire Smarter</div>
+        <div class="step-desc">Use AI-ranked insights to engage the best candidates faster and submit higher quality shortlists.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ INSIGHT / ESSAY SECTION ══ -->
+<section class="insight-section" id="insight">
+  <div class="section-inner">
+    <div style="text-align:center;margin-bottom:0">
+      <span class="section-eyebrow">Our Perspective</span>
+      <h2 class="section-title">Explore the future of hiring with DeepHire.</h2>
+    </div>
+    <div class="insight-body">
+      <p>Artificial intelligence introduces a new paradigm in the recruitment industry — where candidate analysis, job matching and talent insights can be automated at scale. Organisations integrating AI into recruitment workflows can significantly reduce screening time while their teams focus on candidate relationships and strategy.</p>
+      <div class="insight-quote">
+        "Recruitment remains one of the most human-intensive business functions despite digital tools. AI doesn't replace the human judgment that matters — it eliminates the repetitive work that prevents it."
+      </div>
+      <p>While AI handles data analysis — consistency checks, capability scoring, risk profiling — recruiters are freed to do what they are uniquely positioned to do: build relationships, understand culture fit and make the strategic decisions that define a successful hire.</p>
+      <p>Follow us for more insights into the agentic era of recruitment. We are building DeepHire to be the intelligence layer that every modern recruitment agency needs — not to replace recruiters, but to make them extraordinary.</p>
+      <div style="display:flex;gap:12px;margin-top:32px;flex-wrap:wrap">
+        <span class="badge-accent">AI Recruitment</span>
+        <span class="badge-accent">Talent Intelligence</span>
+        <span class="badge-accent">Agentic AI</span>
+        <span class="badge-accent">Future of Hiring</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ CTA SECTION ══ -->
+<section class="cta-section">
+  <div class="section-inner" style="text-align:center">
+    <span class="section-eyebrow" style="color:var(--accent-bright)">Early Access</span>
+    <h2 class="cta-title">Ready to hire smarter?</h2>
+    <p class="cta-sub">Join forward-thinking recruitment agencies already on the DeepHire waitlist. Be first to experience the agentic era of recruitment.</p>
+    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+      <button class="btn-hero-primary" onclick="openModal()">✦ Register Your Interest</button>
+      <button class="btn-hero-secondary" onclick="window.location.href='login-wireframe_v3.html'">Login to Platform →</button>
+    </div>
+    <p style="margin-top:20px;font-size:12px;color:rgba(255,255,255,0.2)">No commitment required · One of our team will be in touch</p>
+  </div>
+</section>
+
+<!-- ══ FOOTER ══ -->
+<footer>
+  <div class="footer-logo">
+    <img src="deephire_logo.png" alt="DeepHire" style="height:32px;width:32px;border-radius:6px;object-fit:cover" />
+    <div>
+      <div class="footer-logo-name">DeepHire</div>
+      <div class="footer-tagline">Talent Runs Deep</div>
+    </div>
+  </div>
+  <div class="footer-copy">© 2026 Golden Wattle Ventures Pvt Ltd · All rights reserved</div>
+  <div style="font-size:12px;color:rgba(255,255,255,0.2)">This AI tool is designed to assist, not replace professional judgment.</div>
+</footer>
+
+<!-- ══ REGISTER INTEREST MODAL ══ -->
+<div class="modal-overlay" id="modal" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <div class="modal-close" onclick="closeModal()">✕</div>
+
+    <div id="form-content">
+      <div style="font-size:28px;margin-bottom:10px">✦</div>
+      <div class="modal-title">Register Your Interest</div>
+      <div class="modal-sub">Tell us about yourself and we'll be in touch shortly with early access details.</div>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">First Name *</label>
+          <input class="form-input" type="text" placeholder="Sarah" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Last Name *</label>
+          <input class="form-input" type="text" placeholder="Reynolds" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Company *</label>
+        <input class="form-input" type="text" placeholder="Your recruitment agency" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Email Address *</label>
+        <input class="form-input" type="email" placeholder="sarah@agency.com" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Phone Number</label>
+        <input class="form-input" type="tel" placeholder="+44 7000 000000" />
+      </div>
+      <button class="btn-submit" onclick="submitForm()">Submit →</button>
+    </div>
+
+    <div class="success-msg" id="success-msg">
+      <div class="success-icon">🎉</div>
+      <div class="success-title">Thank you for your interest!</div>
+      <div class="success-text">Thanks for your interest. One of our Customer Service Representatives will get in touch shortly.</div>
+      <button onclick="closeModal()" style="margin-top:20px;padding:10px 24px;border-radius:7px;background:var(--accent);color:#fff;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openModal() {
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('form-content').style.display = 'block';
+  document.getElementById('success-msg').style.display = 'none';
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+}
+function closeModalOutside(e) {
+  if (e.target === document.getElementById('modal')) closeModal();
+}
+function submitForm() {
+  document.getElementById('form-content').style.display = 'none';
+  document.getElementById('success-msg').style.display = 'block';
+}
+</script>
+</body>
+</html>

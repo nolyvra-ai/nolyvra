@@ -2,13 +2,19 @@ import { BrowserRouter, useLocation, Navigate } from "react-router-dom";
 import AppShell from "./components/AppShell";
 import AppRoutes from "./routes/AppRoutes";
 
+// Routes that are fully public — no auth check, no AppShell
+const PUBLIC_ROUTES = ["/", "/pricing", "/login"];
+
 function Layout() {
   const { pathname } = useLocation();
-  const isLogin = pathname === "/login";
+  const isPublic   = PUBLIC_ROUTES.includes(pathname);
   const isLoggedIn = !!localStorage.getItem("loginId");
 
-  if (!isLoggedIn && !isLogin) return <Navigate to="/login" replace />;
-  if (isLogin) return <AppRoutes />;
+  // Unauthenticated users trying to access app pages → send to landing
+  if (!isLoggedIn && !isPublic) return <Navigate to="/" replace />;
+
+  // Public pages render without AppShell (no sidebar / topbar)
+  if (isPublic) return <AppRoutes />;
 
   return (
     <AppShell>

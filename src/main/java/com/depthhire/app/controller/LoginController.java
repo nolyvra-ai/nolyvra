@@ -23,11 +23,10 @@ public class LoginController {
     }
 
     @PostMapping("/login")
-    public LoginResponse login(
-            @RequestParam("emailId") String emailId,
-            @RequestParam("password") String password) {
+    public LoginResponse login(@RequestBody Map<String, String> body) {
+        String emailId = body.getOrDefault("loginId", "");
+        String password = body.getOrDefault("password", "");
         LoginRequest req = new LoginRequest(emailId, password);
-
         return loginService.login(req)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.UNAUTHORIZED,
