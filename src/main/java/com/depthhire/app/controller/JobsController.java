@@ -67,7 +67,8 @@ public class JobsController {
     // ── MVP2: AI Client Brief Analyzer ───────────────────────────────────────
     @PostMapping("/analyze-brief")
     public ClientBriefResponse analyzeClientBrief(
+            @RequestParam(required = false, defaultValue = "") String loginId,
             @Valid @RequestBody ClientBriefRequest req) {
-        return jobService.analyzeClientBrief(req);
+        return jobService.analyzeClientBrief(req, loginId);
     }
 }

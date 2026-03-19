@@ -280,11 +280,43 @@ export default function AddCandidatePage() {
   }
 
   async function handleBulkSave() {
+    // Check if there is room for at least 1 more candidate before starting
+    if (!checkCandidateLimit()) {
+      setBulkDialog(false);
+      setLimitDialog(true);
+      return;
+    }
+
     setBulkSaving(true);
     const loginId = localStorage.getItem("loginId") || "";
+    const readyFiles = bulkFiles.filter(b => b.status === "ready");
+    const slotsAvailable = (usage?.maxCandidates ?? 0) - (usage?.currentCandidates ?? 0);
+
+    if (readyFiles.length > slotsAvailable) {
+      // Warn user how many can actually be saved
+      setBulkFiles(prev => prev.map((b, idx) => {
+        const readyIndex = readyFiles.indexOf(b);
+        if (b.status === "ready" && readyIndex >= slotsAvailable) {
+          return { ...b, status: "error", error: "Candidate limit reached — slot not available" };
+        }
+        return b;
+      }));
+    }
+
+    let savedCount = 0;
     for (let i = 0; i < bulkFiles.length; i++) {
       const b = bulkFiles[i];
       if (b.status !== "ready") continue;
+
+      // Stop saving if limit reached mid-bulk
+      if (savedCount >= slotsAvailable) {
+        setBulkFiles(prev => prev.map((bf, idx) =>
+          idx === i && bf.status === "ready"
+            ? { ...bf, status: "error", error: "Candidate limit reached — slot not available" }
+            : bf));
+        continue;
+      }
+
       try {
         const path = bulkJobId
           ? `/api/jobs/${bulkJobId}/candidates`
@@ -298,6 +330,7 @@ export default function AddCandidatePage() {
         });
         setBulkFiles(prev => prev.map((bf, idx) =>
           idx === i ? { ...bf, status: "saved" } : bf));
+        savedCount++;
       } catch (e) {
         setBulkFiles(prev => prev.map((bf, idx) =>
           idx === i ? { ...bf, status: "error", error: e.message } : bf));
@@ -305,6 +338,12 @@ export default function AddCandidatePage() {
     }
     setBulkSaving(false);
     setBulkDone(true);
+
+    // If limit was hit mid-bulk, show the limit dialog after
+    if (savedCount < readyFiles.length) {
+      setBulkDialog(false);
+      setLimitDialog(true);
+    }
   }
 
   async function onSave(e) {
@@ -334,10 +373,10 @@ export default function AddCandidatePage() {
 
   async function onSubmit(e) {
     e.preventDefault();
-    if (!form.jobId) { setValidationErr("Please assign the candidate to a job before running analysis."); return; }
     if (!checkCandidateLimit()) { setLimitDialog(true); return; }
     if (!hasName) { setValidationErr("Candidate name is required."); return; }
     if (!hasCv) { setValidationErr("CV text is required. Please paste or upload a CV."); return; }
+    if (!form.jobId) { setValidationErr("Please assign the candidate to a job before running analysis."); return; }
     setValidationErr("");
     try {
       // Change 3: use unassigned endpoint when no job selected

@@ -24,16 +24,19 @@ public class AnalysisService {
     private final ObjectMapper objectMapper;
     private final String model;
     private final JdbcTemplate jdbc;
+    private final TokenService tokenService;
     private final Map<String, CandidateAnalysisResponse> cache = new ConcurrentHashMap<>();
 
     public AnalysisService(
             ObjectMapper objectMapper,
             OpenAIClient openAIClient,
             JdbcTemplate jdbcTemplate,
+            TokenService tokenService,
             @Value("${openai.model:gpt-4o-mini}") String model) {
         this.objectMapper = objectMapper;
         this.openAI = openAIClient;
         this.jdbc = jdbcTemplate;
+        this.tokenService = tokenService;
         this.model = model;
     }
 
@@ -169,6 +172,7 @@ public class AnalysisService {
                     .build();
 
             var completion = openAI.chat().completions().create(params);
+            tokenService.deductToken(loginId);
             String content = completion.choices().getFirst().message().content()
                     .orElseThrow(() -> new IllegalStateException("Model returned empty content"));
 
@@ -256,7 +260,7 @@ public class AnalysisService {
                 """.formatted(candidateId, candidateName,
                 safeTrim(cvText, 8000), safeTrim(jdText, 4000));
 
-        String content = callOpenAI(systemPrompt, userPrompt);
+        String content = callOpenAI(systemPrompt, userPrompt, loginId);
         try {
             CandidateSummaryResponse result = objectMapper.readValue(
                     cleanJson(content), CandidateSummaryResponse.class);
@@ -332,7 +336,7 @@ public class AnalysisService {
                 """.formatted(candidateId,
                 safeTrim(cvText, 8000), safeTrim(linkedinUrl, 2000));
 
-        String content = callOpenAI(systemPrompt, userPrompt);
+        String content = callOpenAI(systemPrompt, userPrompt, loginId);
         try {
             FraudSignalResponse result = objectMapper.readValue(
                     cleanJson(content), FraudSignalResponse.class);
@@ -402,7 +406,7 @@ public class AnalysisService {
                 """.formatted(candidateId,
                 safeTrim(cvText, 8000), safeTrim(jdText, 4000));
 
-        String content = callOpenAI(systemPrompt, userPrompt);
+        String content = callOpenAI(systemPrompt, userPrompt, loginId);
         try {
             PlacementProbabilityResponse result = objectMapper.readValue(
                     cleanJson(content), PlacementProbabilityResponse.class);
@@ -522,7 +526,7 @@ public class AnalysisService {
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
-    private String callOpenAI(String systemPrompt, String userPrompt) {
+    private String callOpenAI(String systemPrompt, String userPrompt, String loginId) {
         var params = ChatCompletionCreateParams.builder()
                 .model(model)
                 .addSystemMessage(systemPrompt)
@@ -530,6 +534,7 @@ public class AnalysisService {
                 .temperature(0.2)
                 .build();
         var completion = openAI.chat().completions().create(params);
+        tokenService.deductToken(loginId);
         return completion.choices().getFirst().message().content()
                 .orElseThrow(() -> new IllegalStateException("Model returned empty content"));
     }

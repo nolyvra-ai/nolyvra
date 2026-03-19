@@ -1,6 +1,8 @@
 import { Box } from "@mui/material";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const BG     = "#0F1623";
 const ACCENT = "#1D72E8";
 const PURPLE = "#7C3AED";
@@ -60,6 +62,17 @@ export default function TopBar() {
   const nav = useNavigate();
   const loginId = localStorage.getItem("name") || "";
 
+  const [tokens, setTokens] = useState(null);
+
+  useEffect(() => {
+    const id = localStorage.getItem("loginId") || "";
+    if (!id) return;
+    fetch(`${API_BASE}/api/plans/me?loginId=${encodeURIComponent(id)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setTokens(d.tokensRemaining); })
+      .catch(() => {});
+  }, [pathname]); // refresh on every navigation
+
   function handleLogout() {
     localStorage.removeItem("loginId");
     nav("/login");
@@ -89,7 +102,7 @@ export default function TopBar() {
       scrollbarWidth: "none",
     }}>
       {/* Brand */}
-    {/*   <Box sx={{ display: "flex", alignItems: "center", gap: 1, mr: 1.5, flexShrink: 0 }}>
+    {/*  <Box sx={{ display: "flex", alignItems: "center", gap: 1, mr: 1.5, flexShrink: 0 }}>
         <Box sx={{ width: 26, height: 26, bgcolor: ACCENT, borderRadius: "6px",
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: 11, fontWeight: 700, color: "#fff", flexShrink: 0 }}>IQ</Box>
@@ -101,7 +114,7 @@ export default function TopBar() {
             MVP v2.0
           </Box>
         </Box>
-      </Box>*/}
+      </Box> */} 
 
       <Box component="span" sx={{ fontSize: 14, color: "rgba(255,255,255,0.15)", mr: 0.5, userSelect: "none", flexShrink: 0 }}>│</Box>
       <Box component="span" sx={{ fontSize: 10, color: "rgba(255,255,255,0.25)", mr: "4px", whiteSpace: "nowrap", userSelect: "none", flexShrink: 0 }}>
@@ -115,9 +128,23 @@ export default function TopBar() {
         </Box>
       ))}
 
+      {/* Token balance pill */}
+      {tokens !== null && (
+        <Box sx={{
+          ml: "auto", display: "flex", alignItems: "center", gap: "5px",
+          px: "10px", py: "4px", borderRadius: "20px", flexShrink: 0,
+          border: `1px solid ${tokens < 30 ? "#DC2626" : tokens < 100 ? "#D97706" : "rgba(124,58,237,0.6)"}`,
+          color: tokens < 30 ? "#FF6B6B" : tokens < 100 ? "#FBB040" : "rgba(200,180,255,0.85)",
+          fontSize: 11, fontWeight: 600, userSelect: "none",
+        }}>
+          ✦ {tokens} tokens
+        </Box>
+      )}
+
       {/* Logout */}
       <Box onClick={handleLogout} sx={{
-        ml: "auto", display: "flex", alignItems: "center", gap: "6px",
+        ml: tokens !== null ? "8px" : "auto",
+        display: "flex", alignItems: "center", gap: "6px",
         px: "12px", py: "4px", borderRadius: "20px",
         border: `1px solid ${ACCENT}`, color: ACCENT,
         fontSize: 11, fontWeight: 500, cursor: "pointer",

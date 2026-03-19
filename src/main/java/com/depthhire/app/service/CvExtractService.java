@@ -22,13 +22,16 @@ public class CvExtractService {
     private final OpenAIClient openAI;
     private final ObjectMapper objectMapper;
     private final String model;
+    private final TokenService tokenService;
 
     public CvExtractService(
             OpenAIClient openAI,
             ObjectMapper objectMapper,
+            TokenService tokenService,
             @Value("${openai.model:gpt-4o-mini}") String model) {
         this.openAI       = openAI;
         this.objectMapper = objectMapper;
+        this.tokenService  = tokenService; 
         this.model        = model;
     }
 
@@ -55,7 +58,7 @@ public class CvExtractService {
 
     // ── Extended extract — returns text + name/email/phone/linkedinUrl ────────
     // Used by the Add Candidate page to prefill form fields from uploaded CV.
-    public Map<String, Object> extractWithFields(MultipartFile file) throws IOException {
+    public Map<String, Object> extractWithFields(MultipartFile file, String loginId) throws IOException {
         String rawText = extractText(file);
 
         String name        = "";
@@ -87,6 +90,7 @@ public class CvExtractService {
 
             String content = openAI.chat().completions().create(params)
                     .choices().getFirst().message().content().orElse("{}");
+            tokenService.deductToken(loginId);
 
             String clean = content.strip();
             if (clean.startsWith("```")) {

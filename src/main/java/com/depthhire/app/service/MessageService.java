@@ -15,15 +15,18 @@ public class MessageService {
     private final JdbcTemplate jdbc;
     private final WorkflowService workflowService;
     private final String model;
+    private final TokenService tokenService;
 
     public MessageService(
             OpenAIClient openAIClient,
             JdbcTemplate jdbc,
             WorkflowService workflowService,
+            TokenService tokenService,
             @Value("${openai.model:gpt-4o-mini}") String model) {
         this.openAI = openAIClient;
         this.jdbc   = jdbc;
         this.workflowService = workflowService;
+        this.tokenService    = tokenService;
         this.model  = model;
     }
 
@@ -111,6 +114,7 @@ public class MessageService {
                 .build();
 
         var completion = openAI.chat().completions().create(params);
+        tokenService.deductToken(loginId);
         String content = completion.choices().getFirst().message().content()
                 .orElseThrow(() -> new IllegalStateException("Model returned empty content"));
 

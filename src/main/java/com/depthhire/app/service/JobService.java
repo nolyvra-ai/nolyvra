@@ -25,15 +25,18 @@ public class JobService {
     private final OpenAIClient openAI;
     private final ObjectMapper objectMapper;
     private final String model;
+    private final TokenService tokenService;
 
     public JobService(
             JdbcTemplate jdbc,
             OpenAIClient openAIClient,
             ObjectMapper objectMapper,
+            TokenService tokenService,
             @Value("${openai.model:gpt-4o-mini}") String model) {
         this.jdbc = jdbc;
         this.openAI = openAIClient;
         this.objectMapper = objectMapper;
+        this.tokenService = tokenService;
         this.model = model;
     }
 
@@ -133,7 +136,7 @@ public class JobService {
 
     // ─── AI Client Brief Analyzer ─────────────────────────────────────────────
 
-    public ClientBriefResponse analyzeClientBrief(ClientBriefRequest req) {
+    public ClientBriefResponse analyzeClientBrief(ClientBriefRequest req, String loginId) {
 
         String systemPrompt = """
                 You are a senior recruitment consultant who specialises in writing structured job descriptions.
@@ -165,6 +168,7 @@ public class JobService {
                 .build();
 
         var completion = openAI.chat().completions().create(params);
+        tokenService.deductToken(loginId);
         String content = completion.choices().getFirst().message().content()
                 .orElseThrow(() -> new IllegalStateException("Model returned empty content"));
 

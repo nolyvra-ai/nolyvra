@@ -4,6 +4,8 @@ import com.depthhire.app.model.PlanUsageResponse;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
+
 @Service
 public class PlanService {
 
@@ -13,13 +15,13 @@ public class PlanService {
         this.jdbc = jdbc;
     }
 
-    // ─── Get plan + current usage for a user ─────────────────────────────────
+    // ─── Get plan + current usage + token info for a user ────────────────────
 
     public PlanUsageResponse getPlanUsage(String loginId) {
-        // Fetch plan limits for this user
         var rows = jdbc.query("""
                 select p.id as plan_id, p.name as plan_name,
-                       p.max_jobs, p.max_candidates
+                       p.max_jobs, p.max_candidates, p.max_tokens,
+                       l.tokens_remaining, l.renew_date
                 from login l
                 join plans p on p.id = l.plan_id
                 where l.id = ?
@@ -28,26 +30,32 @@ public class PlanService {
                         rs.getString("plan_id"),
                         rs.getString("plan_name"),
                         rs.getInt("max_jobs"),
-                        rs.getInt("max_candidates")
+                        rs.getInt("max_candidates"),
+                        rs.getInt("max_tokens"),
+                        rs.getInt("tokens_remaining"),
+                        rs.getObject("renew_date", LocalDate.class)
                 }, loginId);
 
         if (rows.isEmpty()) {
-            // Default to Free plan if user not found (shouldn't happen)
             return new PlanUsageResponse("plan-free", "Free", 7, 10,
-                    currentJobCount(loginId), currentCandidateCount(loginId));
+                    currentJobCount(loginId), currentCandidateCount(loginId),
+                    100, 100, LocalDate.now().plusDays(30));
         }
 
         Object[] row = rows.get(0);
         return new PlanUsageResponse(
-                (String)  row[0],
-                (String)  row[1],
-                (Integer) row[2],
-                (Integer) row[3],
+                (String)    row[0],
+                (String)    row[1],
+                (Integer)   row[2],
+                (Integer)   row[3],
                 currentJobCount(loginId),
-                currentCandidateCount(loginId));
+                currentCandidateCount(loginId),
+                (Integer)   row[4],
+                (Integer)   row[5],
+                (LocalDate) row[6]);
     }
 
-    // ─── Limit checks (called from Job/Candidate controllers) ────────────────
+    // ─── Limit checks ─────────────────────────────────────────────────────────
 
     public boolean isJobLimitReached(String loginId) {
         PlanUsageResponse usage = getPlanUsage(loginId);
@@ -61,7 +69,6 @@ public class PlanService {
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
-    // Count only active (non-soft-deleted) jobs
     private int currentJobCount(String loginId) {
         Integer count = jdbc.queryForObject(
                 "select count(*) from jobs where login_id = ? and is_active = true",
@@ -69,7 +76,6 @@ public class PlanService {
         return count != null ? count : 0;
     }
 
-    // Count only active (non-soft-deleted) candidates
     private int currentCandidateCount(String loginId) {
         Integer count = jdbc.queryForObject(
                 "select count(*) from candidates where login_id = ? and is_active = true",

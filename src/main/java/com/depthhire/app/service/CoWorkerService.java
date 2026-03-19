@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openai.client.OpenAIClient;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -19,15 +20,21 @@ public class CoWorkerService {
     private final ObjectMapper objectMapper;
     private final JdbcTemplate jdbc;
     private final String model;
+    private final TokenService tokenService;
+    private final AnalysisService analysisService; // Change 1: added
 
     public CoWorkerService(
             OpenAIClient openAI,
             ObjectMapper objectMapper,
             JdbcTemplate jdbc,
+            TokenService tokenService,
+            @Lazy AnalysisService analysisService, // Change 1: added (@Lazy avoids circular dependency)
             @Value("${openai.model:gpt-4o-mini}") String model) {
         this.openAI = openAI;
         this.objectMapper = objectMapper;
         this.jdbc = jdbc;
+        this.tokenService = tokenService;
+        this.analysisService = analysisService; // Change 1: added
         this.model = model;
     }
 
@@ -109,6 +116,7 @@ public class CoWorkerService {
 
         try {
             var completion = openAI.chat().completions().create(params);
+            tokenService.deductToken(loginId);
             String content = completion.choices().getFirst().message().content()
                     .orElse("{\"message\":\"I'm here to help! What would you like me to do?\",\"pendingAction\":{\"type\":\"NONE\",\"description\":\"\",\"params\":{}}}");
 
@@ -211,30 +219,25 @@ public class CoWorkerService {
         Long taskId = createTask(loginId, "RUN_ANALYSIS",
                 "Analysis: " + String.join(", ", names));
 
+        // Change 2: replaced raw INSERT with proper AnalysisService.analyze() call
+        int succeeded = 0;
         for (String candidateId : candidateIds) {
             try {
                 updateTaskProgress(taskId, 10);
-                jdbc.update("""
-                        insert into analyses (candidate_id, job_id, login_id, analyzed_at,
-                          consistency_score, capability_score, risk_level, timeline_match_percent,
-                          candidate_name, analysis_json)
-                        select c.id, c.job_id, c.login_id, now(),
-                          null, null, null, null, c.name, '{}'::jsonb
-                        from candidates c
-                        where c.id = ? and not exists (
-                          select 1 from analyses a where a.candidate_id = c.id
-                        )
-                        """, candidateId);
-                updateTaskProgress(taskId, 50);
+                CandidateResponse candidate = analysisService.getJobIdNameForCandidate(candidateId);
+                analysisService.analyze(candidateId, candidate, loginId);
+                updateTaskProgress(taskId, 80);
+                succeeded++;
             } catch (Exception e) {
-                System.err.println("[CoWorker] executeRunAnalysis() error for " + candidateId + ": " + e.getMessage());
+                System.err.println("[CoWorker] executeRunAnalysis() error for "
+                        + candidateId + ": " + e.getMessage());
             }
         }
 
         markTaskDone(taskId);
         return Map.of(
-                "message", "Analysis started for " + candidateIds.size() + " candidate(s): "
-                        + String.join(", ", names) + ". Check the Candidates page for results.",
+                "message", succeeded + " of " + candidateIds.size() + " candidate(s) analysed: "
+                        + String.join(", ", names) + ". View results from the Candidates page.",
                 "success", true,
                 "taskId", taskId);
     }

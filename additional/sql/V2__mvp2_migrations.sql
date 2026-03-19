@@ -163,3 +163,30 @@ ALTER TABLE login
  
 -- 4. Index for fast plan lookups
 CREATE INDEX IF NOT EXISTS idx_logins_plan_id ON login(plan_id);
+
+
+-- 1. Add max_tokens column to plans
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS max_tokens INTEGER NOT NULL DEFAULT 100;
+ 
+-- 2. Update existing plans with token values
+UPDATE plans SET max_tokens = 100  WHERE id = 'plan-free';
+UPDATE plans SET max_tokens = 500  WHERE id = 'plan-silver';
+UPDATE plans SET max_tokens = 1000 WHERE id = 'plan-gold';
+ 
+-- 3. Add bronze plan
+INSERT INTO plans (id, name, max_jobs, max_candidates, max_tokens)
+VALUES ('plan-bronze', 'Bronze', 10, 20, 250)
+ON CONFLICT (id) DO NOTHING;
+ 
+-- 4. Add tokens_remaining and renew_date to login table
+ALTER TABLE login
+    ADD COLUMN IF NOT EXISTS tokens_remaining INTEGER NOT NULL DEFAULT 100;
+ALTER TABLE login
+    ADD COLUMN IF NOT EXISTS renew_date DATE NOT NULL DEFAULT (now()::date + INTERVAL '30 days');
+ 
+-- 5. Populate tokens_remaining based on each user's current plan
+UPDATE login l
+SET tokens_remaining = p.max_tokens
+FROM plans p
+WHERE l.plan_id = p.id;
+

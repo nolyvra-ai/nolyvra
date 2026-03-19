@@ -15,7 +15,7 @@ const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
 const SURFACE  = "#FAFBFD";
 
 // ── Usage bar component ───────────────────────────────────────────────────────
-function UsageBar({ label, used, max }) {
+function UsageBar({ label, used, max, remainingLabel }) {
   const pct   = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
   const color = pct >= 90 ? DANGER : pct >= 70 ? WARN : SUCCESS;
   return (
@@ -31,7 +31,7 @@ function UsageBar({ label, used, max }) {
           borderRadius: "4px", transition: "width .3s" }} />
       </Box>
       <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.5 }}>
-        {max - used} {label.toLowerCase()} remaining
+        {remainingLabel ?? `${max - used} ${label.toLowerCase()} remaining`}
       </Typography>
     </Box>
   );
@@ -61,7 +61,6 @@ export default function SettingsPage() {
   const nav = useNavigate();
   const loginId = localStorage.getItem("loginId") || "";
   const name = localStorage.getItem("name") || "";
-
   // Plan usage from shared hook
   const { usage, loading: planLoading } = usePlanLimit();
 
@@ -159,6 +158,11 @@ export default function SettingsPage() {
                 {[
                   { label: "Max Jobs",       value: usage.maxJobs       },
                   { label: "Max Candidates", value: usage.maxCandidates },
+                  { label: "Max Tokens",     value: usage.maxTokens     },
+                  { label: "Renews On",      value: usage.renewDate
+                      ? new Date(usage.renewDate).toLocaleDateString("en-GB",
+                          { day: "numeric", month: "short", year: "numeric" })
+                      : "—" },
                 ].map(item => (
                   <Box key={item.label}>
                     <Typography sx={{ fontSize: 10, color: MUTED, fontWeight: 600,
@@ -176,6 +180,15 @@ export default function SettingsPage() {
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1.75, mb: 2 }}>
                 <UsageBar label="Jobs"       used={usage.currentJobs}       max={usage.maxJobs} />
                 <UsageBar label="Candidates" used={usage.currentCandidates} max={usage.maxCandidates} />
+                <UsageBar label="Tokens"
+                  used={(usage.maxTokens ?? 0) - (usage.tokensRemaining ?? 0)}
+                  max={usage.maxTokens ?? 0}
+                  remainingLabel={`${usage.tokensRemaining ?? 0} tokens remaining · renews ${
+                    usage.renewDate
+                      ? new Date(usage.renewDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+                      : "—"
+                  }`}
+                />
               </Box>
 
               {/* Upgrade nudge for Free plan */}

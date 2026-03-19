@@ -19,14 +19,14 @@ public class CvExtractController {
     }
 
     @PostMapping(value = "/extract", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> extractText(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<?> extractText(@RequestParam("file") MultipartFile file, @RequestParam(value = "loginId", required = false, defaultValue = "") String loginId) {
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "No file uploaded"));
         }
 
         try {
             // Returns { text, name, email, phone, linkedinUrl }
-            Map<String, Object> result = cvExtractService.extractWithFields(file);
+            Map<String, Object> result = cvExtractService.extractWithFields(file, loginId);
             return ResponseEntity.ok(result);
         } catch (IllegalArgumentException e) {
             // User-facing validation errors — 400
