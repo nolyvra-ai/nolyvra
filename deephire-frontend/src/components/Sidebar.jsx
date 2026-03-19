@@ -124,6 +124,7 @@ export default function Sidebar() {
 
         <Section label="AI Tools" isNew>
           <NavItem to="/talent-search"    icon="🔍" label="AI Talent Search" isNew />
+          <NavItem to="/coworker"         icon="🤖" label="Co-worker AI"     isNew />
           <NavItem to="/scheduler"        icon="📅" label="Interview Scheduler" isNew />
           <NavItem to="/email"            icon="✉"  label="Email Centre" isNew />
         </Section>

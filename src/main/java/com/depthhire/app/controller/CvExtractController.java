@@ -25,8 +25,9 @@ public class CvExtractController {
         }
 
         try {
-            String text = cvExtractService.extractText(file);
-            return ResponseEntity.ok(Map.of("text", text));
+            // Returns { text, name, email, phone, linkedinUrl }
+            Map<String, Object> result = cvExtractService.extractWithFields(file);
+            return ResponseEntity.ok(result);
         } catch (IllegalArgumentException e) {
             // User-facing validation errors — 400
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

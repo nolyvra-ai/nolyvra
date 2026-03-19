@@ -37,6 +37,14 @@ public class CandidatesController {
         return candidate;
     }
 
+    // Add candidate without a job assignment ("Not Assigned")
+    @PostMapping("/candidates")
+    public CandidateResponse addCandidateUnassigned(
+            @RequestParam String loginId,
+            @Valid @RequestBody CandidateCreateRequest req) {
+        return candidateService.addCandidateUnassigned(req, loginId);
+    }
+
     @GetMapping("/candidates/{candidateId}")
     public CandidateResponse getCandidate(
             @PathVariable String candidateId,

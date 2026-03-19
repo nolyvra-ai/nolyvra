@@ -50,6 +50,21 @@ public class CandidateService {
                 req.linkedinUrl(), Instant.now(), "Screening");
     }
 
+    // Create candidate without job assignment (job_id = null — "Not Assigned")
+    public CandidateResponse addCandidateUnassigned(CandidateCreateRequest req, String loginId) {
+        String id = "cand-" + UUID.randomUUID();
+        jdbc.update("""
+                insert into candidates
+                    (id, job_id, login_id, name, email, linkedin_url, cv_text, stage, is_active)
+                values (?, null, ?, ?, ?, ?, ?, 'Screening', true)
+                """,
+                id, loginId,
+                req.name(), req.email(), req.linkedinUrl(), req.cvText());
+
+        return new CandidateResponse(id, null, req.name(), req.email(),
+                req.linkedinUrl(), Instant.now(), "Screening");
+    }
+
     // ─── Read ─────────────────────────────────────────────────────────────────
 
     public Optional<CandidateResponse> getCandidate(String candidateId, String loginId) {

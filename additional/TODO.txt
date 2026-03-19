@@ -1,4 +1,6 @@
-1. Create a simple landing page with the details of upcoming event and register event option
+
+4. Change the subcription model to token based instead of job and candidate
+2. Create a simple landing page with the details of upcoming event and register event option
 2. For admin(use plan Id field) add one section in settings user registration with a Name, email Id, Org Field. 
 5. Setup the subcription logic
 6. Payment gateway integration 
@@ -8,7 +10,7 @@
 Good To have feature before onboarding recuriter
 -----
  
-1. Implement Claude Co worker type feature
+1. Implement Claude Co worker type feature (Done)
 2. In the settings add a choose coworker type
 3. Bulk upload option
 4. Improve the PDF generated

@@ -13,6 +13,7 @@ import SchedulerPage       from "../pages/SchedulerPage";
 import EmailCentrePage     from "../pages/EmailCentrePage";
 import RemindersPage       from "../pages/RemindersPage";
 import SettingsPage        from "../pages/SettingsPage";
+import CoWorkerPage        from "../pages/CoWorkerPage";
 
 export default function AppRoutes() {
   return (
@@ -33,6 +34,7 @@ export default function AppRoutes() {
       <Route path="/email"                              element={<EmailCentrePage />} />
       <Route path="/reminders"                          element={<RemindersPage />} />
       <Route path="/settings"                           element={<SettingsPage />} />
+      <Route path="/coworker"                           element={<CoWorkerPage />} />
       <Route path="*"                                   element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );

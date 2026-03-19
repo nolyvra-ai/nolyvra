@@ -12,9 +12,10 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  LinearProgress,
 } from "@mui/material";
 import { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { usePlanLimit } from "../hooks/usePlanLimit";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -159,29 +160,40 @@ function AnalysisItem({ icon, title, description, divider }) {
 // ─── Main component ──────────────────────────────────────────────────────────
 export default function AddCandidatePage() {
   const nav = useNavigate();
+  const location = useLocation();
+  const prefill = location.state?.prefill;
+
   const { checkCandidateLimit, usage } = usePlanLimit();
-  const [limitDialog,    setLimitDialog]    = useState(false);
+  const [limitDialog, setLimitDialog] = useState(false);
   const [analysisDialog, setAnalysisDialog] = useState(false);
 
+  // Change 3: jobId defaults to "" = "Not Assigned"
   const [form, setForm] = useState({
-    name: "",
+    name: prefill?.name ?? "",
     email: "",
-    linkedinUrl: "",
-    cvText: "",
+    linkedinUrl: prefill?.linkedinUrl ?? "",
+    cvText: prefill?.cvText ?? "",
     recruiterNotes: "",
-    jobId: "job-1",
+    jobId: "",
   });
-  const [jobs,          setJobs]          = useState([]);
-  const [cvFile,        setCvFile]        = useState(null);   // Change 1: uploaded file name
-  const [cvUploading,   setCvUploading]   = useState(false);  // Change 1: extraction in progress
-  const [cvUploadError, setCvUploadError] = useState(null);   // Change 1: extraction error
+  const [jobs, setJobs] = useState([]);
+  const [cvFile, setCvFile] = useState(null);
+  const [cvUploading, setCvUploading] = useState(false);
+  const [cvUploadError, setCvUploadError] = useState(null);
   const [validationErr, setValidationErr] = useState("");
+
+  // Change 2: Bulk upload state
+  const [bulkDialog, setBulkDialog] = useState(false);
+  const [bulkFiles, setBulkFiles] = useState([]);   // { file, status, name, email, cvText, error }
+  const [bulkJobId, setBulkJobId] = useState("");
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkDone, setBulkDone] = useState(false);
 
   function setField(k, v) {
     setForm((p) => ({ ...p, [k]: v }));
   }
 
-  // ── Change 1: CV file upload — sends to backend for text extraction ────────
+  // ── Change 1: CV upload — extracts text AND prefills name/email/linkedinUrl ─
   async function handleCvUpload(file) {
     if (!file) return;
     const allowed = ["application/pdf",
@@ -202,8 +214,15 @@ export default function AddCandidatePage() {
       url.searchParams.set("loginId", loginId);
       const res = await fetch(url.toString(), { method: "POST", body: formData });
       if (!res.ok) throw new Error(await res.text());
-      const { text } = await res.json();
-      setField("cvText", text);
+      const data = await res.json();
+      // Prefill all available fields from CV
+      setForm(prev => ({
+        ...prev,
+        cvText: data.text || prev.cvText,
+        name: data.name || prev.name,
+        email: data.email || prev.email,
+        linkedinUrl: data.linkedinUrl || prev.linkedinUrl,
+      }));
     } catch (e) {
       setCvUploadError("Failed to extract text: " + e.message);
       setCvFile(null);
@@ -217,6 +236,7 @@ export default function AddCandidatePage() {
       try {
         const data = await apiGet("/api/jobs");
         setJobs(data ?? []);
+        // Do NOT auto-select first job — default is "Not Assigned"
       } catch (e) {
         console.error("Failed to load jobs", e);
       }
@@ -225,20 +245,85 @@ export default function AddCandidatePage() {
   }, []);
 
   // ── Save candidate (no analysis) ──────────────────────────────────────────
+
+  // Change 2: bulk upload handlers
+  async function handleBulkFiles(files) {
+    const arr = Array.from(files).map(f => ({
+      file: f, status: "pending", name: "", email: "", cvText: "", error: null
+    }));
+    setBulkFiles(arr);
+    setBulkDone(false);
+    for (let i = 0; i < arr.length; i++) {
+      setBulkFiles(prev => prev.map((b, idx) =>
+        idx === i ? { ...b, status: "extracting" } : b));
+      try {
+        const formData = new FormData();
+        formData.append("file", arr[i].file);
+        const loginId = localStorage.getItem("loginId") || "";
+        const url = new URL(`${API_BASE}/api/cv/extract`);
+        url.searchParams.set("loginId", loginId);
+        const res = await fetch(url.toString(), { method: "POST", body: formData });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        setBulkFiles(prev => prev.map((b, idx) =>
+          idx === i ? {
+            ...b, status: "ready",
+            name: data.name || arr[i].file.name,
+            email: data.email || "",
+            cvText: data.text || "",
+          } : b));
+      } catch (e) {
+        setBulkFiles(prev => prev.map((b, idx) =>
+          idx === i ? { ...b, status: "error", error: e.message } : b));
+      }
+    }
+  }
+
+  async function handleBulkSave() {
+    setBulkSaving(true);
+    const loginId = localStorage.getItem("loginId") || "";
+    for (let i = 0; i < bulkFiles.length; i++) {
+      const b = bulkFiles[i];
+      if (b.status !== "ready") continue;
+      try {
+        const path = bulkJobId
+          ? `/api/jobs/${bulkJobId}/candidates`
+          : `/api/candidates`;
+        const url = new URL(`${API_BASE}${path}`);
+        url.searchParams.set("loginId", loginId);
+        await fetch(url.toString(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: b.name, email: b.email, cvText: b.cvText, linkedinUrl: "" }),
+        });
+        setBulkFiles(prev => prev.map((bf, idx) =>
+          idx === i ? { ...bf, status: "saved" } : bf));
+      } catch (e) {
+        setBulkFiles(prev => prev.map((bf, idx) =>
+          idx === i ? { ...bf, status: "error", error: e.message } : bf));
+      }
+    }
+    setBulkSaving(false);
+    setBulkDone(true);
+  }
+
   async function onSave(e) {
     e.preventDefault();
     if (!checkCandidateLimit()) { setLimitDialog(true); return; }
-    // Change 3: validate mandatory fields
     if (!hasName) { setValidationErr("Candidate name is required."); return; }
-    if (!hasCv)   { setValidationErr("CV text is required. Please paste or upload a CV."); return; }
+    if (!hasCv) { setValidationErr("CV text is required. Please paste or upload a CV."); return; }
     setValidationErr("");
     try {
-      await apiPost(`/api/jobs/${form.jobId}/candidates`, {
-        name:           form.name,
-        email:          form.email,
-        linkedinUrl:    form.linkedinUrl,
-        cvText:         form.cvText,
-        recruiterNotes: form.recruiterNotes,  // Change 2: include notes
+      // Change 3: use unassigned endpoint when no job selected
+      const apiPath = form.jobId
+        ? `/api/jobs/${form.jobId}/candidates`
+        : `/api/candidates`;
+      await apiPost(apiPath, {
+        name: form.name,
+        email: form.email,
+        linkedinUrl: form.linkedinUrl,
+        cvText: form.cvText,
+        recruiterNotes: form.recruiterNotes,
       });
       nav("/candidates");
     } catch (e) {
@@ -249,24 +334,27 @@ export default function AddCandidatePage() {
 
   async function onSubmit(e) {
     e.preventDefault();
+    if (!form.jobId) { setValidationErr("Please assign the candidate to a job before running analysis."); return; }
     if (!checkCandidateLimit()) { setLimitDialog(true); return; }
-    // Change 3: validate mandatory fields
     if (!hasName) { setValidationErr("Candidate name is required."); return; }
-    if (!hasCv)   { setValidationErr("CV text is required. Please paste or upload a CV."); return; }
+    if (!hasCv) { setValidationErr("CV text is required. Please paste or upload a CV."); return; }
     setValidationErr("");
     try {
-      // Step 1: Save candidate and get back the candidateId
-      const candidate = await apiPost(`/api/jobs/${form.jobId}/candidates`, {
-        name:           form.name,
-        email:          form.email,
-        linkedinUrl:    form.linkedinUrl,
-        cvText:         form.cvText,
+      // Change 3: use unassigned endpoint when no job selected
+      const apiPath = form.jobId
+        ? `/api/jobs/${form.jobId}/candidates`
+        : `/api/candidates`;
+      const candidate = await apiPost(apiPath, {
+        name: form.name,
+        email: form.email,
+        linkedinUrl: form.linkedinUrl,
+        cvText: form.cvText,
         recruiterNotes: form.recruiterNotes,
       });
 
       const candidateId = candidate.id;
 
-      // Step 2: Show popup immediately, then trigger analysis in background
+      // Show popup immediately, trigger analysis in background
       setAnalysisDialog(true);
       const loginId = localStorage.getItem("loginId") || "";
       const analyzeUrl = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
@@ -283,7 +371,7 @@ export default function AddCandidatePage() {
 
   const [firstName = "", ...rest] = (form.name ?? "").trim().split(" ");
   const hasName = firstName.length > 0;
-  const hasJob = !!form.jobId;
+  const hasJob = true; // Change 3: "Not Assigned" is always valid
   const hasLinkedin = form.linkedinUrl.trim().length > 0;
   const hasCv = form.cvText.trim().length > 0;
   const wordCount = form.cvText.trim()
@@ -331,28 +419,33 @@ export default function AddCandidatePage() {
             variant="outlined"
             onClick={() => nav("/candidates")}
             sx={{
-              fontSize: 12,
-              fontWeight: 500,
-              borderColor: BORDER,
-              color: TEXT,
-              borderRadius: "6px",
-              textTransform: "none",
+              fontSize: 12, fontWeight: 500, borderColor: BORDER, color: TEXT,
+              borderRadius: "6px", textTransform: "none",
               "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE },
             }}
           >
             Cancel
+          </Button>
+          {/* Change 2: Bulk Upload button */}
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => { setBulkFiles([]); setBulkDone(false); setBulkDialog(true); }}
+            sx={{
+              fontSize: 12, fontWeight: 500, borderColor: "#C4B5FD", color: "#7C3AED",
+              borderRadius: "6px", textTransform: "none",
+              "&:hover": { borderColor: "#7C3AED", bgcolor: "#F5F3FF" },
+            }}
+          >
+            📦 Bulk Upload CVs
           </Button>
           <Button
             size="small"
             variant="contained"
             onClick={onSubmit}
             sx={{
-              fontSize: 12,
-              fontWeight: 500,
-              bgcolor: ACCENT,
-              borderRadius: "6px",
-              textTransform: "none",
-              boxShadow: "none",
+              fontSize: 12, fontWeight: 500, bgcolor: ACCENT, borderRadius: "6px",
+              textTransform: "none", boxShadow: "none",
               "&:hover": { bgcolor: "#1660CC", boxShadow: "none" },
             }}
           >
@@ -428,15 +521,19 @@ export default function AddCandidatePage() {
 
         {/* Change 3: validation error banner */}
         {validationErr && (
-          <Box sx={{ mb: 2, p: "10px 14px", bgcolor: "#FEF2F2",
+          <Box sx={{
+            mb: 2, p: "10px 14px", bgcolor: "#FEF2F2",
             border: "1px solid #FECACA", borderRadius: "8px",
-            display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            display: "flex", alignItems: "center", justifyContent: "space-between"
+          }}>
             <Typography sx={{ fontSize: 12, color: "#DC2626", fontWeight: 500 }}>
               ⚠ {validationErr}
             </Typography>
             <Box onClick={() => setValidationErr("")}
-              sx={{ cursor: "pointer", fontSize: 14, color: "#DC2626", opacity: 0.6,
-                "&:hover": { opacity: 1 }, ml: 2, flexShrink: 0 }}>×</Box>
+              sx={{
+                cursor: "pointer", fontSize: 14, color: "#DC2626", opacity: 0.6,
+                "&:hover": { opacity: 1 }, ml: 2, flexShrink: 0
+              }}>×</Box>
           </Box>
         )}
         <Box sx={{ display: "flex", gap: 1.75, alignItems: "flex-start" }}>
@@ -520,23 +617,21 @@ export default function AddCandidatePage() {
                 <TextField
                   fullWidth
                   select
-                  label="Assign to Job *"
+                  label="Assign to Job"
                   size="small"
                   value={form.jobId}
                   onChange={(e) => setField("jobId", e.target.value)}
                   sx={{ ...fieldSx, mb: 1.5 }}
                 >
-                  {jobs.length > 0 ? (
-                    jobs.map((job) => (
-                      <MenuItem key={job.id} value={job.id} sx={{ fontSize: 13 }}>
-                        {job.title}
-                      </MenuItem>
-                    ))
-                  ) : (
-                    <MenuItem value="job-1" sx={{ fontSize: 13 }}>
-                      Senior Backend Engineer — FinTech Co.
+                  {/* Change 3: Not Assigned default option */}
+                  <MenuItem value="" sx={{ fontSize: 13, color: MUTED }}>
+                    — Not Assigned —
+                  </MenuItem>
+                  {jobs.map((job) => (
+                    <MenuItem key={job.id} value={job.id} sx={{ fontSize: 13 }}>
+                      {job.title}
                     </MenuItem>
-                  )}
+                  ))}
                 </TextField>
 
                 {/* LinkedIn URL */}
@@ -609,8 +704,10 @@ export default function AddCandidatePage() {
                     <Typography sx={{ fontSize: 20 }}>
                       {cvUploading ? "⏳" : cvFile ? "✅" : "📎"}
                     </Typography>
-                    <Typography sx={{ fontSize: 12, fontWeight: 500,
-                      color: cvFile ? SUCCESS : TEXT, textAlign: "center" }}>
+                    <Typography sx={{
+                      fontSize: 12, fontWeight: 500,
+                      color: cvFile ? SUCCESS : TEXT, textAlign: "center"
+                    }}>
                       {cvUploading
                         ? "Extracting text…"
                         : cvFile
@@ -642,14 +739,18 @@ export default function AddCandidatePage() {
                     </Typography>
                   )}
                   {cvFile && (
-                    <Box sx={{ mt: 0.75, display: "flex", alignItems: "center",
-                      justifyContent: "space-between" }}>
+                    <Box sx={{
+                      mt: 0.75, display: "flex", alignItems: "center",
+                      justifyContent: "space-between"
+                    }}>
                       <Typography sx={{ fontSize: 11, color: MUTED }}>
                         Or edit extracted text manually below
                       </Typography>
                       <Box onClick={() => { setCvFile(null); setField("cvText", ""); }}
-                        sx={{ fontSize: 11, color: "#DC2626", cursor: "pointer",
-                          "&:hover": { textDecoration: "underline" } }}>
+                        sx={{
+                          fontSize: 11, color: "#DC2626", cursor: "pointer",
+                          "&:hover": { textDecoration: "underline" }
+                        }}>
                         Remove file
                       </Box>
                     </Box>
@@ -923,8 +1024,10 @@ export default function AddCandidatePage() {
             Cancel
           </Button>
           <Button variant="contained" size="small" onClick={() => setLimitDialog(false)}
-            sx={{ fontSize: 12, bgcolor: "#1D72E8", borderRadius: "6px", textTransform: "none",
-              boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
+            sx={{
+              fontSize: 12, bgcolor: "#1D72E8", borderRadius: "6px", textTransform: "none",
+              boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" }
+            }}>
             Upgrade Plan
           </Button>
         </DialogActions>
@@ -946,10 +1049,124 @@ export default function AddCandidatePage() {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
           <Button variant="contained" size="small" onClick={() => setAnalysisDialog(false)}
-            sx={{ fontSize: 12, bgcolor: "#1D72E8", borderRadius: "6px", textTransform: "none",
-              boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
+            sx={{
+              fontSize: 12, bgcolor: "#1D72E8", borderRadius: "6px", textTransform: "none",
+              boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" }
+            }}>
             OK, Got It
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Change 2: Bulk Upload dialog */}
+      <Dialog open={bulkDialog}
+        onClose={() => { if (!bulkSaving) { setBulkDialog(false); setBulkFiles([]); setBulkDone(false); } }}
+        maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "12px" } }}>
+        <DialogTitle sx={{ fontSize: 14, fontWeight: 600, color: TEXT, pb: 1 }}>
+          📦 Bulk Upload CVs
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: 12, color: MUTED, mb: 2, lineHeight: 1.6 }}>
+            Upload multiple CV files. Name and email will be auto-extracted from each.
+          </Typography>
+
+          {/* Job selector for bulk */}
+          <TextField select fullWidth size="small" label="Assign all to Job"
+            value={bulkJobId} onChange={e => setBulkJobId(e.target.value)}
+            sx={{ ...fieldSx, mb: 2 }}>
+            <MenuItem value="" sx={{ fontSize: 13, color: MUTED }}>— Not Assigned —</MenuItem>
+            {jobs.map(j => (
+              <MenuItem key={j.id} value={j.id} sx={{ fontSize: 13 }}>{j.title}</MenuItem>
+            ))}
+          </TextField>
+
+          {/* File drop zone */}
+          {bulkFiles.length === 0 && (
+            <Box component="label" htmlFor="bulk-file-input"
+              sx={{
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 1,
+                border: `2px dashed ${BORDER}`, borderRadius: "8px", p: 3, cursor: "pointer",
+                bgcolor: SURFACE, "&:hover": { borderColor: ACCENT, bgcolor: "#EBF2FF" }
+              }}>
+              <Typography sx={{ fontSize: 22 }}>📂</Typography>
+              <Typography sx={{ fontSize: 13, fontWeight: 500, color: TEXT }}>
+                Click to select multiple CV files
+              </Typography>
+              <Typography sx={{ fontSize: 11, color: MUTED }}>
+                PDF or Word (.docx) — multiple files supported
+              </Typography>
+              <Box id="bulk-file-input" component="input" type="file" multiple
+                accept=".pdf,.doc,.docx"
+                onChange={e => handleBulkFiles(e.target.files)}
+                sx={{ display: "none" }} />
+            </Box>
+          )}
+
+          {/* File list */}
+          {bulkFiles.length > 0 && (
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {bulkFiles.map((b, i) => (
+                <Box key={i} sx={{
+                  display: "flex", alignItems: "center", gap: 1.5,
+                  p: 1.25, border: `1px solid ${BORDER}`, borderRadius: "8px",
+                  bgcolor: b.status === "saved" ? SUCCESS_BG
+                    : b.status === "error" ? "#FEF2F2"
+                      : SURFACE
+                }}>
+                  <Typography sx={{ fontSize: 18, flexShrink: 0 }}>
+                    {b.status === "extracting" ? "⏳"
+                      : b.status === "ready" ? "✅"
+                        : b.status === "saved" ? "🎉"
+                          : b.status === "error" ? "❌"
+                            : "📄"}
+                  </Typography>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{
+                      fontSize: 12, fontWeight: 600, color: TEXT,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+                    }}>
+                      {b.name || b.file.name}
+                    </Typography>
+                    <Typography sx={{ fontSize: 11, color: MUTED }}>
+                      {b.status === "extracting" ? "Extracting…"
+                        : b.status === "ready" ? (b.email || "No email found")
+                          : b.status === "saved" ? "Added to pipeline ✓"
+                            : b.status === "error" ? b.error
+                              : "Pending"}
+                    </Typography>
+                    {b.status === "extracting" && (
+                      <LinearProgress sx={{ mt: 0.5, borderRadius: "3px", height: 3 }} />
+                    )}
+                  </Box>
+                </Box>
+              ))}
+            </Box>
+          )}
+
+          {bulkDone && (
+            <Alert severity="success" sx={{ mt: 2, borderRadius: "8px" }}>
+              {bulkFiles.filter(b => b.status === "saved").length} candidate(s) added to pipeline successfully.
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button variant="outlined" size="small" disabled={bulkSaving}
+            onClick={() => { setBulkDialog(false); setBulkFiles([]); setBulkDone(false); }}
+            sx={{ fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none" }}>
+            {bulkDone ? "Close" : "Cancel"}
+          </Button>
+          {!bulkDone && bulkFiles.some(b => b.status === "ready") && (
+            <Button variant="contained" size="small"
+              onClick={handleBulkSave} disabled={bulkSaving}
+              sx={{
+                fontSize: 12, bgcolor: ACCENT, borderRadius: "6px", textTransform: "none",
+                boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" }
+              }}>
+              {bulkSaving
+                ? "Saving…"
+                : `Add ${bulkFiles.filter(b => b.status === "ready").length} to Pipeline`}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
     </Box>
