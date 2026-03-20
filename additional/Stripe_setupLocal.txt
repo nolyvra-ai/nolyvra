@@ -1,0 +1,37 @@
+Download latest from:
+https://github.com/stripe/stripe-cli/releases/latest
+
+tar -xvf ~/Downloads/stripe_1.37.8_mac-os_arm64.tar.gz -C ~/Downloads/
+
+sudo mv ~/Downloads/stripe /usr/local/bin
+
+xattr -d com.apple.quarantine /usr/local/bin/stripe
+
+stripe --version
+
+stripe login : Follow the weblogin
+The Stripe CLI is configured for DeepHire sandbox with account id acct_1TCv56HSylYtuqgq
+
+stripe listen --forward-to localhost:8080/api/stripe/webhook
+
+stripe listen \
+  --events invoice.paid,invoice.payment_succeeded,checkout.session.completed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted \
+  --forward-to localhost:8080/api/stripe/webhook
+
+stripe listen \
+  --events invoice.paid,invoice.payment_succeeded,invoice_payment.paid,checkout.session.completed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted \
+  --forward-to localhost:8080/api/stripe/webhook
+
+Test Cards:
+
+Card number:  4242 4242 4242 4242
+Expiry:       12/34  (any future date)
+CVC:          123    (any 3 digits)
+Postcode:     3000   (any value)
+
+Scenario                                        Card Number
+Payment succeeds                            4242 4242 4242 4242
+Card declined                               4000 0000 0000 9995
+Insufficient funds                          4000 0000 0000 9995
+Requires 3D Secure auth                     4000 0025 0000 3155
+Card expired                                4000 0000 0000 0069

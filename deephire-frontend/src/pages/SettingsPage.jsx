@@ -3,7 +3,7 @@ import {
   Box, Paper, Typography, Button, TextField,
   Alert, CircularProgress, LinearProgress
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePlanLimit } from "../hooks/usePlanLimit";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -65,8 +65,15 @@ function PlanBadge({ name }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
   const loginId = localStorage.getItem("loginId") || "";
   const name = localStorage.getItem("name") || "";
+
+  // Show success banner if returning from Stripe checkout
+  const [upgradeSuccess, setUpgradeSuccess] = useState(
+    searchParams.get("upgraded") === "true"
+  );
+
   // Plan usage from shared hook
   const { usage, loading: planLoading } = usePlanLimit();
 
@@ -166,6 +173,31 @@ export default function SettingsPage() {
     nav("/login");
   }
 
+  // ── Manage Subscription (Stripe Portal) ──────────────────────────────────
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  async function handleManageSubscription() {
+    setPortalLoading(true);
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/stripe/portal?` +
+        `loginId=${encodeURIComponent(loginId)}` +
+        `&returnUrl=${encodeURIComponent(window.location.origin + "/settings")}`,
+        { method: "POST" }
+      );
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.error || "Failed to open billing portal.");
+      }
+    } catch (e) {
+      alert("Network error. Please try again.");
+    } finally {
+      setPortalLoading(false);
+    }
+  }
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2, maxWidth: 540 }}>
 
@@ -176,6 +208,17 @@ export default function SettingsPage() {
           Manage your account and preferences
         </Typography>
       </Box>
+
+      {/* ── Stripe upgrade success banner ─────────────────────────────────── */}
+      {upgradeSuccess && (
+        <Alert
+          severity="success"
+          onClose={() => setUpgradeSuccess(false)}
+          sx={{ borderRadius: "10px", fontSize: 13 }}
+        >
+          🎉 Your plan has been upgraded successfully! Your new limits are now active.
+        </Alert>
+      )}
 
       {/* ── Subscription Plan ─────────────────────────────────────────────── */}
       <Paper elevation={0} sx={{
@@ -194,7 +237,22 @@ export default function SettingsPage() {
               Your current plan and usage limits
             </Typography>
           </Box>
-          {!planLoading && usage && <PlanBadge name={usage.planName} />}
+          {!planLoading && usage && (
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <PlanBadge name={usage.planName} />
+              {/* Show portal button for paid plans */}
+              {usage.planName !== "Free" && usage.planName !== "Registered" && (
+                <Button size="small" variant="outlined"
+                  onClick={handleManageSubscription}
+                  disabled={portalLoading}
+                  sx={{ fontSize: 11, borderRadius: "6px", textTransform: "none",
+                    borderColor: BORDER, color: MUTED,
+                    "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
+                  {portalLoading ? "Opening…" : "Manage"}
+                </Button>
+              )}
+            </Box>
+          )}
         </Box>
 
         <Box sx={{ p: 2.25 }}>
@@ -265,7 +323,7 @@ export default function SettingsPage() {
                     </Typography>
                   </Box>
                   <Button size="small" variant="contained"
-                    onClick={() => nav("/pricing")}
+                    onClick={() => nav(`/pricing?loginId=${encodeURIComponent(loginId)}`)}
                     sx={{
                       fontSize: 11, fontWeight: 600, bgcolor: PURPLE, borderRadius: "6px",
                       textTransform: "none", boxShadow: "none", flexShrink: 0,

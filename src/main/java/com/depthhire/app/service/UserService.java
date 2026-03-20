@@ -121,10 +121,10 @@ public class UserService {
     // ─── Admin check ──────────────────────────────────────────────────────────
 
     public boolean isAdmin(String loginId) {
-        var rows = jdbc.query(
-                "select id from login where id = ? and plan_id = 'admin'",
-                (rs, r) -> rs.getString("id"), loginId);
-        return !rows.isEmpty();
+    var rows = jdbc.query(
+            "select id from login where (id = ? or email = ?) and plan_id = 'admin'",
+            (rs, r) -> rs.getString("id"), loginId, loginId);
+    return !rows.isEmpty();
     }
 
     // ─── Get all users for admin panel ────────────────────────────────────────

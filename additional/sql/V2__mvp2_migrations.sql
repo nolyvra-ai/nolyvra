@@ -202,3 +202,5 @@ VALUES
     ('admin',      'Admin',      0, 0, 0)
 ON CONFLICT (id) DO NOTHING;
 
+ALTER TABLE login ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT;
+

@@ -28,5 +28,16 @@ coresignal:
   api-key: ${CORESIGNAL_API_KEY:}    # Set via env var or replace here
   base-url: https://api.coresignal.com/cdapi/v1
 
+stripe:
+  secret-key: sk_test_51TCv56HSylYtuqgqdhNlQ2fnUiQHm70QbDql2oNfAgISYovjDFxT56AXqnfIsfeb31euEW1rWSmM42gyZKpagdVd00i4UO0psT
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_1794d55ed1f866214693d84d0d3f2b76e0ddd5d15306540cb51c10b4949b0654}
+  price-ids:
+    plan-bronze-monthly: ${STRIPE_PRICE_BRONZE_MONTHLY:price_1TCvYaHSylYtuqgqG9CdV9Wg}
+    plan-bronze-yearly:  ${STRIPE_PRICE_BRONZE_YEARLY:price_1TCvYaHSylYtuqgqT4go8y2T}
+    plan-silver-monthly: ${STRIPE_PRICE_SILVER_MONTHLY:price_1TCvbnHSylYtuqgq8myuq6hk}
+    plan-silver-yearly:  ${STRIPE_PRICE_SILVER_YEARLY:price_1TCvbnHSylYtuqgqaD6sggor}
+    plan-gold-monthly:   ${STRIPE_PRICE_GOLD_MONTHLY:price_1TCvdSHSylYtuqgq0e1HNXo7}
+    plan-gold-yearly:    ${STRIPE_PRICE_GOLD_YEARLY:price_1TCvdSHSylYtuqgqnmpEAONC}
+
 
   

@@ -1,9 +1,41 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
 export default function PricingPage() {
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
+  // loginId passed from SettingsPage upgrade button, or from localStorage if logged in
+  const loginId = searchParams.get("loginId") || localStorage.getItem("loginId") || "";
   const [isYearly, setIsYearly] = useState(true);
+  const [subscribing, setSubscribing] = useState(null); // tracks which plan is loading
+
+  async function handleSubscribe(planId) {
+    if (!loginId) { nav("/login"); return; }
+    setSubscribing(planId);
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/stripe/checkout?` +
+        `loginId=${encodeURIComponent(loginId)}` +
+        `&planId=${encodeURIComponent(planId)}` +
+        `&billing=${isYearly ? "yearly" : "monthly"}` +
+        `&successUrl=${encodeURIComponent(window.location.origin + "/settings")}` +
+        `&cancelUrl=${encodeURIComponent(window.location.origin + "/pricing")}`,
+        { method: "POST" }
+      );
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url; // redirect to Stripe hosted checkout
+      } else {
+        alert(data.error || "Failed to start checkout. Please try again.");
+      }
+    } catch (e) {
+      alert("Network error. Please try again.");
+    } finally {
+      setSubscribing(null);
+    }
+  }
 
   const CHECK = (color = "#16A34A") => (
     <div style={{ width:16,height:16,borderRadius:"50%",background:color==="green"?"#F0FDF4":color==="blue"?"#EBF2FF":color==="gold"?"#FEF3C7":"#F5F3FF",border:`1px solid ${color==="green"?"#BBF7D0":color==="blue"?"#BFDBFE":color==="gold"?"#FDE68A":"#C4B5FD"}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
@@ -164,7 +196,7 @@ export default function PricingPage() {
               {featItem("Advanced AI Model",null,true)}
               {featItem("Multi-user Access",null,true)}
             </div>
-            <button className="pricing-btn" style={{ background:"#1D72E8",color:"#fff" }}>Get Started</button>
+            <button className="pricing-btn" onClick={() => handleSubscribe("plan-bronze")} disabled={subscribing === "plan-bronze"} style={{ background:"#1D72E8",color:"#fff",opacity:subscribing==="plan-bronze"?0.7:1 }}>{subscribing === "plan-bronze" ? "Redirecting…" : "Get Started"}</button>
             <div style={{ fontSize:10,color:"#16A34A",fontWeight:600,textAlign:"center",marginTop:8,display:"flex",alignItems:"center",justifyContent:"center",gap:4 }}>✦ First year launch pricing</div>
           </div>
 
@@ -196,7 +228,7 @@ export default function PricingPage() {
               {featItem("5 Team Members","blue")}
               {featItem("Priority Support","blue")}
             </div>
-            <button className="pricing-btn" style={{ background:"#1D72E8",color:"#fff" }}>Get Started</button>
+            <button className="pricing-btn" onClick={() => handleSubscribe("plan-silver")} disabled={subscribing === "plan-silver"} style={{ background:"#1D72E8",color:"#fff",opacity:subscribing==="plan-silver"?0.7:1 }}>{subscribing === "plan-silver" ? "Redirecting…" : "Get Started"}</button>
             <div style={{ fontSize:10,color:"#16A34A",fontWeight:600,textAlign:"center",marginTop:8 }}>✦ First year launch pricing</div>
           </div>
 
@@ -226,7 +258,7 @@ export default function PricingPage() {
               {featItem("15 Team Members","gold")}
               {featItem("Dedicated Support","gold")}
             </div>
-            <button className="pricing-btn" style={{ background:"#1D72E8",color:"#fff" }}>Get Started</button>
+            <button className="pricing-btn" onClick={() => handleSubscribe("plan-gold")} disabled={subscribing === "plan-gold"} style={{ background:"#1D72E8",color:"#fff",opacity:subscribing==="plan-gold"?0.7:1 }}>{subscribing === "plan-gold" ? "Redirecting…" : "Get Started"}</button>
             <div style={{ fontSize:10,color:"#16A34A",fontWeight:600,textAlign:"center",marginTop:8 }}>✦ First year launch pricing</div>
           </div>
 
