@@ -1,5 +1,4 @@
-1. Payment gateway integration
-2. Add a unsubscripe button 
+1. Update the no of candidate, jobs in pricing and DB page 
 7. Upload in render
 8. Integrate with Domain
 
@@ -17,3 +16,13 @@ Rel 2
 6. Video Interview - Rel 2
 4. Improve the PDF generated - Rel 2
 2. In the settings add a choose coworker type - Rel 2
+
+Rel 3
+
+HR Module
+
+Rel 4 
+Candidate Module - Profile creation. 
+Detail CV analysis, Suggested questions,things to learn, 
+Build credibility by building project and showcasing
+Generate DeepHire rating which will be visible to recruiters/company 
