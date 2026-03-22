@@ -134,6 +134,36 @@ export default function CandidateWorkflowPage() {
     finally { setStageLoading(false); }
   }
 
+  async function handleApprove() {
+    setStageLoading(true);
+    try {
+      await apiPatch(`/api/candidates/${candidateId}/stage`, { stage: "Selected" });
+      setWorkflow(p => ({ ...p, stage: "Selected" }));
+      setSelectedStage("Selected");
+    } catch(e) { setError(e.message); }
+    finally { setStageLoading(false); }
+  }
+
+  async function handleReject() {
+    setStageLoading(true);
+    try {
+      await apiPatch(`/api/candidates/${candidateId}/stage`, { stage: "Rejected" });
+      setWorkflow(p => ({ ...p, stage: "Rejected" }));
+      setSelectedStage("Rejected");
+    } catch(e) { setError(e.message); }
+    finally { setStageLoading(false); }
+  }
+
+  async function handleRevert() {
+    setStageLoading(true);
+    try {
+      await apiPatch(`/api/candidates/${candidateId}/stage`, { stage: "Screening" });
+      setWorkflow(p => ({ ...p, stage: "Screening" }));
+      setSelectedStage("Screening");
+    } catch(e) { setError(e.message); }
+    finally { setStageLoading(false); }
+  }
+
   async function handleSaveNotes() {
     setNotesSaving(true);
     try {
@@ -421,13 +451,25 @@ export default function CandidateWorkflowPage() {
               )}
               <Box sx={{height:1,bgcolor:BORDER,my:0.5}} />
               <Button fullWidth variant="contained" size="small"
-                sx={{fontSize:11,bgcolor:SUCCESS,borderRadius:"6px",textTransform:"none",boxShadow:"none",justifyContent:"flex-start","&:hover":{bgcolor:"#15803D",boxShadow:"none"}}}>
-                ✓ Approve
+                onClick={handleApprove}
+                disabled={stageLoading || workflow.stage === "Selected"}
+                sx={{fontSize:11,bgcolor:SUCCESS,borderRadius:"6px",textTransform:"none",boxShadow:"none",justifyContent:"flex-start","&:hover":{bgcolor:"#15803D",boxShadow:"none"},"&.Mui-disabled":{bgcolor:SUCCESS_BG,color:SUCCESS}}}>
+                ✓ {workflow.stage === "Selected" ? "Approved" : "Approve"}
               </Button>
               <Button fullWidth variant="contained" size="small"
-                sx={{fontSize:11,bgcolor:DANGER,borderRadius:"6px",textTransform:"none",boxShadow:"none",justifyContent:"flex-start","&:hover":{bgcolor:"#B91C1C",boxShadow:"none"}}}>
-                ✗ Reject
+                onClick={handleReject}
+                disabled={stageLoading || workflow.stage === "Rejected"}
+                sx={{fontSize:11,bgcolor:DANGER,borderRadius:"6px",textTransform:"none",boxShadow:"none",justifyContent:"flex-start","&:hover":{bgcolor:"#B91C1C",boxShadow:"none"},"&.Mui-disabled":{bgcolor:DANGER_BG,color:DANGER}}}>
+                ✗ {workflow.stage === "Rejected" ? "Rejected" : "Reject"}
               </Button>
+              {(workflow.stage === "Selected" || workflow.stage === "Rejected") && (
+                <Button fullWidth variant="outlined" size="small"
+                  onClick={handleRevert}
+                  disabled={stageLoading}
+                  sx={{fontSize:11,borderRadius:"6px",textTransform:"none",borderColor:WARN,color:WARN,justifyContent:"flex-start","&:hover":{bgcolor:WARN_BG,borderColor:WARN}}}>
+                  ↩ Revert to Screening
+                </Button>
+              )}
             </Box>
           </Card>
 
