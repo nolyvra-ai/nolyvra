@@ -82,10 +82,10 @@ export default function LandingPage() {
         <div style={{ display:"flex",alignItems:"center",gap:10 }}>
        {/*   <div style={{ width:36,height:36,background:"#1D72E8",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#fff" }}>IQ</div> */}
          <img src="/nolyvra_logo.png" alt="nolyvra"
-          style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover" }} />
+          style={{ width: 63, height: 63, borderRadius: 8, objectFit: "cover" }} />
           <div style={{ lineHeight:1 }}>
             <div style={{ color:"#fff",fontSize:17,fontWeight:700,letterSpacing:"-.4px" }}>nolyvra</div>
-            <div style={{ color:"rgba(255,255,255,.3)",fontSize:9,fontWeight:500,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:2 }}>TALENT RUNS DEEP</div>
+            <div style={{ color:"rgba(255,255,255,.3)",fontSize:9,fontWeight:500,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:2 }}>Intelligence. Evolved</div>
           </div>
         </div>
         <div style={{ display:"flex",gap:28 }}>
@@ -232,7 +232,7 @@ export default function LandingPage() {
           style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover" }} />
           <div>
             <div style={{ color:"rgba(255,255,255,.6)",fontSize:14,fontWeight:600 }}>nolyvra</div>
-            <div style={{ fontSize:11,color:"rgba(255,255,255,.2)",fontStyle:"italic" }}>Talent Runs Deep</div>
+            <div style={{ fontSize:11,color:"rgba(255,255,255,.2)",fontStyle:"italic" }}>Intelligence. Evolved</div>
           </div>
         </div>
         <div style={{ fontSize:12,color:"rgba(255,255,255,.25)" }}>© 2026 Golden Wattle Ventures Pvt Ltd · All rights reserved</div>

@@ -93,7 +93,7 @@ export default function PricingPage() {
           style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover" }} />
           <div style={{ lineHeight:1 }}>
             <div style={{ color:"#fff",fontSize:17,fontWeight:700,letterSpacing:"-.4px" }}>nolyvra</div>
-            <div style={{ color:"rgba(255,255,255,.3)",fontSize:9,fontWeight:500,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:2 }}>TALENT RUNS DEEP</div>
+            <div style={{ color:"rgba(255,255,255,.3)",fontSize:9,fontWeight:500,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:2 }}>Intelligence. Evolved</div>
           </div>
         </a>
         <div style={{ display:"flex",gap:28 }}>
@@ -394,7 +394,7 @@ export default function PricingPage() {
           style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover" }} />
           <div>
             <div style={{ color:"rgba(255,255,255,.6)",fontSize:14,fontWeight:600 }}>nolyvra</div>
-            <div style={{ fontSize:11,color:"rgba(255,255,255,.2)",fontStyle:"italic" }}>Talent Runs Deep</div>
+            <div style={{ fontSize:11,color:"rgba(255,255,255,.2)",fontStyle:"italic" }}>Intelligence. Evolved</div>
           </div>
         </div>
         <div style={{ fontSize:12,color:"rgba(255,255,255,.25)" }}>© 2026 Golden Wattle Ventures Pvt Ltd · All rights reserved</div>
