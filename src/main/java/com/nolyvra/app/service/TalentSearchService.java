@@ -43,7 +43,7 @@ public class TalentSearchService {
         this.coreSignalBaseUrl = coreSignalBaseUrl;
     }
 
-    // ─── POST /api/talent-search/query ───────────────────────────────────────
+    // ─── POST /api/talent-search/query  ───────────────────────────────────────
 
     public TalentSearchResponse search(TalentSearchRequest req, String loginId) {
 

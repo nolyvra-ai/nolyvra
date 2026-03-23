@@ -11,7 +11,7 @@ public class OpenAIConfig {
 
     @Bean
     public OpenAIClient openAIClient(
-            @Value("${openai.api-key}") String apiKey
+            @Value("${openai.api-key:}") String apiKey
     ) {
 
         if (apiKey == null || apiKey.isBlank()) {

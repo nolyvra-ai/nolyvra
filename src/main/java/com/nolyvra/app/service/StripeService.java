@@ -24,19 +24,19 @@ public class StripeService {
 
     private final JdbcTemplate jdbc;
 
-    @Value("${stripe.secret-key}")
+    @Value("${stripe.secret-key:}")
     private String secretKey;
 
-    @Value("${stripe.webhook-secret}")
+    @Value("${stripe.webhook-secret:}")
     private String webhookSecret;
 
     // ── Price IDs from application.yml ────────────────────────────────────────
-    @Value("${stripe.price-ids.plan-bronze-monthly}") private String bronzeMonthly;
-    @Value("${stripe.price-ids.plan-bronze-yearly}")  private String bronzeYearly;
-    @Value("${stripe.price-ids.plan-silver-monthly}") private String silverMonthly;
-    @Value("${stripe.price-ids.plan-silver-yearly}")  private String silverYearly;
-    @Value("${stripe.price-ids.plan-gold-monthly}")   private String goldMonthly;
-    @Value("${stripe.price-ids.plan-gold-yearly}")    private String goldYearly;
+    @Value("${stripe.price-ids.plan-bronze-monthly:}") private String bronzeMonthly;
+    @Value("${stripe.price-ids.plan-bronze-yearly:}")  private String bronzeYearly;
+    @Value("${stripe.price-ids.plan-silver-monthly:}") private String silverMonthly;
+    @Value("${stripe.price-ids.plan-silver-yearly:}")  private String silverYearly;
+    @Value("${stripe.price-ids.plan-gold-monthly:}")   private String goldMonthly;
+    @Value("${stripe.price-ids.plan-gold-yearly:}")    private String goldYearly;
 
     public StripeService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
