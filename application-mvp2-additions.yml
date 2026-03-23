@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# DeepHire MVP2 — application.yml additions
+# nolyvra MVP2 — application.yml additions
 # Add these blocks to your existing application.yml
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ coresignal:
 #
 #   @SpringBootApplication
 #   @EnableScheduling               ← ADD THIS
-#   public class DeepHireApplication { ... }
+#   public class nolyvraApplication { ... }
 #
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -39,7 +39,7 @@ coresignal:
 #
 # spring:
 #   datasource:
-#     url: jdbc:postgresql://localhost:5432/deephire
+#     url: jdbc:postgresql://localhost:5432/nolyvra
 #     username: your_db_user
 #     password: your_db_password
 #   mail:                           ← NEW

@@ -11,11 +11,11 @@
     <relativePath/>
   </parent>
 
-  <groupId>com.depthhire</groupId>
+  <groupId>com.nolyvra</groupId>
   <artifactId>app</artifactId>
   <version>0.0.1-SNAPSHOT</version>
   <name>app</name>
-  <description>DepthHire MVP backend</description>
+  <description>nolyvra MVP backend</description>
 
   <properties>
     <java.version>21</java.version>

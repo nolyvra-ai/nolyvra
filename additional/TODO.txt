@@ -25,4 +25,4 @@ Rel 4
 Candidate Module - Profile creation. 
 Detail CV analysis, Suggested questions,things to learn, 
 Build credibility by building project and showcasing
-Generate DeepHire rating which will be visible to recruiters/company 
+Generate nolyvra rating which will be visible to recruiters/company 

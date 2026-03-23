@@ -6,7 +6,7 @@ target/
 
 ### Node ###
 node_modules/
-deephire-frontend/node_modules/
+nolyvra-frontend/node_modules/
 npm-debug.log
 
 ### System ###

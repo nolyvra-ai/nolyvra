@@ -10,7 +10,7 @@ xattr -d com.apple.quarantine /usr/local/bin/stripe
 stripe --version
 
 stripe login : Follow the weblogin
-The Stripe CLI is configured for DeepHire sandbox with account id acct_1TCv56HSylYtuqgq
+The Stripe CLI is configured for nolyvra sandbox with account id acct_1TCv56HSylYtuqgq
 
 stripe listen --forward-to localhost:8080/api/stripe/webhook
 

@@ -1,5 +1,5 @@
 -- ============================================================
--- DeepHire MVP2 — Database Migration
+-- nolyvra MVP2 — Database Migration
 -- Run after V1 (existing tables: login, jobs, candidates, analyses)
 -- ============================================================
 

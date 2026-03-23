@@ -5,9 +5,9 @@ spring:
     serialization:
       write-dates-as-timestamps: false
   datasource:
-    url: jdbc:postgresql://localhost:5432/depthhire
-    username: depthhire
-    password: depthhirepass
+    url: jdbc:postgresql://localhost:5432/nolyvra
+    username: nolyvra
+    password: nolyvrapass
     driver-class-name: org.postgresql.Driver
   mail:
     host: smtp.gmail.com          # Change to smtp.office365.com for Outlook

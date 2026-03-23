@@ -1,14 +1,14 @@
-docker run --name depthhire-postgres \
-  -e POSTGRES_USER=depthhire \
-  -e POSTGRES_PASSWORD=depthhirepass \
-  -e POSTGRES_DB=depthhire \
+docker run --name nolyvra-postgres \
+  -e POSTGRES_USER=nolyvra \
+  -e POSTGRES_PASSWORD=nolyvrapass \
+  -e POSTGRES_DB=nolyvra \
   -p 5432:5432 \
-  -v depthhire_pgdata:/var/lib/postgresql/data \
+  -v nolyvra_pgdata:/var/lib/postgresql/data \
   -d postgres:16
 
 docker ps
 
-docker exec -it depthhire-postgres psql -U depthhire -d depthhire
+docker exec -it nolyvra-postgres psql -U nolyvra -d nolyvra
 
 view table: \d analyses
 
@@ -165,7 +165,7 @@ create table if not exists login (
 
 insert into login (id, name, company, email)
 values
-('id1', 'Sayan B', 'GW Ventures', 'sayan@deephire-ai.com');
+('id1', 'Sayan B', 'GW Ventures', 'sayan@nolyvra-ai.com');
 
 alter table login
 add column if not exists password_hash text;

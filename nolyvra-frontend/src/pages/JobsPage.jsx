@@ -1,0 +1,666 @@
+import {
+  Box, Paper, Typography, Table, TableHead, TableRow,
+  TableCell, TableBody, Button, TextField, InputAdornment,
+  Alert, LinearProgress, Dialog, DialogTitle, DialogContent, DialogActions,
+} from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import SearchIcon from "@mui/icons-material/Search";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+
+async function apiGet(path) {
+  const loginId = localStorage.getItem("loginId") || "";
+  const url = new URL(`${API_BASE}${path}`);
+  url.searchParams.set("loginId", loginId);
+  const res = await fetch(url.toString());
+  if (!res.ok) { const t = await res.text().catch(() => ""); throw new Error(`${res.status} - ${t}`); }
+  return res.json();
+}
+
+async function apiDelete(path) {
+  const loginId = localStorage.getItem("loginId") || "";
+  const url = new URL(`${API_BASE}${path}`);
+  url.searchParams.set("loginId", loginId);
+  const res = await fetch(url.toString(), { method: "DELETE" });
+  if (!res.ok && res.status !== 204) { const t = await res.text().catch(() => ""); throw new Error(`${res.status} - ${t}`); }
+}
+
+// ─── Style tokens ─────────────────────────────────────────────────────────────
+const BORDER = "#E8ECF2", MUTED = "#9AA3B4", TEXT = "#0F1623", ACCENT = "#1D72E8";
+const SUCCESS = "#16A34A", SUCCESS_BG = "#F0FDF4", SUCCESS_BR = "#BBF7D0";
+const WARN = "#D97706", WARN_BG = "#FFFBEB", WARN_BR = "#FDE68A";
+const DANGER = "#DC2626", DANGER_BG = "#FEF2F2", DANGER_BR = "#FECACA";
+const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
+const NEUTRAL_BG = "#F1F3F7", SURFACE = "#FAFBFD", SELECTED_BG = "#EBF2FF";
+
+const thSx = {
+  fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase",
+  letterSpacing: "0.5px", borderBottom: `1px solid ${BORDER}`,
+  bgcolor: SURFACE, py: 1.25, px: 2, whiteSpace: "nowrap",
+};
+
+// ─── Shared UI components ─────────────────────────────────────────────────────
+function Badge({ label, variant = "neutral" }) {
+  const s = {
+    success: { bg: SUCCESS_BG, border: SUCCESS_BR, color: SUCCESS },
+    warning: { bg: WARN_BG, border: WARN_BR, color: WARN },
+    danger: { bg: DANGER_BG, border: DANGER_BR, color: DANGER },
+    accent: { bg: ACCENT_BG, border: ACCENT_BR, color: ACCENT },
+    neutral: { bg: NEUTRAL_BG, border: BORDER, color: MUTED },
+  }[variant] ?? { bg: NEUTRAL_BG, border: BORDER, color: MUTED };
+  return (
+    <Box sx={{
+      display: "inline-flex", alignItems: "center", bgcolor: s.bg,
+      border: `1px solid ${s.border}`, borderRadius: "20px", px: 1.25, py: 0.25,
+      fontSize: 11, fontWeight: 600, color: s.color, whiteSpace: "nowrap"
+    }}>
+      {label}
+    </Box>
+  );
+}
+
+function StatusBadge({ status }) {
+  const map = {
+    Active:      "success",
+    Approved:    "success",
+    Fulfilling:  "warning",
+    Complete:    "neutral",
+    Review:      "warning",
+    Draft:       "warning",
+    Flagged:     "danger",
+    "Not Run":   "accent",
+    Pending:     "neutral",
+    Analysed:    "success",
+  };
+  return <Badge label={status || "Active"} variant={map[status] ?? "neutral"} />;
+}
+
+function ScoreBar({ value }) {
+  if (value == null) return <Typography sx={{ fontSize: 12, color: MUTED }}>—</Typography>;
+  const pct = Math.min(100, Math.max(0, value));
+  const color = pct >= 80 ? SUCCESS : pct >= 60 ? WARN : DANGER;
+  return (
+    <Box>
+      <Typography sx={{ fontSize: 12, fontWeight: 700, color, lineHeight: 1.2 }}>{pct}%</Typography>
+      <Box sx={{ mt: 0.5, width: 72, height: 5, bgcolor: "#F0F2F6", borderRadius: "3px", overflow: "hidden" }}>
+        <Box sx={{ width: `${pct}%`, height: "100%", bgcolor: color, borderRadius: "3px" }} />
+      </Box>
+    </Box>
+  );
+}
+
+function FilterChip({ label, active, onClick }) {
+  return (
+    <Box onClick={onClick} sx={{
+      display: "inline-flex", alignItems: "center", px: 1.5, py: 0.5,
+      borderRadius: "20px", border: `1px solid ${active ? ACCENT : BORDER}`,
+      bgcolor: active ? ACCENT_BG : "#fff", color: active ? ACCENT : MUTED,
+      fontSize: 12, fontWeight: active ? 600 : 400, cursor: "pointer", userSelect: "none",
+      "&:hover": { borderColor: ACCENT, color: ACCENT }, transition: "all .12s",
+    }}>{label}</Box>
+  );
+}
+
+function AvgMatch({ value }) {
+  if (!value) return <Typography sx={{ fontSize: 12, color: MUTED }}>—</Typography>;
+  const color = value >= 80 ? SUCCESS : value >= 60 ? WARN : DANGER;
+  return <Typography sx={{ fontSize: 13, fontWeight: 700, color }}>{value}%</Typography>;
+}
+
+function StageBadge({ stage }) {
+  const cfg = {
+    Screening: { variant: "accent", label: "Screening" },
+    Interview: { variant: "warning", label: "Interview" },
+    Assessment: { variant: "warning", label: "Assessment" },
+    Offer: { variant: "success", label: "Offer" },
+    Selected: { variant: "success", label: "Selected" },
+    Rejected: { variant: "danger", label: "Rejected" },
+  };
+  const c = cfg[stage] ?? { variant: "neutral", label: stage ?? "—" };
+  return <Badge label={c.label} variant={c.variant} />;
+}
+// ─── Candidate sub-table ──────────────────────────────────────────────────────
+function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandidate, onAnalysisStarted }) {
+  const nav = useNavigate();
+
+  if (candidates.length === 0) {
+    return (
+      <Box sx={{ px: 3, py: 3, textAlign: "center" }}>
+        <Typography sx={{ fontSize: 13, color: MUTED }}>No candidates added to this job yet.</Typography>
+      </Box>
+    );
+  }
+
+  return (
+    <Table>
+      <TableHead>
+        <TableRow>
+          <TableCell sx={thSx}>Candidate</TableCell>
+          <TableCell sx={thSx}>Applied For</TableCell>
+          <TableCell sx={thSx}>Stage</TableCell>
+          <TableCell sx={{ ...thSx, textAlign: "center" }}>Consistency Score</TableCell>
+          <TableCell sx={{ ...thSx, textAlign: "center" }}>Capability Match</TableCell>
+          <TableCell sx={thSx}>Risk Flags</TableCell>
+          <TableCell sx={{ ...thSx, textAlign: "center" }}>Status</TableCell>
+          <TableCell sx={{ ...thSx, textAlign: "right" }} />
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {candidates.map((c, idx) => (
+          <TableRow key={c.id}
+            onClick={() => nav(`/candidates/${c.id}/workflow`)}
+            sx={{
+              bgcolor: idx % 2 === 1 ? SURFACE : "#fff", cursor: "pointer",
+              "&:hover": { bgcolor: "#F0F4FF" }, "&:last-child td": { borderBottom: "none" }
+            }}>
+
+            <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT, lineHeight: 1.2 }}>
+                {c.name || "—"}
+              </Typography>
+              {c.email && <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>{c.email}</Typography>}
+            </TableCell>
+            <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, color: TEXT, borderBottom: `1px solid ${BORDER}` }}>
+              {jobTitle}
+            </TableCell>
+            <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
+              <StageBadge stage={c.stage} />
+            </TableCell>
+            <TableCell sx={{ py: 1.5, px: 2, textAlign: "center", borderBottom: `1px solid ${BORDER}` }}>
+              <Box sx={{ display: "inline-block", textAlign: "left" }}><ScoreBar value={c.consistencyScore} /></Box>
+            </TableCell>
+            <TableCell sx={{ py: 1.5, px: 2, textAlign: "center", borderBottom: `1px solid ${BORDER}` }}>
+              <Box sx={{ display: "inline-block", textAlign: "left" }}><ScoreBar value={c.capabilityScore} /></Box>
+            </TableCell>
+            <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
+              {c.risk
+                ? <Badge label={c.risk} variant={c.risk === "High" ? "danger" : c.risk === "Medium" ? "warning" : "accent"} />
+                : <Badge label="—" variant="neutral" />}
+            </TableCell>
+            <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
+              <StatusBadge status={c.status} />
+            </TableCell>
+            <TableCell sx={{ py: 1.5, px: 2, textAlign: "right", borderBottom: `1px solid ${BORDER}` }}
+              onClick={e => e.stopPropagation()}>
+              <Box sx={{ display: "flex", gap: 0.75, justifyContent: "flex-end" }}>
+                {c.status === "Analysed" ? (
+                  <Button size="small" variant="contained"
+                    onClick={() => nav(`/candidates/${c.id}/workflow`)}
+                    sx={{
+                      fontSize: 11, fontWeight: 500, bgcolor: ACCENT, borderRadius: "6px",
+                      textTransform: "none", boxShadow: "none", whiteSpace: "nowrap",
+                      "&:hover": { bgcolor: "#1660CC", boxShadow: "none" }
+                    }}>
+                    Open Profile
+                  </Button>
+                ) : (
+                  <Button size="small" variant="contained"
+                    onClick={() => { onRunAnalysis(c.id); onAnalysisStarted(); }}
+                    sx={{
+                      fontSize: 11, fontWeight: 500, bgcolor: ACCENT, borderRadius: "6px",
+                      textTransform: "none", boxShadow: "none", whiteSpace: "nowrap",
+                      "&:hover": { bgcolor: "#1660CC", boxShadow: "none" }
+                    }}>
+                    Run Analysis
+                  </Button>
+                )}
+                <Button size="small" variant="outlined"
+                  onClick={e => { e.stopPropagation(); onRemoveCandidate(c.id); }}
+                  sx={{
+                    fontSize: 11, fontWeight: 500, borderColor: DANGER_BR, color: DANGER,
+                    borderRadius: "6px", textTransform: "none",
+                    "&:hover": { bgcolor: DANGER_BG, borderColor: DANGER }
+                  }}>
+                  Remove
+                </Button>
+              </Box>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+export default function JobsPage() {
+  const nav = useNavigate();
+
+  const [jobs, setJobs] = useState([]);
+  const [candidatesByJob, setCandidatesByJob] = useState(new Map());
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [selectedJobId, setSelectedJobId] = useState(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [analysisDialog, setAnalysisDialog] = useState(false); // Change 4
+  // ── Removed: editJob, editOpen state — no longer needed ──────────────────
+
+  // ── Data loading ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true); setErr("");
+      try {
+        const jobsResp = await apiGet("/api/jobs");
+        if (cancelled) return;
+        setJobs(jobsResp ?? []);
+
+        const map = new Map();
+        await Promise.all(
+          (jobsResp ?? []).map(async (job) => {
+            try {
+              const candidates = await apiGet(`/api/jobs/${job.id}/candidates`);
+              const enriched = await Promise.all(
+                (candidates ?? []).map(async (c) => {
+                  try {
+                    const analysis = await apiGet(`/api/candidates/${c.id}/analysis`);
+                    return {
+                      ...c, consistencyScore: analysis?.consistencyScore ?? null,
+                      capabilityScore: analysis?.capabilityScore ?? null,
+                      risk: analysis?.riskLevel ?? null, status: "Analysed"
+                    };
+                  } catch {
+                    return {
+                      ...c, consistencyScore: null, capabilityScore: null,
+                      risk: null, status: "Pending"
+                    };
+                  }
+                })
+              );
+              map.set(job.id, enriched);
+            } catch {
+              map.set(job.id, []);
+            }
+          })
+        );
+        if (cancelled) return;
+        setCandidatesByJob(map);
+        if ((jobsResp ?? []).length > 0) setSelectedJobId(jobsResp[0].id);
+      } catch (e) {
+        if (cancelled) return;
+        setErr(e?.message || "Failed to load jobs");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── Derived values ────────────────────────────────────────────────────────
+  const jobsWithDefaults = useMemo(() =>
+    (jobs ?? []).map(j => ({
+      ...j,
+      company: j.company ?? "—", jobType: j.jobType ?? "—",
+      location: j.location ?? "—", status: j.status ?? "Active"
+    })), [jobs]);
+
+  const statusCounts = useMemo(() => ({
+    All:        jobsWithDefaults.length,
+    Active:     jobsWithDefaults.filter(j => j.status === "Active").length,
+    Fulfilling: jobsWithDefaults.filter(j => j.status === "Fulfilling").length,
+    Complete:   jobsWithDefaults.filter(j => j.status === "Complete").length,
+    Draft:      jobsWithDefaults.filter(j => j.status === "Draft").length,
+  }), [jobsWithDefaults]);
+
+  const visibleJobs = useMemo(() =>
+    jobsWithDefaults.filter(j => {
+      const matchSearch = !search ||
+        (j.title ?? "").toLowerCase().includes(search.toLowerCase()) ||
+        (j.company ?? "").toLowerCase().includes(search.toLowerCase());
+      const matchStatus = statusFilter === "All" || j.status === statusFilter;
+      return matchSearch && matchStatus;
+    }), [jobsWithDefaults, search, statusFilter]);
+
+  const selectedJob = jobsWithDefaults.find(j => j.id === selectedJobId);
+  const selectedCandidates = selectedJobId ? (candidatesByJob.get(selectedJobId) ?? []) : [];
+
+  function jobAvg(jobId) {
+    const analysed = (candidatesByJob.get(jobId) ?? []).filter(c => c.capabilityScore != null);
+    if (!analysed.length) return null;
+    return Math.round(analysed.reduce((s, c) => s + c.capabilityScore, 0) / analysed.length);
+  }
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  async function handleRunAnalysis(candidateId) {
+    try {
+      const loginId = localStorage.getItem("loginId") || "";
+      const url = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
+      url.searchParams.set("loginId", loginId);
+      await fetch(url.toString(), { method: "POST" });
+      const analysis = await apiGet(`/api/candidates/${candidateId}/analysis`);
+      setCandidatesByJob(prev => {
+        const next = new Map(prev);
+        for (const [jid, cands] of next.entries()) {
+          next.set(jid, cands.map(c => c.id === candidateId
+            ? {
+              ...c, consistencyScore: analysis?.consistencyScore ?? null,
+              capabilityScore: analysis?.capabilityScore ?? null,
+              risk: analysis?.riskLevel ?? null, status: "Analysed"
+            }
+            : c));
+        }
+        return next;
+      });
+    } catch (e) { console.error("Analysis failed", e); }
+  }
+
+  async function handleRemoveCandidate(candidateId) {
+    if (!window.confirm("Remove this candidate from the pipeline?")) return;
+    try {
+      await apiDelete(`/api/candidates/${candidateId}`);
+      setCandidatesByJob(prev => {
+        const next = new Map(prev);
+        for (const [jid, cands] of next.entries()) {
+          next.set(jid, cands.filter(c => c.id !== candidateId));
+        }
+        return next;
+      });
+    } catch (e) { setErr(e.message); }
+  }
+
+  async function handleRemoveJob(jobId, e) {
+    e.stopPropagation();
+    if (!window.confirm("Delete this job and all its candidates? This cannot be undone.")) return;
+    try {
+      await apiDelete(`/api/jobs/${jobId}`);
+      setJobs(prev => prev.filter(j => j.id !== jobId));
+      if (selectedJobId === jobId) setSelectedJobId(null);
+    } catch (e) { setErr(e.message); }
+  }
+
+  // ── Removed: handleJobSaved — no longer needed ────────────────────────────
+
+  // ─────────────────────────────────────────────────────────────────────────
+  return (
+    <Box sx={{
+      display: "flex", flexDirection: "column", height: "100%",
+      overflow: "hidden", bgcolor: "#F7F8FA"
+    }}>
+
+      {/* Page header */}
+      <Box sx={{
+        bgcolor: "#fff", borderBottom: `1px solid ${BORDER}`,
+        px: 3, py: 1.5, display: "flex", alignItems: "center",
+        justifyContent: "space-between", flexShrink: 0
+      }}>
+        <Box>
+          <Typography sx={{ fontSize: 14, fontWeight: 700, color: TEXT, letterSpacing: "-0.2px" }}>Jobs</Typography>
+          <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
+            All active and draft job vacancies — click a row to view its candidates
+          </Typography>
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <TextField size="small" placeholder="Search jobs…" value={search}
+            onChange={e => setSearch(e.target.value)}
+            InputProps={{
+              startAdornment:
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ fontSize: 15, color: MUTED }} />
+                </InputAdornment>
+            }}
+            sx={{
+              width: 200,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "7px", fontSize: 12, bgcolor: SURFACE,
+                "& fieldset": { borderColor: BORDER },
+                "&:hover fieldset": { borderColor: "#C0C8D8" },
+                "&.Mui-focused fieldset": { borderColor: ACCENT, borderWidth: 1.5 }
+              }
+            }} />
+          <Button size="small" variant="contained"
+            startIcon={<AddIcon sx={{ fontSize: 14 }} />}
+            onClick={() => nav("/jobs/new")}
+            sx={{
+              fontSize: 12, fontWeight: 500, bgcolor: ACCENT,
+              borderRadius: "6px", textTransform: "none", boxShadow: "none",
+              "&:hover": { bgcolor: "#1660CC", boxShadow: "none" }
+            }}>
+            Create Job
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Scrollable content */}
+      <Box sx={{ flex: 1, overflow: "auto", p: 2.5 }}>
+
+        {err && (
+          <Alert severity="error" sx={{ mb: 2, borderRadius: "8px" }} onClose={() => setErr("")}>
+            {err}
+          </Alert>
+        )}
+        {loading && (
+          <Paper elevation={0} sx={{ p: 2.5, mb: 2, border: `1px solid ${BORDER}`, borderRadius: "10px" }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT, mb: 1 }}>Loading jobs…</Typography>
+            <LinearProgress sx={{ borderRadius: "4px" }} />
+          </Paper>
+        )}
+
+        {/* Filter chips */}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.75 }}>
+          <Typography sx={{ fontSize: 12, color: MUTED, fontWeight: 500 }}>Filter:</Typography>
+          {["All", "Active", "Fulfilling", "Complete", "Draft"].map(s => (
+            <FilterChip key={s} label={`${s} (${statusCounts[s] ?? 0})`}
+              active={statusFilter === s} onClick={() => setStatusFilter(s)} />
+          ))}
+          <Typography sx={{ fontSize: 12, color: MUTED, ml: "auto" }}>
+            {visibleJobs.length} job{visibleJobs.length !== 1 ? "s" : ""} found
+          </Typography>
+        </Box>
+
+        {/* Jobs table */}
+        <Paper elevation={0} sx={{
+          border: `1px solid ${BORDER}`, borderRadius: "10px",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.05)", overflow: "hidden", mb: 1.75
+        }}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ ...thSx, width: 28, px: 1.5 }} />
+                <TableCell sx={thSx}>Job Title</TableCell>
+                <TableCell sx={thSx}>Client</TableCell>
+                <TableCell sx={thSx}>Location</TableCell>
+                <TableCell sx={thSx}>Type</TableCell>
+                <TableCell sx={{ ...thSx, textAlign: "center" }}>Candidates</TableCell>
+                <TableCell sx={thSx}>Avg. Match</TableCell>
+                <TableCell sx={thSx}>Status</TableCell>
+                <TableCell sx={thSx}>Created</TableCell>
+                <TableCell sx={{ ...thSx, textAlign: "right" }} />
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {!loading && visibleJobs.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={10} sx={{ textAlign: "center", py: 5, color: MUTED, fontSize: 13 }}>
+                    No jobs found
+                  </TableCell>
+                </TableRow>
+              )}
+              {visibleJobs.map((job, idx) => {
+                const isSelected = job.id === selectedJobId;
+                const candCount = (candidatesByJob.get(job.id) ?? []).length;
+                const avg = jobAvg(job.id);
+                return (
+                  <TableRow key={job.id}
+                    onClick={() => setSelectedJobId(isSelected ? null : job.id)}
+                    sx={{
+                      bgcolor: isSelected ? SELECTED_BG : idx % 2 === 1 ? SURFACE : "#fff",
+                      cursor: "pointer",
+                      "&:hover": { bgcolor: isSelected ? SELECTED_BG : "#F0F4FF" },
+                      "&:last-child td": { borderBottom: "none" },
+                      transition: "background .1s"
+                    }}>
+
+                    <TableCell sx={{ px: 1.5, py: 1.5, borderBottom: `1px solid ${BORDER}` }}>
+                      <Typography sx={{
+                        fontSize: 11, fontWeight: 700,
+                        color: isSelected ? ACCENT : MUTED, userSelect: "none"
+                      }}>
+                        {isSelected ? "▼" : "▶"}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT, lineHeight: 1.2 }}>
+                        {job.title}
+                      </Typography>
+                      {job.seniority && (
+                        <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>{job.seniority}</Typography>
+                      )}
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, color: TEXT, borderBottom: `1px solid ${BORDER}` }}>
+                      {job.company}
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, color: TEXT, borderBottom: `1px solid ${BORDER}` }}>
+                      {job.location}
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
+                      <Badge label={job.jobType} variant="neutral" />
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5, px: 2, textAlign: "center", borderBottom: `1px solid ${BORDER}` }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{candCount}</Typography>
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
+                      <AvgMatch value={avg} />
+                    </TableCell>
+                    <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
+                      <StatusBadge status={job.status} />
+                    </TableCell>
+                    <TableCell sx={{
+                      py: 1.5, px: 2, fontSize: 11, color: MUTED,
+                      borderBottom: `1px solid ${BORDER}`, whiteSpace: "nowrap"
+                    }}>
+                      {job.createdAt
+                        ? new Date(job.createdAt).toLocaleDateString("en-GB",
+                          { day: "numeric", month: "short", year: "numeric" })
+                        : "—"}
+                    </TableCell>
+
+                    <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}`, textAlign: "right" }}
+                      onClick={e => e.stopPropagation()}>
+                      <Box sx={{ display: "flex", gap: 0.75, justifyContent: "flex-end" }}>
+                        <Button size="small" variant="contained"
+                          startIcon={<AddIcon sx={{ fontSize: 12 }} />}
+                          onClick={() => nav("/candidates/new")}
+                          sx={{
+                            fontSize: 11, fontWeight: 500, bgcolor: ACCENT,
+                            borderRadius: "6px", textTransform: "none", boxShadow: "none",
+                            "&:hover": { bgcolor: "#1660CC", boxShadow: "none" }
+                          }}>
+                          Candidate
+                        </Button>
+                        {/* ── Edit now navigates to edit page with job prepopulated ── */}
+                        <Button size="small" variant="outlined"
+                          onClick={e => { e.stopPropagation(); nav(`/jobs/${job.id}/edit`); }}
+                          sx={{
+                            fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
+                            borderRadius: "6px", textTransform: "none",
+                            "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE }
+                          }}>
+                          Edit
+                        </Button>
+                        <Button size="small" variant="outlined"
+                          onClick={e => handleRemoveJob(job.id, e)}
+                          sx={{
+                            fontSize: 11, fontWeight: 500, borderColor: DANGER_BR, color: DANGER,
+                            borderRadius: "6px", textTransform: "none",
+                            "&:hover": { bgcolor: DANGER_BG, borderColor: DANGER }
+                          }}>
+                          Remove
+                        </Button>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </Paper>
+
+        {/* Candidate panel */}
+        {selectedJob && (
+          <Paper elevation={0} sx={{
+            border: `1px solid ${BORDER}`, borderRadius: "10px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.05)", overflow: "hidden", mb: 1.75
+          }}>
+            <Box sx={{
+              px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`, bgcolor: "#F7F9FF",
+              display: "flex", alignItems: "center", justifyContent: "space-between"
+            }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Box sx={{ width: 3, height: 18, bgcolor: ACCENT, borderRadius: "2px", flexShrink: 0 }} />
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
+                  Candidates — {selectedJob.title}
+                </Typography>
+                <Badge label={selectedJob.company} variant="accent" />
+              </Box>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                <Typography sx={{ fontSize: 11, color: MUTED }}>
+                  {selectedCandidates.length} candidate{selectedCandidates.length !== 1 ? "s" : ""}
+                </Typography>
+                <Button size="small" variant="contained"
+                  startIcon={<AddIcon sx={{ fontSize: 12 }} />}
+                  onClick={() => nav("/candidates/new")}
+                  sx={{
+                    fontSize: 11, fontWeight: 500, bgcolor: ACCENT,
+                    borderRadius: "6px", textTransform: "none", boxShadow: "none",
+                    "&:hover": { bgcolor: "#1660CC", boxShadow: "none" }
+                  }}>
+                  Add Candidate
+                </Button>
+              </Box>
+            </Box>
+            <CandidateSubTable
+              candidates={selectedCandidates}
+              jobTitle={selectedJob.title}
+              onRunAnalysis={handleRunAnalysis}
+              onRemoveCandidate={handleRemoveCandidate}
+              onAnalysisStarted={() => setAnalysisDialog(true)}
+            />
+          </Paper>
+        )}
+
+        {/* Footer */}
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
+          {["copyright@ nolyvra", "A product of Golden Wattle Ventures Pvt Ltd",
+            "This AI tool is designed to assist you, not replace professional judgment. Always consult with a qualified expert."]
+            .map(label => (
+              <Box key={label} sx={{
+                display: "inline-flex", alignItems: "center",
+                bgcolor: "#F0F2F6", border: `1px solid ${BORDER}`, borderRadius: "5px",
+                px: 1, py: 0.25, fontSize: 10, fontWeight: 500, color: MUTED
+              }}>
+                {label}
+              </Box>
+            ))}
+        </Box>
+      </Box>
+      {/* ── Removed: EditJobDialog — replaced by /jobs/:jobId/edit route ────── */}
+
+      {/* Change 4: Analysis in progress dialog */}
+      <Dialog open={analysisDialog} onClose={() => setAnalysisDialog(false)} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { borderRadius: "12px" } }}>
+        <DialogTitle sx={{ fontSize: 14, fontWeight: 600, color: TEXT, pb: 1 }}>
+          🔍 Analysis In Progress
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: 13, color: MUTED, lineHeight: 1.6 }}>
+            Your candidate analysis is being generated. This may take a moment.
+          </Typography>
+          <Typography sx={{ fontSize: 13, color: MUTED, mt: 1, lineHeight: 1.6 }}>
+            You can view it once complete from the candidate's profile.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button variant="contained" size="small" onClick={() => setAnalysisDialog(false)}
+            sx={{ fontSize: 12, bgcolor: ACCENT, borderRadius: "6px", textTransform: "none",
+              boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
+            OK, Got It
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
