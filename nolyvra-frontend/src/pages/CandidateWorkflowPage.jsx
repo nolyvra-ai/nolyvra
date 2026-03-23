@@ -520,6 +520,23 @@ export default function CandidateWorkflowPage() {
               </Button>
             </Box>
           </Card>
+
+          {/* CV / Resume Text */}
+          {workflow.cvText && (
+            <Card>
+              <CardHead title="CV / Resume" />
+              <Box sx={{p:1.75}}>
+                <Box sx={{
+                  bgcolor:"#F7F8FA", border:`1px solid ${BORDER}`, borderRadius:"8px",
+                  p:1.5, maxHeight:300, overflowY:"auto",
+                  fontSize:11.5, color:TEXT, lineHeight:1.7,
+                  fontFamily:"monospace", whiteSpace:"pre-wrap", wordBreak:"break-word"
+                }}>
+                  {workflow.cvText}
+                </Box>
+              </Box>
+            </Card>
+          )}
         </Box>
       </Box>
     </Box>

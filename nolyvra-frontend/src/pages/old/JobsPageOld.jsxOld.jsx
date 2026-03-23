@@ -612,7 +612,7 @@ export default function JobsPage() {
 
         {/* Footer */}
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 1 }}>
-          {["copyright@ nolyvra", "A product of Golden Wattle Ventures Pvt Ltd",
+          {["copyright@ nolyvra",
             "This AI tool is designed to assist you, not replace professional judgment. Always consult with a qualified expert."]
             .map(label => (
               <Box key={label} sx={{

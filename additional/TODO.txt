@@ -1,6 +1,7 @@
-1. Update the no of candidate, jobs in pricing and DB page 
-7. Upload in render
-8. Integrate with Domain
+1. Review the no of candidate, jobs in pricing and DB page
+2. From AI talent search when a candidate is selected, his CV is not populated
+3. Upload in render(Done) Only prod integration pending.
+4. Integrate with Domain
 
 
 Recuriter onboarding can happen at this stage.

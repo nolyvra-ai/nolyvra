@@ -21,7 +21,7 @@ spring:
           starttls:
             enable: true
 openai:
-  api-key: ${OPENAI_API_KEY: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}
+  api-key: ${OPENAI_API_KEY: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}
   model: gpt-4o-mini
 
 coresignal:

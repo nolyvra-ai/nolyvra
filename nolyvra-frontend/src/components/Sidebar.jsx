@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Box, Drawer } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -94,6 +95,22 @@ function Section({ label, isNew = false, children }) {
 
 export default function Sidebar() {
   const loginId = localStorage.getItem("name") || "";
+  const loginIdVal = localStorage.getItem("loginId") || "";
+  const [jobCount, setJobCount] = useState(null);
+  const [candidateCount, setCandidateCount] = useState(null);
+
+  useEffect(() => {
+    if (!loginIdVal) return;
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+    fetch(`${API_BASE}/api/jobs?loginId=${encodeURIComponent(loginIdVal)}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setJobCount(Array.isArray(d) ? d.length : null))
+      .catch(() => {});
+    fetch(`${API_BASE}/api/candidates?loginId=${encodeURIComponent(loginIdVal)}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(d => setCandidateCount(Array.isArray(d) ? d.length : null))
+      .catch(() => {});
+  }, [loginIdVal]);
   return (
     <Drawer variant="permanent" sx={{
       width: W, flexShrink: 0,
@@ -127,12 +144,12 @@ export default function Sidebar() {
         </Section>
 
         <Section label="Jobs">
-          <NavItem to="/jobs" icon="📋" label="All Jobs" badge={3} />
+          <NavItem to="/jobs" icon="📋" label="All Jobs" badge={jobCount} />
           <NavItem to="/jobs/new" icon="＋" label="Create Job" />
         </Section>
 
         <Section label="Candidates">
-          <NavItem to="/candidates" icon="👤" label="All Candidates" badge={9} />
+          <NavItem to="/candidates" icon="👤" label="All Candidates" badge={candidateCount} />
           <NavItem to="/candidates/new" icon="＋" label="Add Candidate" />
         </Section>
 

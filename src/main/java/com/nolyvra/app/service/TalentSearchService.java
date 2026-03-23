@@ -34,16 +34,16 @@ public class TalentSearchService {
             @Value("${openai.model:gpt-4o-mini}") String model,
             @Value("${coresignal.api-key:}") String coreSignalApiKey,
             @Value("${coresignal.base-url:https://api.coresignal.com/cdapi/v1}") String coreSignalBaseUrl) {
-        this.jdbc             = jdbc;
-        this.openAI           = openAIClient;
-        this.objectMapper     = objectMapper;
-        this.restTemplate     = new RestTemplate();
-        this.model            = model;
+        this.jdbc = jdbc;
+        this.openAI = openAIClient;
+        this.objectMapper = objectMapper;
+        this.restTemplate = new RestTemplate();
+        this.model = model;
         this.coreSignalApiKey = coreSignalApiKey;
         this.coreSignalBaseUrl = coreSignalBaseUrl;
     }
 
-    // ─── POST /api/talent-search/query  ───────────────────────────────────────
+    // ─── POST /api/talent-search/query ───────────────────────────────────────
 
     public TalentSearchResponse search(TalentSearchRequest req, String loginId) {
 
@@ -67,10 +67,10 @@ public class TalentSearchService {
         all.sort(Comparator.comparingInt(TalentSearchResult::matchScore).reversed());
 
         // Paginate
-        int page     = req.page()     != null ? req.page()     : 0;
+        int page = req.page() != null ? req.page() : 0;
         int pageSize = req.pageSize() != null ? req.pageSize() : 9;
         int from = page * pageSize;
-        int to   = Math.min(from + pageSize, all.size());
+        int to = Math.min(from + pageSize, all.size());
         List<TalentSearchResult> paged = from < all.size() ? all.subList(from, to) : List.of();
 
         return new TalentSearchResponse(
@@ -124,10 +124,11 @@ public class TalentSearchService {
         // Get all candidates for this login with their latest analysis
         return jdbc.query("""
                 select c.id, c.name, c.linkedin_url, c.cv_text, c.job_id,
-                       j.title as job_title, j.company,
+                       coalesce(j.title, 'Not Assigned') as job_title,
+                       coalesce(j.company, '') as company,
                        a.capability_score, a.risk_level
                 from candidates c
-                join jobs j on j.id = c.job_id
+                left join jobs j on j.id = c.job_id
                 left join lateral (
                     select capability_score, risk_level
                     from analyses
@@ -142,7 +143,7 @@ public class TalentSearchService {
                             rs.getObject("capability_score") != null ? rs.getInt("capability_score") : 50);
 
                     List<String> matched = extractMatchedSkills(cvText, filters.skills());
-                    List<String> gaps    = filters.skills().stream()
+                    List<String> gaps = filters.skills().stream()
                             .filter(s -> !matched.contains(s))
                             .collect(Collectors.toList());
 
@@ -186,11 +187,11 @@ public class TalentSearchService {
             List<TalentSearchResult> out = new ArrayList<>();
             if (results.isArray()) {
                 for (JsonNode member : results) {
-                    String name        = member.path("full_name").asText("Unknown");
-                    String title       = member.path("title").asText("");
-                    String company     = member.path("company").asText("");
+                    String name = member.path("full_name").asText("Unknown");
+                    String title = member.path("title").asText("");
+                    String company = member.path("company").asText("");
                     String linkedinUrl = member.path("url").asText("");
-                    int    yearsExp    = member.path("experience_months").asInt(0) / 12;
+                    int yearsExp = member.path("experience_months").asInt(0) / 12;
 
                     // Extract skills from CoreSignal profile
                     List<String> profileSkills = new ArrayList<>();
@@ -227,7 +228,8 @@ public class TalentSearchService {
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private int scoreCandidate(String cvText, SearchFilters filters, int baseScore) {
-        if (cvText == null) return baseScore;
+        if (cvText == null)
+            return baseScore;
         String lower = cvText.toLowerCase();
         long matches = filters.skills().stream()
                 .filter(s -> lower.contains(s.toLowerCase()))
@@ -237,7 +239,8 @@ public class TalentSearchService {
     }
 
     private List<String> extractMatchedSkills(String cvText, List<String> skills) {
-        if (cvText == null || skills == null) return List.of();
+        if (cvText == null || skills == null)
+            return List.of();
         String lower = cvText.toLowerCase();
         return skills.stream()
                 .filter(s -> lower.contains(s.toLowerCase()))
@@ -246,10 +249,14 @@ public class TalentSearchService {
 
     private String buildCoreSignalQuery(SearchFilters filters) {
         List<String> parts = new ArrayList<>();
-        if (filters.skills() != null) parts.addAll(filters.skills());
-        if (filters.industry() != null) parts.add(filters.industry());
-        if (filters.seniority() != null) parts.add(filters.seniority());
-        if (filters.keywords() != null) parts.addAll(filters.keywords());
+        if (filters.skills() != null)
+            parts.addAll(filters.skills());
+        if (filters.industry() != null)
+            parts.add(filters.industry());
+        if (filters.seniority() != null)
+            parts.add(filters.seniority());
+        if (filters.keywords() != null)
+            parts.addAll(filters.keywords());
         return String.join(" ", parts);
     }
 
@@ -260,6 +267,6 @@ public class TalentSearchService {
             String seniority,
             String industry,
             int minYearsExperience,
-            List<String> keywords
-    ) {}
+            List<String> keywords) {
+    }
 }

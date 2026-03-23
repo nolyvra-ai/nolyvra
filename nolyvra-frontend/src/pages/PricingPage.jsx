@@ -397,7 +397,7 @@ export default function PricingPage() {
             <div style={{ fontSize:11,color:"rgba(255,255,255,.2)",fontStyle:"italic" }}>Intelligence. Evolved</div>
           </div>
         </div>
-        <div style={{ fontSize:12,color:"rgba(255,255,255,.25)" }}>© 2026 Golden Wattle Ventures Pvt Ltd · All rights reserved</div>
+        <div style={{ fontSize:12,color:"rgba(255,255,255,.25)" }}>© 2026 nolyvra· All rights reserved</div>
         <div style={{ fontSize:12,color:"rgba(255,255,255,.2)" }}>Prices shown include applicable taxes.</div>
       </footer>
     </div>

@@ -31,7 +31,8 @@ public class CandidateService {
                 rs.getString("email"),
                 rs.getString("linkedin_url"),
                 odt != null ? odt.toInstant() : null,
-                rs.getString("stage"));
+                rs.getString("stage"),
+                rs.getString("cv_text"));
     };
 
     // ─── Create ───────────────────────────────────────────────────────────────
@@ -47,7 +48,7 @@ public class CandidateService {
                 req.name(), req.email(), req.linkedinUrl(), req.cvText());
 
         return new CandidateResponse(id, jobId, req.name(), req.email(),
-                req.linkedinUrl(), Instant.now(), "Screening");
+                req.linkedinUrl(), Instant.now(), "Screening", req.cvText());
     }
 
     // Create candidate without job assignment (job_id = null — "Not Assigned")
@@ -62,14 +63,14 @@ public class CandidateService {
                 req.name(), req.email(), req.linkedinUrl(), req.cvText());
 
         return new CandidateResponse(id, null, req.name(), req.email(),
-                req.linkedinUrl(), Instant.now(), "Screening");
+                req.linkedinUrl(), Instant.now(), "Screening", req.cvText());
     }
 
     // ─── Read ─────────────────────────────────────────────────────────────────
 
     public Optional<CandidateResponse> getCandidate(String candidateId, String loginId) {
         return jdbc.query("""
-                select id, job_id, name, email, linkedin_url, created_at, stage
+                select id, job_id, name, email, linkedin_url, created_at, stage, cv_text
                 from candidates
                 where id = ?
                   and login_id = ?
@@ -79,7 +80,7 @@ public class CandidateService {
 
     public List<CandidateResponse> getCandidatesByJob(String jobId, String loginId) {
         return jdbc.query("""
-                select id, job_id, name, email, linkedin_url, created_at, stage
+                select id, job_id, name, email, linkedin_url, created_at, stage, cv_text
                 from candidates
                 where job_id = ?
                   and login_id = ?
@@ -90,7 +91,7 @@ public class CandidateService {
 
     public List<CandidateResponse> getAllCandidates(String loginId) {
         return jdbc.query("""
-                select id, job_id, name, email, linkedin_url, created_at, stage
+                select id, job_id, name, email, linkedin_url, created_at, stage, cv_text
                 from candidates
                 where login_id = ?
                   and is_active = true

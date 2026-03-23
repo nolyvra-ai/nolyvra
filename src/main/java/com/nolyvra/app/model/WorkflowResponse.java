@@ -17,7 +17,8 @@ public record WorkflowResponse(
     Integer capabilityScore,
     String riskLevel,
     Instant createdAt,
-    List<ActivityEvent> activityTimeline
+    List<ActivityEvent> activityTimeline,
+    String cvText
 ) {
     public record ActivityEvent(
         Long id,

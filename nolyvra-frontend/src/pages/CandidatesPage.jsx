@@ -601,24 +601,45 @@ export default function CandidatesPage() {
                       sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}`, textAlign: "right" }}
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <Button
-                        size="small"
-                        variant="contained"
-                        className="row-action"
-                        onClick={() => c.status === "Analysed" ? nav(`/analysis/${c.id}`) : handleRunAnalysis(c.id)}
-                        sx={{
-                          fontSize: 11,
-                          fontWeight: 500,
-                          bgcolor: ACCENT,
-                          borderRadius: "6px",
-                          textTransform: "none",
-                          boxShadow: "none",
-                          whiteSpace: "nowrap",
-                          "&:hover": { bgcolor: "#1660CC", boxShadow: "none" },
-                        }}
-                      >
-                        {c.status === "Analysed" ? "View Results" : "Run Analysis"}
-                      </Button>
+                      <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          className="row-action"
+                          onClick={() => nav(`/candidates/${c.id}/workflow`)}
+                          sx={{
+                            fontSize: 11,
+                            fontWeight: 500,
+                            borderColor: BORDER,
+                            color: TEXT,
+                            borderRadius: "6px",
+                            textTransform: "none",
+                            boxShadow: "none",
+                            whiteSpace: "nowrap",
+                            "&:hover": { borderColor: ACCENT, color: ACCENT, boxShadow: "none" },
+                          }}
+                        >
+                          Open Workflow
+                        </Button>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          className="row-action"
+                          onClick={() => c.status === "Analysed" ? nav(`/analysis/${c.id}`) : handleRunAnalysis(c.id)}
+                          sx={{
+                            fontSize: 11,
+                            fontWeight: 500,
+                            bgcolor: ACCENT,
+                            borderRadius: "6px",
+                            textTransform: "none",
+                            boxShadow: "none",
+                            whiteSpace: "nowrap",
+                            "&:hover": { bgcolor: "#1660CC", boxShadow: "none" },
+                          }}
+                        >
+                          {c.status === "Analysed" ? "View Results" : "Run Analysis"}
+                        </Button>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))

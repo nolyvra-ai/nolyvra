@@ -27,7 +27,7 @@ public class WorkflowService {
 
         var rows = jdbc.query("""
                 select c.id, c.name, c.email, c.linkedin_url, c.job_id, c.stage,
-                       c.recruiter_notes, c.created_at,
+                       c.recruiter_notes, c.created_at, c.cv_text,
                        j.title as job_title, j.company,
                        a.consistency_score, a.capability_score, a.risk_level
                 from candidates c
@@ -59,6 +59,7 @@ public class WorkflowService {
                     m.put("capabilityScore", rs.getObject("capability_score"));
                     m.put("riskLevel", rs.getString("risk_level") != null ? rs.getString("risk_level") : "Low");
                     m.put("createdAt", odt != null ? odt.toInstant() : Instant.now());
+                    m.put("cvText", rs.getString("cv_text") != null ? rs.getString("cv_text") : "");
                     return m;
                 }, candidateId, loginId);
 
@@ -83,7 +84,8 @@ public class WorkflowService {
                 row.get("capabilityScore") != null ? ((Number) row.get("capabilityScore")).intValue() : null,
                 (String) row.get("riskLevel"),
                 (Instant) row.get("createdAt"),
-                timeline);
+                timeline,
+                (String) row.get("cvText"));
     }
 
     // ─── Activity timeline ────────────────────────────────────────────────────

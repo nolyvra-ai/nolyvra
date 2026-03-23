@@ -2,7 +2,6 @@ package com.nolyvra.app.model;
 
 import java.time.Instant;
 
-
 public record CandidateResponse(
     String id,
     String jobId,
@@ -10,5 +9,6 @@ public record CandidateResponse(
     String email,
     String linkedinUrl,
     Instant createdAt,
-    String stage
+    String stage,
+    String cvText
 ) {}
