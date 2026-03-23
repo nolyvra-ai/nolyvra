@@ -39,6 +39,3 @@ stripe:
     plan-silver-yearly:  ${STRIPE_PRICE_SILVER_YEARLY:price_1TDxifFnY4rJ5ynhCRTbblDl}
     plan-gold-monthly:   ${STRIPE_PRICE_GOLD_MONTHLY:price_1TDxf5FnY4rJ5ynhHE1wcopq}
     plan-gold-yearly:    ${STRIPE_PRICE_GOLD_YEARLY:price_1TDxf5FnY4rJ5ynhTTAPN1b5}
-
-
-  
