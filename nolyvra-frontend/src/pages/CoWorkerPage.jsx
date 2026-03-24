@@ -550,7 +550,7 @@ export default function CoWorkerPage() {
       {/* Annotation strip */}
       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
         {[
-          "copyright@ nolyvra", "A product of Golden Wattle Ventures Pvt Ltd",
+          "copyright@ nolyvra",
           "This AI tool is designed to assist you, not replace professional judgment.",
         ].map(l => (
           <Box key={l} sx={{ display: "inline-flex", alignItems: "center",

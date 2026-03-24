@@ -432,7 +432,7 @@ public class AnalysisService {
 
     public CandidateResponse getJobIdNameForCandidate(String candidateId) {
         return jdbc.query("""
-                select id, job_id, name, email, linkedin_url, created_at, stage, cvText
+                select id, job_id, name, email, linkedin_url, created_at, stage, cv_text
                 from candidates where id = ?
                 """,
                 (rs, r) -> new CandidateResponse(

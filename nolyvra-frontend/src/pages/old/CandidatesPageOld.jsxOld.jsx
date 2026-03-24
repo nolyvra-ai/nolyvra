@@ -12,11 +12,16 @@ import {
   MenuItem,
   InputAdornment,
   Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import AddIcon from "@mui/icons-material/Add";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { usePlanLimit } from "../hooks/usePlanLimit";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -253,6 +258,8 @@ const thSx = {
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function CandidatesPage() {
   const nav = useNavigate();
+  const { checkCandidateLimit, usage } = usePlanLimit();
+  const [limitDialog, setLimitDialog] = useState(false);
   const [jobs, setJobs] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [search, setSearch] = useState("");
@@ -431,7 +438,7 @@ export default function CandidatesPage() {
             variant="contained"
             size="small"
             startIcon={<AddIcon sx={{ fontSize: 14 }} />}
-            onClick={() => nav("/candidates/new")}
+            onClick={() => { if (!checkCandidateLimit()) { setLimitDialog(true); } else { nav("/candidates/new"); } }}
             sx={{
               fontSize: 12,
               fontWeight: 500,
@@ -622,7 +629,6 @@ export default function CandidatesPage() {
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
           {[
             "copyright@ nolyvra",
-            "A product of Golden Wattle Ventures Pvt Ltd",
             "This AI tool is designed to assist you, not replace professional judgment. Always consult with a qualified expert.",
           ].map((label) => (
             <Chip
@@ -642,6 +648,34 @@ export default function CandidatesPage() {
           ))}
         </Box>
       </Box>
+
+      {/* Plan limit dialog */}
+      <Dialog open={limitDialog} onClose={() => setLimitDialog(false)} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { borderRadius: "12px" } }}>
+        <DialogTitle sx={{ fontSize: 14, fontWeight: 600, color: TEXT, pb: 1 }}>
+          Candidate Limit Reached
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: 13, color: MUTED, lineHeight: 1.6 }}>
+            You have used all <strong>{usage?.currentCandidates ?? 0} / {usage?.maxCandidates ?? 0}</strong> candidate
+            slots on your <strong>{usage?.planName ?? "Free"}</strong> plan.
+          </Typography>
+          <Typography sx={{ fontSize: 13, color: MUTED, mt: 1, lineHeight: 1.6 }}>
+            To add more candidates, please upgrade your plan or remove an existing candidate.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button variant="outlined" size="small" onClick={() => setLimitDialog(false)}
+            sx={{ fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button variant="contained" size="small" onClick={() => setLimitDialog(false)}
+            sx={{ fontSize: 12, bgcolor: ACCENT, borderRadius: "6px", textTransform: "none",
+              boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
+            Upgrade Plan
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

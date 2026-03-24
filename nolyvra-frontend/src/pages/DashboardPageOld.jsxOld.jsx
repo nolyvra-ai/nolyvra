@@ -485,7 +485,7 @@ export default function DashboardPage() {
 
       {/* Footer */}
       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-        {["copyright@ nolyvra", "A product of Golden Wattle Ventures Pvt Ltd",
+        {["copyright@ nolyvra",
           "This AI tool is designed to assist you, not replace professional judgment."]
           .map(label => (
             <Box key={label} sx={{ display: "inline-flex", alignItems: "center",

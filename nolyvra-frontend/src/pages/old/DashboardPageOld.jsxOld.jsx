@@ -638,7 +638,6 @@ export default function DashboardPage() {
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           {[
             "copyright@ nolyvra",
-            "A product of Golden Wattle Ventures Pvt Ltd",
             "This AI tool is designed to assist you, not replace professional judgment. Always consult with a qualified expert.",
           ].map((label) => (
             <Box
