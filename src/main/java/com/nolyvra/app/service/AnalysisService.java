@@ -443,7 +443,7 @@ public class AnalysisService {
                                 ? rs.getTimestamp("created_at").toInstant()
                                 : null,
                         rs.getString("stage"),
-                        rs.getString("cvText")), // ← ADD
+                        rs.getString("cv_text")),
                 candidateId).stream().findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Candidate not found: " + candidateId));
     }
