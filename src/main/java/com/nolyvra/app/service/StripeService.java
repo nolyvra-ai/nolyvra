@@ -49,6 +49,10 @@ public class StripeService {
                                         String cancelUrl) throws Exception {
         Stripe.apiKey = secretKey;
 
+        System.out.println("[Stripe] bronzeYearly=" + bronzeYearly);
+        System.out.println("[Stripe] silverYearly=" + silverYearly);
+        System.out.println("planId=" + planId);
+
         String priceId    = resolvePriceId(planId, billing);
         String customerId = getOrCreateCustomer(loginId);
 
