@@ -376,7 +376,15 @@ export default function CandidateWorkflowPage() {
                   <TextField multiline rows={7} fullWidth defaultValue={msgResult.body}
                     sx={{"& .MuiOutlinedInput-root":{borderRadius:"8px",fontSize:12,fontFamily:"monospace"}}} />
                   <Box sx={{display:"flex",gap:1,mt:1.25}}>
-                    <Button variant="contained" size="small" onClick={() => nav("/email")}
+                    <Button variant="contained" size="small" onClick={() => nav("/email", {
+                        state: {
+                          candidateId,
+                          candidateName: workflow.candidateName,
+                          toAddress: workflow.email || "",
+                          subject: msgResult.subject || "",
+                          body: msgResult.body || "",
+                        }
+                      })}
                       sx={{flex:1,fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",
                         boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>
                       ✉ Send Email
