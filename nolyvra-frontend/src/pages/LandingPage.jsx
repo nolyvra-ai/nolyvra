@@ -13,6 +13,31 @@ export default function LandingPage() {
     firstName: "", lastName: "", company: "", email: "", phone: ""
   });
 
+  // ── Phone country selector ────────────────────────────────────────────────
+  const COUNTRIES = [
+    { flag: "🇦🇺", code: "+61", name: "AU" },
+    { flag: "🇬🇧", code: "+44", name: "GB" },
+    { flag: "🇺🇸", code: "+1",  name: "US" },
+    { flag: "🇮🇳", code: "+91", name: "IN" },
+    { flag: "🇳🇿", code: "+64", name: "NZ" },
+    { flag: "🇸🇬", code: "+65", name: "SG" },
+  ];
+  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
+
+  function formatPhoneNumber(raw) {
+    // Strip non-digits
+    const digits = raw.replace(/\D/g, "");
+    // Format as groups of 4-3-3 (Australian style: 04XX XXX XXX)
+    if (digits.length <= 4) return digits;
+    if (digits.length <= 7) return `${digits.slice(0,4)} ${digits.slice(4)}`;
+    return `${digits.slice(0,4)} ${digits.slice(4,7)} ${digits.slice(7,10)}`;
+  }
+
+  function handlePhoneChange(e) {
+    const formatted = formatPhoneNumber(e.target.value);
+    setField("phone", formatted);
+  }
+
   function setField(k, v) { setForm(p => ({ ...p, [k]: v })); }
 
   async function handleRegister() {
@@ -25,7 +50,10 @@ export default function LandingPage() {
       const res = await fetch(`${API_BASE}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          ...form,
+          phone: form.phone ? `${selectedCountry.code} ${form.phone}` : "",
+        }),
       });
       const data = await res.json();
       if (!res.ok) { setFormError(data.error || "Registration failed."); return; }
@@ -80,12 +108,10 @@ export default function LandingPage() {
         padding:"0 48px",height:64,borderBottom:"1px solid rgba(255,255,255,.06)"
       }}>
         <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-       {/*   <div style={{ width:36,height:36,background:"#1D72E8",borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,fontWeight:800,color:"#fff" }}>IQ</div> */}
-         <img src="/nolyvra_logo.png" alt="nolyvra"
-          style={{ width: 63, height: 63, borderRadius: 8, objectFit: "cover" }} />
+          <img src="/nolyvra_logo.png" alt="nolyvra" style={{ width:36, height:36, borderRadius:8, objectFit:"cover" }} />
           <div style={{ lineHeight:1 }}>
             <div style={{ color:"#fff",fontSize:17,fontWeight:700,letterSpacing:"-.4px" }}>nolyvra</div>
-            <div style={{ color:"rgba(255,255,255,.3)",fontSize:9,fontWeight:500,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:2 }}>Intelligence. Evolved</div>
+            <div style={{ color:"rgba(255,255,255,.3)",fontSize:9,fontWeight:500,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:2 }}>TALENT RUNS DEEP</div>
           </div>
         </div>
         <div style={{ display:"flex",gap:28 }}>
@@ -227,16 +253,23 @@ export default function LandingPage() {
       {/* ── FOOTER ── */}
       <footer style={{ background:"#0F1623",padding:"40px 48px",display:"flex",alignItems:"center",justifyContent:"space-between",borderTop:"1px solid rgba(255,255,255,.06)" }}>
         <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-      {/*    <div style={{ width:30,height:30,background:"#1D72E8",borderRadius:6,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"#fff" }}>IQ</div> */}
-         <img src="/nolyvra_logo.png" alt="nolyvra"
-          style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover" }} />
+          <img src="/nolyvra_logo.png" alt="nolyvra" style={{ width:36, height:36, borderRadius:8, objectFit:"cover" }} />
           <div>
             <div style={{ color:"rgba(255,255,255,.6)",fontSize:14,fontWeight:600 }}>nolyvra</div>
             <div style={{ fontSize:11,color:"rgba(255,255,255,.2)",fontStyle:"italic" }}>Intelligence. Evolved</div>
           </div>
         </div>
         <div style={{ fontSize:12,color:"rgba(255,255,255,.25)" }}>© 2026 nolyvra · All rights reserved</div>
-        <div style={{ fontSize:12,color:"rgba(255,255,255,.2)" }}>This AI tool is designed to assist, not replace professional judgment.</div>
+        <div style={{ display:"flex",alignItems:"center",gap:16 }}>
+          <div style={{ fontSize:12,color:"rgba(255,255,255,.2)" }}>This AI tool is designed to assist, not replace professional judgment.</div>
+          <a href="https://www.linkedin.com/company/nolyvra/" target="_blank" rel="noopener noreferrer"
+            style={{ display:"flex",alignItems:"center",justifyContent:"center",width:32,height:32,borderRadius:6,background:"#0A66C2",color:"#fff",textDecoration:"none",flexShrink:0,transition:"opacity .15s" }}
+            onMouseEnter={e=>e.currentTarget.style.opacity=".8"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+            </svg>
+          </a>
+        </div>
       </footer>
 
       {/* ── REGISTER INTEREST MODAL ── */}
@@ -275,7 +308,26 @@ export default function LandingPage() {
                 </div>
                 <div style={{ marginBottom:20 }}>
                   <label style={{ display:"block",fontSize:12,fontWeight:600,color:"#0F1623",marginBottom:5 }}>Phone Number</label>
-                  <input className="form-input" type="tel" placeholder="+44 7000 000000" value={form.phone} onChange={e => setField("phone", e.target.value)} />
+                  <div style={{ display:"flex",gap:8,alignItems:"center" }}>
+                    {/* Country flag + code selector */}
+                    <select
+                      value={selectedCountry.code}
+                      onChange={e => setSelectedCountry(COUNTRIES.find(c => c.code === e.target.value))}
+                      style={{ padding:"10px 8px",border:"1px solid #E2E6ED",borderRadius:8,fontSize:13,fontFamily:"inherit",color:"#0F1623",background:"#F7F8FA",cursor:"pointer",outline:"none",flexShrink:0 }}>
+                      {COUNTRIES.map(c => (
+                        <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
+                      ))}
+                    </select>
+                    <input className="form-input" type="tel"
+                      placeholder="04XX XXX XXX"
+                      value={form.phone}
+                      onChange={handlePhoneChange}
+                      maxLength={12}
+                      style={{ flex:1 }} />
+                  </div>
+                  <div style={{ fontSize:11,color:"#9AA3B4",marginTop:4 }}>
+                    Country code: {selectedCountry.flag} {selectedCountry.code}
+                  </div>
                 </div>
                 <button onClick={handleRegister} disabled={submitting} style={{ width:"100%",padding:12,borderRadius:8,fontSize:14,fontWeight:600,background:"#1D72E8",color:"#fff",border:"none",cursor:"pointer",fontFamily:"inherit",transition:"all .15s" }}>
                   {submitting ? "Submitting…" : "Submit →"}

@@ -1,5 +1,5 @@
 -- ═══════════════════════════════════════════════════════════════════════════
--- DeepHire — Render PostgreSQL Initialization Script
+-- nolyvra — Render PostgreSQL Initialization Script
 -- Run this once on a fresh Render PostgreSQL database
 -- ═══════════════════════════════════════════════════════════════════════════
 

@@ -75,6 +75,10 @@ export default function LoginPage() {
   const [success, setSuccess]     = useState(false);
   const [apiError, setApiError]   = useState("");
 
+  // ── Change 1: popup state ─────────────────────────────────────────────────
+  const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [policyOpen,  setPolicyOpen]  = useState(false);
+
   const passwordRef = useRef(null);
 
   // Focus password field when step advances
@@ -174,6 +178,34 @@ export default function LoginPage() {
     step === 0 ? { title: "Welcome!",              desc: "Enter your email to continue to nolyvra." }  :
     step === 1 ? { title: "Enter your password",   desc: `Signing in as ${email.trim()}`               }  :
                  { title: "Ready to sign in",       desc: "Click below to access your nolyvra workspace." };
+
+  // ── Shared modal styles ────────────────────────────────────────────────────
+  const modalOverlay = {
+    position: "fixed", inset: 0, zIndex: 999,
+    background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
+    display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+  };
+  const modalBox = {
+    background: "#fff", borderRadius: 14, padding: "32px 36px",
+    width: "100%", maxWidth: 440, position: "relative",
+    boxShadow: "0 24px 64px rgba(0,0,0,0.3)",
+  };
+  const closeBtn = {
+    position: "absolute", top: 14, right: 14,
+    width: 30, height: 30, borderRadius: "50%",
+    background: "#F7F8FA", border: "1px solid #E2E6ED",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    cursor: "pointer", fontSize: 15, color: "#9AA3B4", lineHeight: 1,
+  };
+  const modalTitle = { fontSize: 18, fontWeight: 700, color: "#0F1623", marginBottom: 6 };
+  const modalDesc  = { fontSize: 13, color: "#9AA3B4", lineHeight: 1.6, marginBottom: 20 };
+  const bullet     = { width: 6, height: 6, borderRadius: "50%", background: "#1D72E8", marginTop: 6, flexShrink: 0 };
+  const closeModalBtn = {
+    marginTop: 8, width: "100%", padding: "10px 0",
+    borderRadius: 8, background: "#1D72E8", color: "#fff",
+    border: "none", fontSize: 13, fontWeight: 600,
+    cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+  };
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -502,12 +534,18 @@ export default function LoginPage() {
 
             </div>
 
-            {/* Footer */}
+            {/* ── Change 1: Footer with clickable Privacy Policy + Password Policy ── */}
             <div style={{ marginTop: 24, textAlign: "center" }}>
               <span style={{ fontSize: 10, color: "rgba(255,255,255,0.18)" }}>
                 Protected by nolyvra ·{" "}
-                <a href="#" style={{ color: "rgba(255,255,255,0.25)", textDecoration: "none" }}>
+                <a href="#" onClick={e => { e.preventDefault(); setPrivacyOpen(true); }}
+                  style={{ color: "rgba(255,255,255,0.25)", textDecoration: "none", cursor: "pointer" }}>
                   Privacy Policy
+                </a>
+                {" "}·{" "}
+                <a href="#" onClick={e => { e.preventDefault(); setPolicyOpen(true); }}
+                  style={{ color: "rgba(255,255,255,0.25)", textDecoration: "none", cursor: "pointer" }}>
+                  Password Policy
                 </a>
               </span>
             </div>
@@ -515,6 +553,66 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Change 1a: Privacy Policy Modal ── */}
+      {privacyOpen && (
+        <div style={modalOverlay} onClick={e => { if (e.target === e.currentTarget) setPrivacyOpen(false); }}>
+          <div style={modalBox}>
+            <button onClick={() => setPrivacyOpen(false)} style={closeBtn}>✕</button>
+            <div style={{ fontSize: 22, marginBottom: 8 }}>🔐</div>
+            <div style={modalTitle}>Privacy Policy</div>
+            <div style={modalDesc}>
+              nolyvra is committed to protecting your personal information and your right to privacy.
+            </div>
+            {[
+              ["Data collection", "We collect only the information necessary to provide our recruitment intelligence services, including your name, email address and usage data."],
+              ["Data usage", "Your data is used solely to operate and improve the nolyvra platform. We do not sell or share your personal data with third parties for marketing purposes."],
+              ["Data security", "We implement industry-standard security measures including encryption and access controls to protect your information."],
+              ["Data retention", "We retain your data only for as long as necessary to provide our services or as required by law."],
+              ["Your rights", "You have the right to access, correct or delete your personal data at any time by contacting our support team."],
+            ].map(([title, desc]) => (
+              <div key={title} style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "flex-start" }}>
+                <div style={bullet} />
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#0F1623", marginBottom: 2 }}>{title}</div>
+                  <div style={{ fontSize: 12, color: "#9AA3B4", lineHeight: 1.5 }}>{desc}</div>
+                </div>
+              </div>
+            ))}
+            <button onClick={() => setPrivacyOpen(false)} style={closeModalBtn}>Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Change 1b: Password Policy Modal ── */}
+      {policyOpen && (
+        <div style={modalOverlay} onClick={e => { if (e.target === e.currentTarget) setPolicyOpen(false); }}>
+          <div style={modalBox}>
+            <button onClick={() => setPolicyOpen(false)} style={closeBtn}>✕</button>
+            <div style={{ fontSize: 22, marginBottom: 8 }}>🔒</div>
+            <div style={modalTitle}>Password Policy</div>
+            <div style={modalDesc}>
+              To keep your nolyvra account secure, please follow these guidelines when creating or updating your password.
+            </div>
+            {[
+              ["Minimum length", "Your password must be at least 6 characters long."],
+              ["Mix of characters", "We recommend using a combination of uppercase and lowercase letters, numbers and symbols for a stronger password."],
+              ["Avoid common passwords", "Do not use easily guessable passwords such as your name, email address, or common words like 'password123'."],
+              ["Keep it private", "Never share your password with anyone, including nolyvra support staff."],
+              ["Regular updates", "We recommend updating your password periodically to maintain account security."],
+            ].map(([title, desc]) => (
+              <div key={title} style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "flex-start" }}>
+                <div style={bullet} />
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#0F1623", marginBottom: 2 }}>{title}</div>
+                  <div style={{ fontSize: 12, color: "#9AA3B4", lineHeight: 1.5 }}>{desc}</div>
+                </div>
+              </div>
+            ))}
+            <button onClick={() => setPolicyOpen(false)} style={closeModalBtn}>Close</button>
+          </div>
+        </div>
+      )}
     </>
   );
 }

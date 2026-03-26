@@ -118,6 +118,39 @@ export default function SchedulerPage() {
     finally { setSaving(false); }
   }
 
+  async function handleCancel(interviewId) {
+    try {
+      const url = new URL(`${API_BASE}/api/interviews/${interviewId}/cancel`);
+      url.searchParams.set("loginId", loginId);
+      const res = await fetch(url.toString(), { method: "PATCH" });
+      if (!res.ok) throw new Error(await res.text());
+      setScheduled(p => p.map(iv =>
+        iv.id === interviewId ? { ...iv, status: "Cancelled" } : iv
+      ));
+    } catch(e) { setError(e.message); }
+  }
+
+  function handleReschedule(iv) {
+    // Convert ISO scheduledAt back to datetime-local format
+    const dt = iv.scheduledAt
+      ? new Date(iv.scheduledAt).toISOString().slice(0, 16)
+      : "";
+    setForm({
+      candidateId:     iv.candidateId     || "",
+      jobId:           iv.jobId           || "",
+      interviewer:     iv.interviewer     || "",
+      interviewType:   iv.interviewType   || "Technical",
+      scheduledAt:     dt,
+      durationMinutes: iv.durationMinutes || 60,
+      location:        iv.location        || "Google Meet",
+      meetingLink:     iv.meetingLink     || "",
+      notes:           iv.notes           || "",
+    });
+    setConflictWarning(null);
+    // Scroll to top of form
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   return (
     <Box sx={{display:"flex",flexDirection:"column",gap:2}}>
       <Box sx={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -251,6 +284,23 @@ export default function SchedulerPage() {
                     {iv.durationMinutes ? ` · ${iv.durationMinutes} min` : ""}
                   </Typography>
                   {iv.location && <Typography sx={{fontSize:11,color:MUTED,mt:0.25}}>📍 {iv.location}</Typography>}
+                  {/* Cancel and Reschedule buttons — only for Scheduled interviews */}
+                  {iv.status === "Scheduled" && (
+                    <Box sx={{display:"flex",gap:1,mt:1}}>
+                      <Button size="small" variant="outlined"
+                        onClick={() => handleReschedule(iv)}
+                        sx={{fontSize:10,borderColor:BORDER,color:TEXT,borderRadius:"6px",
+                          textTransform:"none","&:hover":{borderColor:ACCENT,color:ACCENT}}}>
+                        🗓 Reschedule
+                      </Button>
+                      <Button size="small" variant="outlined"
+                        onClick={() => handleCancel(iv.id)}
+                        sx={{fontSize:10,borderColor:BORDER,color:MUTED,borderRadius:"6px",
+                          textTransform:"none","&:hover":{borderColor:"#DC2626",color:"#DC2626"}}}>
+                        ✕ Cancel
+                      </Button>
+                    </Box>
+                  )}
                 </Box>
               ))}
             </Box>

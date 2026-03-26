@@ -82,6 +82,7 @@ export default function SettingsPage() {
   const [pwSaving, setPwSaving] = useState(false);
   const [pwError, setPwError] = useState(null);
   const [pwSuccess, setPwSuccess] = useState(false);
+  const [showPw, setShowPw] = useState({ current: false, new: false, confirm: false });
 
   // ── Admin panel state ─────────────────────────────────────────────────────
   const [isAdmin, setIsAdmin] = useState(false);
@@ -368,33 +369,57 @@ export default function SettingsPage() {
             <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT, mb: 0.5 }}>
               Current Password
             </Typography>
-            <TextField fullWidth size="small" type="password"
+            <TextField fullWidth size="small"
+              type={showPw.current ? "text" : "password"}
               value={pwForm.currentPassword}
               onChange={e => updatePw("currentPassword", e.target.value)}
               placeholder="Enter current password"
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }} />
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}
+              InputProps={{ endAdornment: (
+                <Box component="span" onClick={() => setShowPw(p => ({ ...p, current: !p.current }))}
+                  sx={{ cursor: "pointer", fontSize: 16, color: MUTED, userSelect: "none",
+                    "&:hover": { color: TEXT } }}>
+                  {showPw.current ? "🙈" : "👁"}
+                </Box>
+              )}} />
           </Box>
 
           <Box>
             <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT, mb: 0.5 }}>
               New Password
             </Typography>
-            <TextField fullWidth size="small" type="password"
+            <TextField fullWidth size="small"
+              type={showPw.new ? "text" : "password"}
               value={pwForm.newPassword}
               onChange={e => updatePw("newPassword", e.target.value)}
               placeholder="Enter new password"
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }} />
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}
+              InputProps={{ endAdornment: (
+                <Box component="span" onClick={() => setShowPw(p => ({ ...p, new: !p.new }))}
+                  sx={{ cursor: "pointer", fontSize: 16, color: MUTED, userSelect: "none",
+                    "&:hover": { color: TEXT } }}>
+                  {showPw.new ? "🙈" : "👁"}
+                </Box>
+              )}} />
           </Box>
 
           <Box>
             <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT, mb: 0.5 }}>
               Confirm New Password
             </Typography>
-            <TextField fullWidth size="small" type="password"
+            <TextField fullWidth size="small"
+              type={showPw.confirm ? "text" : "password"}
               value={pwForm.confirmPassword}
               onChange={e => updatePw("confirmPassword", e.target.value)}
               placeholder="Re-enter new password"
-              sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }} />
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}
+              InputProps={{ endAdornment: (
+                <Box component="span" onClick={() => setShowPw(p => ({ ...p, confirm: !p.confirm }))}
+                  sx={{ cursor: "pointer", fontSize: 16, color: MUTED, userSelect: "none",
+                    "&:hover": { color: TEXT } }}>
+                  {showPw.confirm ? "🙈" : "👁"}
+                </Box>
+              )}} />
           </Box>
 
           <Button variant="contained" onClick={handleChangePassword} disabled={pwSaving}
