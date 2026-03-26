@@ -8,6 +8,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 
@@ -25,7 +28,11 @@ public class InterviewController {
     public InterviewResponse scheduleInterview(
             @Valid @RequestBody InterviewScheduleRequest req,
             @RequestParam String loginId) {
-        return interviewService.scheduleInterview(req, loginId);
+        try {
+            return interviewService.scheduleInterview(req, loginId);
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        }
     }
 
     @GetMapping
@@ -38,6 +45,29 @@ public class InterviewController {
             @PathVariable String candidateId,
             @RequestParam String loginId) {
         return interviewService.getInterviewsForCandidate(candidateId, loginId);
+    }
+
+    // ── Check for scheduling conflict before submitting the form ─────────────
+    // Returns { conflict: true/false, message: "..." }
+    @GetMapping("/check-conflict")
+    public Map<String, Object> checkConflict(
+            @RequestParam String candidateId,
+            @RequestParam String scheduledAt,
+            @RequestParam(defaultValue = "60") int durationMinutes,
+            @RequestParam String loginId) {
+        try {
+            OffsetDateTime dt = OffsetDateTime.ofInstant(
+                    Instant.parse(scheduledAt), ZoneOffset.UTC);
+            boolean conflict = interviewService.hasConflict(
+                    loginId, dt, durationMinutes, null);
+            return Map.of(
+                    "conflict", conflict,
+                    "message", conflict
+                            ? "This time slot is already booked. Please choose a different time."
+                            : "");
+        } catch (Exception e) {
+            return Map.of("conflict", false, "message", "");
+        }
     }
 
     @PatchMapping("/{interviewId}/cancel")

@@ -22,6 +22,7 @@ public class InterviewService {
         this.workflowService = workflowService;
     }
 
+    // INTERVIEW_MAPPER updated: left join on jobs so unassigned candidates work
     private static final RowMapper<InterviewResponse> INTERVIEW_MAPPER = (rs, rowNum) -> {
         OffsetDateTime scheduledAt = rs.getObject("scheduled_at", OffsetDateTime.class);
         OffsetDateTime createdAt   = rs.getObject("created_at",   OffsetDateTime.class);
@@ -49,6 +50,13 @@ public class InterviewService {
         String id = "int-" + UUID.randomUUID();
 
         OffsetDateTime scheduledAt = OffsetDateTime.ofInstant(req.scheduledAt(), ZoneOffset.UTC);
+        int duration = req.durationMinutes() != null ? req.durationMinutes() : 60;
+
+        // ── Conflict check: block if ANY interview overlaps this time slot ──
+        if (hasConflict(loginId, scheduledAt, duration, null)) {
+            throw new IllegalStateException(
+                "This time slot is already booked. Please choose a different time.");
+        }
 
         jdbc.update("""
                 insert into interviews (
@@ -58,8 +66,7 @@ public class InterviewService {
                 """,
                 id, req.candidateId(), req.jobId(), loginId,
                 req.interviewer(), req.interviewType(),
-                scheduledAt,
-                req.durationMinutes() != null ? req.durationMinutes() : 60,
+                scheduledAt, duration,
                 req.location(), req.meetingLink(), req.notes());
 
         // Record timeline event
@@ -69,18 +76,19 @@ public class InterviewService {
         return getInterview(id, loginId);
     }
 
-    // ─── GET /api/interviews ─────────────────────────────────────────────────
+    // ─── GET /api/interviews ──────────────────────────────────────────────────
 
     public List<InterviewResponse> getScheduledInterviews(String loginId) {
         return jdbc.query("""
                 select i.id, i.candidate_id, c.name as candidate_name,
-                       i.job_id, j.title as job_title, j.company,
+                       i.job_id, coalesce(j.title, 'Not Assigned') as job_title,
+                       coalesce(j.company, '') as company,
                        i.interviewer, i.interview_type, i.scheduled_at,
                        i.duration_minutes, i.location, i.meeting_link,
                        i.notes, i.status, i.created_at
                 from interviews i
                 join candidates c on c.id = i.candidate_id
-                join jobs j on j.id = i.job_id
+                left join jobs j on j.id = i.job_id
                 where i.login_id = ?
                 order by i.scheduled_at asc
                 """, INTERVIEW_MAPPER, loginId);
@@ -91,13 +99,14 @@ public class InterviewService {
     public List<InterviewResponse> getInterviewsForCandidate(String candidateId, String loginId) {
         return jdbc.query("""
                 select i.id, i.candidate_id, c.name as candidate_name,
-                       i.job_id, j.title as job_title, j.company,
+                       i.job_id, coalesce(j.title, 'Not Assigned') as job_title,
+                       coalesce(j.company, '') as company,
                        i.interviewer, i.interview_type, i.scheduled_at,
                        i.duration_minutes, i.location, i.meeting_link,
                        i.notes, i.status, i.created_at
                 from interviews i
                 join candidates c on c.id = i.candidate_id
-                join jobs j on j.id = i.job_id
+                left join jobs j on j.id = i.job_id
                 where i.candidate_id = ? and i.login_id = ?
                 order by i.scheduled_at asc
                 """, INTERVIEW_MAPPER, candidateId, loginId);
@@ -113,18 +122,44 @@ public class InterviewService {
         return rows > 0;
     }
 
+    // ─── Conflict check ───────────────────────────────────────────────────────
+    // Returns true if the candidate already has a Scheduled interview that
+    // overlaps with [scheduledAt, scheduledAt + durationMinutes].
+    // Pass excludeId to ignore a specific interview (useful for rescheduling).
+
+    public boolean hasConflict(String loginId, OffsetDateTime scheduledAt,
+                               int durationMinutes, String excludeId) {
+        // Block if ANY interview for this recruiter overlaps the requested slot
+        // (prevents double-booking any two candidates at the same time)
+        String sql = """
+                select count(*) from interviews
+                where login_id = ?
+                  and status = 'Scheduled'
+                  and (?::text is null or id != ?::text)
+                  and scheduled_at < (?::timestamptz + (? || ' minutes')::interval)
+                  and (scheduled_at + (coalesce(duration_minutes, 60) || ' minutes')::interval) > ?::timestamptz
+                """;
+        Integer count = jdbc.queryForObject(sql, Integer.class,
+                loginId,
+                excludeId, excludeId,
+                scheduledAt, durationMinutes,
+                scheduledAt);
+        return count != null && count > 0;
+    }
+
     // ─── Internal getter ──────────────────────────────────────────────────────
 
     private InterviewResponse getInterview(String id, String loginId) {
         return jdbc.query("""
                 select i.id, i.candidate_id, c.name as candidate_name,
-                       i.job_id, j.title as job_title, j.company,
+                       i.job_id, coalesce(j.title, 'Not Assigned') as job_title,
+                       coalesce(j.company, '') as company,
                        i.interviewer, i.interview_type, i.scheduled_at,
                        i.duration_minutes, i.location, i.meeting_link,
                        i.notes, i.status, i.created_at
                 from interviews i
                 join candidates c on c.id = i.candidate_id
-                join jobs j on j.id = i.job_id
+                left join jobs j on j.id = i.job_id
                 where i.id = ?
                 """, INTERVIEW_MAPPER, id)
                 .stream().findFirst()

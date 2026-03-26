@@ -6,7 +6,7 @@ import java.time.Instant;
 
 public record InterviewScheduleRequest(
     @NotBlank String candidateId,
-    @NotBlank String jobId,
+    String jobId,
     String interviewer,
     String interviewType,       // Technical | HR | Final Round | Casual Chat
     @NotNull Instant scheduledAt,

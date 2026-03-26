@@ -1,13 +1,10 @@
+Rel 1 Pending
+1. Add a blog page
 1. Review the no of candidate, jobs in pricing and DB page
 2. From AI talent search when a candidate is selected, his CV is not populated
 3. Upload in render(Done) Only prod integration pending.
 4. Integrate with Domain
 
-
-Recuriter onboarding can happen at this stage.
------
-2. Implement logging
-3. Create ServiceImpl and DAO. Remove direct service call from controller.
 
 Rel 2
 
@@ -17,6 +14,8 @@ Rel 2
 6. Video Interview - Rel 2
 4. Improve the PDF generated - Rel 2
 2. In the settings add a choose coworker type - Rel 2
+2. Implement logging
+3. Create ServiceImpl and DAO. Remove direct service call from controller.
 
 Rel 3
 

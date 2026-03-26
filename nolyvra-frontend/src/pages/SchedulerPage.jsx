@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Box, Paper, Typography, Button, TextField, MenuItem, Alert, CircularProgress } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
@@ -6,7 +6,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const BORDER="#E8ECF2",MUTED="#9AA3B4",TEXT="#0F1623",ACCENT="#1D72E8";
 const SUCCESS="#16A34A",SUCCESS_BG="#F0FDF4",SUCCESS_BR="#BBF7D0";
 const WARN="#D97706",WARN_BG="#FFFBEB";
-const DANGER_BG="#FEF2F2",DANGER_BR="#FECACA";
+const DANGER="#DC2626",DANGER_BG="#FEF2F2",DANGER_BR="#FECACA";
 const ACCENT_BG="#EBF2FF",ACCENT_BR="#BFDBFE";
 const PURPLE="#7C3AED",PURPLE_BG="#F5F3FF",PURPLE_BR="#C4B5FD";
 const SURFACE="#FAFBFD";
@@ -42,6 +42,10 @@ export default function SchedulerPage() {
   const [error,      setError]      = useState(null);
   const [success,    setSuccess]    = useState(false);
 
+  // ── Conflict check state ───────────────────────────────────────────────────
+  const [conflictWarning, setConflictWarning] = useState(null);
+  const [conflictChecking, setConflictChecking] = useState(false);
+
   const [form, setForm] = useState({
     candidateId:"", jobId:"", interviewer:"", interviewType:"Technical",
     scheduledAt:"", durationMinutes:60, location:"Google Meet", meetingLink:"", notes:"",
@@ -49,7 +53,11 @@ export default function SchedulerPage() {
 
   useEffect(() => {
     Promise.all([apiGet("/api/candidates"), apiGet("/api/interviews")])
-      .then(([c, s]) => { setCandidates(c); setScheduled(s); })
+      .then(([c, s]) => {
+        // Only show candidates that are assigned to a job
+        setCandidates(c.filter(cand => cand.jobId));
+        setScheduled(s);
+      })
       .catch(e => setError(e.message));
   }, [loginId]);
 
@@ -57,13 +65,41 @@ export default function SchedulerPage() {
 
   // Auto-fill jobId when candidate changes
   function handleCandidateChange(candId) {
-    updateForm("candidateId", candId);
     const cand = candidates.find(c => c.id === candId);
-    if (cand) updateForm("jobId", cand.jobId);
+    setForm(p => ({ ...p, candidateId: candId, jobId: cand?.jobId || "" }));
+    // Clear conflict warning when candidate changes
+    setConflictWarning(null);
   }
+
+  // ── Check conflict whenever candidateId, scheduledAt or durationMinutes changes
+  const checkConflict = useCallback(async (candidateId, scheduledAt, durationMinutes) => {
+    if (!candidateId || !scheduledAt) { setConflictWarning(null); return; }
+    setConflictChecking(true);
+    try {
+      const isoTime = new Date(scheduledAt).toISOString();
+      const url = new URL(`${API_BASE}/api/interviews/check-conflict`);
+      url.searchParams.set("loginId", loginId);
+      url.searchParams.set("candidateId", candidateId);
+      url.searchParams.set("scheduledAt", isoTime);
+      url.searchParams.set("durationMinutes", durationMinutes);
+      const res = await fetch(url.toString());
+      const data = await res.json();
+      setConflictWarning(data.conflict ? data.message : null);
+    } catch (e) {
+      setConflictWarning(null);
+    } finally {
+      setConflictChecking(false);
+    }
+  }, [loginId]);
+
+  // Trigger conflict check when relevant fields change
+  useEffect(() => {
+    checkConflict(form.candidateId, form.scheduledAt, form.durationMinutes);
+  }, [form.candidateId, form.scheduledAt, form.durationMinutes, checkConflict]);
 
   async function handleSchedule() {
     if (!form.candidateId || !form.scheduledAt) { setError("Candidate and date/time are required."); return; }
+    if (conflictWarning) { setError(conflictWarning); return; }
     setSaving(true); setError(null); setSuccess(false);
     try {
       const url = new URL(`${API_BASE}/api/interviews/schedule`);
@@ -76,6 +112,7 @@ export default function SchedulerPage() {
       const newInterview = await res.json();
       setScheduled(p => [newInterview, ...p]);
       setSuccess(true);
+      setConflictWarning(null);
       setForm(p => ({ ...p, candidateId:"", scheduledAt:"", meetingLink:"", notes:"" }));
     } catch(e) { setError(e.message); }
     finally { setSaving(false); }
@@ -130,7 +167,26 @@ export default function SchedulerPage() {
                 <Box>
                   <Typography sx={{fontSize:12,fontWeight:600,color:TEXT,mb:0.5}}>Date & Time <Box component="span" sx={{color:"#DC2626"}}>*</Box></Typography>
                   <TextField type="datetime-local" fullWidth size="small" value={form.scheduledAt} onChange={e => updateForm("scheduledAt", e.target.value)}
-                    sx={{"& .MuiOutlinedInput-root":{borderRadius:"8px",fontSize:12}}} />
+                    sx={{"& .MuiOutlinedInput-root":{
+                      borderRadius:"8px", fontSize:12,
+                      // Highlight in red if conflict detected
+                      ...(conflictWarning ? { "& fieldset": { borderColor: DANGER } } : {})
+                    }}} />
+                  {/* ── Conflict warning inline below date field ── */}
+                  {conflictChecking && (
+                    <Box sx={{display:"flex",alignItems:"center",gap:0.5,mt:0.5}}>
+                      <CircularProgress size={10} sx={{color:MUTED}} />
+                      <Typography sx={{fontSize:10,color:MUTED}}>Checking availability…</Typography>
+                    </Box>
+                  )}
+                  {conflictWarning && !conflictChecking && (
+                    <Box sx={{display:"flex",alignItems:"center",gap:0.5,mt:0.5,
+                      bgcolor:DANGER_BG,border:`1px solid ${DANGER_BR}`,borderRadius:"6px",px:1,py:0.5}}>
+                      <Typography sx={{fontSize:10,fontWeight:600,color:DANGER}}>
+                        ⚠ {conflictWarning}
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
                 <Box>
                   <Typography sx={{fontSize:12,fontWeight:600,color:TEXT,mb:0.5}}>Duration (minutes)</Typography>
@@ -161,9 +217,11 @@ export default function SchedulerPage() {
                   placeholder="Any prep notes for the interviewer…"
                   sx={{"& .MuiOutlinedInput-root":{borderRadius:"8px",fontSize:12}}} />
               </Box>
-              <Button variant="contained" onClick={handleSchedule} disabled={saving}
+              <Button variant="contained" onClick={handleSchedule}
+                disabled={saving || !!conflictWarning}
                 sx={{fontSize:12,fontWeight:500,bgcolor:ACCENT,borderRadius:"8px",textTransform:"none",
-                  boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>
+                  boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"},
+                  "&.Mui-disabled":{bgcolor:conflictWarning?"#FEE2E2":undefined}}}>
                 {saving ? <CircularProgress size={14} sx={{color:"#fff"}} /> : "📅 Schedule & Send Invite"}
               </Button>
             </Box>
