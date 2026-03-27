@@ -34,23 +34,28 @@ export default function EmailCentrePage() {
   const location = useLocation();
 
   const [candidates, setCandidates] = useState([]);
+  const [jobs,       setJobs]       = useState([]);
   const [templates,  setTemplates]  = useState([]);
   const [history,    setHistory]    = useState([]);
   const [sending,    setSending]    = useState(false);
   const [error,      setError]      = useState(null);
   const [success,    setSuccess]    = useState(false);
+  const [rawTemplate, setRawTemplate] = useState({ subject: "", body: "" }); // stores unsubstituted template
 
-  const [form, setForm] = useState({ toAddress:"", subject:"", body:"", candidateId:"", templateType:"" });
+  const [form, setForm] = useState({ toAddress:"", subject:"", body:"", candidateId:"", jobId:"", templateType:"" });
 
   useEffect(() => {
-    Promise.all([
+    Promise.allSettled([
       apiGet("/api/candidates"),
+      apiGet("/api/jobs"),
       apiGet("/api/emails/templates"),
       apiGet("/api/emails/history"),
-    ]).then(([c, t, h]) => {
-      setCandidates(c);
-      setTemplates(t);
-      setHistory(h);
+    ]).then(([cr, jr, tr, hr]) => {
+      if (cr.status === "fulfilled") setCandidates(cr.value);
+      if (jr.status === "fulfilled") setJobs(jr.value);
+      if (tr.status === "fulfilled") setTemplates(tr.value);
+      if (hr.status === "fulfilled") setHistory(hr.value);
+      else if (cr.status === "rejected") setError(cr.reason?.message);
       // ── Pre-populate form from navigation state (from CandidateWorkflowPage) ──
       const s = location.state;
       if (s && (s.toAddress || s.subject || s.body)) {
@@ -62,19 +67,65 @@ export default function EmailCentrePage() {
           body:        s.body        || "",
         }));
       }
-    }).catch(e => setError(e.message));
+    });
   }, [loginId]);
 
   function updateForm(k, v) { setForm(p => ({ ...p, [k]: v })); }
 
+  // Replace common placeholders in template text with actual candidate/job values
+  function substitute(text, candName, job) {
+    if (!text) return text;
+    const recruiterName = localStorage.getItem("name") || "Recruiter";
+    const jobTitle = job?.title || "";
+    const company  = job?.company || "";
+    return text
+      // curly brace formats used in templates
+      .replace(/\{name\}/gi,      candName     || "{name}")
+      .replace(/\{role\}/gi,      jobTitle     || "{role}")
+      .replace(/\{company\}/gi,   company      || "{company}")
+      .replace(/\{recruiter\}/gi, recruiterName)
+      // square bracket formats (fallback)
+      .replace(/\[candidateName\]|\[Candidate Name\]|\[Name\]|\[CANDIDATE_NAME\]/gi, candName || "[Candidate Name]")
+      .replace(/\[jobTitle\]|\[Job Title\]|\[Position\]|\[ROLE\]|\[JOB_TITLE\]/gi,  jobTitle || "[Job Title]");
+  }
+
   function applyTemplate(template) {
-    setForm(p => ({ ...p, subject: template.subject, body: template.body, templateType: template.templateType }));
+    setRawTemplate({ subject: template.subject, body: template.body });
+    const cand = candidates.find(c => c.id === form.candidateId);
+    const job  = jobs.find(j => j.id === form.jobId);
+    setForm(p => ({
+      ...p,
+      subject:      substitute(template.subject, cand?.name || "", job),
+      body:         substitute(template.body,    cand?.name || "", job),
+      templateType: template.templateType,
+    }));
   }
 
   function handleCandidateChange(candId) {
-    updateForm("candidateId", candId);
     const cand = candidates.find(c => c.id === candId);
-    if (cand?.email) updateForm("toAddress", cand.email);
+    const job  = jobs.find(j => j.id === form.jobId);
+    setForm(p => ({
+      ...p,
+      candidateId: candId,
+      toAddress:   cand?.email || p.toAddress,
+      ...(rawTemplate.body ? {
+        subject: substitute(rawTemplate.subject, cand?.name || "", job),
+        body:    substitute(rawTemplate.body,    cand?.name || "", job),
+      } : {}),
+    }));
+  }
+
+  function handleJobChange(jobId) {
+    const cand = candidates.find(c => c.id === form.candidateId);
+    const job  = jobs.find(j => j.id === jobId);
+    setForm(p => ({
+      ...p,
+      jobId,
+      ...(rawTemplate.body ? {
+        subject: substitute(rawTemplate.subject, cand?.name || "", job),
+        body:    substitute(rawTemplate.body,    cand?.name || "", job),
+      } : {}),
+    }));
   }
 
   async function handleSend() {
@@ -121,13 +172,21 @@ export default function EmailCentrePage() {
               <Typography sx={{fontSize:10,color:MUTED,fontStyle:"italic"}}>POST /api/emails/send</Typography>
             </Box>
             <Box sx={{p:2.25,display:"flex",flexDirection:"column",gap:1.5}}>
-              <Box sx={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:1.5}}>
+              <Box sx={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:1.5}}>
                 <Box>
                   <Typography sx={{fontSize:12,fontWeight:600,color:TEXT,mb:0.5}}>To (Candidate)</Typography>
                   <TextField select fullWidth size="small" value={form.candidateId} onChange={e => handleCandidateChange(e.target.value)}
                     sx={{"& .MuiOutlinedInput-root":{borderRadius:"8px",fontSize:12}}}>
                     <MenuItem value="" sx={{fontSize:12}}>Select candidate…</MenuItem>
                     {candidates.map(c => <MenuItem key={c.id} value={c.id} sx={{fontSize:12}}>{c.name} {c.email?`(${c.email})`:""}</MenuItem>)}
+                  </TextField>
+                </Box>
+                <Box>
+                  <Typography sx={{fontSize:12,fontWeight:600,color:TEXT,mb:0.5}}>Job</Typography>
+                  <TextField select fullWidth size="small" value={form.jobId} onChange={e => handleJobChange(e.target.value)}
+                    sx={{"& .MuiOutlinedInput-root":{borderRadius:"8px",fontSize:12}}}>
+                    <MenuItem value="" sx={{fontSize:12}}>Select job…</MenuItem>
+                    {jobs.map(j => <MenuItem key={j.id} value={j.id} sx={{fontSize:12}}>{j.title}</MenuItem>)}
                   </TextField>
                 </Box>
                 <Box>

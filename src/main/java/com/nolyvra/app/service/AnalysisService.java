@@ -10,8 +10,10 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -75,7 +77,8 @@ public class AnalysisService {
         String linkedinUrl = loadLinkedinUrlFromDb(candidateId);
 
         try {
-            String systemPrompt = """
+            String passDate = "Today's date is " + LocalDate.now().format(DateTimeFormatter.ofPattern("d MMMM yyyy")) + ". ";
+            String systemPrompt = passDate + """
                     You are an expert technical recruiter and senior software architect.
                     Return EXACTLY ONE JSON object. No markdown. No extra keys.
 

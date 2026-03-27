@@ -86,6 +86,7 @@ public class CoWorkerService {
                 - For EMAIL actions, always mention in your message that you will take the user to the email page.
                 - Keep your message friendly, concise and specific (mention names and counts).
                 - No markdown. No extra keys.
+                - CRITICAL: You MUST respond with ONLY a valid JSON object. Never respond with plain text. Even for greetings or questions, wrap your reply in the JSON structure above with pendingAction type NONE.
                 """
                 .formatted(context);
 
@@ -121,6 +122,13 @@ public class CoWorkerService {
                     .orElse("{\"message\":\"I'm here to help! What would you like me to do?\",\"pendingAction\":{\"type\":\"NONE\",\"description\":\"\",\"params\":{}}}");
 
             String clean = cleanJson(content);
+
+            // Fix 2: If OpenAI returned plain text instead of JSON, wrap it gracefully
+            if (!clean.startsWith("{")) {
+                persistMessage(loginId, "assistant", clean);
+                return new CoWorkerChatResponse(clean, null);
+            }
+
             var root = objectMapper.readTree(clean);
 
             String message = root.path("message").asText("How can I help?");
@@ -380,23 +388,61 @@ public class CoWorkerService {
 
             var candidates = jdbc.query("""
                     select c.id, c.name, c.stage, j.title as job_title,
-                           exists(select 1 from analyses a where a.candidate_id = c.id) as has_analysis
+                           a.consistency_score, a.capability_score,
+                           a.risk_level, a.placement_prob_json
                     from candidates c
                     join jobs j on j.id = c.job_id
+                    left join (
+                        select distinct on (candidate_id)
+                               candidate_id, consistency_score, capability_score,
+                               risk_level, placement_prob_json
+                        from analyses
+                        order by candidate_id, created_at desc
+                    ) a on a.candidate_id = c.id
                     where c.login_id = ? and c.is_active = true
-                    order by c.created_at desc limit 20
+                    order by c.created_at desc limit 30
                     """,
-                    (rs, r) -> "Candidate[id=" + rs.getString("id")
-                            + ",name=" + rs.getString("name")
-                            + ",stage=" + rs.getString("stage")
-                            + ",job=" + rs.getString("job_title")
-                            + ",analysed=" + rs.getBoolean("has_analysis") + "]",
+                    (rs, r) -> {
+                        Object consistencyScore = rs.getObject("consistency_score");
+                        Object capabilityScore  = rs.getObject("capability_score");
+                        String riskLevel        = rs.getString("risk_level");
+                        // Extract placementProbability integer from the JSON column
+                        Integer placementProb   = extractPlacementProbability(rs.getString("placement_prob_json"));
+                        boolean analysed = consistencyScore != null || capabilityScore != null;
+                        String entry = "Candidate[id=" + rs.getString("id")
+                                + ",name=" + rs.getString("name")
+                                + ",stage=" + rs.getString("stage")
+                                + ",job=" + rs.getString("job_title")
+                                + ",analysed=" + analysed;
+                        if (analysed) {
+                            entry += ",consistencyScore=" + consistencyScore
+                                   + ",capabilityScore=" + capabilityScore
+                                   + ",riskLevel=" + riskLevel
+                                   + ",placementProbability=" + (placementProb != null ? placementProb + "%" : "N/A");
+                        }
+                        return entry + "]";
+                    },
                     loginId);
 
             return "JOBS:\n" + String.join("\n", jobs)
                     + "\n\nCANDIDATES:\n" + String.join("\n", candidates);
         } catch (Exception e) {
+            System.err.println("[CoWorker] buildContext() failed: " + e.getMessage());
+            e.printStackTrace();
             return "Context unavailable.";
+        }
+    }
+
+    // ─── Extract placementProbability integer from JSON string ───────────────
+
+    private Integer extractPlacementProbability(String json) {
+        if (json == null || json.isBlank()) return null;
+        try {
+            var node = objectMapper.readTree(json);
+            var prob = node.path("placementProbability");
+            return prob.isMissingNode() ? null : prob.asInt();
+        } catch (Exception e) {
+            return null;
         }
     }
 

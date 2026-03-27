@@ -1,6 +1,8 @@
 Rel 1 Pending
 1. Add a blog page
 1. Review the no of candidate, jobs in pricing and DB page
+2. Add 3 new columns additional tokens, adiitonal candidates and additional jobs in the login profile. 
+Admin will have the option to increase them.
 2. From AI talent search when a candidate is selected, his CV is not populated
 3. Upload in render(Done) Only prod integration pending.
 4. Integrate with Domain
