@@ -25,54 +25,62 @@ export function TalentSearchPage() {
   const nav = useNavigate();
   const loginId = localStorage.getItem("loginId") || "";
   const [query, setQuery] = useState("");
-  const [searchedQuery, setSearchedQuery] = useState(""); // ← Change 1
+  const [searchedQuery, setSearchedQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  // ── Load More state ──────────────────────────────────────────────────────
+  const [page, setPage] = useState(0);
+  const [allResults, setAllResults] = useState([]);
 
   const QUICK = ["Senior Java Engineer", "FinTech · Series B", "5+ years backend", "Product Manager SaaS"];
+
+  function sortResults(results, searchQuery) {
+    const keywords = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
+    const scored = results.map(c => {
+      const haystack = [c.name, c.currentTitle, c.currentCompany, ...(c.matchedSkills ?? [])].join(" ").toLowerCase();
+      return { ...c, _keywordHits: keywords.filter(k => haystack.includes(k)).length };
+    });
+    return scored.sort((a, b) =>
+      b._keywordHits !== a._keywordHits ? b._keywordHits - a._keywordHits : (b.matchScore ?? 0) - (a.matchScore ?? 0));
+  }
+
+  async function fetchResults(searchQuery, offset) {
+    const url = new URL(`${API_BASE}/api/talent-search/query`);
+    url.searchParams.set("loginId", loginId);
+    const res = await fetch(url.toString(), {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: searchQuery, pageSize: 9, offset }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  }
 
   async function handleSearch(q) {
     const searchQuery = q || query;
     if (!searchQuery.trim()) return;
     setLoading(true); setError(null);
-    setSearchedQuery(searchQuery); // ← Change 2
+    setSearchedQuery(searchQuery);
+    setPage(0);
     try {
-      const url = new URL(`${API_BASE}/api/talent-search/query`);
-      url.searchParams.set("loginId", loginId);
-      const res = await fetch(url.toString(), {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: searchQuery, pageSize: 9 }),
-      });
-      if (!res.ok) throw new Error(await res.text());
+      const data = await fetchResults(searchQuery, 0);
+      const sorted = sortResults(data.results ?? [], searchQuery);
+      setAllResults(sorted);
+      setResult({ ...data, results: sorted });
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  }
 
-      // ── Change 3: sort by keyword hits first, then matchScore ─────────────
-      const data = await res.json();
-
-      const keywords = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
-
-      const scored = (data.results ?? []).map(c => {
-        const haystack = [
-          c.name,
-          c.currentTitle,
-          c.currentCompany,
-          ...(c.matchedSkills ?? []),
-        ].join(" ").toLowerCase();
-
-        const keywordHits = keywords.filter(k => haystack.includes(k)).length;
-        return { ...c, _keywordHits: keywordHits };
-      });
-
-      scored.sort((a, b) => {
-        // Primary: keyword hit count descending
-        if (b._keywordHits !== a._keywordHits) return b._keywordHits - a._keywordHits;
-        // Secondary: matchScore descending
-        return (b.matchScore ?? 0) - (a.matchScore ?? 0);
-      });
-
-      setResult({ ...data, results: scored });
-      // ─────────────────────────────────────────────────────────────────────
-
+  async function handleLoadMore() {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    setLoading(true);
+    try {
+      const data = await fetchResults(searchedQuery, nextPage * 9);
+      const newSorted = sortResults(data.results ?? [], searchedQuery);
+      const combined = [...allResults, ...newSorted];
+      setAllResults(combined);
+      setResult(prev => ({ ...prev, results: combined }));
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
@@ -173,7 +181,7 @@ export function TalentSearchPage() {
                             prefill: {
                               name: c.name ?? "",
                               linkedinUrl: c.linkedinUrl ?? "",
-                              cvText: "",           // external — no CV yet
+                              cvText: "",
                             }
                           }
                         });
@@ -194,10 +202,12 @@ export function TalentSearchPage() {
             })}
           </Box>
 
+          {/* ── Load More: wired to handleLoadMore ── */}
           {result.totalFound > result.results.length && (
             <Box sx={{ textAlign: "center" }}>
-              <Button variant="outlined" sx={{ fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "8px", textTransform: "none" }}>
-                Load More Results ({result.totalFound - result.results.length} remaining)
+              <Button variant="outlined" onClick={handleLoadMore} disabled={loading}
+                sx={{ fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "8px", textTransform: "none" }}>
+                {loading ? "Loading…" : `Load More Results (${result.totalFound - result.results.length} remaining)`}
               </Button>
             </Box>
           )}

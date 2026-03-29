@@ -263,3 +263,10 @@ CREATE INDEX IF NOT EXISTS idx_coworker_tasks_status
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Done — all tables, indexes and seed data created
 -- ═══════════════════════════════════════════════════════════════════════════
+
+-- Additional Changes:
+
+alter table login
+    add column if not exists additional_tokens     integer not null default 0,
+    add column if not exists additional_jobs       integer not null default 0,
+    add column if not exists additional_candidates integer not null default 0;

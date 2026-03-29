@@ -181,6 +181,8 @@ export default function CreateJobPage() {
       const data = await res.json();
       setBriefResult(data);
       if (data.generatedJdText) updateForm("jdText", data.generatedJdText);
+      if (data.company)  updateForm("company",  data.company);
+      if (data.location) updateForm("location", data.location);
       setPreviewSkills({
         technical: data.extractedSkills ?? [],
         soft: data.softSkills ?? [],

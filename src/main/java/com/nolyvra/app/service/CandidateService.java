@@ -35,9 +35,33 @@ public class CandidateService {
                 rs.getString("cv_text"));
     };
 
+    // ─── Duplicate check ──────────────────────────────────────────────────────
+
+    public boolean isDuplicate(String jobId, String name, String loginId) {
+        String sql = jobId != null
+            ? """
+              select count(*) from candidates
+              where job_id = ? and login_id = ? and is_active = true
+              and lower(trim(name)) = lower(trim(?))
+              """
+            : """
+              select count(*) from candidates
+              where job_id is null and login_id = ? and is_active = true
+              and lower(trim(name)) = lower(trim(?))
+              """;
+        Integer count = jobId != null
+            ? jdbc.queryForObject(sql, Integer.class, jobId, loginId, name)
+            : jdbc.queryForObject(sql, Integer.class, loginId, name);
+        return count != null && count > 0;
+    }
+
     // ─── Create ───────────────────────────────────────────────────────────────
 
     public CandidateResponse addCandidate(String jobId, CandidateCreateRequest req, String loginId) {
+        if (isDuplicate(jobId, req.name(), loginId)) {
+            throw new IllegalStateException(
+                req.name() + " is already in the pipeline for this job.");
+        }
         String id = "cand-" + UUID.randomUUID();
         jdbc.update("""
                 insert into candidates
@@ -53,6 +77,10 @@ public class CandidateService {
 
     // Create candidate without job assignment (job_id = null — "Not Assigned")
     public CandidateResponse addCandidateUnassigned(CandidateCreateRequest req, String loginId) {
+        if (isDuplicate(null, req.name(), loginId)) {
+            throw new IllegalStateException(
+                req.name() + " is already in the pipeline as an unassigned candidate.");
+        }
         String id = "cand-" + UUID.randomUUID();
         jdbc.update("""
                 insert into candidates

@@ -16,12 +16,17 @@ public class PlanService {
     }
 
     // ─── Get plan + current usage + token info for a user ────────────────────
+    // Change: include additional_jobs, additional_candidates, additional_tokens
+    // from login table and add them to the plan limits before returning.
 
     public PlanUsageResponse getPlanUsage(String loginId) {
         var rows = jdbc.query("""
                 select p.id as plan_id, p.name as plan_name,
                        p.max_jobs, p.max_candidates, p.max_tokens,
-                       l.tokens_remaining, l.renew_date
+                       l.tokens_remaining, l.renew_date,
+                       coalesce(l.additional_jobs, 0)       as additional_jobs,
+                       coalesce(l.additional_candidates, 0) as additional_candidates,
+                       coalesce(l.additional_tokens, 0)     as additional_tokens
                 from login l
                 join plans p on p.id = l.plan_id
                 where l.id = ?
@@ -33,7 +38,10 @@ public class PlanService {
                         rs.getInt("max_candidates"),
                         rs.getInt("max_tokens"),
                         rs.getInt("tokens_remaining"),
-                        rs.getObject("renew_date", LocalDate.class)
+                        rs.getObject("renew_date", LocalDate.class),
+                        rs.getInt("additional_jobs"),
+                        rs.getInt("additional_candidates"),
+                        rs.getInt("additional_tokens")
                 }, loginId);
 
         if (rows.isEmpty()) {
@@ -43,14 +51,21 @@ public class PlanService {
         }
 
         Object[] row = rows.get(0);
+        int planMaxJobs        = (Integer) row[2];
+        int planMaxCandidates  = (Integer) row[3];
+        int planMaxTokens      = (Integer) row[4];
+        int additionalJobs     = (Integer) row[7];
+        int additionalCandidates = (Integer) row[8];
+        int additionalTokens   = (Integer) row[9];
+
         return new PlanUsageResponse(
                 (String)    row[0],
                 (String)    row[1],
-                (Integer)   row[2],
-                (Integer)   row[3],
+                planMaxJobs       + additionalJobs,       // effective max
+                planMaxCandidates + additionalCandidates, // effective max
                 currentJobCount(loginId),
                 currentCandidateCount(loginId),
-                (Integer)   row[4],
+                planMaxTokens     + additionalTokens,     // effective max
                 (Integer)   row[5],
                 (LocalDate) row[6]);
     }

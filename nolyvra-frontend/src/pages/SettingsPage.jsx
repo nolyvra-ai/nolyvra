@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  Box, Paper, Typography, Button, TextField,
+  Box, Paper, Typography, Button, TextField, MenuItem,
   Alert, CircularProgress, LinearProgress
 } from "@mui/material";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -88,6 +88,10 @@ export default function SettingsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminUsers, setAdminUsers] = useState([]);
   const [onboarding, setOnboarding] = useState(null);
+  const [selectedAdminUser, setSelectedAdminUser] = useState("");
+  const [additionalLimits, setAdditionalLimits] = useState({ tokens: "", jobs: "", candidates: "" });
+  const [limitsUpdating, setLimitsUpdating] = useState(false);
+  const [limitsSuccess, setLimitsSuccess] = useState(false);
 
   useEffect(() => {
     if (!loginId) return;
@@ -111,6 +115,39 @@ export default function SettingsPage() {
       console.error("Onboard failed", e);
     } finally {
       setOnboarding(null);
+    }
+  }
+
+  function handleAdminUserSelect(userId) {
+    setSelectedAdminUser(userId);
+    setLimitsSuccess(false);
+    const u = adminUsers.find(u => u.id === userId);
+    setAdditionalLimits({
+      tokens:     u?.additionalTokens     ?? "",
+      jobs:       u?.additionalJobs       ?? "",
+      candidates: u?.additionalCandidates ?? "",
+    });
+  }
+
+  async function handleUpdateLimits() {
+    if (!selectedAdminUser) return;
+    setLimitsUpdating(true); setLimitsSuccess(false);
+    try {
+      await fetch(`${API_BASE}/api/auth/admin/update-limits?loginId=${encodeURIComponent(loginId)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          targetLoginId:       selectedAdminUser,
+          additionalTokens:     Number(additionalLimits.tokens)     || 0,
+          additionalJobs:       Number(additionalLimits.jobs)       || 0,
+          additionalCandidates: Number(additionalLimits.candidates) || 0,
+        }),
+      });
+      setLimitsSuccess(true);
+    } catch (e) {
+      console.error("Update limits failed", e);
+    } finally {
+      setLimitsUpdating(false);
     }
   }
 
@@ -308,7 +345,7 @@ export default function SettingsPage() {
               </Box>
 
               {/* Upgrade nudge for Free plan */}
-              {usage.planName === "Free" && (
+              {usage.planName !== "Registered" && (
                 <Box sx={{
                   display: "flex", gap: 1.25, alignItems: "center",
                   bgcolor: PURPLE_BG, border: `1px solid ${PURPLE_BR}`,
@@ -317,10 +354,12 @@ export default function SettingsPage() {
                   <Typography sx={{ fontSize: 13 }}>✦</Typography>
                   <Box sx={{ flex: 1 }}>
                     <Typography sx={{ fontSize: 12, fontWeight: 600, color: PURPLE }}>
-                      Upgrade to Silver or Gold
+                      {usage.planName === "Free" ? "Upgrade to Silver or Gold" : "View All Plans"}
                     </Typography>
                     <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
-                      Silver: 20 jobs · 50 candidates &nbsp;|&nbsp; Gold: 100 jobs · 500 candidates
+                      {usage.planName === "Free"
+                        ? "Silver: 20 jobs · 50 candidates \u00a0|\u00a0 Gold: 100 jobs · 500 candidates"
+                        : "Upgrade your plan or add additional capacity"}
                     </Typography>
                   </Box>
                   <Button size="small" variant="contained"
@@ -330,7 +369,7 @@ export default function SettingsPage() {
                       textTransform: "none", boxShadow: "none", flexShrink: 0,
                       "&:hover": { bgcolor: "#6D28D9", boxShadow: "none" }
                     }}>
-                    Upgrade
+                    {usage.planName === "Free" ? "Upgrade" : "View Plans"}
                   </Button>
                 </Box>
               )}
@@ -506,6 +545,61 @@ export default function SettingsPage() {
                 </Box>
               </Box>
             ))}
+          </Box>
+        </Paper>
+      )}
+
+      {/* ── Admin: Additional Limits ──────────────────────────────────────── */}
+      {isAdmin && (
+        <Paper elevation={0} sx={{ border: `1px solid ${WARN_BR}`, borderRadius: "10px", overflow: "hidden", bgcolor: "#fff" }}>
+          <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`, bgcolor: WARN_BG }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#92400E" }}>
+              ➕ Additional Limits
+            </Typography>
+            <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
+              Grant extra tokens, jobs or candidates on top of plan limits
+            </Typography>
+          </Box>
+          <Box sx={{ p: 2.25, display: "flex", flexDirection: "column", gap: 1.5 }}>
+            {limitsSuccess && (
+              <Alert severity="success" onClose={() => setLimitsSuccess(false)}>
+                Limits updated successfully.
+              </Alert>
+            )}
+            <Box>
+              <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT, mb: 0.5 }}>Select User</Typography>
+              <TextField select fullWidth size="small" value={selectedAdminUser}
+                onChange={e => handleAdminUserSelect(e.target.value)}
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}>
+                <MenuItem value="" sx={{ fontSize: 12 }}>— Select a user —</MenuItem>
+                {adminUsers.map(u => (
+                  <MenuItem key={u.id} value={u.id} sx={{ fontSize: 12 }}>
+                    {u.name || u.id} ({u.planName})
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Box>
+            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 1.5 }}>
+              {[
+                { label: "Additional Tokens", key: "tokens" },
+                { label: "Additional Jobs",   key: "jobs" },
+                { label: "Additional Candidates", key: "candidates" },
+              ].map(({ label, key }) => (
+                <Box key={key}>
+                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT, mb: 0.5 }}>{label}</Typography>
+                  <TextField fullWidth size="small" type="number" value={additionalLimits[key]}
+                    onChange={e => setAdditionalLimits(p => ({ ...p, [key]: e.target.value }))}
+                    placeholder="0"
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }} />
+                </Box>
+              ))}
+            </Box>
+            <Button variant="contained" onClick={handleUpdateLimits}
+              disabled={limitsUpdating || !selectedAdminUser}
+              sx={{ alignSelf: "flex-start", fontSize: 12, bgcolor: WARN, borderRadius: "6px",
+                textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#B45309", boxShadow: "none" } }}>
+              {limitsUpdating ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Update Limits"}
+            </Button>
           </Box>
         </Paper>
       )}

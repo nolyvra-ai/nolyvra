@@ -96,6 +96,30 @@ public class AuthController {
         return ResponseEntity.ok(users);
     }
 
+    // POST /api/auth/admin/update-limits?loginId=x  ← CHANGE: new endpoint
+    // Admin only — sets additional tokens/jobs/candidates for a user
+    @PostMapping("/admin/update-limits")
+    public ResponseEntity<?> updateLimits(
+            @RequestParam String loginId,
+            @RequestBody Map<String, Object> body) {
+
+        if (!userService.isAdmin(loginId)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied."));
+        }
+
+        String targetId = (String) body.get("targetLoginId");
+        if (targetId == null || targetId.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "targetLoginId is required."));
+        }
+
+        int additionalTokens     = body.getOrDefault("additionalTokens",     0) instanceof Number n ? n.intValue() : 0;
+        int additionalJobs       = body.getOrDefault("additionalJobs",       0) instanceof Number n ? n.intValue() : 0;
+        int additionalCandidates = body.getOrDefault("additionalCandidates", 0) instanceof Number n ? n.intValue() : 0;
+
+        userService.updateAdditionalLimits(targetId, additionalTokens, additionalJobs, additionalCandidates);
+        return ResponseEntity.ok(Map.of("status", "updated"));
+    }
+
     // POST /api/auth/admin/onboard?loginId=x
     // Admin only — sets a registered user's password to default hash
     @PostMapping("/admin/onboard")

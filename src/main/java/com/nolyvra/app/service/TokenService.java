@@ -86,9 +86,10 @@ public class TokenService {
             int renewed = 0;
             for (String userId : dueUsers) {
                 try {
+                    // Change: reset tokens to plan max + any additional_tokens granted by admin
                     jdbc.update("""
                             update login l
-                            set tokens_remaining = p.max_tokens,
+                            set tokens_remaining = p.max_tokens + coalesce(l.additional_tokens, 0),
                                 renew_date = current_date + INTERVAL '30 days'
                             from plans p
                             where l.plan_id = p.id

@@ -146,6 +146,8 @@ public class JobService {
                   "seniorityLevel": "e.g. Senior · 5+ yrs",
                   "roleType": "e.g. Technical Lead | Individual Contributor | Manager",
                   "industry": "e.g. FinTech | HealthTech | E-Commerce",
+                  "company": "<company or client name if mentioned in the brief, otherwise empty string>",
+                  "location": "<work location or city if mentioned in the brief, otherwise empty string>",
                   "generatedJdText": "<full formal job description as a multi-line string>",
                   "extractedSkills": ["skill1", "skill2", ...],
                   "softSkills": ["skill1", "skill2", ...]
@@ -155,6 +157,8 @@ public class JobService {
                 - generatedJdText must be a complete, professional job description.
                 - extractedSkills: technical skills only, max 10 items.
                 - softSkills: non-technical, max 6 items.
+                - company: extract from brief if mentioned (e.g. company name, client name). Return "" if not found.
+                - location: extract from brief if mentioned (e.g. city, country, remote). Return "" if not found.
                 - All fields are required.
                 """;
 

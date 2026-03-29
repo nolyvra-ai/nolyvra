@@ -21,16 +21,9 @@ public class UserService {
     }
 
     // ─── Change password ──────────────────────────────────────────────────────
-    // Verifies the current password matches what is stored, then updates to new.
-    // Returns false if the current password is wrong.
-    //
-    // NOTE: This implementation stores passwords as plain text matching your
-    // existing login table. If you add hashing later (e.g. BCrypt), replace
-    // the SELECT check and UPDATE with hashed equivalents.
 
     public boolean changePassword(String loginId, String currentPassword, String newPassword) {
 
-        // 1. Verify current password
         var rows = jdbc.query("""
                 select id from login
                 where id = ? and password_hash = ?
@@ -39,11 +32,9 @@ public class UserService {
                 loginId, currentPassword);
 
         if (rows.isEmpty()) {
-            // Current password does not match
             return false;
         }
 
-        // 2. Update to new password
         jdbc.update("""
                 update login
                 set password_hash = ?
@@ -54,12 +45,9 @@ public class UserService {
     }
 
     // ─── Register interest (landing page) ────────────────────────────────────
-    // Saves a new user with plan_id = 'registered' and empty password.
-    // Returns false if the email already exists.
 
     public boolean registerInterest(String firstName, String lastName,
                                     String company, String email, String phone) {
-        // Use email as loginId — check for duplicate
         List<String> existing = jdbc.query(
                 "select id from login where id = ?",
                 (rs, r) -> rs.getString("id"), email);
@@ -75,8 +63,6 @@ public class UserService {
     }
 
     // ─── Login ────────────────────────────────────────────────────────────────
-    // Returns user map on success, empty Optional on failure.
-    // Returns a map with expired=true if free plan is older than 30 days.
 
     public Optional<Map<String, Object>> login(String loginId, String password) {
         var rows = jdbc.query("""
@@ -98,7 +84,6 @@ public class UserService {
         Map<String, Object> user = rows.get(0);
         String planId = (String) user.get("planId");
 
-        // Check 30-day expiry for free plan
         if ("plan-free".equals(planId)) {
             OffsetDateTime createdAt = (OffsetDateTime) user.get("createdAt");
             if (createdAt != null) {
@@ -113,7 +98,6 @@ public class UserService {
             }
         }
 
-        // Remove internal fields before returning
         user.remove("createdAt");
         return Optional.of(user);
     }
@@ -121,31 +105,38 @@ public class UserService {
     // ─── Admin check ──────────────────────────────────────────────────────────
 
     public boolean isAdmin(String loginId) {
-    var rows = jdbc.query(
-            "select id from login where (id = ? or email = ?) and plan_id = 'admin'",
-            (rs, r) -> rs.getString("id"), loginId, loginId);
-    return !rows.isEmpty();
+        var rows = jdbc.query(
+                "select id from login where (id = ? or email = ?) and plan_id = 'admin'",
+                (rs, r) -> rs.getString("id"), loginId, loginId);
+        return !rows.isEmpty();
     }
 
     // ─── Get all users for admin panel ────────────────────────────────────────
+    // Change 1: include additional_tokens, additional_jobs, additional_candidates
 
     public List<Map<String, Object>> getAllUsersForAdmin() {
         return jdbc.query("""
                 select l.id, l.name, l.plan_id, l.phone_number, l.created_at,
                        coalesce(p.name, l.plan_id) as plan_name,
-                       l.tokens_remaining
+                       l.tokens_remaining,
+                       coalesce(l.additional_tokens, 0)     as additional_tokens,
+                       coalesce(l.additional_jobs, 0)       as additional_jobs,
+                       coalesce(l.additional_candidates, 0) as additional_candidates
                 from login l
                 left join plans p on p.id = l.plan_id
                 order by l.created_at desc
                 """,
                 (rs, r) -> {
                     Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("id",              rs.getString("id"));
-                    m.put("name",            rs.getString("name"));
-                    m.put("planId",          rs.getString("plan_id"));
-                    m.put("planName",        rs.getString("plan_name"));
-                    m.put("phone",           rs.getString("phone_number"));
-                    m.put("tokensRemaining", rs.getObject("tokens_remaining"));
+                    m.put("id",                   rs.getString("id"));
+                    m.put("name",                 rs.getString("name"));
+                    m.put("planId",               rs.getString("plan_id"));
+                    m.put("planName",             rs.getString("plan_name"));
+                    m.put("phone",                rs.getString("phone_number"));
+                    m.put("tokensRemaining",      rs.getObject("tokens_remaining"));
+                    m.put("additionalTokens",     rs.getInt("additional_tokens"));
+                    m.put("additionalJobs",       rs.getInt("additional_jobs"));
+                    m.put("additionalCandidates", rs.getInt("additional_candidates"));
                     OffsetDateTime created = rs.getObject("created_at", OffsetDateTime.class);
                     m.put("createdAt", created != null ? created.toString() : null);
                     return m;
@@ -153,7 +144,6 @@ public class UserService {
     }
 
     // ─── Onboard a registered user ────────────────────────────────────────────
-    // Sets the default password hash and promotes to plan-free
 
     public void onboardUser(String targetLoginId) {
         jdbc.update("""
@@ -164,5 +154,39 @@ public class UserService {
                     renew_date = current_date + INTERVAL '30 days'
                 where id = ?
                 """, DEFAULT_PASSWORD_HASH, targetLoginId);
+    }
+
+    // ─── Update additional limits for a user (admin only) ────────────────────
+    // Change 2: new method to set extra tokens/jobs/candidates on top of plan limits
+
+    public void updateAdditionalLimits(String targetLoginId, int additionalTokens,
+                                        int additionalJobs, int additionalCandidates) {
+        // Read current additional_tokens so we can compute the delta
+        Integer currentAdditional = jdbc.queryForObject(
+                "select coalesce(additional_tokens, 0) from login where id = ?",
+                Integer.class, targetLoginId);
+        int previousAdditional = currentAdditional != null ? currentAdditional : 0;
+        int tokenDelta = additionalTokens - previousAdditional;
+
+        if (tokenDelta > 0) {
+            // Grant has increased — top up tokens_remaining by the delta
+            jdbc.update("""
+                    update login
+                    set additional_tokens     = ?,
+                        additional_jobs       = ?,
+                        additional_candidates = ?,
+                        tokens_remaining      = tokens_remaining + ?
+                    where id = ?
+                    """, additionalTokens, additionalJobs, additionalCandidates, tokenDelta, targetLoginId);
+        } else {
+            // Grant unchanged or reduced — just update the limits, don't touch tokens_remaining
+            jdbc.update("""
+                    update login
+                    set additional_tokens     = ?,
+                        additional_jobs       = ?,
+                        additional_candidates = ?
+                    where id = ?
+                    """, additionalTokens, additionalJobs, additionalCandidates, targetLoginId);
+        }
     }
 }

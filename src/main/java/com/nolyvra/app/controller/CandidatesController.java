@@ -25,24 +25,34 @@ public class CandidatesController {
         this.workflowService  = workflowService;
     }
 
+    // CHANGE: wrap with try/catch to return 409 on duplicate
     @PostMapping("/jobs/{jobId}/candidates")
     public CandidateResponse addCandidate(
             @PathVariable String jobId,
             @RequestParam String loginId,
             @Valid @RequestBody CandidateCreateRequest req) {
-        CandidateResponse candidate = candidateService.addCandidate(jobId, req, loginId);
-        // Record timeline event
-        workflowService.recordEvent(candidate.id(), loginId, "CANDIDATE_ADDED",
-                "Added to pipeline for " + jobId, null);
-        return candidate;
+        try {
+            CandidateResponse candidate = candidateService.addCandidate(jobId, req, loginId);
+            // Record timeline event
+            workflowService.recordEvent(candidate.id(), loginId, "CANDIDATE_ADDED",
+                    "Added to pipeline for " + jobId, null);
+            return candidate;
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        }
     }
 
     // Add candidate without a job assignment ("Not Assigned")
+    // CHANGE: wrap with try/catch to return 409 on duplicate
     @PostMapping("/candidates")
     public CandidateResponse addCandidateUnassigned(
             @RequestParam String loginId,
             @Valid @RequestBody CandidateCreateRequest req) {
-        return candidateService.addCandidateUnassigned(req, loginId);
+        try {
+            return candidateService.addCandidateUnassigned(req, loginId);
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        }
     }
 
     @GetMapping("/candidates/{candidateId}")
