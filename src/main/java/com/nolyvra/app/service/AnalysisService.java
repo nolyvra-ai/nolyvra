@@ -235,8 +235,8 @@ public class AnalysisService {
         String cvText = loadCvTextFromDb(candidateId);
         String jdText = getJdForCandidate(candidateId);
         String candidateName = getCandidateName(candidateId);
-
-        String systemPrompt = """
+        String passDate = "Today's date is " + LocalDate.now().format(DateTimeFormatter.ofPattern("d MMMM yyyy")) + ". ";
+            String systemPrompt = passDate + """
                 You are a senior recruitment consultant writing a concise candidate briefing.
                 Return EXACTLY ONE JSON object:
 
@@ -305,8 +305,8 @@ public class AnalysisService {
 
         String cvText = loadCvTextFromDb(candidateId);
         String linkedinUrl = loadLinkedinUrlFromDb(candidateId);
-
-        String systemPrompt = """
+        String passDate = "Today's date is " + LocalDate.now().format(DateTimeFormatter.ofPattern("d MMMM yyyy")) + ". ";
+        String systemPrompt = passDate + """
                 You are a fraud detection specialist in recruitment.
                 Analyse the CV vs LinkedIn URL for authenticity issues.
                 Return EXACTLY ONE JSON object:
@@ -379,8 +379,8 @@ public class AnalysisService {
 
         String cvText = loadCvTextFromDb(candidateId);
         String jdText = getJdForCandidate(candidateId);
-
-        String systemPrompt = """
+        String passDate = "Today's date is " + LocalDate.now().format(DateTimeFormatter.ofPattern("d MMMM yyyy")) + ". ";
+        String systemPrompt = passDate + """
                 You are a data-driven recruitment analyst who predicts placement likelihood.
                 Return EXACTLY ONE JSON object:
 

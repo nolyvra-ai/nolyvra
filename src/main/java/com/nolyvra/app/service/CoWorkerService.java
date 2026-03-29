@@ -54,7 +54,7 @@ public class CoWorkerService {
                 {
                   "message": "<friendly conversational reply, briefly confirm what you found and what you plan to do>",
                   "pendingAction": {
-                    "type": "RUN_ANALYSIS|SCHEDULE_INTERVIEW|MOVE_PIPELINE|EMAIL|CREATE_REMINDER|NONE",
+                    "type": "RUN_ANALYSIS|SCHEDULE_INTERVIEW|RESCHEDULE_AND_NOTIFY|MOVE_PIPELINE|EMAIL|CREATE_REMINDER|NONE",
                     "description": "<1-sentence human-readable action description>",
                     "params": { <action-specific parameters — see below> }
                   }
@@ -70,6 +70,10 @@ public class CoWorkerService {
                 SCHEDULE_INTERVIEW:
                   { "candidateId": "cand-xxx", "candidateName": "...", "interviewType": "Phone Screen|Video Interview|In-Person", "scheduledAt": "ISO datetime or null if not specified", "notes": "..." }
 
+                RESCHEDULE_AND_NOTIFY:
+                  { "interviewId": "int-xxx or null", "candidateId": "cand-xxx", "candidateName": "...", "interviewType": "...", "newScheduledAt": "ISO datetime or null", "notes": "..." }
+                  Use this for any reschedule request, or multi-step (reschedule + notify candidate + next available slots).
+
                 MOVE_PIPELINE:
                   { "candidateIds": ["cand-xxx", ...], "candidateNames": ["Name", ...], "toStage": "Screening|Interview|Assessment|Offer|Selected|Rejected", "jobTitle": "..." }
 
@@ -84,9 +88,12 @@ public class CoWorkerService {
                 - Always match candidate and job names to real IDs from the context above.
                 - If you cannot find a match, say so in the message and set pendingAction type to NONE.
                 - For EMAIL actions, always mention in your message that you will take the user to the email page.
+                - For questions about upcoming meetings or free time, answer directly from UPCOMING INTERVIEWS data above — set pendingAction to NONE.
+                - For reschedule + notify + next slots requests, always use RESCHEDULE_AND_NOTIFY (not SCHEDULE_INTERVIEW).
                 - Keep your message friendly, concise and specific (mention names and counts).
                 - No markdown. No extra keys.
                 - CRITICAL: You MUST respond with ONLY a valid JSON object. Never respond with plain text. Even for greetings or questions, wrap your reply in the JSON structure above with pendingAction type NONE.
+                - CRITICAL: params must ALWAYS be a JSON object {}, never a JSON array []. If scheduling multiple candidates, pick the first one and mention you will handle others separately.
                 """
                 .formatted(context);
 
@@ -137,13 +144,34 @@ public class CoWorkerService {
             var pa = root.path("pendingAction");
             CoWorkerChatResponse.PendingAction pendingAction = null;
             if (pa != null && !pa.isMissingNode() && !"NONE".equals(pa.path("type").asText("NONE"))) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> actionParams = objectMapper.convertValue(
-                        pa.path("params"), Map.class);
+                var paramsNode = pa.path("params");
+                Map<String, Object> actionParams;
+                if (paramsNode.isArray()) {
+                    // AI returned params as array (e.g. multiple candidates) — wrap it
+                    @SuppressWarnings("unchecked")
+                    List<Object> list = objectMapper.convertValue(paramsNode, List.class);
+                    actionParams = new java.util.LinkedHashMap<>();
+                    actionParams.put("items", list);
+                    // Also extract candidateIds/candidateNames for convenience
+                    List<String> ids = new ArrayList<>();
+                    List<String> names = new ArrayList<>();
+                    for (Object item : list) {
+                        if (item instanceof Map<?,?> m) {
+                            if (m.get("candidateId") != null) ids.add(m.get("candidateId").toString());
+                            if (m.get("candidateName") != null) names.add(m.get("candidateName").toString());
+                        }
+                    }
+                    if (!ids.isEmpty()) actionParams.put("candidateIds", ids);
+                    if (!names.isEmpty()) actionParams.put("candidateNames", names);
+                } else {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> m = objectMapper.convertValue(paramsNode, Map.class);
+                    actionParams = m != null ? m : new java.util.LinkedHashMap<>();
+                }
                 pendingAction = new CoWorkerChatResponse.PendingAction(
                         pa.path("type").asText(),
                         pa.path("description").asText(),
-                        actionParams != null ? actionParams : Map.of());
+                        actionParams);
             }
 
             return new CoWorkerChatResponse(message, pendingAction);
@@ -166,6 +194,7 @@ public class CoWorkerService {
         return switch (type) {
             case "RUN_ANALYSIS" -> executeRunAnalysis(loginId, params);
             case "SCHEDULE_INTERVIEW" -> executeScheduleInterview(loginId, params);
+            case "RESCHEDULE_AND_NOTIFY" -> executeRescheduleAndNotify(loginId, params);
             case "MOVE_PIPELINE" -> executeMovePipeline(loginId, params);
             case "EMAIL" -> buildEmailNavigation(params);
             case "CREATE_REMINDER" -> executeCreateReminder(loginId, params);
@@ -266,10 +295,25 @@ public class CoWorkerService {
                 "Scheduled: " + candidateName + " — " + type);
         try {
             OffsetDateTime dt = scheduledAt != null
-                    ? java.time.LocalDateTime.parse(scheduledAt,
-                            java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                            .atOffset(ZoneOffset.UTC)
+                    ? parseFlexibleDateTime(scheduledAt)
                     : OffsetDateTime.now(ZoneOffset.UTC).plusDays(1);
+
+            // Conflict check — give actionable feedback instead of generic error
+            Integer conflictCount = jdbc.queryForObject("""
+                    select count(*) from interviews
+                    where login_id = ?
+                      and status = 'Scheduled'
+                      and scheduled_at < (?::timestamptz + interval '60 minutes')
+                      and (scheduled_at + (coalesce(duration_minutes,60)||' minutes')::interval) > ?::timestamptz
+                    """, Integer.class, loginId, dt, dt);
+            if (conflictCount != null && conflictCount > 0) {
+                markTaskDone(taskId);
+                return Map.of(
+                        "message", "⚠ Time conflict: another interview is already booked at that time for "
+                                + candidateName + ". " + getNextAvailableSlots(loginId),
+                        "success", false,
+                        "conflict", true);
+            }
 
             // Fix 2a: look up job_id — required NOT NULL column in interviews table
             List<String> jobIds = jdbc.query(
@@ -353,9 +397,7 @@ public class CoWorkerService {
 
         try {
             OffsetDateTime dueAt = dueAtStr != null
-                    ? java.time.LocalDateTime.parse(dueAtStr,
-                            java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-                            .atOffset(ZoneOffset.UTC)
+                    ? parseFlexibleDateTime(dueAtStr)
                     : OffsetDateTime.now(ZoneOffset.UTC).plusHours(24);
 
             jdbc.update("""
@@ -369,6 +411,148 @@ public class CoWorkerService {
             System.err.println("[CoWorker] executeCreateReminder() failed: " + e.getMessage());
             e.printStackTrace();
             return Map.of("message", "Could not create the reminder. Please try again.", "success", false);
+        }
+    }
+
+    // ─── Reschedule + notify + next slots (multi-step) ───────────────────────
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> executeRescheduleAndNotify(String loginId, Map<String, Object> params) {
+        String interviewId    = (String) params.get("interviewId");
+        String candidateId    = (String) params.get("candidateId");
+        String candidateName  = (String) params.getOrDefault("candidateName", "Candidate");
+        String newScheduledAt = (String) params.get("newScheduledAt");
+        String type           = (String) params.getOrDefault("interviewType", "Video Interview");
+        String notes          = (String) params.getOrDefault("notes", "");
+
+        try {
+            // Step 1: Cancel existing interview
+            if (interviewId != null) {
+                jdbc.update("update interviews set status = 'Cancelled' where id = ? and login_id = ?",
+                        interviewId, loginId);
+            }
+
+            // Step 2: Book new slot with conflict check
+            String scheduledMsg = "";
+            if (newScheduledAt != null) {
+                OffsetDateTime newDt = parseFlexibleDateTime(newScheduledAt);
+
+                Integer conflictCount = jdbc.queryForObject("""
+                        select count(*) from interviews
+                        where login_id = ? and status = 'Scheduled'
+                          and scheduled_at < (?::timestamptz + interval '60 minutes')
+                          and (scheduled_at + (coalesce(duration_minutes,60)||' minutes')::interval) > ?::timestamptz
+                        """, Integer.class, loginId, newDt, newDt);
+
+                if (conflictCount != null && conflictCount > 0) {
+                    return Map.of(
+                            "message", "⚠ The new time conflicts with another interview. "
+                                    + getNextAvailableSlots(loginId),
+                            "success", false, "conflict", true);
+                }
+
+                List<String> jobIds = jdbc.query(
+                        "select job_id from candidates where id = ? and is_active = true",
+                        (rs, r) -> rs.getString("job_id"), candidateId);
+                if (!jobIds.isEmpty()) {
+                    String newId = "int-" + UUID.randomUUID();
+                    jdbc.update("""
+                            insert into interviews
+                                (id, candidate_id, job_id, login_id, interview_type, scheduled_at, status, notes)
+                            values (?, ?, ?, ?, ?, ?, 'Scheduled', ?)
+                            """, newId, candidateId, jobIds.get(0), loginId, type, newDt, notes);
+                    scheduledMsg = " New interview booked for " + newScheduledAt + ".";
+                }
+            }
+
+            // Step 3: Next available slots
+            String slotsMsg = getNextAvailableSlots(loginId);
+
+            // Step 4: Pre-fill email to notify candidate
+            Map<String, Object> emailParams = new LinkedHashMap<>();
+            emailParams.put("candidateId",   candidateId);
+            emailParams.put("candidateName", candidateName);
+            emailParams.put("subject",       "Your Interview Has Been Rescheduled");
+            emailParams.put("body",          "Dear " + candidateName + ",\n\nYour interview has been rescheduled."
+                    + (newScheduledAt != null ? " Your new time is " + newScheduledAt + "." : "")
+                    + "\n\nPlease confirm your availability.\n\nBest regards,\nRecruitment Team");
+
+            return Map.of(
+                    "message", "Interview for " + candidateName + " cancelled." + scheduledMsg
+                            + " Opening Email Centre to notify them. " + slotsMsg,
+                    "success",    true,
+                    "navigateTo", "/email",
+                    "emailParams", emailParams);
+
+        } catch (Exception e) {
+            System.err.println("[CoWorker] executeRescheduleAndNotify() failed: " + e.getMessage());
+            e.printStackTrace();
+            return Map.of("message", "Could not complete the reschedule. Please try again.", "success", false);
+        }
+    }
+
+    // ─── Context builder ──────────────────────────────────────────────────────
+
+    private String buildInterviewContext(String loginId) {
+        try {
+            var interviews = jdbc.query("""
+                    select i.id, c.name as candidate_name, i.interview_type,
+                           i.scheduled_at, i.status
+                    from interviews i
+                    join candidates c on c.id = i.candidate_id
+                    where i.login_id = ?
+                      and i.status = 'Scheduled'
+                      and i.scheduled_at >= now()
+                    order by i.scheduled_at asc limit 20
+                    """,
+                    (rs, r) -> {
+                        OffsetDateTime dt = rs.getObject("scheduled_at", OffsetDateTime.class);
+                        return "Interview[id=" + rs.getString("id")
+                                + ",candidate=" + rs.getString("candidate_name")
+                                + ",type=" + rs.getString("interview_type")
+                                + ",at=" + (dt != null ? dt.toString() : "TBD")
+                                + ",status=" + rs.getString("status") + "]";
+                    }, loginId);
+            return interviews.isEmpty() ? "No upcoming interviews." : String.join("\n", interviews);
+        } catch (Exception e) {
+            return "Interview data unavailable.";
+        }
+    }
+
+    private String getNextAvailableSlots(String loginId) {
+        try {
+            var booked = jdbc.query("""
+                    select scheduled_at, coalesce(duration_minutes, 60) as dur
+                    from interviews
+                    where login_id = ? and status = 'Scheduled'
+                      and scheduled_at between now() and now() + interval '7 days'
+                    """,
+                    (rs, r) -> {
+                        OffsetDateTime dt = rs.getObject("scheduled_at", OffsetDateTime.class);
+                        int dur = rs.getInt("dur");
+                        return dt != null
+                                ? new long[]{ dt.toEpochSecond(), dt.toEpochSecond() + dur * 60L }
+                                : new long[]{ 0, 0 };
+                    }, loginId);
+
+            List<String> slots = new ArrayList<>();
+            java.time.LocalDate day = java.time.LocalDate.now(ZoneOffset.UTC).plusDays(1);
+            int found = 0;
+            while (found < 6 && !day.isAfter(java.time.LocalDate.now(ZoneOffset.UTC).plusDays(14))) {
+                if (day.getDayOfWeek().getValue() <= 5) {
+                    for (int hour : new int[]{ 9, 11, 14, 16 }) {
+                        OffsetDateTime slot = day.atTime(hour, 0).atOffset(ZoneOffset.UTC);
+                        long s = slot.toEpochSecond(), e = s + 3600;
+                        boolean conflict = booked.stream().anyMatch(b -> b[0] < e && b[1] > s);
+                        if (!conflict) { slots.add(slot.toString()); if (++found >= 6) break; }
+                    }
+                }
+                day = day.plusDays(1);
+            }
+            return slots.isEmpty() ? "No free slots found in the next 14 days."
+                    : "Next available slots: " + String.join(", ", slots);
+        } catch (Exception e) {
+            return "Slot availability unavailable.";
         }
     }
 
@@ -425,11 +609,30 @@ public class CoWorkerService {
                     loginId);
 
             return "JOBS:\n" + String.join("\n", jobs)
-                    + "\n\nCANDIDATES:\n" + String.join("\n", candidates);
+                    + "\n\nCANDIDATES:\n" + String.join("\n", candidates)
+                    + "\n\nUPCOMING INTERVIEWS:\n" + buildInterviewContext(loginId);
         } catch (Exception e) {
             System.err.println("[CoWorker] buildContext() failed: " + e.getMessage());
             e.printStackTrace();
             return "Context unavailable.";
+        }
+    }
+
+    // ─── Flexible datetime parser ─────────────────────────────────────────────
+    // Handles all formats the AI may return:
+    //   "2026-03-29T10:00"     → ISO_LOCAL_DATE_TIME (no zone)
+    //   "2026-03-29T10:00Z"    → ISO instant with Z
+    //   "2026-03-29T10:00+05:30" → ISO offset datetime
+
+    private static OffsetDateTime parseFlexibleDateTime(String s) {
+        try {
+            // Try full offset/zoned format first (handles Z, +HH:mm, etc.)
+            return OffsetDateTime.parse(s, java.time.format.DateTimeFormatter.ISO_DATE_TIME);
+        } catch (Exception e1) {
+            // Fall back to local datetime (no zone) and assume UTC
+            return java.time.LocalDateTime.parse(s,
+                    java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                    .atOffset(ZoneOffset.UTC);
         }
     }
 

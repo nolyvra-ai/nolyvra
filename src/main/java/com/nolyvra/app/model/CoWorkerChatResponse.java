@@ -8,7 +8,7 @@ public record CoWorkerChatResponse(
 ) {
     // Represents an action the AI wants to take — requires user confirmation
     public record PendingAction(
-            String type,             // RUN_ANALYSIS | SCHEDULE_INTERVIEW | MOVE_PIPELINE | EMAIL | CREATE_REMINDER
+            String type,             // RUN_ANALYSIS | SCHEDULE_INTERVIEW | RESCHEDULE_AND_NOTIFY | MOVE_PIPELINE | EMAIL | CREATE_REMINDER
             String description,      // human-readable "I will do X"
             Map<String, Object> params // action-specific parameters
     ) {}

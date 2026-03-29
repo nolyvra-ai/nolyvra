@@ -247,6 +247,7 @@ export default function DashboardPage() {
   }, [loginId]);
 
   const todayTasks   = reminders.filter(r => !r.isCompleted);
+  const jobTitleMap  = useMemo(() => Object.fromEntries(recentJobs.map(j => [j.id, j.title])), [recentJobs]);
   const high   = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) >= 80).length;
   const medium = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) >= 60 && (a?.capabilityScore ?? 0) < 80).length;
   const low    = recentAnalyses.filter(a => (a?.capabilityScore ?? 0) < 60).length;
@@ -483,7 +484,7 @@ export default function DashboardPage() {
                   <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{row.candidate_name}</Typography>
                 </TableCell>
                 <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, color: MUTED, fontWeight: 600, borderBottom: `1px solid ${BORDER}` }}>
-                  {row.jobId}
+                  {jobTitleMap[row.jobId] ?? row.jobId ?? "—"}
                 </TableCell>
                 <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
                   <ScoreCell value={row?.consistencyScore} />
