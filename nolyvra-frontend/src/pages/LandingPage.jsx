@@ -98,10 +98,46 @@ export default function LandingPage() {
         .lp-btn-primary:hover { background:#3B8BFF;transform:translateY(-1px); }
         .lp-btn-secondary { padding:14px 32px;border-radius:8px;font-size:15px;font-weight:500;background:transparent;color:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.2);cursor:pointer;font-family:inherit;transition:all .2s; }
         .lp-btn-secondary:hover { border-color:rgba(255,255,255,.5);color:#fff; }
+
+        /* ── Mobile responsive ─────────────────────────────────────────────── */
+        @media (max-width: 768px) {
+          .lp-nav-links { display: none !important; }
+          .lp-nav-actions { gap: 6px !important; }
+          .lp-nav-actions button { padding: 6px 12px !important; font-size: 12px !important; }
+          .lp-nav { padding: 0 16px !important; }
+
+          .lp-hero { padding: 88px 20px 60px !important; }
+          .lp-hero h1 { font-size: 32px !important; letter-spacing: -0.5px !important; line-height: 1.2 !important; }
+          .lp-hero p { font-size: 15px !important; }
+          .lp-hero-btns { flex-direction: column !important; align-items: stretch !important; }
+          .lp-hero-btns button { width: 100% !important; }
+          .lp-hero-stats { flex-direction: column !important; max-width: 100% !important; }
+          .lp-hero-stat { border-right: none !important; border-bottom: 1px solid rgba(255,255,255,.08) !important; padding: 14px 16px !important; }
+          .lp-hero-stat:last-child { border-bottom: none !important; }
+
+          .lp-section { padding: 56px 20px !important; }
+          .lp-grid-2 { grid-template-columns: 1fr !important; gap: 28px !important; }
+          .lp-grid-3 { grid-template-columns: 1fr !important; gap: 16px !important; }
+          .lp-grid-4 { grid-template-columns: 1fr 1fr !important; gap: 0 !important; }
+
+          .lp-cta { padding: 64px 20px !important; }
+          .lp-cta h2 { font-size: 26px !important; }
+          .lp-cta-btns { flex-direction: column !important; align-items: stretch !important; }
+          .lp-cta-btns button { width: 100% !important; }
+
+          .lp-footer { flex-direction: column !important; gap: 20px !important; text-align: center !important; padding: 32px 20px !important; align-items: center !important; }
+
+          .modal-box { padding: 24px 20px !important; margin: 16px !important; max-width: calc(100vw - 32px) !important; }
+          .modal-name-row { grid-template-columns: 1fr !important; }
+
+          .lp-feature-card { padding: 20px !important; }
+          .lp-btn-primary { padding: 12px 24px !important; font-size: 14px !important; }
+          .lp-btn-secondary { padding: 12px 24px !important; font-size: 14px !important; }
+        }
       `}</style>
 
       {/* ── NAV ── */}
-      <nav style={{
+      <nav className="lp-nav" style={{
         position:"fixed",top:0,left:0,right:0,zIndex:100,
         background:"rgba(15,22,35,.96)",backdropFilter:"blur(12px)",
         display:"flex",alignItems:"center",justifyContent:"space-between",
@@ -114,19 +150,19 @@ export default function LandingPage() {
             <div style={{ color:"rgba(255,255,255,.3)",fontSize:9,fontWeight:500,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:2 }}>TALENT RUNS DEEP</div>
           </div>
         </div>
-        <div style={{ display:"flex",gap:28 }}>
+        <div className="lp-nav-links" style={{ display:"flex",gap:28 }}>
           {[["Why nolyvra","#problem"],["AI in Recruitment","#data"],["Features","#features"],["How It Works","#how"]].map(([l,h]) => (
             <a key={l} href={h} className="lp-nav-link">{l}</a>
           ))}
         </div>
-        <div style={{ display:"flex",gap:10,alignItems:"center" }}>
+        <div className="lp-nav-actions" style={{ display:"flex",gap:10,alignItems:"center" }}>
           <button onClick={() => nav("/login")} style={{ padding:"7px 18px",borderRadius:7,fontSize:13,fontWeight:500,border:"1px solid rgba(255,255,255,.2)",color:"rgba(255,255,255,.8)",background:"transparent",cursor:"pointer",fontFamily:"inherit",transition:"all .15s" }}>Login</button>
           <button onClick={openModal} style={{ padding:"7px 18px",borderRadius:7,fontSize:13,fontWeight:600,background:"#1D72E8",color:"#fff",border:"none",cursor:"pointer",fontFamily:"inherit" }}>Register Interest</button>
         </div>
       </nav>
 
       {/* ── HERO ── */}
-      <section style={{ minHeight:"100vh",background:"linear-gradient(160deg,#0F1623 0%,#1B2A4A 50%,#0F1623 100%)",display:"flex",alignItems:"center",justifyContent:"center",padding:"100px 48px 80px",position:"relative",overflow:"hidden" }}>
+      <section className="lp-hero" style={{ minHeight:"100vh",background:"linear-gradient(160deg,#0F1623 0%,#1B2A4A 50%,#0F1623 100%)",display:"flex",alignItems:"center",justifyContent:"center",padding:"100px 48px 80px",position:"relative",overflow:"hidden" }}>
         <div style={{ position:"absolute",inset:0,backgroundImage:"linear-gradient(rgba(29,114,232,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(29,114,232,.06) 1px,transparent 1px)",backgroundSize:"60px 60px" }} />
         <div style={{ position:"absolute",top:-200,left:"50%",transform:"translateX(-50%)",width:800,height:600,background:"radial-gradient(ellipse,rgba(29,114,232,.18) 0%,transparent 70%)",pointerEvents:"none" }} />
         <div style={{ maxWidth:960,margin:"0 auto",textAlign:"center",position:"relative",zIndex:1 }}>
@@ -141,11 +177,11 @@ export default function LandingPage() {
           <p style={{ fontSize:22,fontWeight:300,color:"rgba(255,255,255,.55)",letterSpacing:"-.3px",marginBottom:32,lineHeight:1.5 }}>
             nolyvra uses AI to analyse candidates, detect risk signals<br />and surface insights — so recruiters can focus on people.
           </p>
-          <div style={{ display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",marginBottom:56 }}>
+          <div className="lp-hero-btns" style={{ display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",marginBottom:56 }}>
             <button className="lp-btn-primary" onClick={openModal}>✦ Register Your Interest</button>
             <button className="lp-btn-secondary" onClick={() => nav("/login")}>Login to Platform →</button>
           </div>
-          <div style={{ display:"flex",border:"1px solid rgba(255,255,255,.08)",borderRadius:12,background:"rgba(255,255,255,.03)",backdropFilter:"blur(8px)",overflow:"hidden",maxWidth:680,margin:"0 auto" }}>
+          <div className="lp-hero-stats" style={{ display:"flex",border:"1px solid rgba(255,255,255,.08)",borderRadius:12,background:"rgba(255,255,255,.03)",backdropFilter:"blur(8px)",overflow:"hidden",maxWidth:680,margin:"0 auto" }}>
             {[["73%","Recruiter time on manual review"],["4×","Faster candidate screening with AI"],["$8.5B","AI recruitment market by 2027"],["68%","Of firms plan AI hiring tools"]].map(([val,lbl]) => (
               <div key={lbl} className="lp-hero-stat">
                 <div style={{ fontSize:28,fontWeight:700,color:"#fff",letterSpacing:"-.5px",lineHeight:1 }}>{val}</div>
@@ -157,14 +193,14 @@ export default function LandingPage() {
       </section>
 
       {/* ── PROBLEM SECTION ── */}
-      <section id="problem" style={{ padding:"96px 48px",background:"#fff" }}>
+      <section id="problem" className="lp-section" style={{ padding:"96px 48px",background:"#fff" }}>
         <div style={{ maxWidth:1100,margin:"0 auto" }}>
           <div style={{ textAlign:"center",marginBottom:0 }}>
             <span style={{ fontSize:11,fontWeight:700,color:"#1D72E8",textTransform:"uppercase",letterSpacing:"1.2px",display:"inline-block",marginBottom:12 }}>The Problem</span>
             <h2 style={{ fontSize:36,fontWeight:700,color:"#0F1623",letterSpacing:"-.8px",lineHeight:1.2,marginBottom:14,maxWidth:700,margin:"0 auto 12px" }}>Recruitment is drowning in data. Insights are scarce.</h2>
             <p style={{ fontSize:16,color:"#9AA3B4",lineHeight:1.7,maxWidth:600,margin:"0 auto",textAlign:"center" }}>Despite digital tools, most candidate evaluation remains manual — costing agencies time, money and quality hires.</p>
           </div>
-          <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:48,alignItems:"center",marginTop:56 }}>
+          <div className="lp-grid-2" style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:48,alignItems:"center",marginTop:56 }}>
             <div>
               {["Artificial Intelligence is redefining how organisations identify, evaluate and hire talent. It has transitioned from research innovation to operational capability.",
                 "Companies across industries are integrating AI to automate workflows, analyse data and augment decision-making.",
@@ -189,12 +225,12 @@ export default function LandingPage() {
       </section>
 
       {/* ── FEATURES SECTION ── */}
-      <section id="features" style={{ padding:"96px 48px",background:"#fff" }}>
+      <section id="features" className="lp-section" style={{ padding:"96px 48px",background:"#fff" }}>
         <div style={{ maxWidth:1100,margin:"0 auto" }}>
           <span style={{ fontSize:11,fontWeight:700,color:"#1D72E8",textTransform:"uppercase",letterSpacing:"1.2px",display:"inline-block",marginBottom:12 }}>Platform Capabilities</span>
           <h2 style={{ fontSize:36,fontWeight:700,color:"#0F1623",letterSpacing:"-.8px",lineHeight:1.2,marginBottom:14 }}>Everything a modern recruiter needs.</h2>
           <p style={{ fontSize:16,color:"#9AA3B4",lineHeight:1.7,maxWidth:600,marginBottom:48 }}>nolyvra combines AI analysis, risk detection and workflow management in one unified platform built for recruitment agencies.</p>
-          <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:20 }}>
+          <div className="lp-grid-3" style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:20 }}>
             {[["🔍","#EBF2FF","AI Candidate Analysis","CV vs LinkedIn consistency scoring, capability matrix and risk flag detection — all automated in seconds."],
               ["🛡","#F5F3FF","Fraud Detection","AI-generated resume detection, timeline inconsistency flags and skill inflation signals to protect hiring quality."],
               ["📊","#F0FDF4","Placement Probability","Predict hire likelihood using AI pattern matching across historical placements and candidate profiles."],
@@ -213,13 +249,13 @@ export default function LandingPage() {
       </section>
 
       {/* ── HOW IT WORKS ── */}
-      <section id="how" style={{ padding:"96px 48px",background:"linear-gradient(160deg,#0F1623 0%,#1B2A4A 100%)",position:"relative",overflow:"hidden" }}>
+      <section id="how" className="lp-section" style={{ padding:"96px 48px",background:"linear-gradient(160deg,#0F1623 0%,#1B2A4A 100%)",position:"relative",overflow:"hidden" }}>
         <div style={{ position:"absolute",inset:0,backgroundImage:"linear-gradient(rgba(29,114,232,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(29,114,232,.04) 1px,transparent 1px)",backgroundSize:"50px 50px" }} />
         <div style={{ maxWidth:1100,margin:"0 auto",position:"relative",zIndex:1 }}>
           <span style={{ fontSize:11,fontWeight:700,color:"#3B8BFF",textTransform:"uppercase",letterSpacing:"1.2px",display:"inline-block",marginBottom:12 }}>How It Works</span>
           <h2 style={{ fontSize:36,fontWeight:700,color:"#fff",letterSpacing:"-.8px",lineHeight:1.2,marginBottom:14 }}>From CV to insight in minutes.</h2>
           <p style={{ fontSize:16,color:"rgba(255,255,255,.45)",lineHeight:1.7,maxWidth:600,marginBottom:56 }}>nolyvra's agentic AI analyses candidates end-to-end so your team focuses on relationships, not repetition.</p>
-          <div style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:0 }}>
+          <div className="lp-grid-4" style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:0 }}>
             {[["1","Post a Job","Paste a job description. AI extracts required skills, seniority signals and capability criteria automatically."],
               ["2","Add Candidate","Paste a CV or upload a PDF. Provide the LinkedIn URL for cross-validation."],
               ["3","Run AI Analysis","AI scores consistency, capability match, fraud signals and generates interview questions in seconds."],
@@ -237,12 +273,12 @@ export default function LandingPage() {
       </section>
 
       {/* ── CTA SECTION ── */}
-      <section style={{ background:"linear-gradient(135deg,#0F1623 0%,#1B3A6B 100%)",textAlign:"center",padding:"96px 48px" }}>
+      <section className="lp-cta" style={{ background:"linear-gradient(135deg,#0F1623 0%,#1B3A6B 100%)",textAlign:"center",padding:"96px 48px" }}>
         <div style={{ maxWidth:1100,margin:"0 auto" }}>
           <span style={{ fontSize:11,fontWeight:700,color:"#3B8BFF",textTransform:"uppercase",letterSpacing:"1.2px",display:"inline-block",marginBottom:12 }}>Early Access</span>
           <h2 style={{ fontSize:42,fontWeight:700,color:"#fff",letterSpacing:"-1px",marginBottom:16 }}>Ready to hire smarter?</h2>
           <p style={{ fontSize:17,color:"rgba(255,255,255,.5)",marginBottom:40,maxWidth:560,margin:"0 auto 40px",lineHeight:1.6 }}>Join forward-thinking recruitment agencies already on the nolyvra waitlist.</p>
-          <div style={{ display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap" }}>
+          <div className="lp-cta-btns" style={{ display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap" }}>
             <button className="lp-btn-primary" onClick={openModal}>✦ Register Your Interest</button>
             <button className="lp-btn-secondary" onClick={() => nav("/login")}>Login to Platform →</button>
           </div>
@@ -251,7 +287,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── FOOTER ── */}
-      <footer style={{ background:"#0F1623",padding:"40px 48px",display:"flex",alignItems:"center",justifyContent:"space-between",borderTop:"1px solid rgba(255,255,255,.06)" }}>
+      <footer className="lp-footer" style={{ background:"#0F1623",padding:"40px 48px",display:"flex",alignItems:"center",justifyContent:"space-between",borderTop:"1px solid rgba(255,255,255,.06)" }}>
         <div style={{ display:"flex",alignItems:"center",gap:10 }}>
           <img src="/nolyvra_logo.png" alt="nolyvra" style={{ width:36, height:36, borderRadius:8, objectFit:"cover" }} />
           <div>
@@ -288,7 +324,7 @@ export default function LandingPage() {
                   <div style={{ background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:12,color:"#DC2626" }}>{formError}</div>
                 )}
 
-                <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:16 }}>
+                <div className="modal-name-row" style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:16 }}>
                   <div>
                     <label style={{ display:"block",fontSize:12,fontWeight:600,color:"#0F1623",marginBottom:5 }}>First Name *</label>
                     <input className="form-input" type="text" placeholder="Sarah" value={form.firstName} onChange={e => setField("firstName", e.target.value)} />
