@@ -252,7 +252,7 @@ function FraudDetectionCard({ candidateId }) {
 
   if (loading) return (
     <Card isNew>
-      <CardHead title="Candidate Authenticity & Fraud Detection" isNew />
+      <CardHead title="Profile Consistency & Authenticity Detection" isNew />
       <Box sx={{ p: 2.5, display: "flex", alignItems: "center", gap: 1.5 }}>
         <CircularProgress size={16} sx={{ color: PURPLE }} />
         <Typography sx={{ fontSize: 12, color: MUTED }}>Analysing authenticity…</Typography>
@@ -279,7 +279,7 @@ function FraudDetectionCard({ candidateId }) {
 
   return (
     <Card isNew>
-      <CardHead title="Candidate Authenticity & Fraud Detection" isNew
+      <CardHead title="Profile Consistency & Authenticity Detection" isNew
         action={<Badge label={data.overallVerdict} variant={verdictVariant} />} />
       <Box sx={{ p: 2.25 }}>
 

@@ -159,7 +159,7 @@ export default function PricingPage() {
               {featItem("AI Candidate Analysis")}
               {featItem("CV vs LinkedIn Scoring")}
               {featItem("Risk Flag Detection")}
-              {featItem("Fraud Detection")}
+              {featItem("Authenticity Detection")}
               {featItem("Placement Probability")}
               {featItem("AI Email Generator")}
               {featItem("Interview Scheduler")}
@@ -294,7 +294,7 @@ export default function PricingPage() {
         <div style={{ maxWidth:1200,margin:"0 auto" }}>
           <div style={{ fontSize:24,fontWeight:700,color:"#0F1623",letterSpacing:"-.4px",marginBottom:32,textAlign:"center" }}>Frequently Asked Questions</div>
           <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:20 }}>
-            {[["🪙","What is a Token?","Tokens power AI analysis. Each candidate analysis consumes tokens for CV scoring, fraud detection, interview question generation and placement probability. 1 full analysis ≈ 10 tokens."],
+            {[["🪙","What is a Token?","Tokens power AI analysis. Each candidate analysis consumes tokens for CV scoring, authenticity detection, interview question generation and placement probability. 1 full analysis ≈ 10 tokens."],
               ["🔄","Do tokens roll over?","Tokens reset monthly. Unused tokens do not roll over to the next month. Additional token packs can be purchased any time from your account settings."],
               ["💳","Can I change my plan?","Yes. You can upgrade or downgrade at any time. Upgrades take effect immediately. Downgrades take effect at the start of your next billing cycle."],
               ["🔒","Is my data secure?","All candidate and job data is encrypted at rest and in transit. nolyvra does not store PII beyond what is needed for analysis and never shares data with third parties."],
@@ -338,7 +338,7 @@ export default function PricingPage() {
               {[["AI Candidate Analysis",1,1,1,1,1],
                 ["CV vs LinkedIn Scoring",1,1,1,1,1],
                 ["Risk Flag Detection",1,1,1,1,1],
-                ["Fraud Detection",1,1,1,1,1],
+                ["Authenticity Detection",1,1,1,1,1],
                 ["Placement Probability",1,1,1,1,1],
                 ["AI Email Generator",1,1,1,1,1],
                 ["AI Talent Search",0,1,1,1,1],

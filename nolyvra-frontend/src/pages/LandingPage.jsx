@@ -238,7 +238,7 @@ export default function LandingPage() {
           <p style={{ fontSize:16,color:"#9AA3B4",lineHeight:1.7,maxWidth:600,marginBottom:48 }}>nolyvra combines AI analysis, risk detection and workflow management in one unified platform built for recruitment agencies.</p>
           <div className="lp-grid-3" style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:20 }}>
             {[["🔍","#EBF2FF","AI Candidate Analysis","CV vs LinkedIn consistency scoring, capability matrix and risk flag detection — all automated in seconds."],
-              ["🛡","#F5F3FF","Fraud Detection","AI-generated resume detection, timeline inconsistency flags and skill inflation signals to protect hiring quality."],
+              ["🛡","#F5F3FF","Authenticity Detection","AI-generated resume detection, timeline inconsistency flags and skill inflation signals to protect hiring quality."],
               ["📊","#F0FDF4","Placement Probability","Predict hire likelihood using AI pattern matching across historical placements and candidate profiles."],
               ["✦","#FFFBEB","AI Talent Search","Natural language search across your internal database and market data to surface the best-fit candidates instantly."],
               ["📅","#FEF2F2","Interview Scheduling","Integrated calendar scheduling with Google Calendar and Outlook sync — send invites in one click."],
