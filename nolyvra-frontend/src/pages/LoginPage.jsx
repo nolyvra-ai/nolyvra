@@ -1,392 +1,618 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+// ─── Encryption helper ────────────────────────────────────────────────────────
+// Uses Web Crypto API (built-in to all modern browsers, no extra deps needed)
+async function encryptPassword(plaintext) {
+  const encoder = new TextEncoder();
+  const data     = encoder.encode(plaintext);
+  const hashBuf  = await crypto.subtle.digest("SHA-256", data);
+  const hashArr  = Array.from(new Uint8Array(hashBuf));
+  return hashArr.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
-export default function LandingPage() {
-  const nav = useNavigate();
-  const [modalOpen,   setModalOpen]   = useState(false);
-  const [submitted,   setSubmitted]   = useState(false);
-  const [submitting,  setSubmitting]  = useState(false);
-  const [formError,   setFormError]   = useState("");
-  const [form, setForm] = useState({
-    firstName: "", lastName: "", company: "", email: "", phone: ""
-  });
-
-  // ── Phone country selector ────────────────────────────────────────────────
-  const COUNTRIES = [
-    { flag: "🇦🇺", code: "+61", name: "AU" },
-    { flag: "🇬🇧", code: "+44", name: "GB" },
-    { flag: "🇺🇸", code: "+1",  name: "US" },
-    { flag: "🇮🇳", code: "+91", name: "IN" },
-    { flag: "🇳🇿", code: "+64", name: "NZ" },
-    { flag: "🇸🇬", code: "+65", name: "SG" },
-  ];
-  const [selectedCountry, setSelectedCountry] = useState(COUNTRIES[0]);
-
-  function formatPhoneNumber(raw) {
-    // Strip non-digits
-    const digits = raw.replace(/\D/g, "");
-    // Format as groups of 4-3-3 (Australian style: 04XX XXX XXX)
-    if (digits.length <= 4) return digits;
-    if (digits.length <= 7) return `${digits.slice(0,4)} ${digits.slice(4)}`;
-    return `${digits.slice(0,4)} ${digits.slice(4,7)} ${digits.slice(7,10)}`;
-  }
-
-  function handlePhoneChange(e) {
-    const formatted = formatPhoneNumber(e.target.value);
-    setField("phone", formatted);
-  }
-
-  function setField(k, v) { setForm(p => ({ ...p, [k]: v })); }
-
-  async function handleRegister() {
-    if (!form.firstName.trim() || !form.email.trim()) {
-      setFormError("First name and email are required.");
-      return;
-    }
-    setSubmitting(true); setFormError("");
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          phone: form.phone ? `${selectedCountry.code} ${form.phone}` : "",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setFormError(data.error || "Registration failed."); return; }
-      setSubmitted(true);
-    } catch { setFormError("Network error. Please try again."); }
-    finally { setSubmitting(false); }
-  }
-
-  function openModal() {
-    setSubmitted(false); setFormError("");
-    setForm({ firstName: "", lastName: "", company: "", email: "", phone: "" });
-    setModalOpen(true);
-  }
-
-  const CHECK_GREEN = (
-    <svg width="8" height="8" viewBox="0 0 8 8">
-      <path d="M1 4l2 2 4-3" stroke="#16A34A" strokeWidth="1.4" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  );
-
+// ─── Leaf SVG (reusable) ──────────────────────────────────────────────────────
+function Leaf({ gradientId, gradientProps, pathD, veinD, shimmer, style }) {
   return (
-    <div style={{ fontFamily: "'DM Sans', sans-serif", color: "#0F1623", background: "#fff", overflowX: "hidden" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap');
-        html { scroll-behavior: smooth; }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { overflow-x: hidden; }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-        @keyframes modalIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
-        .lp-nav-link { color: rgba(255,255,255,.5); font-size: 13px; font-weight: 500; text-decoration: none; transition: color .15s; }
-        .lp-nav-link:hover { color: #fff; }
-        .lp-feature-card { background: #F7F8FA; border: 1px solid #E2E6ED; border-radius: 12px; padding: 28px; transition: box-shadow .2s, transform .2s; }
-        .lp-feature-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,.08); transform: translateY(-2px); }
-        .lp-hero-stat { flex: 1; padding: 20px 24px; text-align: center; border-right: 1px solid rgba(255,255,255,.08); }
-        .lp-hero-stat:last-child { border-right: none; }
-        .lp-step:not(:last-child)::after { content:'→'; position:absolute; right:-8px; top:28px; font-size:18px; color:rgba(255,255,255,.15); }
-        .modal-overlay { position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center; }
-        .modal-box { background:#fff;border-radius:16px;padding:40px;width:100%;max-width:460px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,.3);animation:modalIn .2s ease; }
-        .form-input { width:100%;padding:10px 13px;border:1px solid #E2E6ED;border-radius:8px;font-size:13px;font-family:inherit;color:#0F1623;background:#F7F8FA;outline:none;transition:border-color .15s; }
-        .form-input:focus { border-color:#1D72E8;box-shadow:0 0 0 3px rgba(29,114,232,.1); }
-        .lp-btn-primary { padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;background:#1D72E8;color:#fff;border:none;cursor:pointer;font-family:inherit;transition:all .2s;box-shadow:0 4px 24px rgba(29,114,232,.4); }
-        .lp-btn-primary:hover { background:#3B8BFF;transform:translateY(-1px); }
-        .lp-btn-secondary { padding:14px 32px;border-radius:8px;font-size:15px;font-weight:500;background:transparent;color:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.2);cursor:pointer;font-family:inherit;transition:all .2s; }
-        .lp-btn-secondary:hover { border-color:rgba(255,255,255,.5);color:#fff; }
+    <div style={style}>
+      <svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" fill="none"
+           style={{ width: "100%", height: "100%" }}>
+        <defs>
+          <radialGradient id={gradientId} {...gradientProps}>
+            {gradientProps.stops.map((s, i) => (
+              <stop key={i} offset={s.offset} stopColor={s.color} stopOpacity={s.opacity} />
+            ))}
+          </radialGradient>
+          {shimmer && <filter id={`blur-${gradientId}`}><feGaussianBlur stdDeviation="6"/></filter>}
+        </defs>
+        <path d={pathD} fill={`url(#${gradientId})`} opacity="0.9" />
+        <path d={veinD} stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" fill="none" />
+        {shimmer && (
+          <ellipse cx="150" cy="130" rx="60" ry="90"
+                   fill="rgba(255,255,255,0.07)"
+                   transform="rotate(-20 150 130)"
+                   filter={`url(#blur-${gradientId})`} />
+        )}
+      </svg>
+    </div>
+  );
+}
 
-        /* ── Mobile responsive ─────────────────────────────────────────────── */
-        @media (max-width: 768px) {
-          .lp-nav-links { display: none !important; }
-          .lp-nav-actions { gap: 6px !important; }
-          .lp-nav-actions button { padding: 6px 12px !important; font-size: 12px !important; }
-          .lp-nav { padding: 0 16px !important; }
+// ─── Step progress dots ───────────────────────────────────────────────────────
+function StepDots({ step }) {
+  return (
+    <div style={{ display: "flex", gap: 6, marginBottom: 28 }}>
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          style={{
+            height: 6,
+            borderRadius: i < step ? 3 : "50%",
+            background:
+              i < step  ? "#1D72E8" :
+              i === step ? "#ffffff" :
+              "rgba(255,255,255,0.18)",
+            width: i < step ? 18 : 6,
+            transition: "all 0.3s ease",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
-          .lp-hero { padding: 88px 20px 60px !important; }
-          .lp-hero h1 { font-size: 32px !important; letter-spacing: -0.5px !important; line-height: 1.2 !important; }
-          .lp-hero p { font-size: 15px !important; }
-          .lp-hero-btns { flex-direction: column !important; align-items: stretch !important; }
-          .lp-hero-btns button { width: 100% !important; }
-          .lp-hero-stats { flex-direction: column !important; max-width: 100% !important; }
-          .lp-hero-stat { border-right: none !important; border-bottom: 1px solid rgba(255,255,255,.08) !important; padding: 14px 16px !important; }
-          .lp-hero-stat:last-child { border-bottom: none !important; }
+// ─── Main component ───────────────────────────────────────────────────────────
+export default function LoginPage() {
+  const nav = useNavigate();
 
-          .lp-section { padding: 56px 20px !important; }
-          .lp-grid-2 { grid-template-columns: 1fr !important; gap: 28px !important; }
-          .lp-grid-3 { grid-template-columns: 1fr !important; gap: 16px !important; }
-          .lp-grid-4 { grid-template-columns: 1fr 1fr !important; gap: 0 !important; }
+  const [step, setStep]           = useState(0); // 0=email, 1=password, 2=ready
+  const [email, setEmail]         = useState("");
+  const [password, setPassword]   = useState("");
+  const [pwVisible, setPwVisible] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [pwHint, setPwHint]       = useState("");
+  const [loading, setLoading]     = useState(false);
+  const [success, setSuccess]     = useState(false);
+  const [apiError, setApiError]   = useState("");
 
-          .lp-cta { padding: 64px 20px !important; }
-          .lp-cta h2 { font-size: 26px !important; }
-          .lp-cta-btns { flex-direction: column !important; align-items: stretch !important; }
-          .lp-cta-btns button { width: 100% !important; }
+  // ── Change 1: popup state ─────────────────────────────────────────────────
+  const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [policyOpen,  setPolicyOpen]  = useState(false);
 
-          .lp-footer { flex-direction: column !important; gap: 20px !important; text-align: center !important; padding: 32px 20px !important; align-items: center !important; }
+  const passwordRef = useRef(null);
 
-          .modal-box { padding: 24px 20px !important; margin: 16px !important; max-width: calc(100vw - 32px) !important; }
-          .modal-name-row { grid-template-columns: 1fr !important; }
+  // Focus password field when step advances
+  useEffect(() => {
+    if (step === 1 && passwordRef.current) {
+      setTimeout(() => passwordRef.current?.focus(), 80);
+    }
+  }, [step]);
 
-          .lp-feature-card { padding: 20px !important; }
-          .lp-btn-primary { padding: 12px 24px !important; font-size: 14px !important; }
-          .lp-btn-secondary { padding: 12px 24px !important; font-size: 14px !important; }
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function isValidEmail(v) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+  }
+
+  function handleEmailChange(e) {
+    const v = e.target.value;
+    setEmail(v);
+    if (v.length > 0 && !isValidEmail(v)) {
+      setEmailError("Enter a valid email address");
+    } else {
+      setEmailError("");
+    }
+  }
+
+  function handleEmailKeyDown(e) {
+    if (e.key === "Enter" && isValidEmail(email)) submitEmail();
+  }
+
+  function submitEmail() {
+    if (!isValidEmail(email)) return;
+    setStep(1);
+  }
+
+  function handlePasswordChange(e) {
+    const v = e.target.value;
+    setPassword(v);
+    setApiError("");
+    if (v.length === 0) {
+      setPwHint("");
+      setStep(1);
+    } else if (v.length < 6) {
+      setPwHint(`${6 - v.length} more character${6 - v.length === 1 ? "" : "s"} needed`);
+      setStep(1);
+    } else {
+      setPwHint("✓ Password entered");
+      setStep(2);
+    }
+  }
+
+  function handlePasswordKeyDown(e) {
+    if (e.key === "Enter" && password.length >= 6) handleSubmit();
+  }
+
+  // ── Submit → API call ──────────────────────────────────────────────────────
+  async function handleSubmit() {
+    if (loading || password.length < 6) return;
+    setLoading(true);
+    setApiError("");
+
+    try {
+      const encryptedPassword = await encryptPassword(password);
+
+      const res = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:8080"}/api/login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ loginId: email.trim(), password: encryptedPassword }),
         }
-      `}</style>
+      );
 
-      {/* ── NAV ── */}
-      <nav className="lp-nav" style={{
-        position:"fixed",top:0,left:0,right:0,zIndex:100,
-        background:"rgba(15,22,35,.96)",backdropFilter:"blur(12px)",
-        display:"flex",alignItems:"center",justifyContent:"space-between",
-        padding:"0 48px",height:64,borderBottom:"1px solid rgba(255,255,255,.06)"
+      const data = await res.json();
+
+      // Free plan expiry check
+      if (data.expired) {
+        setApiError(data.error || "Your free trial has expired. Please contact us to update your plan.");
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error || `Login failed (${res.status})`);
+      }
+
+      localStorage.setItem("loginId", data.id);
+      localStorage.setItem("name",    data.name);
+      setSuccess(true);
+      nav("/dashboard");
+    } catch (err) {
+      setApiError(err.message || "Login failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Dynamic heading ────────────────────────────────────────────────────────
+  const heading =
+    step === 0 ? { title: "Welcome!",              desc: "Enter your email to continue to nolyvra." }  :
+    step === 1 ? { title: "Enter your password",   desc: `Signing in as ${email.trim()}`               }  :
+                 { title: "Ready to sign in",       desc: "Click below to access your nolyvra workspace." };
+
+  // ── Shared modal styles ────────────────────────────────────────────────────
+  const modalOverlay = {
+    position: "fixed", inset: 0, zIndex: 999,
+    background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
+    display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+  };
+  const modalBox = {
+    background: "#fff", borderRadius: 14, padding: "32px 36px",
+    width: "100%", maxWidth: 440, position: "relative",
+    boxShadow: "0 24px 64px rgba(0,0,0,0.3)",
+  };
+  const closeBtn = {
+    position: "absolute", top: 14, right: 14,
+    width: 30, height: 30, borderRadius: "50%",
+    background: "#F7F8FA", border: "1px solid #E2E6ED",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    cursor: "pointer", fontSize: 15, color: "#9AA3B4", lineHeight: 1,
+  };
+  const modalTitle = { fontSize: 18, fontWeight: 700, color: "#0F1623", marginBottom: 6 };
+  const modalDesc  = { fontSize: 13, color: "#9AA3B4", lineHeight: 1.6, marginBottom: 20 };
+  const bullet     = { width: 6, height: 6, borderRadius: "50%", background: "#1D72E8", marginTop: 6, flexShrink: 0 };
+  const closeModalBtn = {
+    marginTop: 8, width: "100%", padding: "10px 0",
+    borderRadius: 8, background: "#1D72E8", color: "#fff",
+    border: "none", fontSize: 13, fontWeight: 600,
+    cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  return (
+    <>
+      {/* ── Google Font ── */}
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=DM+Serif+Display&display=swap"
+        rel="stylesheet"
+      />
+
+      <div style={{
+        position: "fixed", inset: 0,
+        fontFamily: "'DM Sans', sans-serif",
+        overflow: "hidden",
       }}>
-        <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-          <img src="/nolyvra_logo.png" alt="nolyvra" style={{ width:36, height:36, borderRadius:8, objectFit:"cover" }} />
-          <div style={{ lineHeight:1 }}>
-            <div style={{ color:"#fff",fontSize:17,fontWeight:700,letterSpacing:"-.4px" }}>nolyvra</div>
-            <div style={{ color:"rgba(255,255,255,.3)",fontSize:9,fontWeight:500,letterSpacing:"1.5px",textTransform:"uppercase",marginTop:2 }}>TALENT RUNS DEEP</div>
-          </div>
-        </div>
-        <div className="lp-nav-links" style={{ display:"flex",gap:28 }}>
-          {[["Why nolyvra","#problem"],["Features","#features"],["How It Works","#how"]].map(([l,h]) => (
-            <a key={l} href={h} className="lp-nav-link">{l}</a>
-          ))}
-          <a
-            href="/ai-in-recruitment"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="lp-nav-link">
-            AI in Recruitment
-          </a>
-        </div>
-        <div className="lp-nav-actions" style={{ display:"flex",gap:10,alignItems:"center" }}>
-          <button onClick={() => nav("/login")} style={{ padding:"7px 18px",borderRadius:7,fontSize:13,fontWeight:500,border:"1px solid rgba(255,255,255,.2)",color:"rgba(255,255,255,.8)",background:"transparent",cursor:"pointer",fontFamily:"inherit",transition:"all .15s" }}>Login</button>
-          <button onClick={openModal} style={{ padding:"7px 18px",borderRadius:7,fontSize:13,fontWeight:600,background:"#1D72E8",color:"#fff",border:"none",cursor:"pointer",fontFamily:"inherit" }}>Register Interest</button>
-        </div>
-      </nav>
 
-      {/* ── HERO ── */}
-      <section className="lp-hero" style={{ minHeight:"100vh",background:"linear-gradient(160deg,#0F1623 0%,#1B2A4A 50%,#0F1623 100%)",display:"flex",alignItems:"center",justifyContent:"center",padding:"100px 48px 80px",position:"relative",overflow:"hidden" }}>
-        <div style={{ position:"absolute",inset:0,backgroundImage:"linear-gradient(rgba(29,114,232,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(29,114,232,.06) 1px,transparent 1px)",backgroundSize:"60px 60px" }} />
-        <div style={{ position:"absolute",top:-200,left:"50%",transform:"translateX(-50%)",width:800,height:600,background:"radial-gradient(ellipse,rgba(29,114,232,.18) 0%,transparent 70%)",pointerEvents:"none" }} />
-        <div style={{ maxWidth:960,margin:"0 auto",textAlign:"center",position:"relative",zIndex:1 }}>
-          <div style={{ display:"inline-flex",alignItems:"center",gap:8,background:"rgba(29,114,232,.12)",border:"1px solid rgba(29,114,232,.3)",borderRadius:20,padding:"5px 14px",marginBottom:28 }}>
-            <div style={{ width:6,height:6,borderRadius:"50%",background:"#3B8BFF",animation:"pulse 2s infinite" }} />
-            <span style={{ fontSize:12,fontWeight:600,color:"#3B8BFF",letterSpacing:".3px" }}>AI-Powered Recruitment Intelligence</span>
-          </div>
-          <h1 style={{ fontSize:58,fontWeight:700,color:"#fff",lineHeight:1.1,letterSpacing:"-1.5px",marginBottom:12 }}>
-            Recruitment is human-intensive.<br />
-            It's time to make it <span style={{ background:"linear-gradient(135deg,#3B8BFF,#60A5FA)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text" }}>human-centric.</span>
-          </h1>
-          <p style={{ fontSize:22,fontWeight:300,color:"rgba(255,255,255,.55)",letterSpacing:"-.3px",marginBottom:32,lineHeight:1.5 }}>
-            nolyvra uses AI to analyse candidates, detect risk signals<br />and surface insights — so recruiters can focus on people.
-          </p>
-          <div className="lp-hero-btns" style={{ display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap",marginBottom:56 }}>
-            <button className="lp-btn-primary" onClick={openModal}>✦ Register Your Interest</button>
-            <button className="lp-btn-secondary" onClick={() => nav("/login")}>Login to Platform →</button>
-          </div>
-          <div className="lp-hero-stats" style={{ display:"flex",border:"1px solid rgba(255,255,255,.08)",borderRadius:12,background:"rgba(255,255,255,.03)",backdropFilter:"blur(8px)",overflow:"hidden",maxWidth:680,margin:"0 auto" }}>
-            {[["73%","Recruiter time on manual review"],["4×","Faster candidate screening with AI"],["$8.5B","AI recruitment market by 2027"],["68%","Of firms plan AI hiring tools"]].map(([val,lbl]) => (
-              <div key={lbl} className="lp-hero-stat">
-                <div style={{ fontSize:28,fontWeight:700,color:"#fff",letterSpacing:"-.5px",lineHeight:1 }}>{val}</div>
-                <div style={{ fontSize:11,color:"rgba(255,255,255,.35)",marginTop:5,fontWeight:500,textTransform:"uppercase",letterSpacing:".5px" }}>{lbl}</div>
+        {/* ── Background ── */}
+        <div style={{
+          position: "absolute", inset: 0,
+          background: `
+            radial-gradient(ellipse 80% 60% at 20% 100%, #0D2F6E 0%, transparent 60%),
+            radial-gradient(ellipse 60% 80% at 90% 10%,  #071B4A 0%, transparent 55%),
+            radial-gradient(ellipse 100% 100% at 50% 50%, #0A1628 0%, #060D1A 100%)
+          `,
+          zIndex: 0,
+        }} />
+
+        {/* ── Leaf top-right ── */}
+        <Leaf
+          gradientId="lg1"
+          style={{
+            position: "absolute", right: -120, top: -80,
+            width: 640, height: 640,
+            opacity: 0.18, pointerEvents: "none", zIndex: 1,
+            animation: "leafFloat 8s ease-in-out infinite",
+          }}
+          gradientProps={{
+            cx: "35%", cy: "30%", r: "70%",
+            stops: [
+              { offset: "0%",   color: "#3D8EFF", opacity: 1    },
+              { offset: "55%",  color: "#1D72E8", opacity: 0.7  },
+              { offset: "100%", color: "#ffffff", opacity: 0.15 },
+            ],
+          }}
+          pathD="M200 20 C310 20 380 100 380 200 C380 310 300 385 200 385 C90 385 18 300 20 200 C22 90 90 20 200 20 Z"
+          veinD="M200 40 C290 80 340 150 320 260 C300 340 240 375 200 385"
+          shimmer
+        />
+
+        {/* ── Leaf bottom-left ── */}
+        <Leaf
+          gradientId="lg2"
+          style={{
+            position: "absolute", left: -160, bottom: -120,
+            width: 520, height: 520,
+            opacity: 0.10, pointerEvents: "none", zIndex: 1,
+            animation: "leafFloat 11s ease-in-out infinite reverse",
+          }}
+          gradientProps={{
+            cx: "60%", cy: "65%", r: "65%",
+            stops: [
+              { offset: "0%",   color: "#ffffff", opacity: 0.6 },
+              { offset: "50%",  color: "#1D72E8", opacity: 0.5 },
+              { offset: "100%", color: "#0A1628", opacity: 0.1 },
+            ],
+          }}
+          pathD="M200 15 C315 15 385 100 385 205 C385 315 300 388 200 388 C88 388 15 302 15 200 C15 88 90 15 200 15 Z"
+          veinD="M200 40 C285 90 330 170 310 275 C290 355 238 382 200 388"
+        />
+
+        {/* ── CSS keyframes injected inline ── */}
+        <style>{`
+          @keyframes leafFloat {
+            0%,100% { transform: rotate(0deg) scale(1); }
+            50%      { transform: rotate(4deg) scale(1.03); }
+          }
+          @keyframes cardIn {
+            from { opacity:0; transform: translateY(20px) scale(.98); }
+            to   { opacity:1; transform: translateY(0) scale(1); }
+          }
+          @keyframes fieldIn {
+            from { opacity:0; transform: translateY(10px); }
+            to   { opacity:1; transform: translateY(0); }
+          }
+          .login-input {
+            width: 100%;
+            height: 46px;
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.14);
+            border-radius: 10px;
+            padding: 0 16px;
+            font-size: 14px;
+            font-family: 'DM Sans', sans-serif;
+            color: #fff;
+            outline: none;
+            transition: border-color .2s, background .2s, box-shadow .2s;
+            box-sizing: border-box;
+          }
+          .login-input::placeholder { color: rgba(255,255,255,0.28); }
+          .login-input:focus {
+            border-color: #1D72E8;
+            background: rgba(29,114,232,0.08);
+            box-shadow: 0 0 0 3px rgba(29,114,232,0.18);
+          }
+          .login-input:read-only {
+            opacity: 0.55;
+            cursor: default;
+          }
+          .arrow-btn {
+            flex-shrink: 0;
+            width: 46px; height: 46px;
+            border-radius: 10px; border: none;
+            background: linear-gradient(135deg, #1D72E8, #3D8EFF);
+            color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(29,114,232,0.35);
+            transition: transform .15s, box-shadow .15s, opacity .15s;
+            font-size: 18px; line-height: 1;
+          }
+          .arrow-btn:hover:not(:disabled) {
+            transform: translateX(2px);
+            box-shadow: 0 6px 20px rgba(29,114,232,0.5);
+          }
+          .arrow-btn:disabled { opacity: 0.35; cursor: default; }
+          .submit-btn {
+            width: 100%; height: 48px;
+            border-radius: 10px; border: none;
+            background: linear-gradient(135deg, #1D72E8 0%, #3D8EFF 100%);
+            color: #fff;
+            font-size: 14px; font-weight: 600;
+            font-family: 'DM Sans', sans-serif;
+            cursor: pointer;
+            box-shadow: 0 4px 18px rgba(29,114,232,0.4);
+            transition: transform .15s, box-shadow .15s, background .3s;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            animation: fieldIn .35s .05s cubic-bezier(.22,1,.36,1) both;
+          }
+          .submit-btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(29,114,232,0.5);
+          }
+          .submit-btn:disabled { opacity: 0.75; cursor: default; transform: none; }
+          .submit-btn.success {
+            background: linear-gradient(135deg, #16A34A, #22C55E);
+            box-shadow: 0 4px 18px rgba(22,163,74,0.4);
+          }
+          .pw-toggle {
+            position: absolute; right: 14px; top: 50%;
+            transform: translateY(-50%);
+            background: none; border: none;
+            color: rgba(255,255,255,0.35);
+            cursor: pointer; font-size: 14px; padding: 0; line-height: 1;
+            transition: color .15s;
+          }
+          .pw-toggle:hover { color: rgba(255,255,255,0.6); }
+          .field-group-animate { animation: fieldIn .35s cubic-bezier(.22,1,.36,1) both; }
+        `}</style>
+
+        {/* ── Page centre ── */}
+        <div style={{
+          position: "relative", zIndex: 2,
+          height: "100vh",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 24,
+        }}>
+
+          {/* ── Card ── */}
+          <div style={{
+            width: "100%", maxWidth: 420,
+            background: "rgba(12,24,50,0.72)",
+            border: "1px solid rgba(255,255,255,0.09)",
+            borderRadius: 18,
+            padding: "40px 40px 36px",
+            backdropFilter: "blur(28px)",
+            WebkitBackdropFilter: "blur(28px)",
+            boxShadow: "0 0 0 1px rgba(29,114,232,0.08), 0 32px 64px rgba(0,0,0,0.48), 0 4px 16px rgba(0,0,0,0.32)",
+            animation: "cardIn .5s cubic-bezier(.22,1,.36,1) both",
+          }}>
+
+            {/* Brand */}
+            <div style={{ display: "flex", alignItems: "center", gap: 11, marginBottom: 32 }}>
+              <div style={{
+                width: 36, height: 36,
+                background: "linear-gradient(135deg, #1D72E8, #3D8EFF)",
+                borderRadius: 9,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 13, fontWeight: 800, color: "#fff",
+                boxShadow: "0 4px 14px rgba(29,114,232,0.4)",
+                letterSpacing: "-0.3px", flexShrink: 0,
+              }}>
+                IQ
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── PROBLEM SECTION ── */}
-      <section id="problem" className="lp-section" style={{ padding:"96px 48px",background:"#fff" }}>
-        <div style={{ maxWidth:1100,margin:"0 auto" }}>
-          <div style={{ textAlign:"center",marginBottom:0 }}>
-            <span style={{ fontSize:11,fontWeight:700,color:"#1D72E8",textTransform:"uppercase",letterSpacing:"1.2px",display:"inline-block",marginBottom:12 }}>The Problem</span>
-            <h2 style={{ fontSize:36,fontWeight:700,color:"#0F1623",letterSpacing:"-.8px",lineHeight:1.2,marginBottom:14,maxWidth:700,margin:"0 auto 12px" }}>Recruitment is drowning in data. Insights are scarce.</h2>
-            <p style={{ fontSize:16,color:"#9AA3B4",lineHeight:1.7,maxWidth:600,margin:"0 auto",textAlign:"center" }}>Despite digital tools, most candidate evaluation remains manual — costing agencies time, money and quality hires.</p>
-          </div>
-          <div className="lp-grid-2" style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:48,alignItems:"center",marginTop:56 }}>
-            <div>
-              {["Artificial Intelligence is redefining how organisations identify, evaluate and hire talent. It has transitioned from research innovation to operational capability.",
-                "Companies across industries are integrating AI to automate workflows, analyse data and augment decision-making.",
-                "Recruitment remains one of the most human-intensive business functions despite digital tools. Recruitment agencies manage large volumes of candidate data across multiple roles and clients.",
-                "Despite advancements in applicant tracking systems, the majority of recruiters' time is spent reviewing resumes and coordinating interviews — rather than engaging strategically with candidates."
-              ].map((p,i) => <p key={i} style={{ fontSize:15,color:"#3D4A63",lineHeight:1.9,marginBottom:16 }}>{p}</p>)}
-            </div>
-            <div style={{ background:"linear-gradient(135deg,#EBF2FF,#F0F4FF)",border:"1px solid #BFDBFE",borderRadius:12,padding:28 }}>
-              <div style={{ fontSize:12,fontWeight:700,color:"#1D72E8",textTransform:"uppercase",letterSpacing:".8px",marginBottom:16 }}>Industry Reality Check</div>
-              {[["73%","of a recruiter's working week is spent on manual resume review and coordination tasks"],
-                ["250+","average applications received per corporate job opening, mostly unscreened"],
-                ["$14k","average cost of a bad hire — not including productivity and team impact"],
-                ["42 days","average time-to-hire for professional roles in the current market"]].map(([n,t]) => (
-                <div key={n} style={{ display:"flex",alignItems:"center",gap:12,padding:"10px 0",borderBottom:"1px solid rgba(191,219,254,.5)" }}>
-                  <div style={{ fontSize:26,fontWeight:700,color:"#1D72E8",minWidth:64,lineHeight:1 }}>{n}</div>
-                  <div style={{ fontSize:13,color:"#3D4A63",lineHeight:1.5 }}>{t}</div>
+              <div>
+                <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 22, color: "#fff", letterSpacing: "-0.3px", lineHeight: 1 }}>
+                  nolyvra
                 </div>
-              ))}
+                <div style={{ fontSize: 9, color: "rgba(255,255,255,0.3)", letterSpacing: "0.5px", marginTop: 2 }}>
+                  MVP v0.1
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      </section>
 
-      {/* ── FEATURES SECTION ── */}
-      <section id="features" className="lp-section" style={{ padding:"96px 48px",background:"#fff" }}>
-        <div style={{ maxWidth:1100,margin:"0 auto" }}>
-          <span style={{ fontSize:11,fontWeight:700,color:"#1D72E8",textTransform:"uppercase",letterSpacing:"1.2px",display:"inline-block",marginBottom:12 }}>Platform Capabilities</span>
-          <h2 style={{ fontSize:36,fontWeight:700,color:"#0F1623",letterSpacing:"-.8px",lineHeight:1.2,marginBottom:14 }}>Everything a modern recruiter needs.</h2>
-          <p style={{ fontSize:16,color:"#9AA3B4",lineHeight:1.7,maxWidth:600,marginBottom:48 }}>nolyvra combines AI analysis, risk detection and workflow management in one unified platform built for recruitment agencies.</p>
-          <div className="lp-grid-3" style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:20 }}>
-            {[["🔍","#EBF2FF","AI Candidate Analysis","CV vs LinkedIn consistency scoring, capability matrix and risk flag detection — all automated in seconds."],
-              ["🛡","#F5F3FF","Fraud Detection","AI-generated resume detection, timeline inconsistency flags and skill inflation signals to protect hiring quality."],
-              ["📊","#F0FDF4","Placement Probability","Predict hire likelihood using AI pattern matching across historical placements and candidate profiles."],
-              ["✦","#FFFBEB","AI Talent Search","Natural language search across your internal database and market data to surface the best-fit candidates instantly."],
-              ["📅","#FEF2F2","Interview Scheduling","Integrated calendar scheduling with Google Calendar and Outlook sync — send invites in one click."],
-              ["✉","#EBF2FF","AI Email Generator","Generate professional candidate communications instantly — interview invites, follow-ups and offer letters."]
-            ].map(([icon,bg,title,desc]) => (
-              <div key={title} className="lp-feature-card">
-                <div style={{ width:44,height:44,borderRadius:10,background:bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,marginBottom:16 }}>{icon}</div>
-                <div style={{ fontSize:15,fontWeight:700,color:"#0F1623",marginBottom:8 }}>{title}</div>
-                <div style={{ fontSize:13,color:"#9AA3B4",lineHeight:1.7 }}>{desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+            {/* Step dots */}
+            <StepDots step={step} />
 
-      {/* ── HOW IT WORKS ── */}
-      <section id="how" className="lp-section" style={{ padding:"96px 48px",background:"linear-gradient(160deg,#0F1623 0%,#1B2A4A 100%)",position:"relative",overflow:"hidden" }}>
-        <div style={{ position:"absolute",inset:0,backgroundImage:"linear-gradient(rgba(29,114,232,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(29,114,232,.04) 1px,transparent 1px)",backgroundSize:"50px 50px" }} />
-        <div style={{ maxWidth:1100,margin:"0 auto",position:"relative",zIndex:1 }}>
-          <span style={{ fontSize:11,fontWeight:700,color:"#3B8BFF",textTransform:"uppercase",letterSpacing:"1.2px",display:"inline-block",marginBottom:12 }}>How It Works</span>
-          <h2 style={{ fontSize:36,fontWeight:700,color:"#fff",letterSpacing:"-.8px",lineHeight:1.2,marginBottom:14 }}>From CV to insight in minutes.</h2>
-          <p style={{ fontSize:16,color:"rgba(255,255,255,.45)",lineHeight:1.7,maxWidth:600,marginBottom:56 }}>nolyvra's agentic AI analyses candidates end-to-end so your team focuses on relationships, not repetition.</p>
-          <div className="lp-grid-4" style={{ display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:0 }}>
-            {[["1","Post a Job","Paste a job description. AI extracts required skills, seniority signals and capability criteria automatically."],
-              ["2","Add Candidate","Paste a CV or upload a PDF. Provide the LinkedIn URL for cross-validation."],
-              ["3","Run AI Analysis","AI scores consistency, capability match, fraud signals and generates interview questions in seconds."],
-              ["4","Hire Smarter","Use AI-ranked insights to engage the best candidates faster and submit higher quality shortlists."]
-            ].map(([num,title,desc],i,arr) => (
-              <div key={num} className="lp-step" style={{ textAlign:"center",padding:"0 20px",position:"relative" }}>
-                {i < arr.length-1 && <span style={{ position:"absolute",right:-8,top:28,fontSize:18,color:"rgba(255,255,255,.15)" }}>→</span>}
-                <div style={{ width:56,height:56,borderRadius:"50%",border:"2px solid rgba(29,114,232,.4)",background:"rgba(29,114,232,.1)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,fontWeight:700,color:"#3B8BFF",margin:"0 auto 16px" }}>{num}</div>
-                <div style={{ fontSize:14,fontWeight:600,color:"#fff",marginBottom:8 }}>{title}</div>
-                <div style={{ fontSize:12,color:"rgba(255,255,255,.4)",lineHeight:1.6 }}>{desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+            {/* Heading */}
+            <div style={{ marginBottom: 28 }}>
+              <h1 style={{ fontSize: 22, fontWeight: 700, color: "#fff", letterSpacing: "-0.4px", lineHeight: 1.2, margin: "0 0 6px" }}>
+                {heading.title}
+              </h1>
+              <p style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", lineHeight: 1.6, margin: 0 }}>
+                {heading.desc}
+              </p>
+            </div>
 
-      {/* ── CTA SECTION ── */}
-      <section className="lp-cta" style={{ background:"linear-gradient(135deg,#0F1623 0%,#1B3A6B 100%)",textAlign:"center",padding:"96px 48px" }}>
-        <div style={{ maxWidth:1100,margin:"0 auto" }}>
-          <span style={{ fontSize:11,fontWeight:700,color:"#3B8BFF",textTransform:"uppercase",letterSpacing:"1.2px",display:"inline-block",marginBottom:12 }}>Early Access</span>
-          <h2 style={{ fontSize:42,fontWeight:700,color:"#fff",letterSpacing:"-1px",marginBottom:16 }}>Ready to hire smarter?</h2>
-          <p style={{ fontSize:17,color:"rgba(255,255,255,.5)",marginBottom:40,maxWidth:560,margin:"0 auto 40px",lineHeight:1.6 }}>Join forward-thinking recruitment agencies already on the nolyvra waitlist.</p>
-          <div className="lp-cta-btns" style={{ display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap" }}>
-            <button className="lp-btn-primary" onClick={openModal}>✦ Register Your Interest</button>
-            <button className="lp-btn-secondary" onClick={() => nav("/login")}>Login to Platform →</button>
-          </div>
-          <p style={{ marginTop:20,fontSize:12,color:"rgba(255,255,255,.2)" }}>No commitment required · One of our team will be in touch</p>
-        </div>
-      </section>
+            {/* Form */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
 
-      {/* ── FOOTER ── */}
-      <footer className="lp-footer" style={{ background:"#0F1623",padding:"40px 48px",display:"flex",alignItems:"center",justifyContent:"space-between",borderTop:"1px solid rgba(255,255,255,.06)" }}>
-        <div style={{ display:"flex",alignItems:"center",gap:10 }}>
-          <img src="/nolyvra_logo.png" alt="nolyvra" style={{ width:36, height:36, borderRadius:8, objectFit:"cover" }} />
-          <div>
-            <div style={{ color:"rgba(255,255,255,.6)",fontSize:14,fontWeight:600 }}>nolyvra</div>
-            <div style={{ fontSize:11,color:"rgba(255,255,255,.2)",fontStyle:"italic" }}>Intelligence. Evolved</div>
-          </div>
-        </div>
-        <div style={{ fontSize:12,color:"rgba(255,255,255,.25)" }}>© 2026 nolyvra · All rights reserved</div>
-        <div style={{ display:"flex",alignItems:"center",gap:16 }}>
-          <div style={{ fontSize:12,color:"rgba(255,255,255,.2)" }}>This AI tool is designed to assist, not replace professional judgment.</div>
-          <a href="https://www.linkedin.com/company/nolyvra/" target="_blank" rel="noopener noreferrer"
-            style={{ display:"flex",alignItems:"center",justifyContent:"center",width:32,height:32,borderRadius:6,background:"#0A66C2",color:"#fff",textDecoration:"none",flexShrink:0,transition:"opacity .15s" }}
-            onMouseEnter={e=>e.currentTarget.style.opacity=".8"} onMouseLeave={e=>e.currentTarget.style.opacity="1"}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-            </svg>
-          </a>
-        </div>
-      </footer>
-
-      {/* ── REGISTER INTEREST MODAL ── */}
-      {modalOpen && (
-        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setModalOpen(false); }}>
-          <div className="modal-box">
-            <button onClick={() => setModalOpen(false)} style={{ position:"absolute",top:16,right:16,width:32,height:32,borderRadius:"50%",background:"#F7F8FA",border:"1px solid #E2E6ED",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:16,color:"#9AA3B4" }}>✕</button>
-
-            {!submitted ? (
-              <>
-                <div style={{ fontSize:28,marginBottom:10 }}>✦</div>
-                <div style={{ fontSize:22,fontWeight:700,color:"#0F1623",letterSpacing:"-.4px",marginBottom:6 }}>Register Your Interest</div>
-                <div style={{ fontSize:13,color:"#9AA3B4",marginBottom:28,lineHeight:1.5 }}>Tell us about yourself and we'll be in touch shortly with early access details.</div>
-
-                {formError && (
-                  <div style={{ background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:12,color:"#DC2626" }}>{formError}</div>
+              {/* ── Email field ── */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.55)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                  Email
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input
+                    className="login-input"
+                    type="email"
+                    placeholder="you@company.com"
+                    value={email}
+                    onChange={handleEmailChange}
+                    onKeyDown={handleEmailKeyDown}
+                    readOnly={step > 0}
+                    autoComplete="email"
+                    autoFocus
+                  />
+                  {step === 0 && (
+                    <button
+                      className="arrow-btn"
+                      onClick={submitEmail}
+                      disabled={!isValidEmail(email)}
+                      title="Continue"
+                    >
+                      →
+                    </button>
+                  )}
+                </div>
+                {step === 0 && emailError && (
+                  <div style={{ fontSize: 11, color: "#F87171", paddingLeft: 2 }}>{emailError}</div>
                 )}
-
-                <div className="modal-name-row" style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:16 }}>
-                  <div>
-                    <label style={{ display:"block",fontSize:12,fontWeight:600,color:"#0F1623",marginBottom:5 }}>First Name *</label>
-                    <input className="form-input" type="text" placeholder="Sarah" value={form.firstName} onChange={e => setField("firstName", e.target.value)} />
-                  </div>
-                  <div>
-                    <label style={{ display:"block",fontSize:12,fontWeight:600,color:"#0F1623",marginBottom:5 }}>Last Name</label>
-                    <input className="form-input" type="text" placeholder="Reynolds" value={form.lastName} onChange={e => setField("lastName", e.target.value)} />
-                  </div>
-                </div>
-                <div style={{ marginBottom:16 }}>
-                  <label style={{ display:"block",fontSize:12,fontWeight:600,color:"#0F1623",marginBottom:5 }}>Company *</label>
-                  <input className="form-input" type="text" placeholder="Your recruitment agency" value={form.company} onChange={e => setField("company", e.target.value)} />
-                </div>
-                <div style={{ marginBottom:16 }}>
-                  <label style={{ display:"block",fontSize:12,fontWeight:600,color:"#0F1623",marginBottom:5 }}>Email Address *</label>
-                  <input className="form-input" type="email" placeholder="sarah@agency.com" value={form.email} onChange={e => setField("email", e.target.value)} />
-                </div>
-                <div style={{ marginBottom:20 }}>
-                  <label style={{ display:"block",fontSize:12,fontWeight:600,color:"#0F1623",marginBottom:5 }}>Phone Number</label>
-                  <div style={{ display:"flex",gap:8,alignItems:"center" }}>
-                    {/* Country flag + code selector */}
-                    <select
-                      value={selectedCountry.code}
-                      onChange={e => setSelectedCountry(COUNTRIES.find(c => c.code === e.target.value))}
-                      style={{ padding:"10px 8px",border:"1px solid #E2E6ED",borderRadius:8,fontSize:13,fontFamily:"inherit",color:"#0F1623",background:"#F7F8FA",cursor:"pointer",outline:"none",flexShrink:0 }}>
-                      {COUNTRIES.map(c => (
-                        <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
-                      ))}
-                    </select>
-                    <input className="form-input" type="tel"
-                      placeholder="04XX XXX XXX"
-                      value={form.phone}
-                      onChange={handlePhoneChange}
-                      maxLength={12}
-                      style={{ flex:1 }} />
-                  </div>
-                  <div style={{ fontSize:11,color:"#9AA3B4",marginTop:4 }}>
-                    Country code: {selectedCountry.flag} {selectedCountry.code}
-                  </div>
-                </div>
-                <button onClick={handleRegister} disabled={submitting} style={{ width:"100%",padding:12,borderRadius:8,fontSize:14,fontWeight:600,background:"#1D72E8",color:"#fff",border:"none",cursor:"pointer",fontFamily:"inherit",transition:"all .15s" }}>
-                  {submitting ? "Submitting…" : "Submit →"}
-                </button>
-              </>
-            ) : (
-              <div style={{ textAlign:"center",paddingTop:24 }}>
-                <div style={{ fontSize:48,marginBottom:12 }}>🎉</div>
-                <div style={{ fontSize:18,fontWeight:700,color:"#0F1623",marginBottom:8 }}>Thank you for your interest!</div>
-                <div style={{ fontSize:14,color:"#9AA3B4",lineHeight:1.6,marginBottom:20 }}>Thanks for your interest. One of our Customer Service Representatives will get in touch shortly.</div>
-                <button onClick={() => setModalOpen(false)} style={{ padding:"10px 24px",borderRadius:7,background:"#1D72E8",color:"#fff",border:"none",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit" }}>Close</button>
+                {step > 0 && (
+                  <div style={{ fontSize: 11, color: "#4ADE80", paddingLeft: 2 }}>✓ Email confirmed</div>
+                )}
               </div>
-            )}
+
+              {/* ── Password field (shown from step 1) ── */}
+              {step >= 1 && (
+                <div className="field-group-animate" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.55)", textTransform: "uppercase", letterSpacing: "0.6px" }}>
+                    Password
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ position: "relative", flex: 1 }}>
+                      <input
+                        ref={passwordRef}
+                        className="login-input"
+                        type={pwVisible ? "text" : "password"}
+                        placeholder="Enter your password"
+                        value={password}
+                        onChange={handlePasswordChange}
+                        onKeyDown={handlePasswordKeyDown}
+                        autoComplete="current-password"
+                        style={{ paddingRight: 44 }}
+                      />
+                      <button
+                        className="pw-toggle"
+                        onClick={() => setPwVisible((v) => !v)}
+                        title="Show / hide password"
+                        type="button"
+                      >
+                        {pwVisible ? "🙈" : "👁"}
+                      </button>
+                    </div>
+                  </div>
+                  {pwHint && (
+                    <div style={{
+                      fontSize: 11,
+                      color: pwHint.startsWith("✓") ? "#4ADE80" : "rgba(255,255,255,0.35)",
+                      paddingLeft: 2,
+                    }}>
+                      {pwHint}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── API error ── */}
+              {apiError && (
+                <div style={{
+                  fontSize: 12, color: "#F87171",
+                  background: "rgba(239,68,68,0.1)",
+                  border: "1px solid rgba(239,68,68,0.25)",
+                  borderRadius: 8, padding: "10px 14px",
+                }}>
+                  {apiError}
+                </div>
+              )}
+
+              {/* ── Submit button (shown from step 2) ── */}
+              {step >= 2 && (
+                <button
+                  className={`submit-btn${success ? " success" : ""}`}
+                  onClick={handleSubmit}
+                  disabled={loading || success}
+                >
+                  {success
+                    ? <><span>✓ Signed in</span><span>— redirecting…</span></>
+                    : loading
+                    ? <span style={{ opacity: 0.7 }}>Signing in…</span>
+                    : <><span>Sign In to nolyvra</span><span>→</span></>
+                  }
+                </button>
+              )}
+
+            </div>
+
+            {/* ── Change 1: Footer with clickable Privacy Policy + Password Policy ── */}
+            <div style={{ marginTop: 24, textAlign: "center" }}>
+              <span style={{ fontSize: 10, color: "rgba(255,255,255,0.18)" }}>
+                Protected by nolyvra ·{" "}
+                <a href="#" onClick={e => { e.preventDefault(); setPrivacyOpen(true); }}
+                  style={{ color: "rgba(255,255,255,0.25)", textDecoration: "none", cursor: "pointer" }}>
+                  Privacy Policy
+                </a>
+                {" "}·{" "}
+                <a href="#" onClick={e => { e.preventDefault(); setPolicyOpen(true); }}
+                  style={{ color: "rgba(255,255,255,0.25)", textDecoration: "none", cursor: "pointer" }}>
+                  Password Policy
+                </a>
+              </span>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      {/* ── Change 1a: Privacy Policy Modal ── */}
+      {privacyOpen && (
+        <div style={modalOverlay} onClick={e => { if (e.target === e.currentTarget) setPrivacyOpen(false); }}>
+          <div style={modalBox}>
+            <button onClick={() => setPrivacyOpen(false)} style={closeBtn}>✕</button>
+            <div style={{ fontSize: 22, marginBottom: 8 }}>🔐</div>
+            <div style={modalTitle}>Privacy Policy</div>
+            <div style={modalDesc}>
+              nolyvra is committed to protecting your personal information and your right to privacy.
+            </div>
+            {[
+              ["Data collection", "We collect only the information necessary to provide our recruitment intelligence services, including your name, email address and usage data."],
+              ["Data usage", "Your data is used solely to operate and improve the nolyvra platform. We do not sell or share your personal data with third parties for marketing purposes."],
+              ["Data security", "We implement industry-standard security measures including encryption and access controls to protect your information."],
+              ["Data retention", "We retain your data only for as long as necessary to provide our services or as required by law."],
+              ["Your rights", "You have the right to access, correct or delete your personal data at any time by contacting our support team."],
+            ].map(([title, desc]) => (
+              <div key={title} style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "flex-start" }}>
+                <div style={bullet} />
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#0F1623", marginBottom: 2 }}>{title}</div>
+                  <div style={{ fontSize: 12, color: "#9AA3B4", lineHeight: 1.5 }}>{desc}</div>
+                </div>
+              </div>
+            ))}
+            <button onClick={() => setPrivacyOpen(false)} style={closeModalBtn}>Close</button>
           </div>
         </div>
       )}
-    </div>
+
+      {/* ── Change 1b: Password Policy Modal ── */}
+      {policyOpen && (
+        <div style={modalOverlay} onClick={e => { if (e.target === e.currentTarget) setPolicyOpen(false); }}>
+          <div style={modalBox}>
+            <button onClick={() => setPolicyOpen(false)} style={closeBtn}>✕</button>
+            <div style={{ fontSize: 22, marginBottom: 8 }}>🔒</div>
+            <div style={modalTitle}>Password Policy</div>
+            <div style={modalDesc}>
+              To keep your nolyvra account secure, please follow these guidelines when creating or updating your password.
+            </div>
+            {[
+              ["Minimum length", "Your password must be at least 6 characters long."],
+              ["Mix of characters", "We recommend using a combination of uppercase and lowercase letters, numbers and symbols for a stronger password."],
+              ["Avoid common passwords", "Do not use easily guessable passwords such as your name, email address, or common words like 'password123'."],
+              ["Keep it private", "Never share your password with anyone, including nolyvra support staff."],
+              ["Regular updates", "We recommend updating your password periodically to maintain account security."],
+            ].map(([title, desc]) => (
+              <div key={title} style={{ display: "flex", gap: 10, marginBottom: 12, alignItems: "flex-start" }}>
+                <div style={bullet} />
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#0F1623", marginBottom: 2 }}>{title}</div>
+                  <div style={{ fontSize: 12, color: "#9AA3B4", lineHeight: 1.5 }}>{desc}</div>
+                </div>
+              </div>
+            ))}
+            <button onClick={() => setPolicyOpen(false)} style={closeModalBtn}>Close</button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
