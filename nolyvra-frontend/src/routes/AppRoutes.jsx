@@ -1,20 +1,21 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import LandingPage         from "../pages/LandingPage";
-import PricingPage         from "../pages/PricingPage";
-import LoginPage           from "../pages/LoginPage";
-import DashboardPage       from "../pages/DashboardPage";
-import JobsPage            from "../pages/JobsPage";
-import CreateJobPage       from "../pages/CreateJobPage";
-import CandidatesPage      from "../pages/CandidatesPage";
-import AddCandidatePage    from "../pages/AddCandidatePage";
-import AnalysisPage        from "../pages/AnalysisPage";
-import TalentSearchPage    from "../pages/TalentSearchPage";
-import CandidateWorkflowPage from "../pages/CandidateWorkflowPage";
-import SchedulerPage       from "../pages/SchedulerPage";
-import EmailCentrePage     from "../pages/EmailCentrePage";
-import RemindersPage       from "../pages/RemindersPage";
-import SettingsPage        from "../pages/SettingsPage";
-import CoWorkerPage        from "../pages/CoWorkerPage";
+import LandingPage            from "../pages/LandingPage";
+import PricingPage            from "../pages/PricingPage";
+import LoginPage              from "../pages/LoginPage";
+import DashboardPage          from "../pages/DashboardPage";
+import JobsPage               from "../pages/JobsPage";
+import CreateJobPage          from "../pages/CreateJobPage";
+import CandidatesPage         from "../pages/CandidatesPage";
+import AddCandidatePage       from "../pages/AddCandidatePage";
+import AnalysisPage           from "../pages/AnalysisPage";
+import TalentSearchPage       from "../pages/TalentSearchPage";
+import CandidateWorkflowPage  from "../pages/CandidateWorkflowPage";
+import SchedulerPage          from "../pages/SchedulerPage";
+import EmailCentrePage        from "../pages/EmailCentrePage";
+import RemindersPage          from "../pages/RemindersPage";
+import SettingsPage           from "../pages/SettingsPage";
+import CoWorkerPage           from "../pages/CoWorkerPage";
+import AgentEconomyPage       from "../pages/AgentEconomyPage"; 
 
 export default function AppRoutes() {
   return (
@@ -23,6 +24,7 @@ export default function AppRoutes() {
       <Route path="/"                                   element={<LandingPage />} />
       <Route path="/pricing"                            element={<PricingPage />} />
       <Route path="/login"                              element={<LoginPage />} />
+      <Route path="/ai-in-recruitment"                  element={<AgentEconomyPage />} /> {/* ← NEW */}
 
       {/* App pages */}
       <Route path="/dashboard"                          element={<DashboardPage />} />

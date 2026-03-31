@@ -151,9 +151,15 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="lp-nav-links" style={{ display:"flex",gap:28 }}>
-          {[["Why nolyvra","#problem"],["AI in Recruitment","#data"],["Features","#features"],["How It Works","#how"]].map(([l,h]) => (
+          {[["Why nolyvra","#problem"],["Features","#features"],["How It Works","#how"]].map(([l,h]) => (
             <a key={l} href={h} className="lp-nav-link">{l}</a>
           ))}
+          <button
+            onClick={() => nav("/ai-in-recruitment")}
+            className="lp-nav-link"
+            style={{ background:"none",border:"none",cursor:"pointer",padding:0,fontFamily:"inherit",fontSize:13,fontWeight:500,lineHeight:"normal",display:"inline-flex",alignItems:"center" }}>
+            AI in Recruitment
+          </button>
         </div>
         <div className="lp-nav-actions" style={{ display:"flex",gap:10,alignItems:"center" }}>
           <button onClick={() => nav("/login")} style={{ padding:"7px 18px",borderRadius:7,fontSize:13,fontWeight:500,border:"1px solid rgba(255,255,255,.2)",color:"rgba(255,255,255,.8)",background:"transparent",cursor:"pointer",fontFamily:"inherit",transition:"all .15s" }}>Login</button>
