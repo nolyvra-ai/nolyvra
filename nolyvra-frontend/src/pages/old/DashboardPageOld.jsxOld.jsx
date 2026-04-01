@@ -551,7 +551,6 @@ export default function DashboardPage() {
             </TableHead>
             <TableBody>
               {recentAnalyses.map((row, idx) => {
-                console.log("analysis row fields:", row);
                 const consistency = row?.consistencyScore ?? 0;
                 const capability = row?.capabilityScore ?? 0;
                 const riskLevel = row?.riskLevel || "Medium";

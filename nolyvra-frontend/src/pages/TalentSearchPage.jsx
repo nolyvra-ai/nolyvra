@@ -179,7 +179,9 @@ export function TalentSearchPage() {
                         nav("/candidates/new", {
                           state: {
                             prefill: {
+                              candidateId: c.candidateId ?? null,
                               name: c.name ?? "",
+                              email: c.email ?? "",
                               linkedinUrl: c.linkedinUrl ?? "",
                               cvText: "",
                             }

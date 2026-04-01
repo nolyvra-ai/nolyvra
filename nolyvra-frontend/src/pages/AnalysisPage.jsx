@@ -252,7 +252,7 @@ function FraudDetectionCard({ candidateId }) {
 
   if (loading) return (
     <Card isNew>
-      <CardHead title="Profile Consistency & Authenticity Detection" isNew />
+      <CardHead title="Candidate Profile Verification" isNew />
       <Box sx={{ p: 2.5, display: "flex", alignItems: "center", gap: 1.5 }}>
         <CircularProgress size={16} sx={{ color: PURPLE }} />
         <Typography sx={{ fontSize: 12, color: MUTED }}>Analysing authenticity…</Typography>
@@ -279,7 +279,7 @@ function FraudDetectionCard({ candidateId }) {
 
   return (
     <Card isNew>
-      <CardHead title="Profile Consistency & Authenticity Detection" isNew
+      <CardHead title="Candidate Profile Verification" isNew
         action={<Badge label={data.overallVerdict} variant={verdictVariant} />} />
       <Box sx={{ p: 2.25 }}>
 
@@ -293,13 +293,13 @@ function FraudDetectionCard({ candidateId }) {
               {data.authenticityScore}%
             </Box>
             <Typography sx={{ fontSize: 10, color: MUTED, mt: 0.5, lineHeight: 1.3 }}>
-              Authenticity<br />Score
+              Verification<br />Score
             </Typography>
           </Box>
           <Box sx={{ flex: 1, minWidth: 160 }}>
             <Typography sx={{ fontSize: 11, fontWeight: 600, color: MUTED,
               textTransform: "uppercase", letterSpacing: ".4px", mb: 0.5 }}>
-              Authenticity Gauge
+              Verification Gauge
             </Typography>
             <Box sx={{ height: 10, borderRadius: "5px", mb: 0.75, position: "relative",
               background: `linear-gradient(90deg,${DANGER} 0%,${WARN} 40%,${SUCCESS} 80%,#22C55E 100%)` }}>
@@ -1114,6 +1114,8 @@ export default function AnalysisPage() {
                 )}
 
                 {/* Actions — MVP2 updated: Schedule Interview + Open Workflow */}
+                {/* TEMPORARILY COMMENTED OUT — Actions can be performed from Workflow page.
+                    Accept/Reject not wired. Re-enable when implemented.
                 <Card>
                   <CardHead title="Actions" />
                   <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1 }}>
@@ -1145,6 +1147,7 @@ export default function AnalysisPage() {
                     </Button>
                   </Box>
                 </Card>
+                */}
 
               </Box>
             </Box>

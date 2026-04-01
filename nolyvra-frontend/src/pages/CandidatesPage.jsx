@@ -332,7 +332,6 @@ export default function CandidatesPage() {
 
   async function handleRunAnalysis(candidateId) {
     const loginId = localStorage.getItem("loginId") || "";
-    console.log("candidateId = " + candidateId);
     const url = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
     url.searchParams.set("loginId", loginId);
     // Change 4: show popup immediately, fire request in background

@@ -170,7 +170,7 @@ export default function AddCandidatePage() {
   // Change 3: jobId defaults to "" = "Not Assigned"
   const [form, setForm] = useState({
     name:           prefill?.name        ?? "",
-    email:          "",
+    email:          prefill?.email       ?? "",
     linkedinUrl:    prefill?.linkedinUrl ?? "",
     cvText:         prefill?.cvText      ?? "",
     recruiterNotes: "",
@@ -194,6 +194,48 @@ export default function AddCandidatePage() {
   }
 
   // ── Change 1: CV upload — extracts text AND prefills name/email/linkedinUrl ─
+  // ── CV content validator — called after extraction ───────────────────────
+  function validateCvContent(text) {
+    const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+    if (wordCount < 80) {
+      return "This file doesn't contain enough text to be a CV. Please upload a valid CV document.";
+    }
+
+    const lowerText = text.toLowerCase();
+
+    // Group 1: must have at least 1 career-history keyword
+    const careerKeywords = [
+      "work experience", "employment history", "professional experience",
+      "career history", "work history", "previous employment",
+      "job title", "job description", "responsibilities", "key responsibilities",
+      "internship", "volunteer"
+    ];
+    const hasCareer = careerKeywords.some(k => lowerText.includes(k));
+
+    // Group 2: must have at least 1 education/qualification keyword
+    const educationKeywords = [
+      "education", "qualification", "university", "college", "degree",
+      "bachelor", "master", "phd", "diploma", "certification",
+      "graduated", "gcse", "a-level", "high school"
+    ];
+    const hasEducation = educationKeywords.some(k => lowerText.includes(k));
+
+    // Group 3: must have at least 1 skills/profile keyword
+    const skillsKeywords = [
+      "skills", "competencies", "expertise", "proficient", "summary",
+      "profile", "objective", "about me", "curriculum vitae", "resume",
+      "references", "achievements", "accomplishments"
+    ];
+    const hasSkills = skillsKeywords.some(k => lowerText.includes(k));
+
+    const groupsMatched = [hasCareer, hasEducation, hasSkills].filter(Boolean).length;
+
+    if (groupsMatched < 2) {
+      return "This file doesn't appear to be a CV or resume. Please upload a candidate's CV document (must include employment history and education or skills).";
+    }
+    return null; // valid
+  }
+
   async function handleCvUpload(file) {
     if (!file) return;
     const allowed = ["application/pdf",
@@ -213,18 +255,45 @@ export default function AddCandidatePage() {
       const url = new URL(`${API_BASE}/api/cv/extract`);
       url.searchParams.set("loginId", loginId);
       const res = await fetch(url.toString(), { method: "POST", body: formData });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
+
+      // Read body as text first to avoid JSON parse errors
+      const rawBody = await res.text();
+
+      if (!res.ok) {
+        setCvUploadError("Could not read the file. Please try a different document.");
+        setCvFile(null);
+        return;
+      }
+
+      let data;
+      try {
+        data = JSON.parse(rawBody);
+      } catch {
+        setCvUploadError("Unexpected response from server. Please try again.");
+        setCvFile(null);
+        return;
+      }
+
+      const extractedText = data.text || "";
+
+      // Run CV validation on extracted text
+      const validationError = validateCvContent(extractedText);
+      if (validationError) {
+        setCvUploadError(validationError);
+        setCvFile(null);
+        return;
+      }
+
       // Prefill all available fields from CV
       setForm(prev => ({
         ...prev,
-        cvText:      data.text        || prev.cvText,
+        cvText:      extractedText        || prev.cvText,
         name:        data.name        || prev.name,
         email:       data.email       || prev.email,
         linkedinUrl: data.linkedinUrl || prev.linkedinUrl,
       }));
     } catch (e) {
-      setCvUploadError("Failed to extract text: " + e.message);
+      setCvUploadError("Failed to read the file: " + e.message);
       setCvFile(null);
     } finally {
       setCvUploading(false);
@@ -243,6 +312,18 @@ export default function AddCandidatePage() {
     }
     loadJobs();
   }, []);
+
+  // Fix 2: if prefill has a candidateId (internal candidate from talent search),
+  // fetch full candidate to get email which the search result doesn't include
+  useEffect(() => {
+    if (!prefill?.candidateId) return;
+    apiGet(`/api/candidates/${prefill.candidateId}`)
+      .then(candidate => {
+        if (candidate?.email) setField("email", candidate.email);
+        if (candidate?.linkedinUrl) setField("linkedinUrl", candidate.linkedinUrl);
+      })
+      .catch(err => console.error("[AddCandidate] prefill fetch failed:", err));
+  }, [prefill?.candidateId]);
 
   // ── Save candidate (no analysis) ──────────────────────────────────────────
 
@@ -348,8 +429,9 @@ export default function AddCandidatePage() {
   async function onSave(e) {
     e.preventDefault();
     if (!checkCandidateLimit()) { setLimitDialog(true); return; }
-    if (!hasName) { setValidationErr("Candidate name is required."); return; }
-    if (!hasCv)   { setValidationErr("CV text is required. Please paste or upload a CV."); return; }
+    if (!hasName)  { setValidationErr("Candidate name is required."); return; }
+    if (!hasEmail) { setValidationErr("Email address is required."); return; }
+    if (!hasCv)    { setValidationErr("CV text is required. Please paste or upload a CV."); return; }
     setValidationErr("");
     try {
       // Change 3: use unassigned endpoint when no job selected
@@ -377,8 +459,9 @@ export default function AddCandidatePage() {
   async function onSubmit(e) {
     e.preventDefault();
     if (!checkCandidateLimit()) { setLimitDialog(true); return; }
-    if (!hasName) { setValidationErr("Candidate name is required."); return; }
-    if (!hasCv)   { setValidationErr("CV text is required. Please paste or upload a CV."); return; }
+    if (!hasName)  { setValidationErr("Candidate name is required."); return; }
+    if (!hasEmail) { setValidationErr("Email address is required."); return; }
+    if (!hasCv)    { setValidationErr("CV text is required. Please paste or upload a CV."); return; }
     if (!form.jobId) { setValidationErr("Please assign the candidate to a job before running analysis."); return; }
     setValidationErr("");
     try {
@@ -417,13 +500,14 @@ export default function AddCandidatePage() {
 
   const [firstName = "", ...rest] = (form.name ?? "").trim().split(" ");
   const hasName    = firstName.length > 0;
+  const hasEmail   = form.email.trim().length > 0;
   const hasJob     = true; // Change 3: "Not Assigned" is always valid
   const hasLinkedin = form.linkedinUrl.trim().length > 0;
   const hasCv      = form.cvText.trim().length > 0;
   const wordCount  = form.cvText.trim()
     ? form.cvText.trim().split(/\s+/).length
     : 0;
-  const allReady = hasName && hasJob && hasCv;
+  const allReady = hasName && hasEmail && hasJob && hasCv;
 
   // ── Step indicator ────────────────────────────────────────────────────────
   const steps = ["Candidate Details", "CV / Resume", "Review & Run"];
@@ -639,7 +723,7 @@ export default function AddCandidatePage() {
                 <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5, mb: 1.5 }}>
                   <TextField
                     fullWidth
-                    label="Email"
+                    label="Email *"
                     size="small"
                     type="email"
                     value={form.email}
@@ -916,10 +1000,11 @@ export default function AddCandidatePage() {
               </Box>
               <Box sx={{ p: 2 }}>
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 1, mb: 2 }}>
-                  <CheckItem done={hasName} label="Candidate name entered" />
-                  <CheckItem done={hasJob} label="Job assigned" />
+                  <CheckItem done={hasName}    label="Candidate name entered" />
+                  <CheckItem done={hasEmail}   label="Email address provided" />
+                  <CheckItem done={hasJob}     label="Job assigned" />
                   <CheckItem done={hasLinkedin} label="LinkedIn URL provided" />
-                  <CheckItem done={hasCv} label="CV text pasted" />
+                  <CheckItem done={hasCv}      label="CV text pasted" />
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                     <Box
                       sx={{
