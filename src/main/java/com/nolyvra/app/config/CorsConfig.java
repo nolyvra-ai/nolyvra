@@ -13,7 +13,8 @@ public class CorsConfig implements WebMvcConfigurer {
         .allowedOrigins(
             "http://localhost:5173",
             "http://localhost:3000",
-            "https://nolyvra.onrender.com"
+            "https://nolyvra.onrender.com",
+            "https://nolyvra-prod.onrender.com"
         )
         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")
         .allowedHeaders("*");

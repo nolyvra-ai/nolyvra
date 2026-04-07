@@ -13,8 +13,12 @@ public class UserService {
     private final JdbcTemplate jdbc;
 
     // SHA-256 of "123456" — set when admin onboards a registered user
+   /* private static final String DEFAULT_PASSWORD_HASH =
+            "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";*/ 
+
+    // SHA-256 of "Welcome1" — set when admin onboards a registered user
     private static final String DEFAULT_PASSWORD_HASH =
-            "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
+            "7e19e31ae82d749034fc921f777f717ba5b57c6add9add889eb536ac6effcde0";
 
     public UserService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
