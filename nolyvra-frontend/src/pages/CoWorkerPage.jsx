@@ -154,7 +154,7 @@ function TaskItem({ task }) {
       </Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography sx={{ fontSize: 12, fontWeight: 500, color: TEXT,
-          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          lineHeight: 1.5 }}>
           {task.description}
         </Typography>
         {isRunning && (

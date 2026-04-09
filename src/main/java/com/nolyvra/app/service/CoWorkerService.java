@@ -258,8 +258,19 @@ public class CoWorkerService {
 
         // Change 2: replaced raw INSERT with proper AnalysisService.analyze() call
         int succeeded = 0;
+        int skipped = 0;
         for (String candidateId : candidateIds) {
             try {
+                // Skip if analysis already exists in DB
+                Integer existingCount = jdbc.queryForObject(
+                        "select count(*) from analyses where candidate_id = ?",
+                        Integer.class, candidateId);
+                if (existingCount != null && existingCount > 0) {
+                    System.out.println("[CoWorker] Skipping analysis for " + candidateId + " — already analysed.");
+                    skipped++;
+                    continue;
+                }
+
                 updateTaskProgress(taskId, 10);
                 CandidateResponse candidate = analysisService.getJobIdNameForCandidate(candidateId);
                 analysisService.analyze(candidateId, candidate, loginId);
@@ -272,11 +283,11 @@ public class CoWorkerService {
         }
 
         markTaskDone(taskId);
-        return Map.of(
-                "message", succeeded + " of " + candidateIds.size() + " candidate(s) analysed: "
-                        + String.join(", ", names) + ". View results from the Candidates page.",
-                "success", true,
-                "taskId", taskId);
+        String msg = succeeded + " of " + candidateIds.size() + " candidate(s) analysed: "
+                + String.join(", ", names) + ".";
+        if (skipped > 0) msg += " " + skipped + " already had an existing analysis and were skipped.";
+        msg += " View results from the Candidates page.";
+        return Map.of("message", msg, "success", true, "taskId", taskId);
     }
 
     @SuppressWarnings("unchecked")
