@@ -12,6 +12,9 @@ import org.springframework.stereotype.Service;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Service
 public class CoWorkerService {
@@ -22,6 +25,9 @@ public class CoWorkerService {
     private final String model;
     private final TokenService tokenService;
     private final AnalysisService analysisService; // Change 1: added
+
+    // Fixed thread pool — 3 threads for parallel analysis (safe for all OpenAI tiers)
+    private static final ExecutorService ANALYSIS_POOL = Executors.newFixedThreadPool(3);
 
     public CoWorkerService(
             OpenAIClient openAI,
@@ -256,38 +262,44 @@ public class CoWorkerService {
         Long taskId = createTask(loginId, "RUN_ANALYSIS",
                 "Analysis: " + String.join(", ", names));
 
-        // Change 2: replaced raw INSERT with proper AnalysisService.analyze() call
-        int succeeded = 0;
-        int skipped = 0;
-        for (String candidateId : candidateIds) {
-            try {
-                // Skip if analysis already exists in DB
-                Integer existingCount = jdbc.queryForObject(
-                        "select count(*) from analyses where candidate_id = ?",
-                        Integer.class, candidateId);
-                if (existingCount != null && existingCount > 0) {
-                    System.out.println("[CoWorker] Skipping analysis for " + candidateId + " — already analysed.");
-                    skipped++;
-                    continue;
-                }
+        // Run analysis in background using a fixed 3-thread pool.
+        // — Returns immediately so navigation does not interrupt the work.
+        // — 3 threads = safe for all OpenAI tiers without hitting RPM limits.
+        CompletableFuture.runAsync(() -> {
+            // Build one future per candidate, all capped at 3 concurrent threads
+            List<CompletableFuture<Void>> futures = candidateIds.stream()
+                    .map(candidateId -> CompletableFuture.runAsync(() -> {
+                        try {
+                            // Skip if analysis already exists in DB
+                            Integer existingCount = jdbc.queryForObject(
+                                    "select count(*) from analyses where candidate_id = ?",
+                                    Integer.class, candidateId);
+                            if (existingCount != null && existingCount > 0) {
+                                System.out.println("[CoWorker] Skipping " + candidateId + " — already analysed.");
+                                return;
+                            }
+                            updateTaskProgress(taskId, 10);
+                            CandidateResponse candidate = analysisService.getJobIdNameForCandidate(candidateId);
+                            analysisService.analyze(candidateId, candidate, loginId);
+                            updateTaskProgress(taskId, 80);
+                        } catch (Exception e) {
+                            System.err.println("[CoWorker] executeRunAnalysis() error for "
+                                    + candidateId + ": " + e.getMessage());
+                        }
+                    }, ANALYSIS_POOL))
+                    .toList();
 
-                updateTaskProgress(taskId, 10);
-                CandidateResponse candidate = analysisService.getJobIdNameForCandidate(candidateId);
-                analysisService.analyze(candidateId, candidate, loginId);
-                updateTaskProgress(taskId, 80);
-                succeeded++;
-            } catch (Exception e) {
-                System.err.println("[CoWorker] executeRunAnalysis() error for "
-                        + candidateId + ": " + e.getMessage());
-            }
-        }
+            // Wait for all candidates to finish, then mark done
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            markTaskDone(taskId);
+            System.out.println("[CoWorker] Bulk analysis complete for: " + String.join(", ", names));
+        });
 
-        markTaskDone(taskId);
-        String msg = succeeded + " of " + candidateIds.size() + " candidate(s) analysed: "
-                + String.join(", ", names) + ".";
-        if (skipped > 0) msg += " " + skipped + " already had an existing analysis and were skipped.";
-        msg += " View results from the Candidates page.";
-        return Map.of("message", msg, "success", true, "taskId", taskId);
+        // Return immediately — frontend polls /tasks to see progress
+        String startMsg = "Analysis started for " + candidateIds.size()
+                + " candidate(s): " + String.join(", ", names)
+                + ". You can navigate freely — the analysis will continue in the background.";
+        return Map.of("message", startMsg, "success", true, "taskId", taskId);
     }
 
     @SuppressWarnings("unchecked")
