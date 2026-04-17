@@ -15,7 +15,8 @@ import EmailCentrePage        from "../pages/EmailCentrePage";
 import RemindersPage          from "../pages/RemindersPage";
 import SettingsPage           from "../pages/SettingsPage";
 import CoWorkerPage           from "../pages/CoWorkerPage";
-import AgentEconomyPage       from "../pages/AgentEconomyPage"; 
+import AgentEconomyPage       from "../pages/AgentEconomyPage";
+import InterviewAnalysisPage  from "../pages/InterviewAnalysisPage";
 
 export default function AppRoutes() {
   return (
@@ -35,7 +36,8 @@ export default function AppRoutes() {
       <Route path="/candidates/new"                     element={<AddCandidatePage />} />
       <Route path="/analysis/:candidateId"              element={<AnalysisPage />} />
       <Route path="/talent-search"                      element={<TalentSearchPage />} />
-      <Route path="/candidates/:candidateId/workflow"   element={<CandidateWorkflowPage />} />
+      <Route path="/candidates/:candidateId/workflow"           element={<CandidateWorkflowPage />} />
+      <Route path="/candidates/:candidateId/interview-analysis" element={<InterviewAnalysisPage />} />
       <Route path="/scheduler"                          element={<SchedulerPage />} />
       <Route path="/email"                              element={<EmailCentrePage />} />
       <Route path="/reminders"                          element={<RemindersPage />} />

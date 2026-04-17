@@ -18,7 +18,8 @@ public record WorkflowResponse(
     String riskLevel,
     Instant createdAt,
     List<ActivityEvent> activityTimeline,
-    String cvText
+    String cvText,
+    String interviewQuestions
 ) {
     public record ActivityEvent(
         Long id,

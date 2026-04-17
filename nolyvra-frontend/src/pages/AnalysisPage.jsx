@@ -473,10 +473,11 @@ export default function AnalysisPage() {
   const nav = useNavigate();
   const loginId = localStorage.getItem("loginId") || "";
 
-  const [analysis,   setAnalysis]   = useState(null);
-  const [candidate,  setCandidate]  = useState(null);
-  const [loading,    setLoading]    = useState(true);
-  const [err,        setErr]        = useState("");
+  const [analysis,         setAnalysis]         = useState(null);
+  const [candidate,        setCandidate]        = useState(null);
+  const [loading,          setLoading]          = useState(true);
+  const [err,              setErr]              = useState("");
+  const [interviewAnalysis, setInterviewAnalysis] = useState(null);
   const [notes,      setNotes]      = useState("");
   const [notesSaving, setNotesSaving] = useState(false);
   const [notesSaved,  setNotesSaved]  = useState(false);
@@ -488,14 +489,16 @@ export default function AnalysisPage() {
     async function load() {
       setLoading(true); setErr("");
       try {
-        const [analysisResp, candidateResp] = await Promise.all([
+        const [analysisResp, candidateResp, interviewResp] = await Promise.all([
           apiGet(`/api/candidates/${candidateId}/aianalysis`),
           apiGet(`/api/candidates/${candidateId}`),
+          apiGet(`/api/candidates/${candidateId}/interview-analysis`).catch(() => []),
         ]);
         if (cancelled) return;
         setAnalysis(analysisResp);
         setCandidate(candidateResp);
         setNotes(analysisResp?.recruiterNotes ?? "");
+        if (interviewResp.length > 0) setInterviewAnalysis(interviewResp[0]);
       } catch (e) {
         if (!cancelled) setErr(e?.message || "Failed to load analysis");
       } finally {
@@ -1151,6 +1154,110 @@ export default function AnalysisPage() {
 
               </Box>
             </Box>
+
+            {/* ── Interview Analysis Summary ───────────────────────────────── */}
+            {interviewAnalysis && (() => {
+              const ia = interviewAnalysis;
+              const iaColor = v => v >= 80 ? SUCCESS : v >= 60 ? WARN : DANGER;
+              const recVariant = r => {
+                if (!r) return "neutral";
+                if (r === "Strong Hire" || r === "Strong Yes") return "success";
+                if (r === "Hire" || r === "Yes") return "success";
+                if (r === "Borderline" || r === "Maybe") return "warning";
+                return "danger";
+              };
+              return (
+                <Card isNew sx={{ mt: 2 }}>
+                  <Box sx={{ px: 2.25, py: 1.75, borderBottom: `1px solid ${BORDER}`,
+                    display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                      <Typography sx={{ fontSize: 16 }}>✦</Typography>
+                      <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
+                        Interview Analysis
+                      </Typography>
+                      <Box sx={{ display: "inline-flex", alignItems: "center", px: "7px", py: "2px",
+                        bgcolor: PURPLE_BG, border: `1px solid ${PURPLE_BR}`, borderRadius: "4px",
+                        fontSize: 10, fontWeight: 600, color: PURPLE, ml: 0.5 }}>NEW</Box>
+                    </Box>
+                    <Button size="small" variant="outlined"
+                      onClick={() => nav(`/candidates/${candidateId}/interview-analysis`)}
+                      sx={{ fontSize: 11, borderRadius: "6px", textTransform: "none",
+                        borderColor: PURPLE_BR, color: PURPLE }}>
+                      View Full Report →
+                    </Button>
+                  </Box>
+                  <Box sx={{ px: 2.25, py: 2,
+                    display: "flex", alignItems: "center", gap: 3, flexWrap: "wrap" }}>
+                    {[
+                      { v: ia.communicationScore, label: "Communication" },
+                      ...(ia.technicalScore > 0 ? [{ v: ia.technicalScore, label: "Technical" }] : []),
+                      { v: ia.culturalFitScore, label: "Cultural Fit" },
+                      { v: ia.sentimentScore, label: "Engagement" },
+                    ].map((item, i, arr) => (
+                      <>
+                        <Box key={item.label} sx={{ display: "flex", flexDirection: "column",
+                          alignItems: "center", gap: 0.5 }}>
+                          <Box sx={{ width: 60, height: 60, borderRadius: "50%",
+                            border: `3px solid ${iaColor(item.v)}`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 16, fontWeight: 700, color: iaColor(item.v) }}>
+                            {item.v}%
+                          </Box>
+                          <Typography sx={{ fontSize: 10, color: MUTED, fontWeight: 500,
+                            textAlign: "center", lineHeight: 1.3 }}>{item.label}</Typography>
+                        </Box>
+                        {i < arr.length - 1 && (
+                          <Box key={`div-${i}`} sx={{ width: "1px", bgcolor: BORDER,
+                            height: 48, flexShrink: 0 }} />
+                        )}
+                      </>
+                    ))}
+
+                    <Box sx={{ width: "1px", bgcolor: BORDER, height: 48, flexShrink: 0 }} />
+
+                    <Box sx={{ display: "flex", gap: 3, flex: 1 }}>
+                      <Box>
+                        <Typography sx={{ fontSize: 10, color: MUTED, fontWeight: 600,
+                          textTransform: "uppercase", letterSpacing: "0.5px" }}>Sentiment</Typography>
+                        <Typography sx={{ fontSize: 13, fontWeight: 600, mt: 0.25, color: TEXT }}>
+                          {ia.overallSentiment ?? "—"}
+                        </Typography>
+                        <Typography sx={{ fontSize: 10, color: MUTED, fontWeight: 600,
+                          textTransform: "uppercase", letterSpacing: "0.5px", mt: 1 }}>Confidence</Typography>
+                        <Badge label={ia.confidenceLevel ?? "—"} sx={{ mt: 0.5 }}
+                          variant={ia.confidenceLevel === "High" ? "success"
+                            : ia.confidenceLevel === "Medium" ? "warning" : "danger"} />
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: 10, color: MUTED, fontWeight: 600,
+                          textTransform: "uppercase", letterSpacing: "0.5px" }}>Interview Type</Typography>
+                        <Typography sx={{ fontSize: 13, fontWeight: 500, mt: 0.25, color: TEXT }}>
+                          {ia.interviewType ?? "General"}
+                        </Typography>
+                        <Typography sx={{ fontSize: 10, color: MUTED, fontWeight: 600,
+                          textTransform: "uppercase", letterSpacing: "0.5px", mt: 1 }}>Analysed</Typography>
+                        <Typography sx={{ fontSize: 12, mt: 0.25, color: MUTED }}>
+                          {ia.analyzedAt
+                            ? new Date(ia.analyzedAt).toLocaleString("en-GB",
+                                { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+                            : "—"}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    <Box sx={{ textAlign: "center", flexShrink: 0 }}>
+                      <Typography sx={{ fontSize: 10, color: MUTED, fontWeight: 600,
+                        textTransform: "uppercase", letterSpacing: "0.5px", mb: 0.75 }}>
+                        Recommendation
+                      </Typography>
+                      <Badge label={ia.hiringRecommendation ?? "—"}
+                        variant={recVariant(ia.hiringRecommendation)}
+                        sx={{ fontSize: 13, px: 1.75, py: 0.75 }} />
+                    </Box>
+                  </Box>
+                </Card>
+              );
+            })()}
 
             {/* Annotation strip */}
      {/*       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", mt: 2 }}>
