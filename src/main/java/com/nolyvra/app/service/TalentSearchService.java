@@ -23,6 +23,9 @@ import java.util.stream.Collectors;
 @Service
 public class TalentSearchService {
 
+    private static final int CACHE_MIN_RESULTS = 3;
+    private static final int CACHE_DAYS_VALID  = 30;
+
     private final JdbcTemplate jdbc;
     private final OpenAIClient openAI;
     private final ObjectMapper objectMapper;
@@ -183,6 +186,30 @@ public class TalentSearchService {
     private List<TalentSearchResult> searchCoreSignal(SearchFilters filters, String loginId,
                                                        String originalQuery) {
         try {
+            // Try cache first
+            List<TalentSearchResult> cached = searchCoreSignalCache(filters);
+            System.out.println("[CoreSignal] cache results: " + cached.size());
+            if (cached.size() >= CACHE_MIN_RESULTS) {
+                System.out.println("[CoreSignal] serving from cache, skipping API call");
+                List<Integer> aiScores = List.of();
+                if (tokenService.hasTokens(loginId)) {
+                    aiScores = scoreWithAI(cached, originalQuery);
+                    if (!aiScores.isEmpty()) tokenService.deductToken(loginId);
+                }
+                if (aiScores.size() == cached.size()) {
+                    List<TalentSearchResult> scored = new ArrayList<>();
+                    for (int i = 0; i < cached.size(); i++) {
+                        TalentSearchResult p = cached.get(i);
+                        scored.add(new TalentSearchResult(
+                                p.candidateId(), p.name(), p.currentTitle(), p.currentCompany(),
+                                p.linkedinUrl(), p.matchedSkills(), p.gapSkills(),
+                                aiScores.get(i), p.yearsExperience(), p.source(), p.alreadyInPipeline()));
+                    }
+                    return scored;
+                }
+                return cached;
+            }
+
             // Fix 2: use apikey header, not Authorization: Bearer
             HttpHeaders searchHeaders = new HttpHeaders();
             searchHeaders.set("apikey", coreSignalApiKey);
@@ -208,10 +235,10 @@ public class TalentSearchService {
                 return List.of();
             }
 
-            // Take first 20 IDs
-            List<Integer> ids = new ArrayList<>();
-            for (int i = 0; i < Math.min(20, idsNode.size()); i++) {
-                ids.add(idsNode.get(i).asInt());
+            // Take first 3 IDs
+            List<Long> ids = new ArrayList<>();
+            for (int i = 0; i < Math.min(3, idsNode.size()); i++) {
+                ids.add(idsNode.get(i).asLong());
             }
             System.out.println("[CoreSignal] got " + idsNode.size() + " IDs, fetching first " + ids.size());
             if (ids.isEmpty()) return List.of();
@@ -263,7 +290,7 @@ public class TalentSearchService {
 
     // ─── Fetch a single profile by ID (used by CompletableFuture) ────────────
 
-    private TalentSearchResult fetchProfile(int id, SearchFilters filters) {
+    private TalentSearchResult fetchProfile(long id, SearchFilters filters) {
         try {
             HttpHeaders headers = new HttpHeaders();
             headers.set("apikey", coreSignalApiKey);
@@ -273,6 +300,7 @@ public class TalentSearchService {
                     coreSignalBaseUrl + "/employee_clean/collect/" + id,
                     HttpMethod.GET, entity, String.class);
 
+            System.out.println("[CoreSignal] profile " + id + " HTTP " + resp.getStatusCode() + " bodyLen=" + (resp.getBody() != null ? resp.getBody().length() : "null"));
             if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) return null;
 
             // Fix 5: correct field names from confirmed API response
@@ -305,6 +333,49 @@ public class TalentSearchService {
             int score = 50 + (matched.size() * 5);
             score = Math.min(score, 99);
 
+            // Save to cache before returning
+            try {
+                String skillsJson = objectMapper.writeValueAsString(profileSkills);
+                System.out.println("[CoreSignal] cache saving id=" + id + " name=" + name + " skills=" + profileSkills.size() + " skillsJson=" + skillsJson);
+                jdbc.update("""
+                    insert into coresignal_cache
+                        (coresignal_id, full_name, job_title, current_company,
+                         location_city, location_country, linkedin_url, skills,
+                         years_experience, management_level, description, raw_json)
+                    values (?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?, ?, CAST(? AS jsonb))
+                    on conflict (coresignal_id) do update set
+                        full_name        = excluded.full_name,
+                        job_title        = excluded.job_title,
+                        current_company  = excluded.current_company,
+                        location_city    = excluded.location_city,
+                        location_country = excluded.location_country,
+                        linkedin_url     = excluded.linkedin_url,
+                        skills           = excluded.skills,
+                        years_experience = excluded.years_experience,
+                        management_level = excluded.management_level,
+                        description      = excluded.description,
+                        raw_json         = excluded.raw_json,
+                        cached_at        = now(),
+                        last_searched_at = now()
+                    """,
+                    id,
+                    name,
+                    title,
+                    company,
+                    profile.path("location_city").asText(null),
+                    profile.path("location_country").asText(null),
+                    linkedinUrl,
+                    skillsJson,
+                    yearsExp,
+                    profile.path("management_level").asText(null),
+                    profile.path("description").asText(null),
+                    resp.getBody());
+                System.out.println("[CoreSignal] cache saved id=" + id);
+            } catch (Exception e) {
+                System.err.println("[CoreSignal] cache save FAILED for id " + id + ": " + e);
+                e.printStackTrace(System.err);
+            }
+
             return new TalentSearchResult(
                     null, name, title, company, linkedinUrl,
                     matched, gaps, score, yearsExp,
@@ -316,6 +387,79 @@ public class TalentSearchService {
         } catch (Exception e) {
             System.err.println("[CoreSignal] profile " + id + " failed: " + e.getClass().getSimpleName() + ": " + e.getMessage());
             return null;
+        }
+    }
+
+    // ─── CoreSignal cache lookup ──────────────────────────────────────────────
+
+    private List<TalentSearchResult> searchCoreSignalCache(SearchFilters filters) {
+        try {
+            StringBuilder sql = new StringBuilder(
+                    "select coresignal_id, full_name, job_title, current_company," +
+                    " linkedin_url, skills, years_experience" +
+                    " from coresignal_cache" +
+                    " where cached_at > now() - interval '" + CACHE_DAYS_VALID + " days'");
+
+            List<Object> args = new ArrayList<>();
+
+            String titleQuery = buildTitleQuery(filters);
+            if (titleQuery != null && !titleQuery.isBlank()) {
+                sql.append(" and lower(job_title) like lower(?) ");
+                args.add("%" + titleQuery + "%");
+            }
+
+            if (filters.location() != null && !filters.location().isBlank()) {
+                sql.append(" and (lower(location_city) like lower(?) or lower(location_country) like lower(?)) ");
+                args.add("%" + filters.location() + "%");
+                args.add("%" + filters.location() + "%");
+            }
+
+            if (filters.skills() != null && !filters.skills().isEmpty()) {
+                List<String> orClauses = new ArrayList<>();
+                for (String skill : filters.skills()) {
+                    orClauses.add("skills::text ilike ?");
+                    args.add("%" + skill + "%");
+                }
+                sql.append(" and (").append(String.join(" or ", orClauses)).append(") ");
+            }
+
+            sql.append(" order by last_searched_at desc limit 20");
+
+            return jdbc.query(sql.toString(), (rs, rowNum) -> {
+                List<String> skills = new ArrayList<>();
+                try {
+                    JsonNode skillsNode = objectMapper.readTree(
+                        rs.getString("skills") != null ? rs.getString("skills") : "[]");
+                    if (skillsNode.isArray()) {
+                        for (JsonNode s : skillsNode) skills.add(s.asText());
+                    }
+                } catch (Exception ignored) {}
+
+                List<String> matched = extractMatchedSkills(
+                    String.join(" ", skills), filters.skills());
+                List<String> gaps = filters.skills().stream()
+                    .filter(s -> !matched.contains(s))
+                    .collect(Collectors.toList());
+                int score = 50 + (matched.size() * 5);
+                score = Math.min(score, 99);
+
+                jdbc.update("update coresignal_cache set last_searched_at = now() where coresignal_id = ?",
+                    rs.getLong("coresignal_id"));
+
+                return new TalentSearchResult(
+                    null,
+                    rs.getString("full_name"),
+                    rs.getString("job_title"),
+                    rs.getString("current_company"),
+                    rs.getString("linkedin_url"),
+                    matched, gaps, score,
+                    rs.getInt("years_experience"),
+                    "CORESIGNAL", false);
+            }, args.toArray());
+
+        } catch (Exception e) {
+            System.err.println("[CoreSignal] cache search failed: " + e.getMessage());
+            return List.of();
         }
     }
 
@@ -379,6 +523,14 @@ public class TalentSearchService {
                     .collect(Collectors.toList());
             mustClauses.add(Map.of("bool", Map.of(
                     "should", shouldSkills,
+                    "minimum_should_match", 1)));
+        }
+
+        if (filters.location() != null && !filters.location().isBlank()) {
+            mustClauses.add(Map.of("bool", Map.of(
+                    "should", List.of(
+                            Map.of("match", Map.of("location_city", filters.location())),
+                            Map.of("match", Map.of("location_country", filters.location()))),
                     "minimum_should_match", 1)));
         }
 
