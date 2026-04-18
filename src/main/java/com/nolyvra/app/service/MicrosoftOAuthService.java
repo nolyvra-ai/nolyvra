@@ -68,6 +68,7 @@ public class MicrosoftOAuthService {
                 + "&client_secret="    + enc(clientSecret);
 
         JsonNode json = postForm(TOKEN_URL, body);
+        System.out.println("[OAuth] Token response: " + json.toString());
         String accessToken  = json.path("access_token").asText();
         String refreshToken = json.path("refresh_token").asText(null);
         Instant expiresAt   = Instant.now().plusSeconds(json.path("expires_in").asLong(3600));
@@ -190,6 +191,7 @@ public class MicrosoftOAuthService {
                 .POST(HttpRequest.BodyPublishers.ofString(formBody))
                 .build();
         HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+        System.out.println("[OAuth] postForm status: " + res.statusCode() + " body: " + res.body());
         return objectMapper.readTree(res.body());
     }
 
