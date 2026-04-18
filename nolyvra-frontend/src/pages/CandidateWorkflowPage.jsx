@@ -185,6 +185,10 @@ export default function CandidateWorkflowPage() {
 
   // Change 2: run analysis handler
   async function handleRunAnalysis() {
+    if (!workflow.cvText?.trim()) {
+      setAnalysisError("Please upload a CV first before running analysis.");
+      return;
+    }
     setAnalysisRunning(true); setAnalysisError(null);
     try {
       const url = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
@@ -297,6 +301,19 @@ export default function CandidateWorkflowPage() {
               textTransform:"none","&:hover":{bgcolor:PURPLE_BG}}}>
             🎤 Interview Analysis
           </Button>
+          {!workflow.cvText?.trim() && (
+            <Button variant="outlined" size="small"
+              onClick={() => nav("/candidates/new", { state: { prefill: {
+                name: workflow.candidateName ?? "",
+                email: workflow.email ?? "",
+                linkedinUrl: workflow.linkedinUrl ?? "",
+                cvText: "",
+              }}})}
+              sx={{fontSize:11,borderColor:WARN_BR,color:WARN,borderRadius:"6px",
+                textTransform:"none","&:hover":{bgcolor:WARN_BG,borderColor:WARN}}}>
+              ⬆ Upload CV
+            </Button>
+          )}
           {isAnalysed ? (
             <Button variant="contained" size="small" onClick={() => nav(`/analysis/${candidateId}`)}
               sx={{fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",
@@ -516,6 +533,20 @@ export default function CandidateWorkflowPage() {
                 sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none",justifyContent:"flex-start","&:hover":{bgcolor:SURFACE}}}>
                 💡 Suggestive Questions
               </Button>
+              {/* Upload CV button — shown in sidebar when CV is missing */}
+              {!workflow.cvText?.trim() && (
+                <Button fullWidth variant="outlined" size="small"
+                  onClick={() => nav("/candidates/new", { state: { prefill: {
+                    name: workflow.candidateName ?? "",
+                    email: workflow.email ?? "",
+                    linkedinUrl: workflow.linkedinUrl ?? "",
+                    cvText: "",
+                  }}})}
+                  sx={{fontSize:11,borderColor:WARN_BR,color:WARN,borderRadius:"6px",
+                    textTransform:"none",justifyContent:"flex-start","&:hover":{bgcolor:WARN_BG,borderColor:WARN}}}>
+                  ⬆ Upload CV
+                </Button>
+              )}
               {/* Change 3: show Run Analysis or View Analysis in Actions panel */}
               {isAnalysed ? (
                 <Button fullWidth variant="contained" size="small" onClick={() => nav(`/analysis/${candidateId}`)}

@@ -74,6 +74,52 @@ export default function SettingsPage() {
     searchParams.get("upgraded") === "true"
   );
 
+  // Outlook OAuth
+  const [outlookSuccess,      setOutlookSuccess]      = useState(searchParams.get("outlook") === "connected");
+  const [outlookError,        setOutlookError]        = useState(searchParams.get("outlook") === "error");
+  const [outlookOAuthConnected, setOutlookOAuthConnected] = useState(false);
+  const [outlookOAuthEmail,   setOutlookOAuthEmail]   = useState("");
+  const [outlookEmail,        setOutlookEmail]        = useState(
+    () => localStorage.getItem("outlookEmail") || ""
+  );
+  const [outlookInput,        setOutlookInput]        = useState(
+    () => localStorage.getItem("outlookEmail") || ""
+  );
+  const [outlookSaved,        setOutlookSaved]        = useState(false);
+
+  const outlookConnected = outlookOAuthConnected || outlookEmail.trim() !== "";
+  const displayEmail     = outlookOAuthEmail || outlookEmail;
+
+  useEffect(() => {
+    if (!loginId) return;
+    fetch(`${API_BASE}/auth/microsoft/status?loginId=${encodeURIComponent(loginId)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.connected) { setOutlookOAuthConnected(true); setOutlookOAuthEmail(d.email || ""); } })
+      .catch(() => {});
+  }, [loginId]);
+
+  function handleOutlookConnect() {
+    window.location.href = `${API_BASE}/auth/microsoft/connect?loginId=${encodeURIComponent(loginId)}`;
+  }
+
+  function handleOutlookSave() {
+    const trimmed = outlookInput.trim();
+    localStorage.setItem("outlookEmail", trimmed);
+    setOutlookEmail(trimmed);
+    setOutlookSaved(true);
+    setTimeout(() => setOutlookSaved(false), 2500);
+  }
+
+  async function handleOutlookDisconnect() {
+    await fetch(`${API_BASE}/auth/microsoft/disconnect?loginId=${encodeURIComponent(loginId)}`,
+      { method: "DELETE" }).catch(() => {});
+    localStorage.removeItem("outlookEmail");
+    setOutlookOAuthConnected(false);
+    setOutlookOAuthEmail("");
+    setOutlookEmail("");
+    setOutlookInput("");
+  }
+
   // Plan usage from shared hook
   const { usage, loading: planLoading } = usePlanLimit();
 
@@ -249,12 +295,23 @@ export default function SettingsPage() {
 
       {/* ── Stripe upgrade success banner ─────────────────────────────────── */}
       {upgradeSuccess && (
-        <Alert
-          severity="success"
-          onClose={() => setUpgradeSuccess(false)}
-          sx={{ borderRadius: "10px", fontSize: 13 }}
-        >
+        <Alert severity="success" onClose={() => setUpgradeSuccess(false)}
+          sx={{ borderRadius: "10px", fontSize: 13 }}>
           🎉 Your plan has been upgraded successfully! Your new limits are now active.
+        </Alert>
+      )}
+
+      {/* ── Outlook connection banners ────────────────────────────────────── */}
+      {outlookSuccess && (
+        <Alert severity="success" onClose={() => setOutlookSuccess(false)}
+          sx={{ borderRadius: "10px", fontSize: 13 }}>
+          📧 Microsoft Outlook connected successfully! Emails will now be sent via your Outlook account.
+        </Alert>
+      )}
+      {outlookError && (
+        <Alert severity="error" onClose={() => setOutlookError(false)}
+          sx={{ borderRadius: "10px", fontSize: 13 }}>
+          Failed to connect Microsoft Outlook. Please try again.
         </Alert>
       )}
 
@@ -603,6 +660,111 @@ export default function SettingsPage() {
           </Box>
         </Paper>
       )}
+
+      {/* ── Connected Accounts ───────────────────────────────────────────── */}
+      <Paper elevation={0} sx={{
+        border: `1px solid ${BORDER}`, borderRadius: "10px",
+        overflow: "hidden", bgcolor: "#fff"
+      }}>
+        <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}` }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
+            Connected Accounts
+          </Typography>
+          <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
+            Link your email account to send emails directly from your inbox
+          </Typography>
+        </Box>
+        <Box sx={{ p: 2.25, display: "flex", flexDirection: "column", gap: 1.5 }}>
+
+          {outlookSaved && (
+            <Alert severity="success" onClose={() => setOutlookSaved(false)}
+              sx={{ fontSize: 12, borderRadius: "8px" }}>
+              Outlook email saved successfully.
+            </Alert>
+          )}
+
+          {/* Outlook row */}
+          <Box sx={{
+            p: "12px 14px",
+            bgcolor: outlookConnected ? SUCCESS_BG : SURFACE,
+            border: `1px solid ${outlookConnected ? SUCCESS_BR : BORDER}`,
+            borderRadius: "8px",
+            display: "flex", flexDirection: "column", gap: 1.25
+          }}>
+
+            {/* Header row: icon + name + status + Remove */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+              <Box sx={{ fontSize: 20, lineHeight: 1 }}>📧</Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
+                  Microsoft Outlook
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: outlookConnected ? SUCCESS : MUTED, mt: 0.25 }}>
+                  {outlookConnected ? `Connected · ${displayEmail}` : "Not connected"}
+                </Typography>
+              </Box>
+              {outlookConnected && (
+                <Button size="small" variant="outlined"
+                  onClick={handleOutlookDisconnect}
+                  sx={{
+                    fontSize: 11, borderRadius: "6px", textTransform: "none",
+                    borderColor: DANGER_BR, color: DANGER, flexShrink: 0,
+                    "&:hover": { bgcolor: DANGER_BG, borderColor: DANGER }
+                  }}>
+                  Remove
+                </Button>
+              )}
+            </Box>
+
+            {/* OAuth button — always visible */}
+            <Button
+              variant="contained"
+              onClick={handleOutlookConnect}
+              fullWidth
+              sx={{
+                fontSize: 12, fontWeight: 600, bgcolor: "#0078D4", borderRadius: "8px",
+                textTransform: "none", boxShadow: "none",
+                "&:hover": { bgcolor: "#006CBF", boxShadow: "none" }
+              }}>
+              🔗 Connect with Microsoft
+            </Button>
+
+            {/* Divider */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Box sx={{ flex: 1, height: "1px", bgcolor: BORDER }} />
+              <Typography sx={{ fontSize: 10, color: MUTED, whiteSpace: "nowrap" }}>
+                or add email manually
+              </Typography>
+              <Box sx={{ flex: 1, height: "1px", bgcolor: BORDER }} />
+            </Box>
+
+            {/* Manual email input — always visible as fallback */}
+            <Box sx={{ display: "flex", gap: 1 }}>
+              <TextField
+                fullWidth size="small"
+                type="email"
+                value={outlookInput}
+                onChange={e => setOutlookInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && handleOutlookSave()}
+                placeholder="Enter your Outlook email address"
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+              />
+              <Button
+                variant="outlined"
+                onClick={handleOutlookSave}
+                disabled={!outlookInput.trim()}
+                sx={{
+                  fontSize: 11, fontWeight: 600, borderColor: ACCENT_BR, color: ACCENT,
+                  borderRadius: "8px", textTransform: "none", whiteSpace: "nowrap", flexShrink: 0,
+                  "&:hover": { bgcolor: ACCENT_BG, borderColor: ACCENT },
+                  "&.Mui-disabled": { borderColor: BORDER, color: MUTED }
+                }}>
+                Save
+              </Button>
+            </Box>
+          </Box>
+        </Box>
+      </Paper>
 
       {/* ── Session / Logout ──────────────────────────────────────────────── */}
       <Paper elevation={0} sx={{

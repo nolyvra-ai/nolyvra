@@ -172,11 +172,14 @@ export default function CreateJobPage() {
     if (!briefText.trim()) return;
     setBriefLoading(true); setBriefError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/jobs/analyze-brief`, {
+      const briefUrl = new URL(`${API_BASE}/api/jobs/analyze-brief`);
+      briefUrl.searchParams.set("loginId", loginId);
+      const res = await fetch(briefUrl.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ briefText }),
       });
+      if (res.status === 402) throw new Error("You have run out of tokens. Please upgrade your plan to continue.");
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setBriefResult(data);

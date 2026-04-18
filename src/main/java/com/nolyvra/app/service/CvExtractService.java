@@ -9,8 +9,10 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -67,6 +69,9 @@ public class CvExtractService {
         String linkedinUrl = "";
 
         try {
+            if (!tokenService.hasTokens(loginId))
+                throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
+
             String snippet = rawText.length() > 3000 ? rawText.substring(0, 3000) : rawText;
             String prompt = """
                     Extract the following fields from this CV text.

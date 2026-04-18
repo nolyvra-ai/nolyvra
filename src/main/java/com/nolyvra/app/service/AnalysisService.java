@@ -5,9 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openai.client.OpenAIClient;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -75,6 +77,9 @@ public class AnalysisService {
         String jdText = loadJobDescriptionFromDb(candidateResponse.jobId());
         String cvText = loadCvTextFromDb(candidateId);
         String linkedinUrl = loadLinkedinUrlFromDb(candidateId);
+
+        if (!tokenService.hasTokens(loginId))
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
 
         try {
             String passDate = "Today's date is " + LocalDate.now().format(DateTimeFormatter.ofPattern("d MMMM yyyy")) + ". ";

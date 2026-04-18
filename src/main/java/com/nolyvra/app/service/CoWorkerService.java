@@ -259,6 +259,10 @@ public class CoWorkerService {
             return Map.of("message", "No candidates to analyse.", "success", false);
         }
 
+        if (!tokenService.hasTokens(loginId)) {
+            return Map.of("message", "You have run out of tokens. Please upgrade your plan to continue.", "success", false);
+        }
+
         Long taskId = createTask(loginId, "RUN_ANALYSIS",
                 "Analysis: " + String.join(", ", names));
 

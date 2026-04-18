@@ -10,8 +10,10 @@ import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.chat.completions.ChatCompletionSystemMessageParam;
 import com.openai.models.chat.completions.ChatCompletionUserMessageParam;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -29,15 +31,18 @@ public class InterviewTranscriptService {
     private final OpenAIClient openAI;
     private final ObjectMapper objectMapper;
     private final String model;
+    private final TokenService tokenService;
 
     public InterviewTranscriptService(
             JdbcTemplate jdbc,
             OpenAIClient openAI,
             ObjectMapper objectMapper,
+            TokenService tokenService,
             @Value("${openai.model:gpt-4o-mini}") String model) {
         this.jdbc = jdbc;
         this.openAI = openAI;
         this.objectMapper = objectMapper;
+        this.tokenService = tokenService;
         this.model = model;
     }
 
@@ -47,11 +52,15 @@ public class InterviewTranscriptService {
             String candidateId, String loginId,
             String interviewId, String transcriptText) {
 
+        if (!tokenService.hasTokens(loginId))
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
+
         String cvAnalysisContext = loadCvAnalysisSummary(candidateId);
         String candidateName     = loadCandidateName(candidateId);
         InterviewMeta meta       = loadInterviewMeta(interviewId);
 
         String rawJson = callOpenAI(buildSystemPrompt(), buildUserPrompt(transcriptText, cvAnalysisContext, candidateName, meta));
+        tokenService.deductToken(loginId);
 
         JsonNode root;
         try {

@@ -260,7 +260,11 @@ export default function AddCandidatePage() {
       const rawBody = await res.text();
 
       if (!res.ok) {
-        setCvUploadError("Could not read the file. Please try a different document.");
+        if (res.status === 402) {
+          setCvUploadError("You have run out of tokens. Please upgrade your plan to continue.");
+        } else {
+          setCvUploadError("Could not read the file. Please try a different document.");
+        }
         setCvFile(null);
         return;
       }
@@ -479,14 +483,20 @@ export default function AddCandidatePage() {
 
       const candidateId = candidate.id;
 
-      // Show popup immediately, trigger analysis in background
-      setAnalysisDialog(true);
       const loginId = localStorage.getItem("loginId") || "";
       const analyzeUrl = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
       analyzeUrl.searchParams.set("loginId", loginId);
-      fetch(analyzeUrl.toString(), { method: "POST" })
-        .then(() => nav(`/analysis/${candidateId}`))
-        .catch(err => console.error("Analysis failed", err));
+      const analyzeRes = await fetch(analyzeUrl.toString(), { method: "POST" });
+      if (analyzeRes.status === 402) {
+        setValidationErr("You have run out of tokens. Please upgrade your plan to run analysis.");
+        return;
+      }
+      if (!analyzeRes.ok) {
+        setValidationErr("Analysis failed. Please try again.");
+        return;
+      }
+      setAnalysisDialog(true);
+      nav(`/analysis/${candidateId}`);
 
     } catch (err) {
       const msg = err.message || "";

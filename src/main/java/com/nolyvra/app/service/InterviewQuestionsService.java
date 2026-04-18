@@ -7,8 +7,10 @@ import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.chat.completions.ChatCompletionSystemMessageParam;
 import com.openai.models.chat.completions.ChatCompletionUserMessageParam;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class InterviewQuestionsService {
@@ -17,23 +19,30 @@ public class InterviewQuestionsService {
     private final OpenAIClient openAI;
     private final ObjectMapper objectMapper;
     private final String model;
+    private final TokenService tokenService;
 
     public InterviewQuestionsService(
             JdbcTemplate jdbc,
             OpenAIClient openAI,
             ObjectMapper objectMapper,
+            TokenService tokenService,
             @Value("${openai.model:gpt-4o-mini}") String model) {
         this.jdbc = jdbc;
         this.openAI = openAI;
         this.objectMapper = objectMapper;
+        this.tokenService = tokenService;
         this.model = model;
     }
 
     // ─── Generate questions via OpenAI ────────────────────────────────────────
 
     public String generateQuestions(String candidateId, String loginId) {
+        if (!tokenService.hasTokens(loginId))
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
         CandidateContext ctx = loadContext(candidateId, loginId);
-        return callOpenAI(buildSystemPrompt(), buildUserPrompt(ctx));
+        String result = callOpenAI(buildSystemPrompt(), buildUserPrompt(ctx));
+        tokenService.deductToken(loginId);
+        return result;
     }
 
     // ─── Save questions to candidates table ──────────────────────────────────

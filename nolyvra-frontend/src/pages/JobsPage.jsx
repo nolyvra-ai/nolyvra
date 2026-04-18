@@ -330,7 +330,9 @@ export default function JobsPage() {
       const loginId = localStorage.getItem("loginId") || "";
       const url = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
       url.searchParams.set("loginId", loginId);
-      await fetch(url.toString(), { method: "POST" });
+      const res = await fetch(url.toString(), { method: "POST" });
+      if (res.status === 402) { setErr("You have run out of tokens. Please upgrade your plan to continue."); return; }
+      if (!res.ok) { setErr("Analysis failed. Please try again."); return; }
       const analysis = await apiGet(`/api/candidates/${candidateId}/analysis`);
       setCandidatesByJob(prev => {
         const next = new Map(prev);
@@ -345,7 +347,7 @@ export default function JobsPage() {
         }
         return next;
       });
-    } catch (e) { console.error("Analysis failed", e); }
+    } catch (e) { setErr("Analysis failed: " + (e.message || "Please try again.")); }
   }
 
   async function handleRemoveCandidate(candidateId) {

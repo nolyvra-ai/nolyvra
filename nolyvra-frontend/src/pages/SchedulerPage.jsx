@@ -46,6 +46,8 @@ export default function SchedulerPage() {
   const [conflictWarning, setConflictWarning] = useState(null);
   const [conflictChecking, setConflictChecking] = useState(false);
 
+  const [icsMessage, setIcsMessage] = useState(null);
+
   const [form, setForm] = useState({
     candidateId:"", jobId:"", interviewer:"", interviewType:"Technical",
     scheduledAt:"", durationMinutes:60, location:"Google Meet", meetingLink:"", notes:"",
@@ -151,6 +153,69 @@ export default function SchedulerPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  // ── .ics generation ───────────────────────────────────────────────────────
+  function toIcsDate(dateStr) {
+    return new Date(dateStr).toISOString().replace(/[-:.]/g, "").slice(0, 15) + "Z";
+  }
+
+  function buildIcs(iv) {
+    const start   = new Date(iv.scheduledAt);
+    const end     = new Date(start.getTime() + (iv.durationMinutes || 60) * 60_000);
+    const stamp   = new Date();
+    const uid     = `${stamp.getTime()}-${Math.random().toString(36).slice(2)}@nolyvra.com`;
+    const summary = `${iv.interviewType || "Interview"} — ${iv.candidateName}`;
+    const descParts = [
+      iv.notes       ? `Notes: ${iv.notes}`             : "",
+      iv.meetingLink ? `Meeting Link: ${iv.meetingLink}` : "",
+      iv.interviewer ? `Interviewer: ${iv.interviewer}`  : "",
+    ].filter(Boolean);
+
+    return [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Nolyvra//Interview Scheduler//EN",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "BEGIN:VEVENT",
+      `UID:${uid}`,
+      `DTSTAMP:${toIcsDate(stamp.toISOString())}`,
+      `DTSTART:${toIcsDate(start.toISOString())}`,
+      `DTEND:${toIcsDate(end.toISOString())}`,
+      `SUMMARY:${summary}`,
+      descParts.length ? `DESCRIPTION:${descParts.join("\\n")}` : "",
+      iv.location    ? `LOCATION:${iv.location}`    : "",
+      iv.meetingLink ? `URL:${iv.meetingLink}`       : "",
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].filter(Boolean).join("\r\n");
+  }
+
+  function handleCalendarExport() {
+    if (!form.candidateId || !form.scheduledAt) {
+      setIcsMessage("Select a candidate and date/time in the form below, then click again to download the .ics file.");
+      return;
+    }
+    setIcsMessage(null);
+    const cand = candidates.find(c => c.id === form.candidateId);
+    const ics = buildIcs({
+      candidateName:   cand?.name         || "Candidate",
+      interviewType:   form.interviewType,
+      scheduledAt:     form.scheduledAt,
+      durationMinutes: form.durationMinutes || 60,
+      location:        form.location,
+      meetingLink:     form.meetingLink,
+      notes:           form.notes,
+      interviewer:     form.interviewer,
+    });
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = "nolyvra-interview.ics";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <Box sx={{display:"flex",flexDirection:"column",gap:2}}>
       <Box sx={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -162,11 +227,23 @@ export default function SchedulerPage() {
           <Typography sx={{fontSize:11,color:MUTED,mt:0.25}}>Schedule and manage candidate interviews</Typography>
         </Box>
         <Box sx={{display:"flex",gap:1}}>
-          <Button variant="outlined" size="small" sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>Sync Google Calendar</Button>
-          <Button variant="outlined" size="small" sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>Sync Outlook</Button>
+          <Button variant="outlined" size="small" onClick={handleCalendarExport}
+            sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none",
+              "&:hover":{borderColor:ACCENT,color:ACCENT}}}>
+            📅 Add to Google Calendar
+          </Button>
+          <Button variant="outlined" size="small" onClick={handleCalendarExport}
+            sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none",
+              "&:hover":{borderColor:ACCENT,color:ACCENT}}}>
+            📅 Add to Outlook
+          </Button>
         </Box>
       </Box>
 
+      {icsMessage && (
+        <Alert severity="info" onClose={() => setIcsMessage(null)}
+          sx={{fontSize:12}}>{icsMessage}</Alert>
+      )}
       {error   && <Alert severity="error"   onClose={() => setError(null)}>{error}</Alert>}
       {success && <Alert severity="success" onClose={() => setSuccess(false)}>Interview scheduled successfully!</Alert>}
 
@@ -255,7 +332,7 @@ export default function SchedulerPage() {
                 sx={{fontSize:12,fontWeight:500,bgcolor:ACCENT,borderRadius:"8px",textTransform:"none",
                   boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"},
                   "&.Mui-disabled":{bgcolor:conflictWarning?"#FEE2E2":undefined}}}>
-                {saving ? <CircularProgress size={14} sx={{color:"#fff"}} /> : "📅 Schedule & Send Invite"}
+                {saving ? <CircularProgress size={14} sx={{color:"#fff"}} /> : "📅 Schedule"}
               </Button>
             </Box>
           </Paper>

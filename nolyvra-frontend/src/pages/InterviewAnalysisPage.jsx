@@ -46,6 +46,7 @@ async function apiPost(path, body) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  if (res.status === 402) throw new Error("You have run out of tokens. Please upgrade your plan to continue.");
   if (!res.ok) throw new Error(await res.text().catch(() => res.statusText));
   return res.json();
 }

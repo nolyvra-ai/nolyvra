@@ -1,6 +1,7 @@
 // ─── TalentSearchPage.jsx ────────────────────────────────────────────────────
-import { useState } from "react";
-import { Box, Paper, Typography, Button, TextField, CircularProgress, Alert } from "@mui/material";
+import { useState, useEffect } from "react";
+import { Box, Paper, Typography, Button, TextField, CircularProgress, Alert,
+  Dialog, DialogTitle, DialogContent, DialogActions, MenuItem } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -33,6 +34,25 @@ export function TalentSearchPage() {
   const [page, setPage] = useState(0);
   const [allResults, setAllResults] = useState([]);
 
+  // Change 1 — Pipeline dialog state
+  const [pipelineDialog,    setPipelineDialog]    = useState(false);
+  const [pipelineCandidate, setPipelineCandidate] = useState(null);
+  const [pipelineJobId,     setPipelineJobId]     = useState("");
+  const [pipelineJobs,      setPipelineJobs]      = useState([]);
+  const [pipelineSaving,    setPipelineSaving]    = useState(false);
+  const [pipelineError,     setPipelineError]     = useState("");
+
+  // Change 3 — no-CV error alert state
+  const [noCvError, setNoCvError] = useState(false);
+
+  // Change 1 — fetch jobs on mount for pipeline dialog
+  useEffect(() => {
+    if (!loginId) return;
+    const url = new URL(`${API_BASE}/api/jobs`);
+    url.searchParams.set("loginId", loginId);
+    fetch(url.toString()).then(r => r.json()).then(setPipelineJobs).catch(() => {});
+  }, [loginId]);
+
   const QUICK = ["Senior Java Engineer", "FinTech · Series B", "5+ years backend", "Product Manager SaaS"];
 
   function sortResults(results, searchQuery) {
@@ -52,6 +72,7 @@ export function TalentSearchPage() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query: searchQuery, pageSize: 9, offset }),
     });
+    if (res.status === 402) throw new Error("You have run out of tokens. Please upgrade your plan to continue searching.");
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   }
@@ -85,6 +106,47 @@ export function TalentSearchPage() {
     finally { setLoading(false); }
   }
 
+  // Change 1 — pipeline save handler
+  async function handlePipelineSave() {
+    setPipelineSaving(true);
+    setPipelineError("");
+    try {
+      const path = pipelineJobId
+        ? `/api/jobs/${pipelineJobId}/candidates`
+        : `/api/candidates`;
+      const url = new URL(`${API_BASE}${path}`);
+      url.searchParams.set("loginId", loginId);
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name:        pipelineCandidate?.name        ?? "",
+          linkedinUrl: pipelineCandidate?.linkedinUrl ?? "",
+          email:       pipelineCandidate?.email       ?? "",
+          cvText:      "",
+        }),
+      });
+      if (!res.ok) {
+        // Change 4 — parse error body, check for 409
+        const text = await res.text().catch(() => "");
+        const msg = `${res.status} ${res.statusText} - ${text}`;
+        if (res.status === 409 || msg.toLowerCase().includes("already in the pipeline")) {
+          setPipelineError("This candidate is already in the pipeline.");
+        } else {
+          setPipelineError("Failed to add candidate: " + text);
+        }
+        return;
+      }
+      const candidate = await res.json();
+      setPipelineDialog(false);
+      nav(`/candidates/${candidate.id}/workflow`);
+    } catch (e) {
+      setPipelineError("Failed to add candidate: " + e.message);
+    } finally {
+      setPipelineSaving(false);
+    }
+  }
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -111,7 +173,7 @@ export function TalentSearchPage() {
             {loading ? <CircularProgress size={16} sx={{ color: "#fff" }} /> : "✦ Search Talent"}
           </Button>
           {QUICK.map(q => (
-            <Box key={q} onClick={() => { setQuery(q); handleSearch(q); }}
+            <Box key={q} onClick={() => setQuery(q)}
               sx={{ bgcolor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)", px: "10px", py: "4px", borderRadius: "20px", fontSize: 11, cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.15)" } }}>
               "{q}"
             </Box>
@@ -136,13 +198,22 @@ export function TalentSearchPage() {
             </Box>
           </Box>
 
+          {/* Change 3 — no-CV warning alert */}
+          {noCvError && (
+            <Alert severity="warning" onClose={() => setNoCvError(false)}>
+              Please upload a CV first before running analysis. Click "⬆ Upload CV" on the candidate card.
+            </Alert>
+          )}
+
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 1.5 }}>
             {result.results.map((c, i) => {
               const scoreColor = c.matchScore >= 80 ? SUCCESS : c.matchScore >= 60 ? WARN : DANGER;
               return (
                 <Paper key={i} elevation={0} onClick={() => c.candidateId && nav(`/candidates/${c.candidateId}/workflow`)}
                   sx={{
-                    border: `1px solid ${BORDER}`, borderRadius: "10px", p: 2, boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
+                    border: `1px solid ${c.source === "CORESIGNAL" ? PURPLE_BR : ACCENT_BR}`,
+                    borderLeft: `3px solid ${c.source === "CORESIGNAL" ? PURPLE : ACCENT}`,
+                    borderRadius: "10px", p: 2, boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
                     cursor: c.candidateId ? "pointer" : "default", "&:hover": c.candidateId ? { boxShadow: "0 4px 12px rgba(0,0,0,0.1)" } : {}, transition: "box-shadow .15s", bgcolor: "#fff"
                   }}>
                   <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1.25 }}>
@@ -169,24 +240,46 @@ export function TalentSearchPage() {
                     {c.source === "CORESIGNAL" && " · 🔗 Active Profiles in Market"}
                   </Typography>
                   <Box sx={{ display: "flex", gap: 0.75 }} onClick={e => e.stopPropagation()}>
-                    <Button size="small" variant="contained" onClick={() => c.candidateId && nav(`/candidates/${c.candidateId}/workflow`)}
-                      sx={{ flex: 1, fontSize: 11, bgcolor: ACCENT, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
-                      View Profile
-                    </Button>
+
+                    {/* Change 3 — "View Profile" for internal, "Run Analysis" for CoreSignal */}
+                    {c.source === "INTERNAL" ? (
+                      <Button size="small" variant="contained"
+                        onClick={() => c.candidateId && nav(`/candidates/${c.candidateId}/workflow`)}
+                        sx={{ flex: 1, fontSize: 11, bgcolor: ACCENT, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
+                        View Profile
+                      </Button>
+                    ) : (
+                      <Button size="small" variant="contained"
+                        onClick={() => {
+                          if (!c.cvText?.trim()) {
+                            setNoCvError(true);
+                            setTimeout(() => setNoCvError(false), 3000);
+                          } else {
+                            nav("/candidates/new", {
+                              state: {
+                                prefill: {
+                                  name:        c.name        ?? "",
+                                  email:       c.email       ?? "",
+                                  linkedinUrl: c.linkedinUrl ?? "",
+                                  cvText:      c.cvText      ?? "",
+                                }
+                              }
+                            });
+                          }
+                        }}
+                        sx={{ flex: 1, fontSize: 11, bgcolor: PURPLE, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#6D28D9", boxShadow: "none" } }}>
+                        Run Analysis
+                      </Button>
+                    )}
+
+                    {/* Change 1 — + Pipeline opens dialog instead of navigating */}
                     <Button size="small" variant="outlined"
                       onClick={e => {
                         e.stopPropagation();
-                        nav("/candidates/new", {
-                          state: {
-                            prefill: {
-                              candidateId: c.candidateId ?? null,
-                              name: c.name ?? "",
-                              email: c.email ?? "",
-                              linkedinUrl: c.linkedinUrl ?? "",
-                              cvText: "",
-                            }
-                          }
-                        });
+                        setPipelineCandidate(c);
+                        setPipelineJobId("");
+                        setPipelineError("");
+                        setPipelineDialog(true);
                       }}
                       sx={{
                         flex: 1, fontSize: 11, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none",
@@ -194,10 +287,29 @@ export function TalentSearchPage() {
                       }}>
                       + Pipeline
                     </Button>
-                    <Button size="small" variant="outlined" onClick={() => nav("/candidates/new")}
-                      sx={{ fontSize: 11, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none" }}>
-                      Analyse
-                    </Button>
+
+                    {/* Change 2 — Upload CV only for CoreSignal candidates */}
+                    {c.source === "CORESIGNAL" && (
+                      <Button size="small" variant="outlined"
+                        onClick={e => {
+                          e.stopPropagation();
+                          nav("/candidates/new", {
+                            state: {
+                              prefill: {
+                                name:        c.name        ?? "",
+                                email:       c.email       ?? "",
+                                linkedinUrl: c.linkedinUrl ?? "",
+                                cvText:      "",
+                              }
+                            }
+                          });
+                        }}
+                        sx={{ fontSize: 11, borderColor: PURPLE_BR, color: PURPLE,
+                          borderRadius: "6px", textTransform: "none",
+                          "&:hover": { borderColor: PURPLE, bgcolor: PURPLE_BG } }}>
+                        ⬆ Upload CV
+                      </Button>
+                    )}
                   </Box>
                 </Paper>
               );
@@ -215,6 +327,57 @@ export function TalentSearchPage() {
           )}
         </>
       )}
+
+      {/* Change 1 — Add to Pipeline dialog */}
+      <Dialog open={pipelineDialog} onClose={() => !pipelineSaving && setPipelineDialog(false)}
+        maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "12px" } }}>
+        <DialogTitle sx={{ fontSize: 14, fontWeight: 600, color: TEXT, pb: 1 }}>
+          Add to Pipeline
+        </DialogTitle>
+        <DialogContent>
+          {pipelineCandidate && (
+            <Typography sx={{ fontSize: 13, color: MUTED, mb: 2 }}>
+              Adding <strong style={{ color: TEXT }}>{pipelineCandidate.name}</strong> to your candidate pipeline.
+            </Typography>
+          )}
+          <TextField
+            select fullWidth size="small"
+            label="Assign to Job"
+            value={pipelineJobId}
+            onChange={e => { setPipelineJobId(e.target.value); setPipelineError(""); }}
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}>
+            <MenuItem value="" sx={{ fontSize: 13, color: MUTED }}>— Not Assigned —</MenuItem>
+            {pipelineJobs.map(job => (
+              <MenuItem key={job.id} value={job.id} sx={{ fontSize: 13 }}>
+                {job.title}{job.company ? ` — ${job.company}` : ""}
+              </MenuItem>
+            ))}
+          </TextField>
+          {/* Change 4 — inline error in dialog */}
+          {pipelineError && (
+            <Typography sx={{ fontSize: 12, color: DANGER, mt: 1.25, fontWeight: 500 }}>
+              ⚠ {pipelineError}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button variant="outlined" size="small"
+            onClick={() => setPipelineDialog(false)}
+            disabled={pipelineSaving}
+            sx={{ fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button variant="contained" size="small"
+            onClick={handlePipelineSave}
+            disabled={pipelineSaving}
+            sx={{ fontSize: 12, bgcolor: ACCENT, borderRadius: "6px", textTransform: "none",
+              boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
+            {pipelineSaving
+              ? <CircularProgress size={14} sx={{ color: "#fff" }} />
+              : "Add to Pipeline"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

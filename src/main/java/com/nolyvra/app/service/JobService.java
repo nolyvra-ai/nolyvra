@@ -8,9 +8,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openai.client.OpenAIClient;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -137,6 +139,9 @@ public class JobService {
     // ─── AI Client Brief Analyzer ─────────────────────────────────────────────
 
     public ClientBriefResponse analyzeClientBrief(ClientBriefRequest req, String loginId) {
+
+        if (!tokenService.hasTokens(loginId))
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
 
         String systemPrompt = """
                 You are a senior recruitment consultant who specialises in writing structured job descriptions.

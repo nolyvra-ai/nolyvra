@@ -301,7 +301,10 @@ export default function LandingPage() {
             <div style={{ fontSize:11,color:"rgba(255,255,255,.2)",fontStyle:"italic" }}>Intelligence. Evolved</div>
           </div>
         </div>
-        <div style={{ fontSize:12,color:"rgba(255,255,255,.25)" }}>© 2026 nolyvra · All rights reserved</div>
+        <div style={{ fontSize:12,color:"rgba(255,255,255,.25)", lineHeight:1.6 }}>
+          © 2026 nolyvra · All rights reserved<br/>
+          <span style={{ fontSize:11 }}>ABN 54 673 612 603 · Melbourne, Victoria</span>
+        </div>
         <div style={{ display:"flex",alignItems:"center",gap:16 }}>
           <div style={{ fontSize:12,color:"rgba(255,255,255,.2)" }}>This AI tool is designed to assist, not replace professional judgment.</div>
           <a href="https://www.linkedin.com/company/nolyvra/" target="_blank" rel="noopener noreferrer"

@@ -13,7 +13,6 @@ public record CandidateCreateRequest(
 
     String linkedinUrl,
 
-    @NotBlank
     String cvText
 
 ) {}

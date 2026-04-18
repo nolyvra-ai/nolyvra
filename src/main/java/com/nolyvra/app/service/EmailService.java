@@ -3,6 +3,7 @@ package com.nolyvra.app.service;
 import com.nolyvra.app.model.EmailHistoryResponse;
 import com.nolyvra.app.model.EmailSendRequest;
 import com.nolyvra.app.model.EmailTemplateResponse;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.mail.SimpleMailMessage;
@@ -18,14 +19,17 @@ public class EmailService {
     private final JavaMailSender mailSender;
     private final JdbcTemplate jdbc;
     private final WorkflowService workflowService;
+    private final MicrosoftOAuthService microsoftOAuthService;
 
     public EmailService(
             JavaMailSender mailSender,
             JdbcTemplate jdbc,
-            WorkflowService workflowService) {
-        this.mailSender       = mailSender;
-        this.jdbc             = jdbc;
-        this.workflowService  = workflowService;
+            WorkflowService workflowService,
+            @Lazy MicrosoftOAuthService microsoftOAuthService) {
+        this.mailSender             = mailSender;
+        this.jdbc                   = jdbc;
+        this.workflowService        = workflowService;
+        this.microsoftOAuthService  = microsoftOAuthService;
     }
 
     private static final RowMapper<EmailHistoryResponse> HISTORY_MAPPER = (rs, rowNum) -> {
@@ -58,11 +62,19 @@ public class EmailService {
     public EmailHistoryResponse sendEmail(EmailSendRequest req, String loginId) {
         String status = "Sent";
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setTo(req.toAddress());
-            message.setSubject(req.subject());
-            message.setText(req.body());
-            mailSender.send(message);
+            String outlookToken = null;
+            try { outlookToken = microsoftOAuthService.getValidAccessToken(loginId); }
+            catch (Exception ignored) {}
+
+            if (outlookToken != null) {
+                microsoftOAuthService.sendEmailViaOutlook(loginId, req.toAddress(), req.subject(), req.body());
+            } else {
+                SimpleMailMessage message = new SimpleMailMessage();
+                message.setTo(req.toAddress());
+                message.setSubject(req.subject());
+                message.setText(req.body());
+                mailSender.send(message);
+            }
         } catch (Exception e) {
             status = "Failed";
             System.err.println("Failed to send email: " + e.getMessage());

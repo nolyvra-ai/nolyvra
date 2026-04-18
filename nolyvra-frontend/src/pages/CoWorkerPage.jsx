@@ -297,9 +297,12 @@ export default function CoWorkerPage() {
 
       loadTasks();
     } catch (e) {
+      const msg = e.message || "";
       setMessages(prev => [...prev, {
         role: "assistant",
-        content: "Failed to execute action. Please try again.",
+        content: msg.includes("402") || msg.includes("Insufficient tokens")
+          ? "You have run out of tokens. Please upgrade your plan to continue."
+          : "Failed to execute action. Please try again.",
         id: Date.now(),
       }]);
     } finally {
