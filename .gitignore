@@ -42,3 +42,6 @@ build/
 .vscode/
 .DS_Store
 **/.DS_Store
+
+### Claude Code ###
+.claude/

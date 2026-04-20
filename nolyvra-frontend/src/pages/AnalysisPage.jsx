@@ -490,7 +490,7 @@ export default function AnalysisPage() {
       setLoading(true); setErr("");
       try {
         const [analysisResp, candidateResp, interviewResp] = await Promise.all([
-          apiGet(`/api/candidates/${candidateId}/aianalysis`),
+          apiGet(`/api/candidates/${candidateId}/aianalysis`).catch(() => null),
           apiGet(`/api/candidates/${candidateId}`),
           apiGet(`/api/candidates/${candidateId}/interview-analysis`).catch(() => []),
         ]);
@@ -699,7 +699,7 @@ export default function AnalysisPage() {
               boxShadow: CARD_SHADOW, bgcolor: "#fff", px: 3, py: 2, mb: 2,
               display: "flex", alignItems: "center", gap: 3, flexWrap: "wrap" }}>
 
-              {consistency != null && (
+              {consistency != null && candidate?.linkedinUrl && (
                 <>
                   <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
                     <Box sx={{ width: 72, height: 72, borderRadius: "50%",
@@ -735,7 +735,7 @@ export default function AnalysisPage() {
                 </>
               )}
 
-              {timelineMatch != null && (
+              {timelineMatch != null && candidate?.linkedinUrl && (
                 <>
                   <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
                     <Box sx={{ width: 72, height: 72, borderRadius: "50%",

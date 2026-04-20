@@ -162,10 +162,16 @@ export default function AddCandidatePage() {
   const nav      = useNavigate();
   const location = useLocation();
   const prefill  = location.state?.prefill;
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => { isMountedRef.current = false; };
+  }, []);
 
   const { checkCandidateLimit, usage } = usePlanLimit();
-  const [limitDialog,    setLimitDialog]    = useState(false);
-  const [analysisDialog, setAnalysisDialog] = useState(false);
+  const [limitDialog,        setLimitDialog]        = useState(false);
+  const [analysisDialog,     setAnalysisDialog]     = useState(false);
+  const [analysisCandidateId, setAnalysisCandidateId] = useState(null);
 
   // Change 3: jobId defaults to "" = "Not Assigned"
   const [form, setForm] = useState({
@@ -486,17 +492,23 @@ export default function AddCandidatePage() {
       const loginId = localStorage.getItem("loginId") || "";
       const analyzeUrl = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
       analyzeUrl.searchParams.set("loginId", loginId);
-      const analyzeRes = await fetch(analyzeUrl.toString(), { method: "POST" });
-      if (analyzeRes.status === 402) {
-        setValidationErr("You have run out of tokens. Please upgrade your plan to run analysis.");
-        return;
-      }
-      if (!analyzeRes.ok) {
-        setValidationErr("Analysis failed. Please try again.");
-        return;
-      }
+
+      // Fire analysis in background — navigate when done only if still on this page
+      fetch(analyzeUrl.toString(), { method: "POST" }).then(analyzeRes => {
+        if (!isMountedRef.current) return;
+        if (analyzeRes.status === 402) {
+          setValidationErr("You have run out of tokens. Please upgrade your plan to run analysis.");
+        } else {
+          nav(`/analysis/${candidateId}`);
+        }
+      }).catch(() => {
+        if (isMountedRef.current) {
+          setValidationErr("Analysis failed. Please try again.");
+        }
+      });
+
+      setAnalysisCandidateId(candidateId);
       setAnalysisDialog(true);
-      nav(`/analysis/${candidateId}`);
 
     } catch (err) {
       const msg = err.message || "";
@@ -1170,10 +1182,10 @@ export default function AddCandidatePage() {
         </DialogTitle>
         <DialogContent>
           <Typography sx={{ fontSize: 13, color: "#9AA3B4", lineHeight: 1.6 }}>
-            Your candidate analysis is being generated. This may take a moment.
+            Analysis is running in the background. You will be taken to the results page automatically when it completes.
           </Typography>
           <Typography sx={{ fontSize: 13, color: "#9AA3B4", mt: 1, lineHeight: 1.6 }}>
-            You will be taken to the results page once it is complete.
+            You can also navigate away — the analysis will keep running and you can view the results from the Candidates page.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
