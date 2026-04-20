@@ -48,8 +48,9 @@ Work through these in priority order as assigned by the Tech Lead. Do not self-a
 | M-2 | `ANALYSIS_POOL` static field, no Spring lifecycle | `CoWorkerService.java:30` | S |
 | M-3 | No health check endpoint | `application.yml`, `pom.xml` | S |
 | M-4 | JVM runs without memory bounds on Render | `Dockerfile:33` | S |
-| M-5 | No composite index for interview conflict check | `schema_dump.sql:692` | S |
 | M-6 | No pagination on `getAnalysesFromDb()` | `AnalysisService.java:473-480` | S |
+
+> **M-5 (composite index)** is owned by the **DBA agent** — do not create migration files for it yourself.
 
 ### LOW — Maintainability
 | ID | Finding | File | Effort |
@@ -78,7 +79,7 @@ C-2 (rotate Stripe keys — do NOW, before anything else)
 
 ## Implementation Standards
 
-- **Never alter existing SQL migration files** — create new versioned ones (next: `V12__indexes.sql`)
+- **Never create or alter SQL migration files** — all schema and index changes are owned by the **DBA agent**. If a fix you are implementing requires a DB schema change, stop and flag it to the Tech Lead. The Tech Lead will assign it to the DBA. You implement any resulting code changes only after the DBA's SQL file has been reviewed by Tech Lead and approved by Sayan.
 - **Never hardcode credentials** — env vars only, no fallback defaults
 - **No unsolicited refactoring** — fix what is assigned, nothing else
 - **One finding per commit** — do not bundle multiple fixes in one commit
@@ -102,5 +103,5 @@ application.yml                 ← Primary config
 application-mvp2-additions.yml  ← MVP2 overrides
 Dockerfile                      ← Container config
 pom.xml                         ← Dependencies
-additional/sql/                 ← Migration scripts
+additional/sql/                 ← Migration scripts (READ ONLY — DBA agent owns new files here)
 ```
