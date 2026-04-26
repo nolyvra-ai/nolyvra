@@ -151,7 +151,7 @@ export default function CreateJobPage() {
     setLoadingJob(true);
     const url = new URL(`${API_BASE}/api/jobs/${jobId}`);
     url.searchParams.set("loginId", loginId);
-    fetch(url.toString())
+    fetch(url.toString(), { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } })
       .then(res => { if (!res.ok) throw new Error("Failed to load job"); return res.json(); })
       .then(job => {
         setForm({
@@ -176,7 +176,7 @@ export default function CreateJobPage() {
       briefUrl.searchParams.set("loginId", loginId);
       const res = await fetch(briefUrl.toString(), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
         body: JSON.stringify({ briefText }),
       });
       if (res.status === 402) throw new Error("You have run out of tokens. Please upgrade your plan to continue.");
@@ -209,7 +209,7 @@ export default function CreateJobPage() {
         url.searchParams.set("loginId", loginId);
         const res = await fetch(url.toString(), {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
           body: JSON.stringify({
             ...form,
             seniority: briefResult?.seniorityLevel || null,
@@ -222,7 +222,7 @@ export default function CreateJobPage() {
         url.searchParams.set("loginId", loginId);
         const res = await fetch(url.toString(), {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
           body: JSON.stringify({
             ...form,
             seniority: briefResult?.seniorityLevel || null,

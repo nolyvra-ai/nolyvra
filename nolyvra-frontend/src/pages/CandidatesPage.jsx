@@ -30,7 +30,7 @@ async function apiGet(path) {
   const loginId = localStorage.getItem("loginId") || "";
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`${res.status} ${res.statusText} - ${text}`);
@@ -337,7 +337,7 @@ export default function CandidatesPage() {
     // Change 4: show popup immediately, fire request in background
     setAnalysisDialog(true);
     try {
-      await fetch(url.toString(), { method: "POST" });
+      await fetch(url.toString(), { method: "POST", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
       // Refresh candidates list after analysis triggered
       setCandidates(prev =>
         prev.map(c =>

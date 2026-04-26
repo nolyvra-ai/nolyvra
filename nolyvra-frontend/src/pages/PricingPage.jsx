@@ -22,7 +22,7 @@ export default function PricingPage() {
         `&billing=${isYearly ? "yearly" : "monthly"}` +
         `&successUrl=${encodeURIComponent(window.location.origin + "/settings")}` +
         `&cancelUrl=${encodeURIComponent(window.location.origin + "/pricing")}`,
-        { method: "POST" }
+        { method: "POST", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } }
       );
       const data = await res.json();
       if (data.url) {

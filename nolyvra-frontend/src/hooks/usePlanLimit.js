@@ -15,7 +15,7 @@ export function usePlanLimit() {
   useEffect(() => {
     const url = new URL(`${API_BASE}/api/plans/me`);
     url.searchParams.set("loginId", loginId);
-    fetch(url.toString())
+    fetch(url.toString(), { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } })
       .then(r => r.json())
       .then(setUsage)
       .catch(() => setUsage(null))

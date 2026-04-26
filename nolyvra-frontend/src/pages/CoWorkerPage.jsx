@@ -17,7 +17,7 @@ async function apiPost(path, loginId, body) {
   url.searchParams.set("loginId", loginId);
   const res = await fetch(url.toString(), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -28,7 +28,7 @@ async function apiGet(path, loginId, extra = {}) {
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
   Object.entries(extra).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

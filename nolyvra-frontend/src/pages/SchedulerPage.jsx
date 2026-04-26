@@ -18,7 +18,7 @@ async function apiGet(path) {
   const loginId = localStorage.getItem("loginId")||"";
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -84,7 +84,7 @@ export default function SchedulerPage() {
       url.searchParams.set("candidateId", candidateId);
       url.searchParams.set("scheduledAt", isoTime);
       url.searchParams.set("durationMinutes", durationMinutes);
-      const res = await fetch(url.toString());
+      const res = await fetch(url.toString(), { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
       const data = await res.json();
       setConflictWarning(data.conflict ? data.message : null);
     } catch (e) {
@@ -107,7 +107,7 @@ export default function SchedulerPage() {
       const url = new URL(`${API_BASE}/api/interviews/schedule`);
       url.searchParams.set("loginId", loginId);
       const res = await fetch(url.toString(), {
-        method:"POST", headers:{"Content-Type":"application/json"},
+        method:"POST", headers:{"Content-Type":"application/json","Authorization":`Bearer ${localStorage.getItem("sessionToken")||""}`},
         body: JSON.stringify({ ...form, scheduledAt: new Date(form.scheduledAt).toISOString() }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -124,7 +124,7 @@ export default function SchedulerPage() {
     try {
       const url = new URL(`${API_BASE}/api/interviews/${interviewId}/cancel`);
       url.searchParams.set("loginId", loginId);
-      const res = await fetch(url.toString(), { method: "PATCH" });
+      const res = await fetch(url.toString(), { method: "PATCH", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
       if (!res.ok) throw new Error(await res.text());
       setScheduled(p => p.map(iv =>
         iv.id === interviewId ? { ...iv, status: "Cancelled" } : iv

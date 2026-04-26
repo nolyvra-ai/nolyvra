@@ -32,7 +32,7 @@ async function apiGet(path) {
   const loginId = localStorage.getItem("loginId") || "";
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
   if (!res.ok) throw new Error(await res.text().catch(() => res.statusText));
   return res.json();
 }
@@ -43,7 +43,7 @@ async function apiPost(path, body) {
   url.searchParams.set("loginId", loginId);
   const res = await fetch(url.toString(), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
     body: JSON.stringify(body),
   });
   if (res.status === 402) throw new Error("You have run out of tokens. Please upgrade your plan to continue.");
@@ -196,7 +196,7 @@ export default function InterviewAnalysisPage() {
         form.append("file", file);
         const url = new URL(`${API_BASE}/api/cv/extract`);
         url.searchParams.set("loginId", loginId);
-        const res = await fetch(url.toString(), { method: "POST", body: form });
+        const res = await fetch(url.toString(), { method: "POST", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` }, body: form });
         if (!res.ok) throw new Error(await res.text().catch(() => "Extraction failed"));
         const data = await res.json();
         if (data.error) throw new Error(data.error);

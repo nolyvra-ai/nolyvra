@@ -19,7 +19,7 @@ async function apiGet(path) {
   const loginId = localStorage.getItem("loginId") || "";
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -29,7 +29,7 @@ async function apiPatch(path, body) {
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
   const res = await fetch(url.toString(), {
-    method: "PATCH", headers: { "Content-Type": "application/json" },
+    method: "PATCH", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -41,7 +41,7 @@ async function apiPost(path, body) {
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
   const res = await fetch(url.toString(), {
-    method: "POST", headers: { "Content-Type": "application/json" },
+    method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -193,7 +193,7 @@ export default function CandidateWorkflowPage() {
     try {
       const url = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
       url.searchParams.set("loginId", loginId);
-      await fetch(url.toString(), { method: "POST" });
+      await fetch(url.toString(), { method: "POST", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
       // Refresh workflow to pick up new scores
       const updated = await apiGet(`/api/candidates/${candidateId}/workflow`);
       setWorkflow(updated);
@@ -225,7 +225,7 @@ export default function CandidateWorkflowPage() {
     try {
       const url = new URL(`${API_BASE}/api/candidates/${candidateId}/interview-questions/generate`);
       url.searchParams.set("loginId", loginId);
-      const res = await fetch(url.toString(), { method: "POST" });
+      const res = await fetch(url.toString(), { method: "POST", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setQuestionsData(data);
@@ -243,7 +243,7 @@ export default function CandidateWorkflowPage() {
       url.searchParams.set("loginId", loginId);
       await fetch(url.toString(), {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
         body: JSON.stringify({ questions: questionsData }),
       });
       setQuestionsSaved(true);

@@ -14,7 +14,7 @@ async function apiGet(path) {
   const loginId = localStorage.getItem("loginId") || "";
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
   if (!res.ok) { const t = await res.text().catch(() => ""); throw new Error(`${res.status} - ${t}`); }
   return res.json();
 }
@@ -23,7 +23,7 @@ async function apiDelete(path) {
   const loginId = localStorage.getItem("loginId") || "";
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
-  const res = await fetch(url.toString(), { method: "DELETE" });
+  const res = await fetch(url.toString(), { method: "DELETE", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
   if (!res.ok && res.status !== 204) { const t = await res.text().catch(() => ""); throw new Error(`${res.status} - ${t}`); }
 }
 
@@ -330,7 +330,7 @@ export default function JobsPage() {
       const loginId = localStorage.getItem("loginId") || "";
       const url = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
       url.searchParams.set("loginId", loginId);
-      const res = await fetch(url.toString(), { method: "POST" });
+      const res = await fetch(url.toString(), { method: "POST", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
       if (res.status === 402) { setErr("You have run out of tokens. Please upgrade your plan to continue."); return; }
       if (!res.ok) { setErr("Analysis failed. Please try again."); return; }
       const analysis = await apiGet(`/api/candidates/${candidateId}/analysis`);

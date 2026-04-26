@@ -109,11 +109,12 @@ export default function Sidebar() {
   useEffect(() => {
     if (!loginIdVal) return;
     const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
-    fetch(`${API_BASE}/api/jobs?loginId=${encodeURIComponent(loginIdVal)}`)
+    const authHeader = { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` };
+    fetch(`${API_BASE}/api/jobs?loginId=${encodeURIComponent(loginIdVal)}`, { headers: authHeader })
       .then(r => r.ok ? r.json() : [])
       .then(d => setJobCount(Array.isArray(d) ? d.length : null))
       .catch(() => {});
-    fetch(`${API_BASE}/api/candidates?loginId=${encodeURIComponent(loginIdVal)}`)
+    fetch(`${API_BASE}/api/candidates?loginId=${encodeURIComponent(loginIdVal)}`, { headers: authHeader })
       .then(r => r.ok ? r.json() : [])
       .then(d => setCandidateCount(Array.isArray(d) ? d.length : null))
       .catch(() => {});

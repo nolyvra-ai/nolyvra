@@ -50,7 +50,7 @@ export function TalentSearchPage() {
     if (!loginId) return;
     const url = new URL(`${API_BASE}/api/jobs`);
     url.searchParams.set("loginId", loginId);
-    fetch(url.toString()).then(r => r.json()).then(setPipelineJobs).catch(() => {});
+    fetch(url.toString(), { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } }).then(r => r.json()).then(setPipelineJobs).catch(() => {});
   }, [loginId]);
 
   const QUICK = ["Senior Java Engineer", "FinTech · Series B", "5+ years backend", "Product Manager SaaS"];
@@ -69,7 +69,7 @@ export function TalentSearchPage() {
     const url = new URL(`${API_BASE}/api/talent-search/query`);
     url.searchParams.set("loginId", loginId);
     const res = await fetch(url.toString(), {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
       body: JSON.stringify({ query: searchQuery, pageSize: 9, offset }),
     });
     if (res.status === 402) throw new Error("You have run out of tokens. Please upgrade your plan to continue searching.");
@@ -118,7 +118,7 @@ export function TalentSearchPage() {
       url.searchParams.set("loginId", loginId);
       const res = await fetch(url.toString(), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
         body: JSON.stringify({
           name:        pipelineCandidate?.name        ?? "",
           linkedinUrl: pipelineCandidate?.linkedinUrl ?? "",

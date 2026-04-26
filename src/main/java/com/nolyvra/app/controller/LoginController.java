@@ -3,8 +3,9 @@ package com.nolyvra.app.controller;
 import com.nolyvra.app.model.LoginRequest;
 import com.nolyvra.app.model.LoginResponse;
 import com.nolyvra.app.service.LoginService;
-import jakarta.validation.Valid;
+import com.nolyvra.app.service.SessionService;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
@@ -17,20 +18,31 @@ import org.springframework.web.server.ResponseStatusException;
 public class LoginController {
 
     private final LoginService loginService;
+    private final SessionService sessionService;
 
-    public LoginController(LoginService loginService) {
+    public LoginController(LoginService loginService, SessionService sessionService) {
         this.loginService = loginService;
+        this.sessionService = sessionService;
     }
 
     @PostMapping("/login")
-    public LoginResponse login(@RequestBody Map<String, String> body) {
+    public Map<String, Object> login(@RequestBody Map<String, String> body) {
         String emailId = body.getOrDefault("loginId", "");
         String password = body.getOrDefault("password", "");
         LoginRequest req = new LoginRequest(emailId, password);
-        return loginService.login(req)
+        LoginResponse resp = loginService.login(req)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.UNAUTHORIZED,
                         "Invalid email or password"));
+
+        String sessionToken = sessionService.createSession(resp.id());
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", resp.id());
+        result.put("name", resp.name());
+        result.put("company", resp.company());
+        result.put("email", resp.email());
+        result.put("sessionToken", sessionToken);
+        return result;
     }
 
     @PostMapping("/api/auth/change-password")

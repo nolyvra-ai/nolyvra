@@ -12,7 +12,7 @@ async function apiGet(path) {
   const loginId = localStorage.getItem("loginId") || "";
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`${res.status} ${res.statusText} - ${text}`);
@@ -514,7 +514,7 @@ export default function AnalysisPage() {
     try {
       const url = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
       url.searchParams.set("loginId", loginId);
-      await fetch(url.toString(), { method: "POST" });
+      await fetch(url.toString(), { method: "POST", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
       const updated = await apiGet(`/api/candidates/${candidateId}/aianalysis`);
       setAnalysis(updated);
     } catch (e) {
@@ -531,7 +531,7 @@ export default function AnalysisPage() {
       url.searchParams.set("loginId", loginId);
       await fetch(url.toString(), {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
         body: JSON.stringify({ notes }),
       });
       setNotesSaved(true);

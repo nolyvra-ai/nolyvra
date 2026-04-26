@@ -125,7 +125,7 @@ async function apiGet(path) {
   const loginId = localStorage.getItem("loginId") || "";
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -305,7 +305,7 @@ export default function EmailCentrePage() {
       const url = new URL(`${API_BASE}/api/emails/send`);
       url.searchParams.set("loginId", loginId);
       const res = await fetch(url.toString(), {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
         body: JSON.stringify({ ...form, body: buildBodyWithSig(form.body, signature) }),
       });
       if (!res.ok) throw new Error(await res.text());

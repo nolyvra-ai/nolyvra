@@ -141,7 +141,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!loginId) return;
-    fetch(`${API_BASE}/api/auth/admin/users?loginId=${encodeURIComponent(loginId)}`)
+    fetch(`${API_BASE}/api/auth/admin/users?loginId=${encodeURIComponent(loginId)}`, { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } })
       .then(r => { if (r.ok) { setIsAdmin(true); return r.json(); } throw new Error(); })
       .then(d => setAdminUsers(d))
       .catch(() => setIsAdmin(false));
@@ -152,7 +152,7 @@ export default function SettingsPage() {
     try {
       await fetch(`${API_BASE}/api/auth/admin/onboard?loginId=${encodeURIComponent(loginId)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
         body: JSON.stringify({ targetLoginId: targetId }),
       });
       setAdminUsers(prev => prev.map(u =>
@@ -181,7 +181,7 @@ export default function SettingsPage() {
     try {
       await fetch(`${API_BASE}/api/auth/admin/update-limits?loginId=${encodeURIComponent(loginId)}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
         body: JSON.stringify({
           targetLoginId:       selectedAdminUser,
           additionalTokens:     Number(additionalLimits.tokens)     || 0,
@@ -231,7 +231,7 @@ export default function SettingsPage() {
       url.searchParams.set("loginId", loginId);
       const res = await fetch(url.toString(), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
         body: JSON.stringify({
           currentPassword: hashedCurrent,
           newPassword: hashedNew,
@@ -254,6 +254,7 @@ export default function SettingsPage() {
   function handleLogout() {
     localStorage.removeItem("loginId");
     localStorage.removeItem("name");
+    localStorage.removeItem("sessionToken");
     nav("/login");
   }
 
@@ -267,7 +268,7 @@ export default function SettingsPage() {
         `${API_BASE}/api/stripe/portal?` +
         `loginId=${encodeURIComponent(loginId)}` +
         `&returnUrl=${encodeURIComponent(window.location.origin + "/settings")}`,
-        { method: "POST" }
+        { method: "POST", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } }
       );
       const data = await res.json();
       if (data.url) {

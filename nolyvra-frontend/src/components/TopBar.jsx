@@ -67,7 +67,7 @@ export default function TopBar() {
   useEffect(() => {
     const id = localStorage.getItem("loginId") || "";
     if (!id) return;
-    fetch(`${API_BASE}/api/plans/me?loginId=${encodeURIComponent(id)}`)
+    fetch(`${API_BASE}/api/plans/me?loginId=${encodeURIComponent(id)}`, { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setTokens(d.tokensRemaining); })
       .catch(() => {});

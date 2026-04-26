@@ -162,8 +162,9 @@ export default function LoginPage() {
         throw new Error(data.error || `Login failed (${res.status})`);
       }
 
-      localStorage.setItem("loginId", data.id);
-      localStorage.setItem("name",    data.name);
+      localStorage.setItem("loginId",      data.id);
+      localStorage.setItem("name",         data.name);
+      localStorage.setItem("sessionToken", data.sessionToken);
       setSuccess(true);
       nav("/dashboard");
     } catch (err) {

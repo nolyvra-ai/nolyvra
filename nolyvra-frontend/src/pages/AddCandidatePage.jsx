@@ -24,7 +24,7 @@ async function apiGet(path) {
   const loginId = localStorage.getItem("loginId") || "";
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
-  const res = await fetch(url.toString());
+  const res = await fetch(url.toString(), { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`${res.status} ${res.statusText} - ${text}`);
@@ -38,7 +38,7 @@ async function apiPost(path, body) {
   url.searchParams.set("loginId", loginId);
   const res = await fetch(url.toString(), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -260,7 +260,7 @@ export default function AddCandidatePage() {
       formData.append("file", file);
       const url = new URL(`${API_BASE}/api/cv/extract`);
       url.searchParams.set("loginId", loginId);
-      const res = await fetch(url.toString(), { method: "POST", body: formData });
+      const res = await fetch(url.toString(), { method: "POST", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` }, body: formData });
 
       // Read body as text first to avoid JSON parse errors
       const rawBody = await res.text();
@@ -353,7 +353,7 @@ export default function AddCandidatePage() {
         const loginId = localStorage.getItem("loginId") || "";
         const url = new URL(`${API_BASE}/api/cv/extract`);
         url.searchParams.set("loginId", loginId);
-        const res = await fetch(url.toString(), { method: "POST", body: formData });
+        const res = await fetch(url.toString(), { method: "POST", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` }, body: formData });
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
         setBulkFiles(prev => prev.map((b, idx) =>
@@ -415,7 +415,7 @@ export default function AddCandidatePage() {
         url.searchParams.set("loginId", loginId);
         await fetch(url.toString(), {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
           body: JSON.stringify({ name: b.name, email: b.email, cvText: b.cvText, linkedinUrl: "" }),
         });
         setBulkFiles(prev => prev.map((bf, idx) =>

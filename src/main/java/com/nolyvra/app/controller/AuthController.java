@@ -1,5 +1,6 @@
 package com.nolyvra.app.controller;
 
+import com.nolyvra.app.service.SessionService;
 import com.nolyvra.app.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -12,9 +13,11 @@ import java.util.Map;
 public class AuthController {
 
     private final UserService userService;
+    private final SessionService sessionService;
 
-    public AuthController(UserService userService) {
+    public AuthController(UserService userService, SessionService sessionService) {
         this.userService = userService;
+        this.sessionService = sessionService;
     }
 
     // POST /api/auth/change-password?loginId=x
@@ -67,8 +70,18 @@ public class AuthController {
         return ResponseEntity.ok(Map.of("status", "registered"));
     }
 
+    // POST /api/auth/logout
+    // Invalidates the session token supplied in the Authorization header.
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            sessionService.invalidateSession(authHeader.substring(7).trim());
+        }
+        return ResponseEntity.ok(Map.of("status", "logged out"));
+    }
+
     // POST /api/auth/login
-    // Returns loginId, name, planId — also checks 30-day expiry for free plan
+    // Returns loginId, name, planId, sessionToken — also checks 30-day expiry for free plan
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> body) {
         String loginId  = body.getOrDefault("loginId",  "").trim();

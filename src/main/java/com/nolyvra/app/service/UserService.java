@@ -11,6 +11,7 @@ import java.util.*;
 public class UserService {
 
     private final JdbcTemplate jdbc;
+    private final SessionService sessionService;
 
     // SHA-256 of "123456" — set when admin onboards a registered user
    /* private static final String DEFAULT_PASSWORD_HASH =
@@ -20,8 +21,9 @@ public class UserService {
     private static final String DEFAULT_PASSWORD_HASH =
             "7e19e31ae82d749034fc921f777f717ba5b57c6add9add889eb536ac6effcde0";
 
-    public UserService(JdbcTemplate jdbc) {
+    public UserService(JdbcTemplate jdbc, SessionService sessionService) {
         this.jdbc = jdbc;
+        this.sessionService = sessionService;
     }
 
     // ─── Change password ──────────────────────────────────────────────────────
@@ -103,6 +105,8 @@ public class UserService {
         }
 
         user.remove("createdAt");
+        String sessionToken = sessionService.createSession(loginId);
+        user.put("sessionToken", sessionToken);
         return Optional.of(user);
     }
 
