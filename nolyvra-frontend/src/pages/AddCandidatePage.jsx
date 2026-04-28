@@ -194,6 +194,8 @@ export default function AddCandidatePage() {
   const [bulkJobId,      setBulkJobId]      = useState("");
   const [bulkSaving,     setBulkSaving]     = useState(false);
   const [bulkDone,       setBulkDone]       = useState(false);
+  const [bulkAnalyzing,  setBulkAnalyzing]  = useState(false);
+  const [recentBulkCandidates, setRecentBulkCandidates] = useState([]);
 
   function setField(k, v) {
     setForm((p) => ({ ...p, [k]: v }));
@@ -394,6 +396,7 @@ export default function AddCandidatePage() {
     }
 
     let savedCount = 0;
+    const savedCandidates = [];
     for (let i = 0; i < bulkFiles.length; i++) {
       const b = bulkFiles[i];
       if (b.status !== "ready") continue;
@@ -413,13 +416,17 @@ export default function AddCandidatePage() {
           : `/api/candidates`;
         const url = new URL(`${API_BASE}${path}`);
         url.searchParams.set("loginId", loginId);
-        await fetch(url.toString(), {
+        const res = await fetch(url.toString(), {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
           body: JSON.stringify({ name: b.name, email: b.email, cvText: b.cvText, linkedinUrl: "" }),
         });
+        if (!res.ok) throw new Error(await res.text());
+        const candidate = await res.json();
+        const savedCandidate = { ...b, status: "saved", candidateId: candidate.id };
+        savedCandidates.push(savedCandidate);
         setBulkFiles(prev => prev.map((bf, idx) =>
-          idx === i ? { ...bf, status: "saved" } : bf));
+          idx === i ? savedCandidate : bf));
         savedCount++;
       } catch (e) {
         setBulkFiles(prev => prev.map((bf, idx) =>
@@ -428,11 +435,42 @@ export default function AddCandidatePage() {
     }
     setBulkSaving(false);
     setBulkDone(true);
+    setRecentBulkCandidates(savedCandidates);
 
     // If limit was hit mid-bulk, show the limit dialog after
     if (savedCount < readyFiles.length) {
       setBulkDialog(false);
       setLimitDialog(true);
+    }
+  }
+
+  function closeBulkDialog() {
+    setBulkDialog(false);
+    setBulkFiles([]);
+    setBulkDone(false);
+    setBulkAnalyzing(false);
+  }
+
+  async function handleBulkAnalysis(candidates = bulkFiles) {
+    const savedCandidates = candidates.filter(b => b.status === "saved" && b.candidateId);
+    if (!savedCandidates.length || bulkAnalyzing) return;
+
+    setBulkAnalyzing(true);
+    setAnalysisDialog(true);
+    const loginId = localStorage.getItem("loginId") || "";
+    const authHeader = { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` };
+
+    try {
+      await Promise.all(savedCandidates.map(async b => {
+        const analyzeUrl = new URL(`${API_BASE}/api/candidates/${b.candidateId}/analyze`);
+        analyzeUrl.searchParams.set("loginId", loginId);
+        const res = await fetch(analyzeUrl.toString(), { method: "POST", headers: authHeader });
+        if (!res.ok) throw new Error(await res.text());
+      }));
+    } catch {
+      setValidationErr("One or more analyses failed. Please try again from the Candidates page.");
+    } finally {
+      if (isMountedRef.current) setBulkAnalyzing(false);
     }
   }
 
@@ -587,7 +625,7 @@ export default function AddCandidatePage() {
           <Button
             size="small"
             variant="outlined"
-            onClick={() => { setBulkFiles([]); setBulkDone(false); setBulkDialog(true); }}
+            onClick={() => { setBulkFiles([]); setBulkDone(false); setBulkAnalyzing(false); setBulkDialog(true); }}
             sx={{
               fontSize: 12, fontWeight: 500, borderColor: "#C4B5FD", color: "#7C3AED",
               borderRadius: "6px", textTransform: "none",
@@ -672,6 +710,48 @@ export default function AddCandidatePage() {
           );
         })}
       </Box>
+
+      {recentBulkCandidates.length > 0 && (
+        <Box
+          sx={{
+            bgcolor: "#F0FDF4",
+            borderBottom: "1px solid #BBF7D0",
+            px: 3,
+            py: 1.25,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+            flexShrink: 0,
+          }}
+        >
+          <Box>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "#166534" }}>
+              {recentBulkCandidates.length} newest uploaded CV(s) added to pipeline
+            </Typography>
+            <Typography sx={{ fontSize: 11, color: "#15803D", mt: 0.25 }}>
+              Run analysis for this latest bulk upload batch when you are ready.
+            </Typography>
+          </Box>
+          <Button
+            variant="contained"
+            size="small"
+            disabled={bulkAnalyzing}
+            onClick={() => handleBulkAnalysis(recentBulkCandidates)}
+            sx={{
+              fontSize: 12,
+              bgcolor: ACCENT,
+              borderRadius: "6px",
+              textTransform: "none",
+              boxShadow: "none",
+              flexShrink: 0,
+              "&:hover": { bgcolor: "#1660CC", boxShadow: "none" },
+            }}
+          >
+            {bulkAnalyzing ? "Running…" : "🔍 Run Bulk Analysis"}
+          </Button>
+        </Box>
+      )}
 
       {/* ── Scrollable content ────────────────────────────────────────────── */}
       <Box sx={{ flex: 1, overflow: "auto", p: 2.5 }}>
@@ -1204,7 +1284,7 @@ export default function AddCandidatePage() {
 
       {/* Change 2: Bulk Upload dialog */}
       <Dialog open={bulkDialog}
-        onClose={() => { if (!bulkSaving) { setBulkDialog(false); setBulkFiles([]); setBulkDone(false); } }}
+        onClose={() => { if (!bulkSaving && !bulkAnalyzing) closeBulkDialog(); }}
         maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: "12px" } }}>
         <DialogTitle sx={{ fontSize: 14, fontWeight: 600, color: TEXT, pb: 1 }}>
           📦 Bulk Upload CVs
@@ -1213,6 +1293,46 @@ export default function AddCandidatePage() {
           <Typography sx={{ fontSize: 12, color: MUTED, mb: 2, lineHeight: 1.6 }}>
             Upload multiple CV files. Name and email will be auto-extracted from each.
           </Typography>
+
+          {bulkFiles.length > 0 && (
+            <Box sx={{
+              mb: 2,
+              p: 1.5,
+              border: `1px solid ${BORDER}`,
+              borderRadius: "8px",
+              bgcolor: SURFACE,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 1.5,
+            }}>
+              <Box>
+                <Typography sx={{ fontSize: 12, fontWeight: 700, color: TEXT }}>
+                  {bulkFiles.filter(b => b.status === "saved").length} candidate(s) added
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
+                  {bulkFiles.filter(b => b.status === "ready").length} ready, {bulkFiles.filter(b => b.status === "error").length} need attention
+                </Typography>
+              </Box>
+              <Button
+                variant="contained"
+                size="small"
+                disabled={bulkAnalyzing || bulkFiles.filter(b => b.status === "saved" && b.candidateId).length === 0}
+                onClick={handleBulkAnalysis}
+                sx={{
+                  fontSize: 12,
+                  bgcolor: ACCENT,
+                  borderRadius: "6px",
+                  textTransform: "none",
+                  boxShadow: "none",
+                  flexShrink: 0,
+                  "&:hover": { bgcolor: "#1660CC", boxShadow: "none" },
+                }}
+              >
+                {bulkAnalyzing ? "Running…" : "🔍 Run Bulk Analysis"}
+              </Button>
+            </Box>
+          )}
 
           {/* Job selector for bulk */}
           <TextField select fullWidth size="small" label="Assign all to Job"
@@ -1290,8 +1410,8 @@ export default function AddCandidatePage() {
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
-          <Button variant="outlined" size="small" disabled={bulkSaving}
-            onClick={() => { setBulkDialog(false); setBulkFiles([]); setBulkDone(false); }}
+          <Button variant="outlined" size="small" disabled={bulkSaving || bulkAnalyzing}
+            onClick={closeBulkDialog}
             sx={{ fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none" }}>
             {bulkDone ? "Close" : "Cancel"}
           </Button>
