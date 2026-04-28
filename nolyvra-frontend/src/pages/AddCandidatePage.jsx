@@ -494,10 +494,15 @@ export default function AddCandidatePage() {
       analyzeUrl.searchParams.set("loginId", loginId);
 
       // Fire analysis in background — navigate when done only if still on this page
-      fetch(analyzeUrl.toString(), { method: "POST" }).then(analyzeRes => {
+      fetch(analyzeUrl.toString(), {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+      }).then(analyzeRes => {
         if (!isMountedRef.current) return;
         if (analyzeRes.status === 402) {
           setValidationErr("You have run out of tokens. Please upgrade your plan to run analysis.");
+        } else if (!analyzeRes.ok) {
+          setValidationErr("Analysis failed. Please try again.");
         } else {
           nav(`/analysis/${candidateId}`);
         }
