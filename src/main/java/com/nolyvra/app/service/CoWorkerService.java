@@ -48,7 +48,17 @@ public class CoWorkerService {
 
     public CoWorkerChatResponse chat(String loginId, CoWorkerChatRequest request) {
         String context = buildContext(loginId);
-        persistMessage(loginId, "user", request.message());
+
+        // Resolve or create session
+        Long sessionId = request.sessionId();
+        if (sessionId == null) {
+            String title = request.message().length() > 60
+                    ? request.message().substring(0, 57) + "…"
+                    : request.message();
+            sessionId = createSession(loginId, title);
+        }
+
+        persistMessage(loginId, sessionId, "user", request.message());
 
         String systemPrompt = """
                 You are nolyvra Co-worker AI — a helpful recruitment assistant that takes actions inside the app.
@@ -138,14 +148,16 @@ public class CoWorkerService {
 
             // Fix 2: If OpenAI returned plain text instead of JSON, wrap it gracefully
             if (!clean.startsWith("{")) {
-                persistMessage(loginId, "assistant", clean);
-                return new CoWorkerChatResponse(clean, null);
+                persistMessage(loginId, sessionId, "assistant", clean);
+                updateSessionLastMessage(sessionId);
+                return new CoWorkerChatResponse(sessionId, clean, null);
             }
 
             var root = objectMapper.readTree(clean);
 
             String message = root.path("message").asText("How can I help?");
-            persistMessage(loginId, "assistant", message);
+            persistMessage(loginId, sessionId, "assistant", message);
+            updateSessionLastMessage(sessionId);
 
             var pa = root.path("pendingAction");
             CoWorkerChatResponse.PendingAction pendingAction = null;
@@ -180,14 +192,14 @@ public class CoWorkerService {
                         actionParams);
             }
 
-            return new CoWorkerChatResponse(message, pendingAction);
+            return new CoWorkerChatResponse(sessionId, message, pendingAction);
 
         } catch (Exception e) {
             // Fix 1: log full error to backend, return generic message to UI
             System.err.println("[CoWorker] chat() failed: " + e.getMessage());
             e.printStackTrace();
             return new CoWorkerChatResponse(
-                    "Something went wrong on our end. Please try again.", null);
+                    sessionId, "Something went wrong on our end. Please try again.", null);
         }
     }
 
@@ -234,18 +246,45 @@ public class CoWorkerService {
                 }, loginId);
     }
 
-    // ─── Get message history ──────────────────────────────────────────────────
+    // ─── Get session list (history sidebar) ──────────────────────────────────
 
-    public List<Map<String, String>> getHistory(String loginId) {
+    public List<CoWorkerSessionResponse> getHistory(String loginId) {
         return jdbc.query("""
-                select role, content, created_at from coworker_messages
-                where login_id = ?
-                order by created_at asc limit 50
+                select s.id, s.title, s.created_at, s.last_message_at,
+                       (select content from coworker_messages
+                        where session_id = s.id order by created_at desc limit 1) as preview
+                from coworker_sessions s
+                where s.login_id = ?
+                order by s.last_message_at desc limit 50
+                """,
+                (rs, r) -> {
+                    var created = rs.getObject("created_at",
+                            java.time.OffsetDateTime.class);
+                    var lastMsg = rs.getObject("last_message_at",
+                            java.time.OffsetDateTime.class);
+                    return new CoWorkerSessionResponse(
+                            rs.getLong("id"),
+                            rs.getString("title"),
+                            rs.getString("preview"),
+                            created != null ? created.toInstant() : null,
+                            lastMsg != null ? lastMsg.toInstant() : null);
+                }, loginId);
+    }
+
+    // ─── Get messages for a specific session ─────────────────────────────────
+
+    public List<Map<String, String>> getSessionMessages(Long sessionId, String loginId) {
+        return jdbc.query("""
+                select m.role, m.content
+                from coworker_messages m
+                join coworker_sessions s on s.id = m.session_id
+                where m.session_id = ? and s.login_id = ?
+                order by m.created_at asc
                 """,
                 (rs, r) -> Map.of(
                         "role", rs.getString("role"),
                         "content", rs.getString("content")),
-                loginId);
+                sessionId, loginId);
     }
 
     // ─── Action executors ─────────────────────────────────────────────────────
@@ -678,10 +717,32 @@ public class CoWorkerService {
 
     // ─── DB helpers ───────────────────────────────────────────────────────────
 
-    private void persistMessage(String loginId, String role, String content) {
+    private Long createSession(String loginId, String title) {
+        var keys = new org.springframework.jdbc.support.GeneratedKeyHolder();
+        jdbc.update(con -> {
+            var ps = con.prepareStatement(
+                    "insert into coworker_sessions (login_id, title) values (?, ?)",
+                    new String[]{"id"});
+            ps.setString(1, loginId);
+            ps.setString(2, title);
+            return ps;
+        }, keys);
+        return keys.getKey() != null ? keys.getKey().longValue() : null;
+    }
+
+    private void updateSessionLastMessage(Long sessionId) {
+        if (sessionId == null) return;
         try {
-            jdbc.update("insert into coworker_messages (login_id, role, content) values (?, ?, ?)",
-                    loginId, role, content);
+            jdbc.update("update coworker_sessions set last_message_at = now() where id = ?", sessionId);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void persistMessage(String loginId, Long sessionId, String role, String content) {
+        try {
+            jdbc.update(
+                    "insert into coworker_messages (login_id, session_id, role, content) values (?, ?, ?, ?)",
+                    loginId, sessionId, role, content);
         } catch (Exception ignored) {
         }
     }

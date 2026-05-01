@@ -43,9 +43,17 @@ public class CoWorkerController {
         return coWorkerService.getTasks(loginId, status);
     }
 
-    // GET /api/coworker/history?loginId=x
+    // GET /api/coworker/history?loginId=x — returns session list for the history sidebar
     @GetMapping("/history")
-    public List<Map<String, String>> getHistory(@RequestParam String loginId) {
+    public List<CoWorkerSessionResponse> getHistory(@RequestParam String loginId) {
         return coWorkerService.getHistory(loginId);
+    }
+
+    // GET /api/coworker/sessions/{sessionId}?loginId=x — load messages for a specific session
+    @GetMapping("/sessions/{sessionId}")
+    public List<Map<String, String>> getSessionMessages(
+            @PathVariable Long sessionId,
+            @RequestParam String loginId) {
+        return coWorkerService.getSessionMessages(sessionId, loginId);
     }
 }

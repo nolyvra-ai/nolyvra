@@ -1,23 +1,43 @@
-import { useEffect, useRef, useState } from "react";
-import { Box, Paper, Typography, Button, TextField, CircularProgress, LinearProgress } from "@mui/material";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Box, CircularProgress, LinearProgress, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
-const BORDER   = "#E8ECF2", MUTED = "#9AA3B4", TEXT = "#0F1623", ACCENT = "#1D72E8";
-const SUCCESS  = "#16A34A", SUCCESS_BG = "#F0FDF4", SUCCESS_BR = "#BBF7D0";
-const WARN     = "#D97706", WARN_BG    = "#FFFBEB", WARN_BR    = "#FDE68A";
-const DANGER   = "#DC2626", DANGER_BG  = "#FEF2F2", DANGER_BR  = "#FECACA";
-const PURPLE   = "#7C3AED", PURPLE_BG  = "#F5F3FF", PURPLE_BR  = "#C4B5FD";
-const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
-const SURFACE  = "#FAFBFD";
+// ── Palette ───────────────────────────────────────────────────────────────────
+const C = {
+  bg:          "#F7F8FA",
+  white:       "#fff",
+  border:      "#E8ECF2",
+  borderSoft:  "#F0F2F6",
+  text:        "#0F1623",
+  textSec:     "#5A6480",
+  textMuted:   "#9AA3B4",
+  accent:      "#1D72E8",
+  accentBg:    "#EBF2FF",
+  accentBr:    "#BFDBFE",
+  purple:      "#7C3AED",
+  purpleBg:    "#F5F3FF",
+  purpleBr:    "#C4B5FD",
+  success:     "#16A34A",
+  successBg:   "#F0FDF4",
+  successBr:   "#BBF7D0",
+  danger:      "#DC2626",
+  dangerBg:    "#FEF2F2",
+  dangerBr:    "#FECACA",
+  sidebar:     "#FBFAFE",
+  historyThumb:"#D9D6F2",
+};
+
+// ── API helpers ───────────────────────────────────────────────────────────────
+const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` });
 
 async function apiPost(path, loginId, body) {
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
   const res = await fetch(url.toString(), {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+    headers: { "Content-Type": "application/json", ...authHeader() },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -28,226 +48,418 @@ async function apiGet(path, loginId, extra = {}) {
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
   Object.entries(extra).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString(), { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
+  const res = await fetch(url.toString(), { headers: authHeader() });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
 
-// ── Quick action cards ────────────────────────────────────────────────────────
-const QUICK_ACTIONS = [
-  { id: "analysis",  icon: "🔬", label: "Run Analysis — New Candidates",   desc: "Batch analyse all unanalysed candidates under a job",     border: PURPLE_BR,  bg: PURPLE_BG,  prompt: "Run analysis for all unanalysed candidates" },
-  { id: "meeting",   icon: "📅", label: "Schedule a Meeting",               desc: "Phone screen, video interview, or in-person — for any candidate", border: ACCENT_BR,  bg: ACCENT_BG,  prompt: "Schedule a meeting with a candidate" },
-  { id: "report",    icon: "📊", label: "Generate Monthly Report",          desc: "Client report across all jobs — or filtered by client",   border: SUCCESS_BR, bg: SUCCESS_BG, prompt: "Generate a monthly report for all clients" },
-  { id: "followup",  icon: "✉️", label: "Send Follow-up Emails",            desc: "Draft & send post-interview follow-ups for all candidates", border: WARN_BR,    bg: WARN_BG,    prompt: "Send follow-up emails for all interviewed candidates" },
-  { id: "pipeline",  icon: "🔄", label: "Move Candidates in Pipeline",      desc: "Bulk-update stage for all approved candidates in a job",   border: BORDER,     bg: SURFACE,    prompt: "Move candidates in the pipeline" },
-  { id: "shortlist", icon: "⭐", label: "Build a Shortlist",                desc: "Auto-generate top-3 candidate shortlist for a client",    border: BORDER,     bg: SURFACE,    prompt: "Build a shortlist for a client" },
-];
+// ── Welcome screen (shown when stream is empty) ───────────────────────────────
+function WelcomeScreen() {
+  return (
+    <Box sx={{
+      flex: 1, display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center",
+      px: 4, textAlign: "center", gap: 2,
+    }}>
+      {/* Bot icon — large rounded square */}
+      <Box sx={{
+        width: 80, height: 80, borderRadius: "22px",
+        background: "linear-gradient(135deg, #7C3AED, #6D57E8)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        boxShadow: "0 8px 32px rgba(124,58,237,0.22)",
+        mb: 0.5,
+      }}>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="8" width="18" height="12" rx="2"/>
+          <circle cx="8.5" cy="14" r="1.4" fill="#fff" stroke="none"/>
+          <circle cx="15.5" cy="14" r="1.4" fill="#fff" stroke="none"/>
+          <path d="M12 4v4M9 4h6"/>
+        </svg>
+      </Box>
 
-const SUGGEST_CHIPS = [
-  { label: "🔬 Analyse all pending",   prompt: "Run analysis for all unanalysed candidates" },
-  { label: "📅 Schedule interview",    prompt: "Schedule a video interview" },
-  { label: "📊 Monthly report",        prompt: "Generate March monthly report for all clients" },
-  { label: "✉ Follow-ups",            prompt: "Send follow-up emails for all interviewed candidates" },
-];
+      <Typography sx={{ fontSize: 22, fontWeight: 700, color: C.purple, letterSpacing: "-0.3px", lineHeight: 1.2 }}>
+        How can I help today?
+      </Typography>
+      <Typography sx={{ fontSize: 14, color: C.textSec, lineHeight: 1.65, maxWidth: 380 }}>
+        Ask me to triage candidates, schedule interviews, draft emails, or summarise your pipeline. Check the tips on the right for examples.
+      </Typography>
+    </Box>
+  );
+}
 
-const WHAT_CAN_DO = [
-  { icon: "🔬", title: "Run Analysis",       desc: "batch or single candidate" },
-  { icon: "📅", title: "Schedule Meetings",  desc: "phone screen, video, in-person, debrief" },
-  { icon: "📊", title: "Generate Reports",   desc: "monthly, by client, or all jobs" },
-  { icon: "✉️", title: "Send Emails",        desc: "navigates to email centre with pre-filled draft" },
-  { icon: "🔄", title: "Move Pipeline",      desc: "bulk stage updates" },
-  { icon: "⭐", title: "Build Shortlist",    desc: "ranked candidates for clients" },
-  { icon: "🔔", title: "Set Reminders",      desc: "auto-create tasks from conversation" },
-];
-
-// ── Message bubble ────────────────────────────────────────────────────────────
+// ── Message bubble — AI ───────────────────────────────────────────────────────
 function AiBubble({ message, pendingAction, onConfirm, onCancel, isLoading }) {
   return (
     <Box sx={{ display: "flex", gap: 1.25, alignItems: "flex-start" }}>
-      <Box sx={{ width: 26, height: 26, borderRadius: "50%", flexShrink: 0, mt: "2px",
+      <Box sx={{
+        width: 28, height: 28, borderRadius: "8px", flexShrink: 0, mt: "2px",
         background: "linear-gradient(135deg,#7C3AED,#1D72E8)",
-        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>
-        🤖
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="8" width="18" height="12" rx="2"/>
+          <circle cx="8.5" cy="14" r="1.2" fill="#fff" stroke="none"/>
+          <circle cx="15.5" cy="14" r="1.2" fill="#fff" stroke="none"/>
+          <path d="M12 4v4M9 4h6"/>
+        </svg>
       </Box>
-      <Box sx={{ maxWidth: "75%" }}>
-        <Box sx={{ bgcolor: "#fff", border: `1px solid ${BORDER}`, borderRadius: "0 10px 10px 10px",
-          px: 1.75, py: 1.25, fontSize: 12.5, color: TEXT, lineHeight: 1.6,
-          boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+      <Box sx={{ maxWidth: "80%" }}>
+        <Box sx={{
+          bgcolor: C.white, border: `1px solid ${C.border}`,
+          borderRadius: "0 10px 10px 10px", px: 1.75, py: 1.25,
+          fontSize: 12.5, color: C.text, lineHeight: 1.6,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.05)", whiteSpace: "pre-wrap",
+        }}>
           {isLoading
             ? <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                <CircularProgress size={12} sx={{ color: PURPLE }} />
-                <Typography sx={{ fontSize: 12, color: MUTED }}>Thinking…</Typography>
+                <CircularProgress size={12} sx={{ color: C.purple }} />
+                <Typography sx={{ fontSize: 12, color: C.textMuted }}>Thinking…</Typography>
               </Box>
             : message}
 
-          {/* Pending action confirmation card */}
           {pendingAction && pendingAction.type !== "NONE" && (
-            <Box sx={{ mt: 1.25, p: 1.25, bgcolor: PURPLE_BG,
-              border: `1px solid ${PURPLE_BR}`, borderRadius: "8px" }}>
-              <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT, mb: 0.5 }}>
-                Confirm action:
-              </Typography>
-              <Typography sx={{ fontSize: 11, color: MUTED, mb: 1, lineHeight: 1.5 }}>
+            <Box sx={{ mt: 1.25, p: 1.25, bgcolor: C.purpleBg, border: `1px solid ${C.purpleBr}`, borderRadius: "8px" }}>
+              <Typography sx={{ fontSize: 12, fontWeight: 600, color: C.text, mb: 0.5 }}>Confirm action:</Typography>
+              <Typography sx={{ fontSize: 11, color: C.textMuted, mb: 1, lineHeight: 1.5 }}>
                 {pendingAction.description}
                 {pendingAction.type === "EMAIL" && (
-                  <Box component="span" sx={{ color: ACCENT }}> — will open Email Centre</Box>
+                  <Box component="span" sx={{ color: C.accent }}> — will open Email Centre</Box>
                 )}
               </Typography>
               <Box sx={{ display: "flex", gap: 1 }}>
-                <Button size="small" variant="contained" onClick={onConfirm}
-                  sx={{ fontSize: 11, bgcolor: PURPLE, borderRadius: "6px",
-                    textTransform: "none", boxShadow: "none",
-                    "&:hover": { bgcolor: "#6D28D9", boxShadow: "none" } }}>
-                  ✓ Yes, do it
-                </Button>
-                <Button size="small" variant="outlined" onClick={onCancel}
-                  sx={{ fontSize: 11, borderColor: BORDER, color: TEXT,
-                    borderRadius: "6px", textTransform: "none" }}>
-                  Cancel
-                </Button>
+                <Box component="button" onClick={onConfirm} sx={{
+                  fontSize: 11, bgcolor: C.purple, color: "#fff", border: "none",
+                  borderRadius: "6px", px: 1.5, py: 0.625, cursor: "pointer",
+                  "&:hover": { bgcolor: "#6D28D9" },
+                }}>✓ Yes, do it</Box>
+                <Box component="button" onClick={onCancel} sx={{
+                  fontSize: 11, bgcolor: "transparent", color: C.text,
+                  border: `1px solid ${C.border}`, borderRadius: "6px",
+                  px: 1.5, py: 0.625, cursor: "pointer",
+                }}>Cancel</Box>
               </Box>
             </Box>
           )}
         </Box>
-        <Typography sx={{ fontSize: 10, color: MUTED, mt: 0.5, ml: 0.5 }}>
-          Co-worker AI
-        </Typography>
+        <Typography sx={{ fontSize: 10, color: C.textMuted, mt: 0.5, ml: 0.5 }}>Co-worker AI</Typography>
       </Box>
     </Box>
   );
 }
 
+// ── Message bubble — User ─────────────────────────────────────────────────────
 function UserBubble({ message }) {
   return (
     <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-      <Box sx={{ maxWidth: "75%" }}>
-        <Box sx={{ bgcolor: ACCENT, borderRadius: "10px 0 10px 10px",
-          px: 1.75, py: 1.25, fontSize: 12.5, color: "#fff", lineHeight: 1.6 }}>
-          {message}
-        </Box>
-        <Typography sx={{ fontSize: 10, color: MUTED, mt: 0.5, textAlign: "right", mr: 0.5 }}>
-          You
-        </Typography>
+      <Box sx={{ maxWidth: "80%" }}>
+        <Box sx={{
+          bgcolor: C.accent, borderRadius: "10px 0 10px 10px",
+          px: 1.75, py: 1.25, fontSize: 12.5, color: "#fff",
+          lineHeight: 1.6, whiteSpace: "pre-wrap",
+        }}>{message}</Box>
+        <Typography sx={{ fontSize: 10, color: C.textMuted, mt: 0.5, textAlign: "right", mr: 0.5 }}>You</Typography>
       </Box>
     </Box>
   );
 }
 
-// ── Task item for right panel ─────────────────────────────────────────────────
+// ── Thread item in history sidebar ───────────────────────────────────────────
+function ThreadItem({ session, isActive, onClick }) {
+  const date = session.lastMessageAt
+    ? new Date(session.lastMessageAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })
+    : "";
+  return (
+    <Box onClick={onClick} sx={{
+      px: "10px", py: "8px", borderRadius: "7px", cursor: "pointer",
+      mb: "1px", transition: "background .12s",
+      bgcolor: isActive ? "#EBE5FF" : "transparent",
+      "&:hover": { bgcolor: isActive ? "#EBE5FF" : "#F2EEFF" },
+    }}>
+      <Box sx={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 0.5 }}>
+        <Typography sx={{
+          fontSize: 12.5, fontWeight: isActive ? 600 : 500,
+          color: isActive ? C.text : C.textSec,
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1,
+        }}>
+          {session.title || "Untitled conversation"}
+        </Typography>
+        <Typography sx={{ fontSize: 10, color: C.textMuted, flexShrink: 0 }}>{date}</Typography>
+      </Box>
+      {session.preview && (
+        <Typography sx={{
+          fontSize: 11, color: C.textMuted, mt: "1px",
+          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+        }}>
+          {session.preview}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
+// ── Active task item ──────────────────────────────────────────────────────────
 function TaskItem({ task }) {
   const isDone    = task.status === "done";
   const isFailed  = task.status === "failed";
   const isRunning = task.status === "running";
-
-  const iconColor = isDone ? SUCCESS : isFailed ? DANGER : ACCENT;
-  const icon = isDone ? "✓" : isFailed ? "✗" : "⟳";
-
+  const iconColor = isDone ? C.success : isFailed ? C.danger : C.accent;
+  const icon      = isDone ? "✓" : isFailed ? "✗" : "⟳";
   return (
-    <Box sx={{ display: "flex", gap: 1.25, alignItems: "flex-start",
-      py: 1.25, borderBottom: `1px solid #F0F2F6`, "&:last-child": { borderBottom: "none" } }}>
-      <Box sx={{ width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
-        bgcolor: isDone ? SUCCESS_BG : isFailed ? DANGER_BG : ACCENT_BG,
-        border: `1px solid ${isDone ? SUCCESS_BR : isFailed ? DANGER_BR : ACCENT_BR}`,
+    <Box sx={{ display: "flex", gap: 1.25, alignItems: "flex-start", py: 1.25, borderBottom: `1px solid ${C.borderSoft}`, "&:last-child": { borderBottom: "none" } }}>
+      <Box sx={{
+        width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+        bgcolor: isDone ? C.successBg : isFailed ? C.dangerBg : C.accentBg,
+        border: `1px solid ${isDone ? C.successBr : isFailed ? C.dangerBr : C.accentBr}`,
         display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 11, fontWeight: 700, color: iconColor }}>
-        {icon}
-      </Box>
+        fontSize: 10, fontWeight: 700, color: iconColor,
+      }}>{icon}</Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontSize: 12, fontWeight: 500, color: TEXT,
-          lineHeight: 1.5 }}>
+        <Typography sx={{ fontSize: 11.5, fontWeight: 500, color: C.text, lineHeight: 1.4 }}>
           {task.description}
         </Typography>
         {isRunning && (
           <>
-            <Typography sx={{ fontSize: 11, color: ACCENT, mt: 0.25 }}>
-              Processing… {task.progress}%
-            </Typography>
+            <Typography sx={{ fontSize: 10.5, color: C.accent, mt: 0.25 }}>Processing… {task.progress}%</Typography>
             <LinearProgress variant="determinate" value={task.progress}
-              sx={{ mt: 0.5, borderRadius: "3px", height: 4,
-                "& .MuiLinearProgress-bar": { bgcolor: ACCENT } }} />
+              sx={{ mt: 0.5, borderRadius: "3px", height: 3, "& .MuiLinearProgress-bar": { bgcolor: C.accent } }} />
           </>
-        )}
-        {isDone && task.completedAt && (
-          <Typography sx={{ fontSize: 10, color: MUTED, mt: 0.25 }}>
-            {new Date(task.completedAt).toLocaleTimeString("en-GB",
-              { hour: "2-digit", minute: "2-digit" })}
-          </Typography>
         )}
       </Box>
     </Box>
   );
 }
 
+// ── Tips panel content ────────────────────────────────────────────────────────
+const TRY_ASKING = [
+  { eg: "Run analysis on all new candidates for Senior Backend Engineer", tags: ["Triage", "Bulk action"] },
+  { eg: "Schedule interviews with the top 3 for Product Manager next Tue–Thu", tags: ["Scheduling"] },
+  { eg: "Draft a rejection email for candidates with critical verify risk", tags: ["Email"] },
+  { eg: "Summarise this week's pipeline movement and flag stalled candidates", tags: ["Summary"] },
+];
+const PRO_TIPS = [
+  { title: "Be specific about scope", body: "Mention the job role, stage, or time window so Co-worker doesn't have to ask follow-up questions." },
+  { title: "Confirm before bulk actions", body: "Co-worker will preview every email, schedule, and analysis run before sending. Review carefully." },
+  { title: "Reference candidates by name", body: "e.g. \"Re-check Priya Sharma's CV consistency\" — Co-worker will pull her latest analysis." },
+];
+const SHORTCUTS = [
+  { label: "New chat",       key: "⌘ N" },
+  { label: "Send message",   key: "↵" },
+  { label: "New line",       key: "⇧ ↵" },
+  { label: "Toggle history", key: "⌘ /" },
+];
+
+function TipsPanel() {
+  return (
+    <Box sx={{ flex: 1, overflowY: "auto", p: "16px 14px" }}>
+      <Typography sx={{ fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: "0.06em", mb: 1 }}>
+        TRY ASKING
+      </Typography>
+      {TRY_ASKING.map((t, i) => (
+        <Box key={i} sx={{ mb: 1, p: "10px 12px", bgcolor: C.white, border: `1px solid ${C.border}`, borderRadius: "8px" }}>
+          <Typography sx={{ fontSize: 12, color: C.text, lineHeight: 1.5, mb: 0.75 }}>{t.eg}</Typography>
+          <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+            {t.tags.map(tag => (
+              <Box key={tag} sx={{
+                fontSize: 10, px: "7px", py: "2px", borderRadius: "4px",
+                bgcolor: C.purpleBg, border: `1px solid ${C.purpleBr}`, color: C.purple, fontWeight: 600,
+              }}>{tag}</Box>
+            ))}
+          </Box>
+        </Box>
+      ))}
+
+      <Typography sx={{ fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: "0.06em", mt: 2, mb: 1 }}>
+        PRO TIPS
+      </Typography>
+      {PRO_TIPS.map((t, i) => (
+        <Box key={i} sx={{ mb: 1, p: "10px 12px", bgcolor: C.white, border: `1px solid ${C.border}`, borderRadius: "8px" }}>
+          <Typography sx={{ fontSize: 12, fontWeight: 600, color: C.text, mb: 0.5 }}>{t.title}</Typography>
+          <Typography sx={{ fontSize: 11.5, color: C.textSec, lineHeight: 1.5 }}>{t.body}</Typography>
+        </Box>
+      ))}
+
+      <Typography sx={{ fontSize: 10, fontWeight: 700, color: C.textMuted, letterSpacing: "0.06em", mt: 2, mb: 1 }}>
+        SHORTCUTS
+      </Typography>
+      {SHORTCUTS.map(s => (
+        <Box key={s.label} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", py: "6px", borderBottom: `1px solid ${C.borderSoft}` }}>
+          <Typography sx={{ fontSize: 12, color: C.textSec }}>{s.label}</Typography>
+          <Box component="kbd" sx={{
+            fontSize: 10.5, px: "7px", py: "3px", borderRadius: "5px",
+            bgcolor: C.bg, border: `1px solid ${C.border}`, color: C.text, fontFamily: "monospace",
+          }}>{s.key}</Box>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+// ── SVG icons ─────────────────────────────────────────────────────────────────
+const IconMenu = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+  </svg>
+);
+const IconChevronRight = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 18 15 12 9 6"/>
+  </svg>
+);
+const IconX = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+);
+const IconZap = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+  </svg>
+);
+const IconSearch = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+  </svg>
+);
+
+// ── Shared icon-button style ──────────────────────────────────────────────────
+const iconBtnSx = {
+  width: 30, height: 30, border: `1px solid ${C.border}`, borderRadius: "6px",
+  bgcolor: C.white, display: "flex", alignItems: "center", justifyContent: "center",
+  cursor: "pointer", color: C.textSec, flexShrink: 0,
+  "&:hover": { bgcolor: C.accentBg, color: C.accent, borderColor: C.accent },
+};
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function CoWorkerPage() {
-  const nav     = useNavigate();
-  const loginId = localStorage.getItem("loginId") || "";
+  const nav      = useNavigate();
+  const loginId  = localStorage.getItem("loginId") || "";
   const userName = localStorage.getItem("name") || "there";
+  const initials = userName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 
-  const GREETING = `Hi ${userName} 👋 I'm your Co-worker AI. I can take real actions inside nolyvra for you — just tell me what to do.\n\nFor example:\n• "Run analysis for all new candidates in Senior Backend Engineer"\n• "Schedule a phone screen with James Okafor for Tuesday 2pm"\n• "Generate March report for FinTech Co."\n\nWhat would you like me to do?`;
+  // Pane collapse state
+  const [leftOpen,  setLeftOpen]  = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
 
-  const [messages,      setMessages]      = useState([{ role: "assistant", content: GREETING, id: 0 }]);
+  // Session / history state
+  const [sessions,       setSessions]       = useState([]);
+  const [activeSession,  setActiveSession]  = useState(null); // { id, title }
+  const [searchQuery,    setSearchQuery]    = useState("");
+
+  // Active tasks state
+  const [tasks, setTasks] = useState([]);
+
+  // Chat state
+  const [messages,      setMessages]      = useState([]);
   const [input,         setInput]         = useState("");
   const [loading,       setLoading]       = useState(false);
-  const [pendingAction, setPendingAction] = useState(null); // action waiting for confirm
-  const [pendingMsgIdx, setPendingMsgIdx] = useState(null); // which message holds the action
-  const [tasks,         setTasks]         = useState([]);
-  const [tasksDone,     setTasksDone]     = useState([]);
-  const messagesEndRef = useRef(null);
-  const inputRef       = useRef(null);
+  const [pendingAction, setPendingAction] = useState(null);
 
-  // Load task history on mount + poll active tasks
+  const streamEndRef = useRef(null);
+  const textareaRef  = useRef(null);
+
+  // ── Load session list ───────────────────────────────────────────────────────
+  const loadSessions = useCallback(async () => {
+    try {
+      const data = await apiGet("/api/coworker/history", loginId);
+      setSessions(data);
+    } catch { /* silent */ }
+  }, [loginId]);
+
+  useEffect(() => { loadSessions(); }, [loadSessions]);
+
+  // ── Poll active tasks ───────────────────────────────────────────────────────
   useEffect(() => {
+    async function loadTasks() {
+      try {
+        const all = await apiGet("/api/coworker/tasks", loginId);
+        setTasks(all.filter(t => t.status === "running"));
+      } catch { /* silent */ }
+    }
     loadTasks();
     const interval = setInterval(loadTasks, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [loginId]);
 
+  // ── Auto-scroll ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    streamEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  async function loadTasks() {
+  // ── Auto-resize textarea ────────────────────────────────────────────────────
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+  }, [input]);
+
+  // ── Keyboard shortcuts ──────────────────────────────────────────────────────
+  useEffect(() => {
+    function onKey(e) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "n") { e.preventDefault(); startNewChat(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === "/") { e.preventDefault(); setLeftOpen(o => !o); }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Switch to a session ─────────────────────────────────────────────────────
+  async function switchSession(session) {
+    setActiveSession(session);
+    setPendingAction(null);
     try {
-      const all = await apiGet("/api/coworker/tasks", loginId);
-      setTasks(all.filter(t => t.status === "running"));
-      setTasksDone(all.filter(t => t.status === "done" || t.status === "failed"));
-    } catch { /* silent */ }
+      const msgs = await apiGet(`/api/coworker/sessions/${session.id}`, loginId);
+      setMessages(msgs.map((m, i) => ({ ...m, id: i })));
+    } catch {
+      setMessages([]);
+    }
+    textareaRef.current?.focus();
   }
 
+  // ── New chat ────────────────────────────────────────────────────────────────
+  function startNewChat() {
+    setActiveSession(null);
+    setPendingAction(null);
+    setMessages([]);
+    setInput("");
+    textareaRef.current?.focus();
+  }
+
+  // ── Send message ────────────────────────────────────────────────────────────
   async function sendMessage(text) {
-    const msg = text || input.trim();
+    const msg = text ?? input.trim();
     if (!msg || loading) return;
     setInput("");
     setPendingAction(null);
 
-    // Add user message
     const userMsg = { role: "user", content: msg, id: Date.now() };
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
 
-    // Build history for context (exclude the greeting)
-    const history = messages
-      .filter(m => m.id !== 0)
-      .map(m => ({ role: m.role, content: m.content }));
+    const history = messages.map(m => ({ role: m.role, content: m.content }));
 
     try {
       const res = await apiPost("/api/coworker/chat", loginId, {
+        sessionId: activeSession?.id ?? null,
         message: msg,
         history,
       });
 
-      const aiMsg = {
-        role: "assistant",
-        content: res.message,
-        pendingAction: res.pendingAction,
-        id: Date.now() + 1,
-      };
+      // First message in a session — set active session from the returned ID
+      if (!activeSession && res.sessionId) {
+        const newSession = { id: res.sessionId, title: msg.slice(0, 60) };
+        setActiveSession(newSession);
+        loadSessions();
+      } else if (activeSession) {
+        loadSessions();
+      }
+
+      const aiMsg = { role: "assistant", content: res.message, pendingAction: res.pendingAction, id: Date.now() + 1 };
       setMessages(prev => [...prev, aiMsg]);
 
       if (res.pendingAction && res.pendingAction.type !== "NONE") {
         setPendingAction(res.pendingAction);
-        setPendingMsgIdx(messages.length + 1);
       }
     } catch (e) {
       setMessages(prev => [...prev, {
@@ -257,45 +469,33 @@ export default function CoWorkerPage() {
       }]);
     } finally {
       setLoading(false);
-      inputRef.current?.focus();
+      textareaRef.current?.focus();
     }
   }
 
+  // ── Confirm action ──────────────────────────────────────────────────────────
   async function handleConfirm() {
     if (!pendingAction) return;
+    const action = pendingAction;
     setPendingAction(null);
-
-    // Remove confirm card from the last AI message
-    setMessages(prev => prev.map(m =>
-      m.pendingAction ? { ...m, pendingAction: null } : m));
-
+    setMessages(prev => prev.map(m => m.pendingAction ? { ...m, pendingAction: null } : m));
     setLoading(true);
     try {
       const res = await apiPost("/api/coworker/confirm", loginId, {
-        actionType: pendingAction.type,
-        params:     pendingAction.params,
+        actionType: action.type,
+        params: action.params,
       });
-
-      // Handle email navigation — go to email centre with pre-populated data
       if (res.navigateTo === "/email" && res.emailParams) {
-        setMessages(prev => [...prev, {
-          role: "assistant",
-          content: res.message,
-          id: Date.now(),
-        }]);
+        setMessages(prev => [...prev, { role: "assistant", content: res.message, id: Date.now() }]);
         setLoading(false);
-        // Navigate to email page with state so EmailCentrePage can pre-populate
         nav("/email", { state: { prefill: res.emailParams } });
         return;
       }
-
       setMessages(prev => [...prev, {
         role: "assistant",
         content: res.message || (res.success ? "Done! ✓" : "Something went wrong."),
         id: Date.now(),
       }]);
-
-      loadTasks();
     } catch (e) {
       const msg = e.message || "";
       setMessages(prev => [...prev, {
@@ -312,8 +512,7 @@ export default function CoWorkerPage() {
 
   function handleCancel() {
     setPendingAction(null);
-    setMessages(prev => prev.map(m =>
-      m.pendingAction ? { ...m, pendingAction: null } : m));
+    setMessages(prev => prev.map(m => m.pendingAction ? { ...m, pendingAction: null } : m));
     setMessages(prev => [...prev, {
       role: "assistant",
       content: "No problem, action cancelled. What else can I help you with?",
@@ -321,246 +520,257 @@ export default function CoWorkerPage() {
     }]);
   }
 
-  return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+  // ── Filtered session list ───────────────────────────────────────────────────
+  const filteredSessions = sessions.filter(s =>
+    !searchQuery || (s.title || "").toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-      {/* Header */}
-      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography sx={{ fontSize: 15, fontWeight: 600, color: TEXT }}>
-              Co-worker AI
-            </Typography>
-            <Box sx={{ display: "inline-flex", alignItems: "center", px: "7px", py: "2px",
-              bgcolor: PURPLE_BG, border: `1px solid ${PURPLE_BR}`, borderRadius: "4px",
-              fontSize: 10, fontWeight: 600, color: PURPLE }}>BETA</Box>
+  // ── Thread title for chat header ────────────────────────────────────────────
+  const threadTitle = activeSession?.title || "New conversation";
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+  return (
+    <Box sx={{
+      display: "grid",
+      gridTemplateColumns: `${leftOpen ? "220px" : "0"} 1fr ${rightOpen ? "240px" : "0"}`,
+      transition: "grid-template-columns .22s ease",
+      height: "calc(100vh - 56px)", // fill below topnav
+      overflow: "hidden",
+      borderRadius: "10px",
+      border: `1px solid ${C.border}`,
+      bgcolor: C.white,
+    }}>
+
+      {/* ── LEFT: History sidebar ──────────────────────────────────────────── */}
+      <Box sx={{
+        bgcolor: C.sidebar, borderRight: `1px solid ${C.border}`,
+        display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0,
+      }}>
+        {/* New chat + search */}
+        <Box sx={{ p: "14px 12px 10px", borderBottom: `1px solid ${C.borderSoft}`, flexShrink: 0 }}>
+          <Box
+            component="button"
+            onClick={startNewChat}
+            sx={{
+              width: "100%", py: "8px", borderRadius: "8px", border: "none",
+              background: "linear-gradient(135deg, #7C3AED, #1D72E8)",
+              color: "#fff", fontSize: 13, fontWeight: 600,
+              cursor: "pointer", mb: 1.25, display: "flex", alignItems: "center",
+              justifyContent: "center", gap: 0.5,
+              "&:hover": { opacity: 0.9 },
+            }}
+          >
+            ＋ New chat
           </Box>
-          <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
-            Your AI assistant — tell it what to do and it handles the steps
+          <Box sx={{
+            display: "flex", alignItems: "center", gap: "7px",
+            bgcolor: C.white, border: `1px solid ${C.border}`, borderRadius: "7px",
+            px: "9px", py: "6px",
+          }}>
+            <Box sx={{ color: C.textMuted, flexShrink: 0, display: "flex" }}><IconSearch /></Box>
+            <Box
+              component="input"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search chats…"
+              sx={{
+                border: "none", outline: "none", bgcolor: "transparent",
+                fontSize: 12, color: C.text, width: "100%",
+                "::placeholder": { color: C.textMuted },
+              }}
+            />
+          </Box>
+        </Box>
+
+        {/* Thread list */}
+        <Box sx={{ flex: 1, overflowY: "auto", p: "6px 8px 16px",
+          "&::-webkit-scrollbar": { width: "4px" },
+          "&::-webkit-scrollbar-thumb": { bgcolor: C.historyThumb, borderRadius: "2px" },
+        }}>
+          {filteredSessions.length === 0 && (
+            <Typography sx={{ fontSize: 12, color: C.textMuted, px: 1, pt: 2 }}>
+              {searchQuery ? "No matching chats." : "No conversations yet."}
+            </Typography>
+          )}
+          {filteredSessions.map(s => (
+            <ThreadItem
+              key={s.id}
+              session={s}
+              isActive={activeSession?.id === s.id}
+              onClick={() => switchSession(s)}
+            />
+          ))}
+        </Box>
+
+        {/* User footer */}
+        <Box sx={{
+          p: "10px 12px", borderTop: `1px solid ${C.borderSoft}`,
+          display: "flex", alignItems: "center", gap: "9px", flexShrink: 0,
+        }}>
+          <Box sx={{
+            width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+            background: "linear-gradient(135deg,#7C3AED,#1D72E8)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 10, fontWeight: 700, color: "#fff",
+          }}>{initials}</Box>
+          <Typography sx={{ fontSize: 12, fontWeight: 600, color: C.text, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {userName}
           </Typography>
         </Box>
-        <Box sx={{ display: "inline-flex", alignItems: "center",
-          bgcolor: PURPLE_BG, border: `1px solid ${PURPLE_BR}`,
-          borderRadius: "20px", px: 1.5, py: 0.5,
-          fontSize: 11, fontWeight: 600, color: PURPLE }}>
-          🟢 AI Ready
+      </Box>
+
+      {/* ── CENTRE: Main chat ──────────────────────────────────────────────── */}
+      <Box sx={{ display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
+
+        {/* Chat header */}
+        <Box sx={{
+          px: 2, py: "10px", borderBottom: `1px solid ${C.border}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          bgcolor: C.white, flexShrink: 0,
+        }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
+            <Box component="button" onClick={() => setLeftOpen(o => !o)} sx={iconBtnSx} title="Toggle history">
+              <IconMenu />
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography sx={{
+                fontSize: 13, fontWeight: 600, color: C.text,
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 280,
+              }}>{threadTitle}</Typography>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+                <Box sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: C.success }} />
+                <Typography sx={{ fontSize: 10, color: C.textMuted }}>Co-worker · online</Typography>
+              </Box>
+            </Box>
+          </Box>
+          <Box sx={{ display: "flex", gap: 0.75 }}>
+            <Box component="button" onClick={() => setRightOpen(o => !o)} sx={iconBtnSx} title="Toggle tips">
+              <IconZap />
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Message stream */}
+        <Box sx={{
+          flex: 1, overflowY: "auto", bgcolor: C.bg,
+          display: "flex", flexDirection: "column",
+          "&::-webkit-scrollbar": { width: "5px" },
+          "&::-webkit-scrollbar-thumb": { bgcolor: C.border, borderRadius: "3px" },
+        }}>
+          {messages.length === 0 && !loading
+            ? <WelcomeScreen />
+            : <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
+                {messages.map((msg, i) =>
+                  msg.role === "user"
+                    ? <UserBubble key={msg.id ?? i} message={msg.content} />
+                    : <AiBubble
+                        key={msg.id ?? i}
+                        message={msg.content}
+                        pendingAction={msg.pendingAction}
+                        onConfirm={handleConfirm}
+                        onCancel={handleCancel}
+                        isLoading={false}
+                      />
+                )}
+                {loading && <AiBubble message="" isLoading onConfirm={() => {}} onCancel={() => {}} />}
+                <div ref={streamEndRef} />
+              </Box>
+          }
+        </Box>
+
+        {/* Composer */}
+        <Box sx={{ borderTop: `1px solid ${C.border}`, bgcolor: C.white, flexShrink: 0 }}>
+          <Box sx={{ display: "flex", alignItems: "flex-end", gap: 1, px: 2, pt: "12px", pb: "10px" }}>
+            <Box
+              component="textarea"
+              ref={textareaRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+              }}
+              placeholder="Ask Co-worker — e.g. 'Run analysis on new candidates for Backend Engineer'"
+              disabled={loading}
+              rows={1}
+              sx={{
+                flex: 1, resize: "none", border: `1px solid ${C.border}`, borderRadius: "8px",
+                fontSize: 13, color: C.text, px: "12px", py: "8px", outline: "none",
+                fontFamily: "inherit", lineHeight: 1.5, bgcolor: C.white,
+                "&:focus": { borderColor: C.accent },
+                "&::placeholder": { color: C.textMuted },
+                "&:disabled": { bgcolor: C.bg, color: C.textMuted },
+                overflowY: "hidden",
+              }}
+            />
+            <Box
+              component="button"
+              onClick={() => sendMessage()}
+              disabled={loading || !input.trim()}
+              sx={{
+                width: 36, height: 36, borderRadius: "8px", flexShrink: 0,
+                bgcolor: input.trim() && !loading ? C.purple : C.border,
+                border: "none", cursor: input.trim() && !loading ? "pointer" : "default",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#fff", fontSize: 16, transition: "background .15s",
+                "&:hover": { bgcolor: input.trim() && !loading ? "#6D28D9" : C.border },
+              }}
+            >↑</Box>
+          </Box>
+          <Box sx={{ px: 2, pb: "10px", display: "flex", justifyContent: "space-between" }}>
+            <Typography sx={{ fontSize: 10.5, color: C.textMuted }}>
+              Co-worker can take real actions inside Nolyvra (analyse, schedule, email).
+            </Typography>
+            <Typography sx={{ fontSize: 10.5, color: C.textMuted }}>
+              <Box component="kbd" sx={{ fontSize: 10, bgcolor: C.bg, border: `1px solid ${C.border}`, borderRadius: "4px", px: "5px", py: "2px", mr: 0.5 }}>↵</Box>
+              send ·
+              <Box component="kbd" sx={{ fontSize: 10, bgcolor: C.bg, border: `1px solid ${C.border}`, borderRadius: "4px", px: "5px", py: "2px", mx: 0.5 }}>⇧↵</Box>
+              new line
+            </Typography>
+          </Box>
         </Box>
       </Box>
 
-      <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+      {/* ── RIGHT: Active Tasks + Tips panel ──────────────────────────────── */}
+      <Box sx={{
+        borderLeft: `1px solid ${C.border}`, display: "flex",
+        flexDirection: "column", overflow: "hidden", minWidth: 0, bgcolor: C.white,
+      }}>
 
-        {/* LEFT: Quick actions + Chat */}
-        <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-
-          {/* Quick action cards */}
-          <Paper elevation={0} sx={{ border: `1px solid ${PURPLE_BR}`, borderRadius: "10px",
-            overflow: "hidden", bgcolor: "#fff",
-            boxShadow: "0 0 0 2px rgba(124,58,237,0.06)" }}>
-            <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`,
-              display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                <Typography sx={{ fontSize: 15 }}>✦</Typography>
-                <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
-                  Quick Actions — What should I do?
-                </Typography>
-              </Box>
-              <Typography sx={{ fontSize: 10, color: MUTED, fontStyle: "italic" }}>
-                Click any action to start
-              </Typography>
-            </Box>
-            <Box sx={{ p: 2, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.25 }}>
-              {QUICK_ACTIONS.map(action => (
-                <Box key={action.id}
-                  onClick={() => sendMessage(action.prompt)}
-                  sx={{ border: `1px solid ${action.border}`, borderRadius: "8px",
-                    p: "13px 15px", cursor: "pointer", bgcolor: action.bg,
-                    transition: "box-shadow .15s",
-                    "&:hover": { boxShadow: "0 3px 12px rgba(124,58,237,0.12)" } }}>
-                  <Typography sx={{ fontSize: 18, mb: 0.5 }}>{action.icon}</Typography>
-                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT }}>
-                    {action.label}
-                  </Typography>
-                  <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.375 }}>
-                    {action.desc}
-                  </Typography>
-                </Box>
-              ))}
-            </Box>
-          </Paper>
-
-          {/* Chat window */}
-          <Paper elevation={0} sx={{ border: `1px solid ${BORDER}`, borderRadius: "10px",
-            overflow: "hidden", bgcolor: "#fff" }}>
-
-            {/* Chat header */}
-            <Box sx={{ px: 2.25, py: 1.5,
-              background: "linear-gradient(135deg,#1B3A6B,#0F1623)",
-              display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
-                <Box sx={{ width: 32, height: 32, borderRadius: "50%",
-                  background: "linear-gradient(135deg,#7C3AED,#1D72E8)",
-                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
-                  🤖
-                </Box>
-                <Box>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>
-                    nolyvra Co-worker
-                  </Typography>
-                  <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.45)" }}>
-                    AI-powered recruitment assistant
-                  </Typography>
-                </Box>
-              </Box>
-              <Typography sx={{ fontSize: 10, color: "rgba(255,255,255,0.35)" }}>
-                Context-aware · Action-capable
-              </Typography>
-            </Box>
-
-            {/* Messages */}
-            <Box sx={{ bgcolor: "#F7F8FA", minHeight: 280, maxHeight: 400,
-              overflowY: "auto", p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
-              {messages.map((msg, i) => (
-                msg.role === "user"
-                  ? <UserBubble key={msg.id ?? i} message={msg.content} />
-                  : <AiBubble
-                      key={msg.id ?? i}
-                      message={msg.content}
-                      pendingAction={msg.pendingAction}
-                      onConfirm={handleConfirm}
-                      onCancel={handleCancel}
-                      isLoading={false}
-                    />
-              ))}
-              {loading && (
-                <AiBubble message="" isLoading onConfirm={() => {}} onCancel={() => {}} />
-              )}
-              <div ref={messagesEndRef} />
-            </Box>
-
-            {/* Suggested chips */}
-            <Box sx={{ display: "flex", gap: 0.75, flexWrap: "wrap",
-              px: 1.75, py: 1.25, borderTop: `1px solid ${BORDER}`, bgcolor: "#fff" }}>
-              <Typography sx={{ fontSize: 10, color: MUTED, fontWeight: 600,
-                alignSelf: "center", mr: 0.25 }}>
-                SUGGEST:
-              </Typography>
-              {SUGGEST_CHIPS.map(chip => (
-                <Box key={chip.label}
-                  onClick={() => sendMessage(chip.prompt)}
-                  sx={{ bgcolor: "#F0F2F6", border: `1px solid ${BORDER}`,
-                    borderRadius: "20px", px: 1.25, py: 0.375,
-                    fontSize: 11, color: TEXT, cursor: "pointer",
-                    "&:hover": { bgcolor: ACCENT_BG, borderColor: ACCENT, color: ACCENT } }}>
-                  {chip.label}
-                </Box>
-              ))}
-            </Box>
-
-            {/* Input */}
-            <Box sx={{ display: "flex", gap: 1, px: 1.75, py: 1.25,
-              borderTop: `1px solid ${BORDER}`, bgcolor: "#fff" }}>
-              <TextField
-                inputRef={inputRef}
-                fullWidth size="small"
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), sendMessage())}
-                placeholder="Tell Co-worker what to do…"
-                disabled={loading}
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}
-              />
-              <Button variant="contained" onClick={() => sendMessage()} disabled={loading || !input.trim()}
-                sx={{ px: 2.5, bgcolor: PURPLE, borderRadius: "8px",
-                  minWidth: 0, boxShadow: "none",
-                  "&:hover": { bgcolor: "#6D28D9", boxShadow: "none" } }}>
-                ➤
-              </Button>
-            </Box>
-          </Paper>
+        {/* Active tasks */}
+        <Box sx={{ flexShrink: 0, borderBottom: `1px solid ${C.border}` }}>
+          <Box sx={{
+            px: "14px", py: "11px", borderBottom: `1px solid ${C.borderSoft}`,
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+          }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: C.text }}>Active Tasks</Typography>
+            <Box sx={{
+              display: "inline-flex", bgcolor: C.accentBg, border: `1px solid ${C.accentBr}`,
+              borderRadius: "20px", px: "10px", py: "2px", fontSize: 11, fontWeight: 600, color: C.accent,
+            }}>{tasks.length} running</Box>
+          </Box>
+          <Box sx={{ px: "14px", py: tasks.length ? "4px" : 0 }}>
+            {tasks.length === 0
+              ? <Typography sx={{ fontSize: 12, color: C.textMuted, py: 1.5 }}>No active tasks.</Typography>
+              : tasks.map(t => <TaskItem key={t.id} task={t} />)}
+          </Box>
         </Box>
 
-        {/* RIGHT: Tasks + Capabilities */}
-        <Box sx={{ flex: "0 0 240px", display: "flex", flexDirection: "column", gap: 2 }}>
-
-          {/* Active tasks */}
-          <Paper elevation={0} sx={{ border: `1px solid ${PURPLE_BR}`, borderRadius: "10px",
-            overflow: "hidden", bgcolor: "#fff",
-            boxShadow: "0 0 0 2px rgba(124,58,237,0.06)" }}>
-            <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`,
-              display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
-                  Active Tasks
-                </Typography>
-                <Box sx={{ display: "inline-flex", px: "7px", py: "2px",
-                  bgcolor: PURPLE_BG, border: `1px solid ${PURPLE_BR}`,
-                  borderRadius: "4px", fontSize: 10, fontWeight: 600, color: PURPLE }}>NEW</Box>
-              </Box>
-              <Box sx={{ display: "inline-flex", bgcolor: ACCENT_BG, border: `1px solid ${ACCENT_BR}`,
-                borderRadius: "20px", px: 1.25, py: 0.25, fontSize: 11, fontWeight: 600, color: ACCENT }}>
-                {tasks.length} running
-              </Box>
-            </Box>
-            <Box sx={{ px: 2, py: 0.5 }}>
-              {tasks.length === 0
-                ? <Typography sx={{ fontSize: 12, color: MUTED, py: 1.5 }}>No active tasks.</Typography>
-                : tasks.map(t => <TaskItem key={t.id} task={t} />)}
-            </Box>
-          </Paper>
-
-          {/* Completed today */}
-          <Paper elevation={0} sx={{ border: `1px solid ${BORDER}`, borderRadius: "10px",
-            overflow: "hidden", bgcolor: "#fff" }}>
-            <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`,
-              display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
-                Completed Today
-              </Typography>
-              <Box sx={{ display: "inline-flex", bgcolor: SUCCESS_BG, border: `1px solid ${SUCCESS_BR}`,
-                borderRadius: "20px", px: 1.25, py: 0.25, fontSize: 11, fontWeight: 600, color: SUCCESS }}>
-                {tasksDone.length} done
-              </Box>
-            </Box>
-            <Box sx={{ px: 2, py: 0.5 }}>
-              {tasksDone.length === 0
-                ? <Typography sx={{ fontSize: 12, color: MUTED, py: 1.5 }}>No completed tasks yet.</Typography>
-                : tasksDone.slice(0, 5).map(t => <TaskItem key={t.id} task={t} />)}
-            </Box>
-          </Paper>
-
-          {/* What Co-worker can do */}
-          <Paper elevation={0} sx={{ border: `1px solid ${BORDER}`, borderRadius: "10px",
-            overflow: "hidden", bgcolor: "#fff" }}>
-            <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}` }}>
-              <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
-                What Co-worker Can Do
-              </Typography>
-            </Box>
-            <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.25 }}>
-              {WHAT_CAN_DO.map(item => (
-                <Box key={item.title} sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
-                  <Typography sx={{ fontSize: 13, flexShrink: 0 }}>{item.icon}</Typography>
-                  <Typography sx={{ fontSize: 11, color: "#5A6480", lineHeight: 1.5 }}>
-                    <Box component="strong">{item.title}</Box> — {item.desc}
-                  </Typography>
-                </Box>
-              ))}
-            </Box>
-          </Paper>
+        {/* Tips header */}
+        <Box sx={{
+          px: "14px", py: "11px", borderBottom: `1px solid ${C.borderSoft}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0,
+        }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+            <IconZap />
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: C.text }}>Tips</Typography>
+          </Box>
+          <Box component="button" onClick={() => setRightOpen(false)} sx={{ ...iconBtnSx, border: "none", bgcolor: "transparent" }} title="Close">
+            <IconX />
+          </Box>
         </Box>
+        <TipsPanel />
       </Box>
 
-      {/* Annotation strip */}
-      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-        {[
-          "copyright@ nolyvra",
-          "This AI tool is designed to assist you, not replace professional judgment.",
-        ].map(l => (
-          <Box key={l} sx={{ display: "inline-flex", alignItems: "center",
-            bgcolor: PURPLE_BG, border: `1px solid ${PURPLE_BR}`, borderRadius: "5px",
-            px: 1, py: 0.25, fontSize: 10, fontWeight: 500, color: PURPLE }}>{l}</Box>
-        ))}
-      </Box>
     </Box>
   );
 }
