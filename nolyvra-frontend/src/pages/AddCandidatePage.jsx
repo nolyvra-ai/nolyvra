@@ -20,6 +20,25 @@ import { usePlanLimit } from "../hooks/usePlanLimit";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
+function parseApiError(status, statusText, bodyText) {
+  let message = bodyText || statusText || "Request failed";
+  try {
+    const body = JSON.parse(bodyText);
+    message = body.message || body.error || message;
+  } catch {
+    // Non-JSON error body; keep the original text.
+  }
+  return { status, message, detail: bodyText };
+}
+
+function formatCandidateSaveError(error, candidateName) {
+  const message = error?.message || "";
+  if (error?.status === 409 || message.toLowerCase().includes("already in the pipeline")) {
+    return `${candidateName || "This candidate"} is already in the pipeline for this job.`;
+  }
+  return message || "Failed to save candidate.";
+}
+
 async function apiGet(path) {
   const loginId = localStorage.getItem("loginId") || "";
   const url = new URL(`${API_BASE}${path}`);
@@ -27,7 +46,8 @@ async function apiGet(path) {
   const res = await fetch(url.toString(), { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`${res.status} ${res.statusText} - ${text}`);
+    const error = parseApiError(res.status, res.statusText, text);
+    throw Object.assign(new Error(error.message), error);
   }
   return res.json();
 }
@@ -43,7 +63,8 @@ async function apiPost(path, body) {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`${res.status} ${res.statusText} - ${text}`);
+    const error = parseApiError(res.status, res.statusText, text);
+    throw Object.assign(new Error(error.message), error);
   }
   return res.json();
 }
@@ -396,6 +417,7 @@ export default function AddCandidatePage() {
     }
 
     let savedCount = 0;
+    let limitHit = false;
     const savedCandidates = [];
     for (let i = 0; i < bulkFiles.length; i++) {
       const b = bulkFiles[i];
@@ -403,6 +425,7 @@ export default function AddCandidatePage() {
 
       // Stop saving if limit reached mid-bulk
       if (savedCount >= slotsAvailable) {
+        limitHit = true;
         setBulkFiles(prev => prev.map((bf, idx) =>
           idx === i && bf.status === "ready"
             ? { ...bf, status: "error", error: "Candidate limit reached — slot not available" }
@@ -421,7 +444,11 @@ export default function AddCandidatePage() {
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
           body: JSON.stringify({ name: b.name, email: b.email, cvText: b.cvText, linkedinUrl: "" }),
         });
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+          const text = await res.text().catch(() => "");
+          const error = parseApiError(res.status, res.statusText, text);
+          throw Object.assign(new Error(error.message), error);
+        }
         const candidate = await res.json();
         const savedCandidate = { ...b, status: "saved", candidateId: candidate.id };
         savedCandidates.push(savedCandidate);
@@ -430,7 +457,7 @@ export default function AddCandidatePage() {
         savedCount++;
       } catch (e) {
         setBulkFiles(prev => prev.map((bf, idx) =>
-          idx === i ? { ...bf, status: "error", error: e.message } : bf));
+          idx === i ? { ...bf, status: "error", error: formatCandidateSaveError(e, b.name) } : bf));
       }
     }
     setBulkSaving(false);
@@ -438,7 +465,7 @@ export default function AddCandidatePage() {
     setRecentBulkCandidates(savedCandidates);
 
     // If limit was hit mid-bulk, show the limit dialog after
-    if (savedCount < readyFiles.length) {
+    if (limitHit) {
       setBulkDialog(false);
       setLimitDialog(true);
     }
@@ -495,12 +522,7 @@ export default function AddCandidatePage() {
       });
       nav("/candidates");
     } catch (e) {
-      const msg = e.message || "";
-      if (msg.includes("409") || msg.toLowerCase().includes("already in the pipeline")) {
-        setValidationErr(form.name + " is already in the pipeline for this job.");
-      } else {
-        setValidationErr("Failed to save candidate: " + msg);
-      }
+      setValidationErr(formatCandidateSaveError(e, form.name));
     }
   }
 
@@ -554,12 +576,7 @@ export default function AddCandidatePage() {
       setAnalysisDialog(true);
 
     } catch (err) {
-      const msg = err.message || "";
-      if (msg.includes("409") || msg.toLowerCase().includes("already in the pipeline")) {
-        setValidationErr(form.name + " is already in the pipeline for this job.");
-      } else {
-        setValidationErr("Failed to save candidate: " + msg);
-      }
+      setValidationErr(formatCandidateSaveError(err, form.name));
     }
   }
 
