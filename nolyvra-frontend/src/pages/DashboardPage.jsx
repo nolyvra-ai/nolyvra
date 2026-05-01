@@ -55,7 +55,7 @@ function KpiCard({ label, value, delta, deltaUp, valueColor }) {
   return (
     <Paper elevation={0} sx={{
       border: `1px solid ${BORDER}`, borderRadius: "10px",
-      boxShadow: "0 1px 3px rgba(0,0,0,0.05)", p: 2.25, bgcolor: "#fff",
+      boxShadow: "0 1px 3px rgba(0,0,0,0.05)", p: 2.25, bgcolor: "#F5F6F8",
       display: "flex", flexDirection: "column", gap: 0.5
     }}>
       <Typography sx={{
@@ -119,7 +119,7 @@ function Card({ children, sx = {}, isNew = false }) {
     <Paper elevation={0} sx={{
       border: `1px solid ${isNew ? PURPLE_BR : BORDER}`,
       borderRadius: "10px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-      overflow: "hidden", bgcolor: "#fff",
+      overflow: "hidden", bgcolor: "#F7F8FA",
       ...(isNew && { boxShadow: `0 0 0 2px rgba(124,58,237,0.06)` }),
       ...sx,
     }}>{children}</Paper>
@@ -130,7 +130,7 @@ function CardHead({ title, action, isNew = false }) {
   return (
     <Box sx={{
       px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`,
-      display: "flex", alignItems: "center", justifyContent: "space-between", bgcolor: "#fff"
+      display: "flex", alignItems: "center", justifyContent: "space-between", bgcolor: "#F7F8FA"
     }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{title}</Typography>
@@ -162,8 +162,8 @@ function TaskCard({ title, subtitle, urgency }) {
   const cfg = {
     overdue:  { border: DANGER_BR,  bg: DANGER_BG,  color: DANGER  },
     upcoming: { border: SUCCESS_BR, bg: SUCCESS_BG, color: SUCCESS },
-    nudge:    { border: WARN_BR,    bg: WARN_BG,    color: WARN    },
-    normal:   { border: WARN_BR,    bg: WARN_BG,    color: WARN    },
+    nudge:    { border: BORDER,      bg: "#F7F8FA",  color: WARN    },
+    normal:   { border: BORDER,      bg: "#F7F8FA",  color: WARN    },
   };
   const c = cfg[urgency] ?? cfg.normal;
   return (
