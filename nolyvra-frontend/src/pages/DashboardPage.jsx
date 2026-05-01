@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Box, Paper, Typography, Table, TableHead, TableRow,
-  TableCell, TableBody, Button, Alert,
+  TableCell, TableBody, Button, Alert, InputBase,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
@@ -76,6 +76,54 @@ function IcoBell() {
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
       <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+  );
+}
+
+// ── Reminder icons ─────────────────────────────────────────────────────────
+function IcoClock({ color }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <polyline points="12 6 12 12 16 14"/>
+    </svg>
+  );
+}
+function IcoCalendar({ color }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+      <line x1="16" y1="2" x2="16" y2="6"/>
+      <line x1="8" y1="2" x2="8" y2="6"/>
+      <line x1="3" y1="10" x2="21" y2="10"/>
+    </svg>
+  );
+}
+function IcoPeople({ color }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </svg>
+  );
+}
+function IcoDoc({ color }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/>
+      <line x1="16" y1="17" x2="8" y2="17"/>
+      <polyline points="10 9 9 9 8 9"/>
+    </svg>
+  );
+}
+function IcoSpark({ color }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
     </svg>
   );
 }
@@ -156,6 +204,7 @@ function Badge({ label, variant = "neutral" }) {
     accent:  { bg: ACCENT_L,  border: "#BFDBFE", color: ACCENT  },
     neutral: { bg: "#F1F3F7", border: BORDER,    color: MUTED   },
     purple:  { bg: PURPLE_L,  border: PURPLE_BR, color: PURPLE  },
+    urgent:  { bg: DANGER,    border: DANGER,    color: "#fff"  },
   };
   const s = styles[variant] ?? styles.neutral;
   return (
@@ -204,33 +253,169 @@ function PipelineBar({ label, count, pct, color }) {
   );
 }
 
-// ── Task card ──────────────────────────────────────────────────────────────
-function TaskCard({ title, subtitle, urgency }) {
-  const cfg = {
-    overdue:  { border: "#FECACA", bg: DANGER_L,  color: DANGER  },
-    upcoming: { border: "#BBF7D0", bg: SUCCESS_L, color: SUCCESS },
-    nudge:    { border: PURPLE_BR, bg: PURPLE_L,  color: PURPLE  },
-    normal:   { border: BORDER,    bg: "#F8F9FB",  color: MUTED   },
-  };
-  const c = cfg[urgency] ?? cfg.normal;
+// ── AI Prompt Card (Change 1) ──────────────────────────────────────────────
+function AiPromptCard({ onAsk }) {
+  const [input, setInput] = useState("");
+  const nav = useNavigate();
+
+  function handleAsk() {
+    const q = input.trim();
+    if (!q) return;
+    nav("/coworker", { state: { prefillMessage: q } });
+  }
+
   return (
-    <Box sx={{
-      flexShrink: 0, minWidth: 196, maxWidth: 224, minHeight: 80,
-      border: `1px solid ${c.border}`, borderRadius: "8px",
-      p: 1.5, bgcolor: c.bg, display: "flex", flexDirection: "column", gap: 0.75,
+    <Paper elevation={0} sx={{
+      background: "linear-gradient(135deg, #EEF4FF 0%, #F0EEFF 100%)",
+      border: `1px solid #D4E2FF`,
+      borderRadius: "16px",
+      p: 3,
+      display: "flex", flexDirection: "column", gap: 1.5,
     }}>
-      <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
-        <Box sx={{
-          width: 13, height: 13, flexShrink: 0, mt: "2px", borderRadius: "3px",
-          border: `1.5px solid ${urgency === "normal" ? BORDER : c.border}`,
-        }} />
-        <Typography sx={{ fontSize: 11.5, fontWeight: 500, color: TEXT, lineHeight: 1.45 }}>
-          {title}
+      {/* Icon */}
+      <Box sx={{
+        width: 44, height: 44, borderRadius: "50%",
+        bgcolor: SURFACE, display: "flex", alignItems: "center",
+        justifyContent: "center",
+        boxShadow: "0 2px 8px rgba(29,114,232,0.12)",
+      }}>
+        <IcoSpark color={ACCENT} />
+      </Box>
+
+      {/* Heading */}
+      <Box>
+        <Typography sx={{ fontSize: 18, fontWeight: 700, color: TEXT, lineHeight: 1.3 }}>
+          Ready To Find Top Candidates Or Revisit Your Pipeline?
+        </Typography>
+        <Typography sx={{ fontSize: 13, color: MUTED, mt: 0.5 }}>
+          Use AI to analyze and match the best talent for your roles
         </Typography>
       </Box>
-      <Typography sx={{ fontSize: 10.5, fontWeight: 600, color: c.color, pl: "22px" }}>
-        {subtitle}
-      </Typography>
+
+      {/* Input row */}
+      <Box
+        onClick={() => document.getElementById("ai-prompt-input").focus()}
+        sx={{
+          display: "flex", alignItems: "center", gap: 1,
+          bgcolor: SURFACE, border: `1px solid ${BORDER}`,
+          borderRadius: "10px", px: 1.75, py: 0.75,
+          cursor: "text", mt: 0.5,
+          boxShadow: "0 1px 3px rgba(15,22,35,0.06)",
+          transition: "border-color .15s, box-shadow .15s",
+          "&:focus-within": {
+            borderColor: ACCENT,
+            boxShadow: "0 0 0 3px rgba(29,114,232,0.08)",
+          },
+        }}>
+        <InputBase
+          id="ai-prompt-input"
+          fullWidth
+          placeholder="Ask me anything..."
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && handleAsk()}
+          sx={{
+            fontSize: 13, color: ACCENT, fontWeight: 500,
+            "& input::placeholder": { color: ACCENT, opacity: 0.7 },
+          }}
+        />
+        {input.trim() && (
+          <Button size="small" variant="contained" onClick={handleAsk}
+            sx={{
+              fontSize: 11, fontWeight: 600, bgcolor: ACCENT, borderRadius: "6px",
+              textTransform: "none", boxShadow: "none", flexShrink: 0,
+              "&:hover": { bgcolor: "#1660CC", boxShadow: "none" },
+            }}>
+            Ask
+          </Button>
+        )}
+      </Box>
+    </Paper>
+  );
+}
+
+// ── Reminder row (Change 2) ────────────────────────────────────────────────
+function ReminderRow({ reminder, isFirst }) {
+  const now = new Date();
+  const dueDate = new Date(reminder.dueAt);
+  const nudgeTypes = ["AUTO_SCREENING_STUCK", "AUTO_ANALYSIS_PENDING"];
+  const isNudge   = nudgeTypes.includes(reminder.reminderType);
+  const isOverdue = !isNudge && dueDate < now;
+  const isUpcoming = reminder.reminderType === "AUTO_INTERVIEW_UPCOMING";
+
+  // Icon and color based on type
+  let iconColor = ACCENT;
+  let iconBg = ACCENT_L;
+  let IconEl = <IcoCalendar color={iconColor} />;
+
+  if (isOverdue) {
+    iconColor = DANGER; iconBg = DANGER_L;
+    IconEl = <IcoClock color={iconColor} />;
+  } else if (isUpcoming) {
+    iconColor = ACCENT; iconBg = ACCENT_L;
+    IconEl = <IcoCalendar color={iconColor} />;
+  } else if (isNudge) {
+    iconColor = PURPLE; iconBg = PURPLE_L;
+    IconEl = <IcoPeople color={iconColor} />;
+  } else {
+    iconColor = ACCENT; iconBg = ACCENT_L;
+    IconEl = <IcoDoc color={iconColor} />;
+  }
+
+  // Subtitle
+  let subtitle;
+  if (isOverdue) {
+    subtitle = "Overdue";
+  } else if (isUpcoming) {
+    const h = Math.round((dueDate - now) / 3600000);
+    subtitle = h <= 0 ? "In less than 1 hour" : h === 1 ? "In 1 hour" : `In ${h} hours`;
+  } else {
+    const isToday = dueDate.toDateString() === now.toDateString();
+    const isTomorrow = dueDate.toDateString() === new Date(now.getTime() + 86400000).toDateString();
+    if (isToday) {
+      subtitle = "Today at " + dueDate.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
+    } else if (isTomorrow) {
+      subtitle = "Tomorrow at " + dueDate.toLocaleTimeString("en-AU", { hour: "numeric", minute: "2-digit" });
+    } else {
+      const diffDays = Math.round((dueDate - now) / 86400000);
+      subtitle = diffDays > 0 ? `Due in ${diffDays} day${diffDays !== 1 ? "s" : ""}` :
+        dueDate.toLocaleDateString("en-GB", { weekday: "long", hour: "numeric", minute: "2-digit" });
+    }
+  }
+
+  return (
+    <Box sx={{
+      display: "flex", alignItems: "center", gap: 1.75,
+      px: 2, py: 1.5,
+      bgcolor: isOverdue ? "#FFF5F5" : SURFACE,
+      borderRadius: "10px",
+      border: isOverdue ? `1px solid #FECACA` : `1px solid transparent`,
+      transition: "background .12s",
+      "&:hover": { bgcolor: isOverdue ? "#FFF0F0" : "#F8F9FB" },
+    }}>
+      {/* Icon bubble */}
+      <Box sx={{
+        width: 38, height: 38, borderRadius: "50%", flexShrink: 0,
+        bgcolor: iconBg, display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        {IconEl}
+      </Box>
+
+      {/* Text */}
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{
+          fontSize: 13, fontWeight: 600, color: TEXT,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>
+          {reminder.title}
+        </Typography>
+        <Typography sx={{ fontSize: 11.5, color: MUTED, mt: 0.2 }}>
+          {subtitle}
+        </Typography>
+      </Box>
+
+      {/* Urgency badge */}
+      {isOverdue && <Badge label="Urgent" variant="urgent" />}
     </Box>
   );
 }
@@ -368,153 +553,204 @@ export default function DashboardPage() {
 
       {/* KPI row */}
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2 }}>
-        <KpiCard
-          label="Active Jobs"
-          value={recentJobs.length}
-          sub="Current openings"
-          iconBg={ACCENT_L}
-          icon={<IcoBriefcase color={ACCENT} />}
-        />
-        <KpiCard
-          label="Total Candidates"
-          value={recentAnalyses.length}
-          sub="Across all jobs"
-          iconBg={PURPLE_L}
-          icon={<IcoUsers color={PURPLE} />}
-        />
-        <KpiCard
-          label="Analyses Run"
-          value={recentAnalyses.length}
-          sub="AI-scored profiles"
-          iconBg={SUCCESS_L}
-          icon={<IcoTrend color={SUCCESS} />}
-        />
-        <KpiCard
-          label="High-Risk Flags"
+        <KpiCard label="Active Jobs" value={recentJobs.length} sub="Current openings"
+          iconBg={ACCENT_L} icon={<IcoBriefcase color={ACCENT} />} />
+        <KpiCard label="Total Candidates" value={recentAnalyses.length} sub="Across all jobs"
+          iconBg={PURPLE_L} icon={<IcoUsers color={PURPLE} />} />
+        <KpiCard label="Analyses Run" value={recentAnalyses.length} sub="AI-scored profiles"
+          iconBg={SUCCESS_L} icon={<IcoTrend color={SUCCESS} />} />
+        <KpiCard label="High-Risk Flags"
           value={recentAnalyses.filter(a => a?.riskLevel === "High").length}
-          sub="Needs review"
-          subColor={DANGER}
-          iconBg={DANGER_L}
-          icon={<IcoShield color={DANGER} />}
-        />
+          sub="Needs review" subColor={DANGER}
+          iconBg={DANGER_L} icon={<IcoShield color={DANGER} />} />
       </Box>
 
-      {/* Today's Tasks */}
-      <Card sx={{
-        border: `1px solid ${PURPLE_BR}`,
-        boxShadow: `0 0 0 2px rgba(124,58,237,0.04), 0 1px 4px rgba(15,22,35,0.05)`,
-      }}>
-        <CardHead
-          title="Today's Tasks" isNew
-          action={<GhostBtn onClick={() => nav("/reminders")}>View All →</GhostBtn>}
-        />
-        <Box sx={{ p: 2 }}>
-          {todayTasks.length === 0 ? (
-            <Typography sx={{ fontSize: 12, color: MUTED, py: 0.75 }}>
-              All clear — no tasks due today.
-            </Typography>
-          ) : (
-            <Box sx={{
-              display: "flex", gap: 1.5, overflowX: "auto", pb: 0.5,
-              "&::-webkit-scrollbar": { height: 4 },
-              "&::-webkit-scrollbar-thumb": { bgcolor: "#D1D5DB", borderRadius: 4 },
-            }}>
-              {todayTasks.slice(0, 6).map(r => {
-                const dueDate    = new Date(r.dueAt);
-                const nudgeTypes = ["AUTO_SCREENING_STUCK", "AUTO_ANALYSIS_PENDING"];
-                const isNudge    = nudgeTypes.includes(r.reminderType);
-                const isOverdue  = !isNudge && dueDate < now;
-                const isUpcoming = r.reminderType === "AUTO_INTERVIEW_UPCOMING";
+      {/* ── Change 1: AI Prompt Card ── */}
+      <AiPromptCard />
 
-                let subtitle;
-                if (isOverdue) {
-                  subtitle = "Overdue";
-                } else if (isUpcoming) {
-                  const h = Math.round((dueDate - now) / 3600000);
-                  subtitle = h <= 0 ? "In less than 1 hour" : h === 1 ? "In 1 hour" : `In ${h} hours`;
-                } else {
-                  subtitle = dueDate.toDateString() === now.toDateString()
-                    ? "Due today"
-                    : dueDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-                }
+      {/* Middle row: Jobs + Analyses (left) | Reminders + Pipeline + Risk (right) */}
+      <Box sx={{ display: "flex", gap: 2, alignItems: "stretch" }}>
 
-                const urgency = isOverdue ? "overdue" : isUpcoming ? "upcoming" : isNudge ? "nudge" : "normal";
-                return <TaskCard key={r.id} title={r.title} subtitle={subtitle} urgency={urgency} />;
-              })}
-            </Box>
-          )}
-        </Box>
-      </Card>
+        {/* LEFT column — Recent Jobs + Recent Candidate Analyses */}
+        <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
 
-      {/* Middle row: Jobs + Pipeline/Risk */}
-      <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
-        {/* Recent Jobs table */}
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+          {/* Recent Jobs cards */}
           <Card>
-            <CardHead
-              title="Recent Jobs"
-              action={<GhostBtn onClick={() => nav("/jobs")}>View All →</GhostBtn>}
-            />
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={thSx}>Job Title</TableCell>
-                  <TableCell sx={thSx}>Client</TableCell>
-                  <TableCell sx={thSx}>Candidates</TableCell>
-                  <TableCell sx={thSx}>Status</TableCell>
-                  <TableCell sx={{ ...thSx, textAlign: "right" }} />
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {recentJobs.map(j => (
-                  <TableRow key={j.id} onClick={() => nav("/jobs")} sx={{
-                    cursor: "pointer", transition: "background 0.12s",
-                    "&:hover": { bgcolor: "#F2F5FF" },
-                    "&:last-child td": { borderBottom: "none" },
-                  }}>
-                    <TableCell sx={{ py: 1.5, px: 2.5, borderBottom: `1px solid ${BORDER}` }}>
-                      <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{j.title}</Typography>
-                    </TableCell>
-                    <TableCell sx={{ py: 1.5, px: 2.5, fontSize: 12, color: MUTED, borderBottom: `1px solid ${BORDER}` }}>
-                      {j.company}
-                    </TableCell>
-                    <TableCell sx={{ py: 1.5, px: 2.5, borderBottom: `1px solid ${BORDER}` }}>
-                      <Badge
-                        label={String(candidateCountByJob[j.id] ?? 0)}
-                        variant={candidateCountByJob[j.id] > 0 ? "accent" : "neutral"}
-                      />
-                    </TableCell>
-                    <TableCell sx={{ py: 1.5, px: 2.5, borderBottom: `1px solid ${BORDER}` }}>
-                      <Badge
-                        label={j.status ?? "Active"}
-                        variant={j.status === "Complete" ? "neutral" : j.status === "Fulfilling" ? "warning" : "success"}
-                      />
-                    </TableCell>
-                    <TableCell sx={{ py: 1.5, px: 2.5, textAlign: "right", borderBottom: `1px solid ${BORDER}` }}
-                      onClick={e => e.stopPropagation()}>
-                      <Button size="small" variant="outlined" onClick={() => nav("/jobs")}
-                        sx={{ fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
-                          borderRadius: "6px", textTransform: "none",
-                          "&:hover": { borderColor: "#C0C8D8", bgcolor: "#F8F9FB" } }}>
-                        View
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {!loading && recentJobs.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={5} sx={{ py: 4, textAlign: "center", fontSize: 12, color: MUTED, borderBottom: "none" }}>
-                      No jobs yet — create your first job to get started.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+            <CardHead title="Recent Jobs"
+              action={<GhostBtn onClick={() => nav("/jobs")}>View All →</GhostBtn>} />
+            <Box sx={{ p: 2, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
+              {recentJobs.map(j => (
+                <Box key={j.id} onClick={() => nav("/jobs")} sx={{
+                  border: `1px solid ${BORDER}`, borderRadius: "12px",
+                  p: 2.25, cursor: "pointer", bgcolor: SURFACE,
+                  transition: "box-shadow .15s, border-color .15s",
+                  "&:hover": { boxShadow: "0 4px 16px rgba(15,22,35,0.08)", borderColor: "#C8D4E8" },
+                }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 0.75 }}>
+                    <Typography sx={{ fontSize: 14, fontWeight: 700, color: TEXT, lineHeight: 1.3, flex: 1, pr: 1 }}>
+                      {j.title}
+                    </Typography>
+                    <Box sx={{
+                      display: "flex", alignItems: "center", gap: 0.5,
+                      bgcolor: "#F1F3F7", borderRadius: "20px", px: 1.25, py: 0.4, flexShrink: 0,
+                    }}>
+                      <IcoUsers color={MUTED} />
+                      <Typography sx={{ fontSize: 12, fontWeight: 600, color: MUTED }}>
+                        {candidateCountByJob[j.id] ?? 0}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Typography sx={{ fontSize: 12, color: MUTED, mb: 1.25 }}>
+                    {j.company || "—"}&nbsp;·&nbsp;{j.jobType || "Full-time"}
+                  </Typography>
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, alignItems: "center" }}>
+                    <Badge
+                      label={j.status ?? "Active"}
+                      variant={j.status === "Complete" ? "neutral" : j.status === "Fulfilling" ? "warning" : "success"}
+                    />
+                    {(j.stackTags ?? []).slice(0, 2).map(tag => (
+                      <Box key={tag} sx={{
+                        bgcolor: "#F1F3F7", border: `1px solid ${BORDER}`,
+                        borderRadius: "6px", px: 1, py: "2px",
+                        fontSize: 11, fontWeight: 500, color: MUTED,
+                      }}>{tag}</Box>
+                    ))}
+                  </Box>
+                </Box>
+              ))}
+              {!loading && recentJobs.length === 0 && (
+                <Box sx={{ gridColumn: "1 / -1", py: 4, textAlign: "center" }}>
+                  <Typography sx={{ fontSize: 12, color: MUTED }}>
+                    No jobs yet — create your first job to get started.
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          </Card>
+
+          {/* Recent Candidate Analyses — fills remaining height to align with sidebar */}
+          <Card sx={{ flex: 1 }}>
+            <CardHead title="Recent Candidate Analyses"
+              action={<GhostBtn onClick={() => nav("/candidates")}>View All →</GhostBtn>} />
+
+            {/* Header row */}
+            <Box sx={{
+              display: "flex", alignItems: "center",
+              px: 2.5, py: 1.25, borderBottom: `1px solid ${BORDER}`, bgcolor: "#FAFBFD",
+            }}>
+              <Typography sx={{ flex: 1, fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                Name
+              </Typography>
+              <Typography sx={{ width: 100, fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "center" }}>
+                All Scores
+              </Typography>
+              <Typography sx={{ width: 180, fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "right" }}>
+                Applied Role
+              </Typography>
+            </Box>
+
+            {/* Rows — show up to 5, pad with empty rows to fill height */}
+            {(() => {
+              const MAX_ROWS = 5;
+              const rows = recentAnalyses.slice(0, MAX_ROWS);
+              const emptyCount = MAX_ROWS - rows.length;
+              return (
+                <Box sx={{ display: "flex", flexDirection: "column" }}>
+                  {rows.map((row, idx) => {
+                    const initials = (row.candidate_name ?? "")
+                      .split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+                    const score = row?.capabilityScore ?? row?.consistencyScore ?? null;
+                    const scoreColor = score >= 85 ? SUCCESS : score >= 70 ? WARN : DANGER;
+                    const scoreBg   = score >= 85 ? SUCCESS_L : score >= 70 ? WARN_L : DANGER_L;
+                    return (
+                      <Box key={row.id}
+                        onClick={() => nav(`/candidates/${row.candidateId}/workflow`)}
+                        sx={{
+                          display: "flex", alignItems: "center",
+                          px: 2.5, py: 1.5,
+                          borderBottom: `1px solid ${BORDER}`,
+                          cursor: "pointer", transition: "background .12s",
+                          "&:hover": { bgcolor: "#F2F5FF" },
+                        }}>
+                        <Box sx={{ flex: 1, display: "flex", alignItems: "center", gap: 1.5 }}>
+                          <Box sx={{
+                            width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+                            bgcolor: "#E8EDF5", display: "flex", alignItems: "center",
+                            justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#5A6480",
+                          }}>
+                            {initials}
+                          </Box>
+                          <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
+                            {row.candidate_name}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ width: 100, display: "flex", justifyContent: "center" }}>
+                          {score != null ? (
+                            <Box sx={{
+                              bgcolor: scoreBg, borderRadius: "20px", px: 1.5, py: "3px",
+                              fontSize: 12, fontWeight: 700, color: scoreColor,
+                            }}>
+                              {score}%
+                            </Box>
+                          ) : (
+                            <Typography sx={{ fontSize: 12, color: MUTED }}>—</Typography>
+                          )}
+                        </Box>
+                        <Typography sx={{
+                          width: 180, fontSize: 13, color: MUTED, fontWeight: 500, textAlign: "right",
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}>
+                          {jobTitleMap[row.jobId] ?? "—"}
+                        </Typography>
+                      </Box>
+                    );
+                  })}
+
+                  {/* Empty placeholder rows to fill height */}
+                  {Array.from({ length: emptyCount }).map((_, i) => (
+                    <Box key={`empty-${i}`} sx={{
+                      display: "flex", alignItems: "center",
+                      px: 2.5, py: 1.5, borderBottom: `1px solid ${BORDER}`,
+                      minHeight: 57,
+                    }}>
+                      <Typography sx={{ fontSize: 12, color: "#F0F2F6" }}>—</Typography>
+                    </Box>
+                  ))}
+
+                  {!loading && recentAnalyses.length === 0 && (
+                    <Box sx={{ py: 3, textAlign: "center" }}>
+                      <Typography sx={{ fontSize: 12, color: MUTED }}>
+                        No analyses yet — run analysis on a candidate to see results here.
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+              );
+            })()}
           </Card>
         </Box>
 
-        {/* Pipeline + Risk sidebar */}
-        <Box sx={{ flex: "0 0 220px", display: "flex", flexDirection: "column", gap: 2 }}>
+        {/* RIGHT sidebar — Reminders + Pipeline + Risk */}
+        <Box sx={{ flex: "0 0 280px", display: "flex", flexDirection: "column", gap: 2 }}>
+
+          {/* Reminders */}
+          <Card>
+            <CardHead title="Reminders"
+              action={<GhostBtn onClick={() => nav("/reminders")}>View All →</GhostBtn>} />
+            <Box sx={{ p: 1.25, display: "flex", flexDirection: "column", gap: 0.5 }}>
+              {todayTasks.length === 0 ? (
+                <Typography sx={{ fontSize: 12, color: MUTED, py: 1.5, px: 1 }}>
+                  All clear — no tasks due today.
+                </Typography>
+              ) : (
+                todayTasks.slice(0, 4).map((r, i) => (
+                  <ReminderRow key={r.id} reminder={r} isFirst={i === 0} />
+                ))
+              )}
+            </Box>
+          </Card>
+
+          {/* Pipeline */}
           <Card>
             <CardHead title="Pipeline" />
             <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.75 }}>
@@ -523,7 +759,9 @@ export default function DashboardPage() {
               <PipelineBar label="Low Match <60%"   count={low}    pct={Math.round(low    / total * 100)} color={DANGER}  />
             </Box>
           </Card>
-          <Card>
+
+          {/* Risk Summary */}
+          <Card sx={{ flex: 1 }}>
             <CardHead title="Risk Summary" />
             <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
               {[
@@ -543,73 +781,6 @@ export default function DashboardPage() {
           </Card>
         </Box>
       </Box>
-
-      {/* Recent Candidate Analyses */}
-      <Card sx={{ mb: 1.5 }}>
-        <CardHead
-          title="Recent Candidate Analyses"
-          action={<GhostBtn onClick={() => nav("/candidates")}>View All →</GhostBtn>}
-        />
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell sx={thSx}>Candidate</TableCell>
-              <TableCell sx={thSx}>Job</TableCell>
-              <TableCell sx={thSx}>Consistency</TableCell>
-              <TableCell sx={thSx}>Capability</TableCell>
-              <TableCell sx={thSx}>Risk</TableCell>
-              <TableCell sx={{ ...thSx, textAlign: "right" }} />
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {recentAnalyses.map(row => (
-              <TableRow key={row.id}
-                onClick={() => nav(`/candidates/${row.candidateId}/workflow`)}
-                sx={{
-                  cursor: "pointer", transition: "background 0.12s",
-                  "&:hover": { bgcolor: "#F2F5FF" },
-                  "&:last-child td": { borderBottom: "none" },
-                }}>
-                <TableCell sx={{ py: 1.5, px: 2.5, borderBottom: `1px solid ${BORDER}` }}>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{row.candidate_name}</Typography>
-                </TableCell>
-                <TableCell sx={{ py: 1.5, px: 2.5, fontSize: 12, color: MUTED, fontWeight: 500, borderBottom: `1px solid ${BORDER}` }}>
-                  {jobTitleMap[row.jobId] ?? row.jobId ?? "—"}
-                </TableCell>
-                <TableCell sx={{ py: 1.5, px: 2.5, borderBottom: `1px solid ${BORDER}` }}>
-                  <ScoreCell value={row?.consistencyScore} />
-                </TableCell>
-                <TableCell sx={{ py: 1.5, px: 2.5, borderBottom: `1px solid ${BORDER}` }}>
-                  <ScoreCell value={row?.capabilityScore} />
-                </TableCell>
-                <TableCell sx={{ py: 1.5, px: 2.5, borderBottom: `1px solid ${BORDER}` }}>
-                  <Badge
-                    label={row?.riskLevel || "—"}
-                    variant={row?.riskLevel === "High" ? "danger" : row?.riskLevel === "Medium" ? "warning" : "accent"}
-                  />
-                </TableCell>
-                <TableCell sx={{ py: 1.5, px: 2.5, textAlign: "right", borderBottom: `1px solid ${BORDER}` }}
-                  onClick={e => e.stopPropagation()}>
-                  <Button size="small" variant="outlined"
-                    onClick={() => nav(`/candidates/${row.candidateId}/workflow`)}
-                    sx={{ fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
-                      borderRadius: "6px", textTransform: "none",
-                      "&:hover": { borderColor: "#C0C8D8", bgcolor: "#F8F9FB" } }}>
-                    Open Profile
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-            {!loading && recentAnalyses.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={6} sx={{ py: 4, textAlign: "center", fontSize: 12, color: MUTED, borderBottom: "none" }}>
-                  No analyses yet — run analysis on a candidate to see results here.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </Card>
 
       {/* Footer */}
       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", pb: 0.5 }}>
