@@ -8,5 +8,14 @@ public record AiAnalysisResult(
     CandidateAnalysisResponse.CapabilityMatrix capabilityMatrix,
     List<CandidateAnalysisResponse.SuggestedQuestion> suggestedQuestions,
     List<String> riskFlags,
-    String recommendation
+    String recommendation,
+    List<String> matchedSkills,
+    List<String> missingSkills,
+    List<CandidateAnalysisResponse.ConsistencyBreakdownItem> consistencyBreakdown,
+    List<CandidateAnalysisResponse.StrengthSignal> strengthSignals,
+    CandidateAnalysisResponse.AiVerdict aiVerdict,
+    String aiConfidence,
+    String aiConfidenceNote,
+    Integer executionTier,
+    String executionTierNote
 ) {}

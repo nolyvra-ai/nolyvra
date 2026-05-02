@@ -11,11 +11,15 @@ public class OpenAIConfig {
 
     @Bean
     public OpenAIClient openAIClient(
-            @Value("${openai.api-key:}") String apiKey
+            @Value("${openai.api-key:}") String apiKey,
+            @Value("${nolyvra.mock-ai:false}") boolean mockAi
     ) {
 
         if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException("openai.api-key is missing in application.yml");
+            if (!mockAi) {
+                throw new IllegalStateException("openai.api-key is missing in application.yml");
+            }
+            apiKey = "sk-local-placeholder";
         }
 
         return OpenAIOkHttpClient.builder()
