@@ -1,0 +1,16 @@
+# Copy this file to application-local.yml for local development.
+# Do not commit application-local.yml.
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/nolyvra
+    username: nolyvra
+    password: nolyvrapass
+
+nolyvra:
+  mock-ai: true
+
+analysis-jobs:
+  max-parallel: 3
+  max-attempts: 3
+  worker-delay-ms: 1000
