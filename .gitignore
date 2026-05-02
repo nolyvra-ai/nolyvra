@@ -45,3 +45,9 @@ build/
 
 ### Claude Code ###
 .claude/
+
+### Local application overrides ###
+/application-local.yml
+/src/main/resources/application-local.yml
+.env
+.env.*

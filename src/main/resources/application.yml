@@ -6,6 +6,24 @@ spring:
     serialization:
       write-dates-as-timestamps: false
 
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/nolyvra}
+    username: ${SPRING_DATASOURCE_USERNAME:nolyvra}
+    password: ${SPRING_DATASOURCE_PASSWORD:nolyvrapass}
+    driver-class-name: org.postgresql.Driver
+
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
 server:
   port: ${PORT:8080}
 
@@ -13,3 +31,32 @@ analysis-jobs:
   max-parallel: ${ANALYSIS_JOBS_MAX_PARALLEL:3}
   max-attempts: ${ANALYSIS_JOBS_MAX_ATTEMPTS:3}
   worker-delay-ms: ${ANALYSIS_JOBS_WORKER_DELAY_MS:5000}
+
+nolyvra:
+  mock-ai: ${NOLYVRA_MOCK_AI:false}
+
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  model: ${OPENAI_MODEL:gpt-4o-mini}
+
+coresignal:
+  api-key: ${CORESIGNAL_API_KEY:}
+  base-url: ${CORESIGNAL_BASE_URL:https://api.coresignal.com/cdapi/v2}
+
+microsoft:
+  client-id: ${MICROSOFT_CLIENT_ID:}
+  client-secret: ${MICROSOFT_CLIENT_SECRET:}
+  redirect-uri: ${MICROSOFT_REDIRECT_URI:http://localhost:8080/auth/microsoft/callback}
+  frontend-url: ${MICROSOFT_FRONTEND_URL:http://localhost:5173}
+
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY:}
+  publishable-key: ${STRIPE_PUBLISHABLE_KEY:}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
+  price-ids:
+    plan-bronze-monthly: ${STRIPE_PRICE_BRONZE_MONTHLY:}
+    plan-bronze-yearly: ${STRIPE_PRICE_BRONZE_YEARLY:}
+    plan-silver-monthly: ${STRIPE_PRICE_SILVER_MONTHLY:}
+    plan-silver-yearly: ${STRIPE_PRICE_SILVER_YEARLY:}
+    plan-gold-monthly: ${STRIPE_PRICE_GOLD_MONTHLY:}
+    plan-gold-yearly: ${STRIPE_PRICE_GOLD_YEARLY:}
