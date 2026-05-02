@@ -24,6 +24,11 @@ openai:
   api-key: ${OPENAI_API_KEY:}
   model: gpt-4o-mini
 
+analysis-jobs:
+  max-parallel: ${ANALYSIS_JOBS_MAX_PARALLEL:3}
+  max-attempts: ${ANALYSIS_JOBS_MAX_ATTEMPTS:3}
+  worker-delay-ms: ${ANALYSIS_JOBS_WORKER_DELAY_MS:5000}
+
 coresignal:
   api-key: ${CORESIGNAL_API_KEY:}
   base-url: ${CORESIGNAL_BASE_URL:https://api.coresignal.com/cdapi/v2}
