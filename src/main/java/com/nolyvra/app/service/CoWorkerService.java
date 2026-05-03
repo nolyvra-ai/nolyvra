@@ -229,27 +229,50 @@ public class CoWorkerService {
     // ─── Get tasks for right panel ────────────────────────────────────────────
 
     public List<CoWorkerTaskResponse> getTasks(String loginId, String status) {
-        String where = status != null && !status.equals("all")
-                ? "and status = '" + status + "'"
-                : "";
+        String normalizedStatus = normalizeTaskStatus(status);
+        if (normalizedStatus == null) {
+            return jdbc.query("""
+                    select id, task_type, description, status, progress, created_at, completed_at
+                    from coworker_tasks
+                    where login_id = ?
+                    order by created_at desc limit 20
+                    """, this::mapTaskRow, loginId);
+        }
+
         return jdbc.query("""
                 select id, task_type, description, status, progress, created_at, completed_at
                 from coworker_tasks
-                where login_id = ? %s
+                where login_id = ? and status = ?
                 order by created_at desc limit 20
-                """.formatted(where),
-                (rs, r) -> {
-                    OffsetDateTime created = rs.getObject("created_at", OffsetDateTime.class);
-                    OffsetDateTime completed = rs.getObject("completed_at", OffsetDateTime.class);
-                    return new CoWorkerTaskResponse(
-                            rs.getLong("id"),
-                            rs.getString("task_type"),
-                            rs.getString("description"),
-                            rs.getString("status"),
-                            rs.getInt("progress"),
-                            created != null ? created.toInstant() : null,
-                            completed != null ? completed.toInstant() : null);
-                }, loginId);
+                """, this::mapTaskRow, loginId, normalizedStatus);
+    }
+
+    private CoWorkerTaskResponse mapTaskRow(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
+        OffsetDateTime created = rs.getObject("created_at", OffsetDateTime.class);
+        OffsetDateTime completed = rs.getObject("completed_at", OffsetDateTime.class);
+        return new CoWorkerTaskResponse(
+                rs.getLong("id"),
+                rs.getString("task_type"),
+                rs.getString("description"),
+                rs.getString("status"),
+                rs.getInt("progress"),
+                created != null ? created.toInstant() : null,
+                completed != null ? completed.toInstant() : null);
+    }
+
+    private static String normalizeTaskStatus(String status) {
+        if (status == null || status.isBlank() || status.equalsIgnoreCase("all")) {
+            return null;
+        }
+
+        String normalized = status.trim().toLowerCase(Locale.ROOT);
+        if (normalized.equals("active")) {
+            return "running";
+        }
+        if (Set.of("pending", "running", "done", "failed").contains(normalized)) {
+            return normalized;
+        }
+        return "__invalid__";
     }
 
     // ─── Get session list (history sidebar) ──────────────────────────────────
