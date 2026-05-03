@@ -3,6 +3,8 @@ package com.nolyvra.app.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nolyvra.app.model.OAuthToken;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,8 @@ import java.util.Map;
 
 @Service
 public class MicrosoftOAuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(MicrosoftOAuthService.class);
 
     private static final String AUTH_URL      = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
     private static final String TOKEN_URL     = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
@@ -68,7 +72,6 @@ public class MicrosoftOAuthService {
                 + "&client_secret="    + enc(clientSecret);
 
         JsonNode json = postForm(TOKEN_URL, body);
-        System.out.println("[OAuth] Token response: " + json.toString());
         String accessToken  = json.path("access_token").asText();
         String refreshToken = json.path("refresh_token").asText(null);
         Instant expiresAt   = Instant.now().plusSeconds(json.path("expires_in").asLong(3600));
@@ -146,7 +149,7 @@ public class MicrosoftOAuthService {
 
         HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
         if (res.statusCode() >= 400) {
-            throw new RuntimeException("Graph API error " + res.statusCode() + ": " + res.body());
+            throw new RuntimeException("Graph API error " + res.statusCode());
         }
     }
 
@@ -191,8 +194,16 @@ public class MicrosoftOAuthService {
                 .POST(HttpRequest.BodyPublishers.ofString(formBody))
                 .build();
         HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
-        System.out.println("[OAuth] postForm status: " + res.statusCode() + " body: " + res.body());
-        return objectMapper.readTree(res.body());
+        JsonNode json = objectMapper.readTree(res.body());
+        if (res.statusCode() >= 400) {
+            log.warn("[OAuth] token endpoint returned status={}", res.statusCode());
+            throw new RuntimeException("Microsoft OAuth token endpoint returned status " + res.statusCode());
+        }
+        log.debug("[OAuth] token endpoint status={} accessTokenReceived={} refreshTokenReceived={}",
+                res.statusCode(),
+                json.hasNonNull("access_token"),
+                json.hasNonNull("refresh_token"));
+        return json;
     }
 
     private void upsertToken(String loginId, String accessToken, String refreshToken,
