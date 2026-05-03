@@ -2,6 +2,11 @@ spring:
   application:
     name: app
 
+  servlet:
+    multipart:
+      max-file-size: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:10MB}
+      max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:12MB}
+
   jackson:
     serialization:
       write-dates-as-timestamps: false
@@ -29,6 +34,9 @@ server:
 
 nolyvra:
   mock-ai: ${NOLYVRA_MOCK_AI:false}
+
+coworker:
+  analysis-pool-size: ${COWORKER_ANALYSIS_POOL_SIZE:3}
 
 openai:
   api-key: ${OPENAI_API_KEY:}
