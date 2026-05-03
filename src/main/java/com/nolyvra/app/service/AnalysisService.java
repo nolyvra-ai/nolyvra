@@ -5,9 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openai.client.OpenAIClient;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -394,6 +396,10 @@ public class AnalysisService {
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private String callOpenAI(String systemPrompt, String userPrompt, String loginId) {
+        if (!tokenService.deductToken(loginId)) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
+        }
+
         var params = ChatCompletionCreateParams.builder()
                 .model(model)
                 .addSystemMessage(systemPrompt)
@@ -401,7 +407,6 @@ public class AnalysisService {
                 .temperature(0.2)
                 .build();
         var completion = openAI.chat().completions().create(params);
-        tokenService.deductToken(loginId);
         return completion.choices().getFirst().message().content()
                 .orElseThrow(() -> new IllegalStateException("Model returned empty content"));
     }

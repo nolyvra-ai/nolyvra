@@ -59,12 +59,11 @@ public class TalentSearchService {
 
     public TalentSearchResponse search(TalentSearchRequest req, String loginId) {
 
-        if (!tokenService.hasTokens(loginId))
+        if (!tokenService.deductToken(loginId))
             throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
 
         // Step 1: Use AI to extract structured filters from the natural language query
         SearchFilters filters = extractFilters(req.query());
-        tokenService.deductToken(loginId);
 
         // Step 2: Search internal DB candidates
         List<TalentSearchResult> internalResults = searchInternal(filters, loginId);
@@ -192,9 +191,8 @@ public class TalentSearchService {
             if (cached.size() >= CACHE_MIN_RESULTS) {
                 System.out.println("[CoreSignal] serving from cache, skipping API call");
                 List<Integer> aiScores = List.of();
-                if (tokenService.hasTokens(loginId)) {
+                if (tokenService.deductToken(loginId)) {
                     aiScores = scoreWithAI(cached, originalQuery);
-                    if (!aiScores.isEmpty()) tokenService.deductToken(loginId);
                 }
                 if (aiScores.size() == cached.size()) {
                     List<TalentSearchResult> scored = new ArrayList<>();
@@ -258,9 +256,8 @@ public class TalentSearchService {
 
             // Fix 6: score with OpenAI, fall back to existing scoreCandidate logic
             List<Integer> aiScores = List.of();
-            if (tokenService.hasTokens(loginId)) {
+            if (tokenService.deductToken(loginId)) {
                 aiScores = scoreWithAI(profiles, originalQuery);
-                if (!aiScores.isEmpty()) tokenService.deductToken(loginId);
             }
             if (aiScores.size() == profiles.size()) {
                 List<TalentSearchResult> scored = new ArrayList<>();

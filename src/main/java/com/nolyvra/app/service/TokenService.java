@@ -38,7 +38,7 @@ public class TokenService {
             return true;
         } catch (Exception e) {
             System.err.println("[TokenService] deductToken() failed: " + e.getMessage());
-            return true; // fail open — don't block the AI call on DB errors
+            return false;
         }
     }
 

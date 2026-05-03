@@ -140,7 +140,7 @@ public class JobService {
 
     public ClientBriefResponse analyzeClientBrief(ClientBriefRequest req, String loginId) {
 
-        if (!tokenService.hasTokens(loginId))
+        if (!tokenService.deductToken(loginId))
             throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
 
         String systemPrompt = """
@@ -177,7 +177,6 @@ public class JobService {
                 .build();
 
         var completion = openAI.chat().completions().create(params);
-        tokenService.deductToken(loginId);
         String content = completion.choices().getFirst().message().content()
                 .orElseThrow(() -> new IllegalStateException("Model returned empty content"));
 

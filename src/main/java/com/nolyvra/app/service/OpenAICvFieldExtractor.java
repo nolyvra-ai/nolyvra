@@ -34,7 +34,7 @@ public class OpenAICvFieldExtractor implements CvFieldExtractor {
     @Override
     public Map<String, Object> extractFields(String rawText, String originalFilename, String loginId) {
         try {
-            if (!tokenService.hasTokens(loginId)) {
+            if (!tokenService.deductToken(loginId)) {
                 throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
             }
 
@@ -61,7 +61,6 @@ public class OpenAICvFieldExtractor implements CvFieldExtractor {
 
             String content = openAI.chat().completions().create(params)
                     .choices().getFirst().message().content().orElse("{}");
-            tokenService.deductToken(loginId);
 
             var root = objectMapper.readTree(cleanJson(content));
             return Map.of(

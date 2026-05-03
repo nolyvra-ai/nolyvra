@@ -139,8 +139,14 @@ public class CoWorkerService {
                 .build();
 
         try {
+            if (!tokenService.deductToken(loginId)) {
+                return new CoWorkerChatResponse(
+                        sessionId,
+                        "You have run out of tokens. Please upgrade your plan to continue.",
+                        null);
+            }
+
             var completion = openAI.chat().completions().create(params);
-            tokenService.deductToken(loginId);
             String content = completion.choices().getFirst().message().content()
                     .orElse("{\"message\":\"I'm here to help! What would you like me to do?\",\"pendingAction\":{\"type\":\"NONE\",\"description\":\"\",\"params\":{}}}");
 
@@ -296,10 +302,6 @@ public class CoWorkerService {
 
         if (candidateIds.isEmpty()) {
             return Map.of("message", "No candidates to analyse.", "success", false);
-        }
-
-        if (!tokenService.hasTokens(loginId)) {
-            return Map.of("message", "You have run out of tokens. Please upgrade your plan to continue.", "success", false);
         }
 
         Long taskId = createTask(loginId, "RUN_ANALYSIS",
