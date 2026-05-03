@@ -37,11 +37,10 @@ public class InterviewQuestionsService {
     // ─── Generate questions via OpenAI ────────────────────────────────────────
 
     public String generateQuestions(String candidateId, String loginId) {
-        if (!tokenService.hasTokens(loginId))
+        if (!tokenService.deductToken(loginId))
             throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
         CandidateContext ctx = loadContext(candidateId, loginId);
         String result = callOpenAI(buildSystemPrompt(), buildUserPrompt(ctx));
-        tokenService.deductToken(loginId);
         return result;
     }
 

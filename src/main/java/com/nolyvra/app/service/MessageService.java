@@ -5,8 +5,10 @@ import com.nolyvra.app.model.MessageGenerateResponse;
 import com.openai.client.OpenAIClient;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class MessageService {
@@ -113,8 +115,11 @@ public class MessageService {
                 .temperature(0.4)
                 .build();
 
+        if (!tokenService.deductToken(loginId)) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
+        }
+
         var completion = openAI.chat().completions().create(params);
-        tokenService.deductToken(loginId);
         String content = completion.choices().getFirst().message().content()
                 .orElseThrow(() -> new IllegalStateException("Model returned empty content"));
 

@@ -52,7 +52,7 @@ public class InterviewTranscriptService {
             String candidateId, String loginId,
             String interviewId, String transcriptText) {
 
-        if (!tokenService.hasTokens(loginId))
+        if (!tokenService.deductToken(loginId))
             throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
 
         String cvAnalysisContext = loadCvAnalysisSummary(candidateId);
@@ -60,7 +60,6 @@ public class InterviewTranscriptService {
         InterviewMeta meta       = loadInterviewMeta(interviewId);
 
         String rawJson = callOpenAI(buildSystemPrompt(), buildUserPrompt(transcriptText, cvAnalysisContext, candidateName, meta));
-        tokenService.deductToken(loginId);
 
         JsonNode root;
         try {

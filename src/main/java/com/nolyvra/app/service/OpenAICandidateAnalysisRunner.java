@@ -45,7 +45,7 @@ public class OpenAICandidateAnalysisRunner implements CandidateAnalysisRunner {
             String jdText,
             String cvText,
             String linkedinUrl) {
-        if (!tokenService.hasTokens(loginId)) {
+        if (!tokenService.deductToken(loginId)) {
             throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
         }
 
@@ -148,7 +148,6 @@ public class OpenAICandidateAnalysisRunner implements CandidateAnalysisRunner {
                     .build();
 
             var completion = openAI.chat().completions().create(params);
-            tokenService.deductToken(loginId);
             String content = completion.choices().getFirst().message().content()
                     .orElseThrow(() -> new IllegalStateException("Model returned empty content"));
 
