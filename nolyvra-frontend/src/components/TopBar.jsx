@@ -13,7 +13,7 @@ const PILLS = [
   { num: "②", label: "Jobs List",           to: "/jobs" },
   { num: "③", label: "Create Job",          to: "/jobs/new" },
   { num: "④", label: "Candidates",          to: "/candidates" },
-  { num: "⑤", label: "Add Candidate",       to: "/candidates/new" },
+  { num: "⑤", label: "Add Candidate",       to: "/candidates/new-modern" },
   { num: "⑥", label: "Analysis",            to: null },
   { num: "⑦", label: "AI Talent Search ✦",  to: "/talent-search",  isNew: true },
   { num: "⑧", label: "Candidate Workflow ✦",to: null,               isNew: true },
@@ -88,7 +88,7 @@ export default function TopBar() {
     if (pill.to === "/jobs")      return pathname === "/jobs";
     if (pill.to === "/jobs/new")  return pathname === "/jobs/new";
     if (pill.to === "/candidates")     return pathname === "/candidates";
-    if (pill.to === "/candidates/new") return pathname === "/candidates/new";
+    if (pill.to === "/candidates/new-modern") return pathname === "/candidates/new-modern" || pathname === "/candidates/new";
     return pathname.startsWith(pill.to);
   }
 

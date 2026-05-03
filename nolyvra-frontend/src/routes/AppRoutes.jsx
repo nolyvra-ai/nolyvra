@@ -5,6 +5,9 @@ import LoginPage              from "../pages/LoginPage";
 import DashboardPage          from "../pages/DashboardPage";
 import JobsPage               from "../pages/JobsPage";
 import CreateJobPage          from "../pages/CreateJobPage";
+import CreateJobPageModern    from "../pages/CreateJobPageModern";
+import AddCandidatesModernPage from "../pages/AddCandidatesModernPage";
+import AddCandidateModernPage  from "../pages/AddCandidateModernPage";
 import CandidatesPage         from "../pages/CandidatesPage";
 import AddCandidatePage       from "../pages/AddCandidatePage";
 import AnalysisPage           from "../pages/AnalysisPage";
@@ -30,9 +33,13 @@ export default function AppRoutes() {
       {/* App pages */}
       <Route path="/dashboard"                          element={<DashboardPage />} />
       <Route path="/jobs"                               element={<JobsPage />} />
-      <Route path="/jobs/new"                           element={<CreateJobPage />} />
+      <Route path="/jobs/new"                              element={<CreateJobPageModern />} />
+      <Route path="/jobs/new-modern"                    element={<CreateJobPageModern />} />
+      <Route path="/jobs/new-classic"                   element={<CreateJobPage />} />
+      <Route path="/jobs/:jobId/add-candidates-modern"  element={<AddCandidatesModernPage />} />
       <Route path="/jobs/:jobId/edit"                   element={<CreateJobPage />} />
       <Route path="/candidates"                         element={<CandidatesPage />} />
+      <Route path="/candidates/new-modern"              element={<AddCandidateModernPage />} />
       <Route path="/candidates/new"                     element={<AddCandidatePage />} />
       <Route path="/analysis/:candidateId"              element={<AnalysisPage />} />
       <Route path="/talent-search"                      element={<TalentSearchPage />} />

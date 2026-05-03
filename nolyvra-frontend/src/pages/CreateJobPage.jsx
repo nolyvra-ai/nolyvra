@@ -253,7 +253,18 @@ export default function CreateJobPage() {
             {isEditMode ? "Update job details and description" : "Paste JD or client brief to create a vacancy"}
           </Typography>
         </Box>
-        <Box sx={{ display: "flex", gap: 1 }}>
+        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+          {!isEditMode && (
+            <Button variant="outlined" size="small" onClick={() => nav("/jobs/new")}
+              sx={{
+                fontSize: 11, borderColor: PURPLE_BR, color: PURPLE,
+                borderRadius: "50px", textTransform: "none", px: 2,
+                bgcolor: PURPLE_BG,
+                "&:hover": { borderColor: PURPLE, bgcolor: "#EDE9FE" },
+              }}>
+              ✦ Switch to New AI Job Creator
+            </Button>
+          )}
           <Button variant="outlined" size="small" onClick={() => nav("/jobs")}
             sx={{ fontSize: 11, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none" }}>
             Cancel

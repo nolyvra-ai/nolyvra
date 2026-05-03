@@ -654,7 +654,20 @@ export default function AddCandidatePage() {
             Paste CV and LinkedIn for validation analysis
           </Typography>
         </Box>
-        <Box sx={{ display: "flex", gap: 1 }}>
+        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => nav("/candidates/new-modern")}
+            sx={{
+              fontSize: 11, borderColor: "#C4B5FD", color: "#7C3AED",
+              borderRadius: "50px", textTransform: "none", px: 2,
+              bgcolor: "#F5F3FF",
+              "&:hover": { borderColor: "#7C3AED", bgcolor: "#EDE9FE" },
+            }}
+          >
+            ✦ Switch to New AI Add Candidate
+          </Button>
           <Button
             size="small"
             variant="outlined"

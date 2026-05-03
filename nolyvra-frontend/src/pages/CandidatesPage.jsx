@@ -439,7 +439,7 @@ export default function CandidatesPage() {
             variant="contained"
             size="small"
             startIcon={<AddIcon sx={{ fontSize: 14 }} />}
-            onClick={() => { if (!checkCandidateLimit()) { setLimitDialog(true); } else { nav("/candidates/new"); } }}
+            onClick={() => { if (!checkCandidateLimit()) { setLimitDialog(true); } else { nav("/candidates/new-modern"); } }}
             sx={{
               fontSize: 12,
               fontWeight: 500,
