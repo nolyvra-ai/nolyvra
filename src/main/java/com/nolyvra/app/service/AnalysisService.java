@@ -14,9 +14,6 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class AnalysisService {
@@ -27,7 +24,6 @@ public class AnalysisService {
     private final JdbcTemplate jdbc;
     private final TokenService tokenService;
     private final CandidateAnalysisRunner analysisRunner;
-    private final Map<String, CandidateAnalysisResponse> cache = new ConcurrentHashMap<>();
 
     public AnalysisService(
             ObjectMapper objectMapper,
@@ -80,7 +76,6 @@ public class AnalysisService {
         CandidateAnalysisResponse response = analysisRunner.analyze(
                 candidateId, candidateResponse, loginId, jdText, cvText, linkedinUrl);
         persistAnalysisToDb(response, loginId);
-        cache.put(candidateId, response);
         return response;
     }
 
@@ -299,11 +294,7 @@ public class AnalysisService {
         }
     }
 
-    // ─── Existing getters (unchanged) ─────────────────────────────────────────
-
-    public Optional<CandidateAnalysisResponse> getCachedAnalysis(String candidateId) {
-        return Optional.ofNullable(cache.get(candidateId));
-    }
+    // ─── Existing getters ────────────────────────────────────────────────────
 
     public CandidateResponse getJobIdNameForCandidate(String candidateId) {
         return jdbc.query("""
