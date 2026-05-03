@@ -27,6 +27,11 @@ spring:
 server:
   port: ${PORT:8080}
 
+analysis-jobs:
+  max-parallel: ${ANALYSIS_JOBS_MAX_PARALLEL:3}
+  max-attempts: ${ANALYSIS_JOBS_MAX_ATTEMPTS:3}
+  worker-delay-ms: ${ANALYSIS_JOBS_WORKER_DELAY_MS:5000}
+
 nolyvra:
   mock-ai: ${NOLYVRA_MOCK_AI:false}
 

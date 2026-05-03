@@ -217,10 +217,33 @@ export default function AddCandidatePage() {
   const [bulkDone,       setBulkDone]       = useState(false);
   const [bulkAnalyzing,  setBulkAnalyzing]  = useState(false);
   const [recentBulkCandidates, setRecentBulkCandidates] = useState([]);
+  const [bulkAnalysisStatus, setBulkAnalysisStatus] = useState(null);
 
   function setField(k, v) {
     setForm((p) => ({ ...p, [k]: v }));
   }
+
+  const bulkAnalysisBatchId = bulkAnalysisStatus?.batchId;
+  const bulkAnalysisActive = !!bulkAnalysisStatus &&
+    ((bulkAnalysisStatus.queued ?? 0) + (bulkAnalysisStatus.running ?? 0) > 0);
+
+  useEffect(() => {
+    if (!bulkAnalysisBatchId) return undefined;
+
+    const poll = async () => {
+      const loginId = localStorage.getItem("loginId") || "";
+      const url = new URL(`${API_BASE}/api/analysis-jobs/batches/${bulkAnalysisBatchId}`);
+      url.searchParams.set("loginId", loginId);
+      const res = await fetch(url.toString(), {
+        headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+      });
+      if (res.ok) setBulkAnalysisStatus(await res.json());
+    };
+
+    poll();
+    const timer = window.setInterval(poll, 3000);
+    return () => window.clearInterval(timer);
+  }, [bulkAnalysisBatchId]);
 
   // ── Change 1: CV upload — extracts text AND prefills name/email/linkedinUrl ─
   // ── CV content validator — called after extraction ───────────────────────
@@ -463,6 +486,7 @@ export default function AddCandidatePage() {
     setBulkSaving(false);
     setBulkDone(true);
     setRecentBulkCandidates(savedCandidates);
+    setBulkAnalysisStatus(null);
 
     // If limit was hit mid-bulk, show the limit dialog after
     if (limitHit) {
@@ -485,17 +509,22 @@ export default function AddCandidatePage() {
     setBulkAnalyzing(true);
     setAnalysisDialog(true);
     const loginId = localStorage.getItem("loginId") || "";
-    const authHeader = { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` };
 
     try {
-      await Promise.all(savedCandidates.map(async b => {
-        const analyzeUrl = new URL(`${API_BASE}/api/candidates/${b.candidateId}/analyze`);
-        analyzeUrl.searchParams.set("loginId", loginId);
-        const res = await fetch(analyzeUrl.toString(), { method: "POST", headers: authHeader });
-        if (!res.ok) throw new Error(await res.text());
-      }));
+      const url = new URL(`${API_BASE}/api/analysis-jobs/bulk`);
+      url.searchParams.set("loginId", loginId);
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}`,
+        },
+        body: JSON.stringify({ candidateIds: savedCandidates.map(b => b.candidateId) }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setBulkAnalysisStatus(await res.json());
     } catch {
-      setValidationErr("One or more analyses failed. Please try again from the Candidates page.");
+      setValidationErr("Failed to queue bulk analysis. Please try again.");
     } finally {
       if (isMountedRef.current) setBulkAnalyzing(false);
     }
@@ -642,7 +671,7 @@ export default function AddCandidatePage() {
           <Button
             size="small"
             variant="outlined"
-            onClick={() => { setBulkFiles([]); setBulkDone(false); setBulkAnalyzing(false); setBulkDialog(true); }}
+            onClick={() => { setBulkFiles([]); setBulkDone(false); setBulkAnalyzing(false); setBulkAnalysisStatus(null); setBulkDialog(true); }}
             sx={{
               fontSize: 12, fontWeight: 500, borderColor: "#C4B5FD", color: "#7C3AED",
               borderRadius: "6px", textTransform: "none",
@@ -747,13 +776,15 @@ export default function AddCandidatePage() {
               {recentBulkCandidates.length} newest uploaded CV(s) added to pipeline
             </Typography>
             <Typography sx={{ fontSize: 11, color: "#15803D", mt: 0.25 }}>
-              Run analysis for this latest bulk upload batch when you are ready.
+              {bulkAnalysisStatus
+                ? `${bulkAnalysisStatus.queued ?? 0} queued, ${bulkAnalysisStatus.running ?? 0} running, ${bulkAnalysisStatus.succeeded ?? 0} completed, ${bulkAnalysisStatus.failed ?? 0} failed`
+                : "Run analysis for this latest bulk upload batch when you are ready."}
             </Typography>
           </Box>
           <Button
             variant="contained"
             size="small"
-            disabled={bulkAnalyzing}
+            disabled={bulkAnalyzing || bulkAnalysisActive}
             onClick={() => handleBulkAnalysis(recentBulkCandidates)}
             sx={{
               fontSize: 12,
@@ -765,7 +796,7 @@ export default function AddCandidatePage() {
               "&:hover": { bgcolor: "#1660CC", boxShadow: "none" },
             }}
           >
-            {bulkAnalyzing ? "Running…" : "🔍 Run Bulk Analysis"}
+            {bulkAnalyzing || bulkAnalysisActive ? "Running…" : "🔍 Run Bulk Analysis"}
           </Button>
         </Box>
       )}
