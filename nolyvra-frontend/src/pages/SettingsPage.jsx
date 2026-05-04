@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   Box, Paper, Typography, Button, TextField, MenuItem,
-  Alert, CircularProgress, LinearProgress
+  Alert, CircularProgress, LinearProgress, Slider
 } from "@mui/material";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePlanLimit } from "../hooks/usePlanLimit";
@@ -122,6 +122,42 @@ export default function SettingsPage() {
 
   // Plan usage from shared hook
   const { usage, loading: planLoading } = usePlanLimit();
+
+  // ── Monthly Target state ──────────────────────────────────────────────────
+  const [monthlyTarget, setMonthlyTarget] = useState(35);
+  const [targetSaving,  setTargetSaving]  = useState(false);
+  const [targetSaved,   setTargetSaved]   = useState(false);
+
+  useEffect(() => {
+    if (!loginId) return;
+    const url = new URL(`${API_BASE}/api/settings`);
+    url.searchParams.set("loginId", loginId);
+    fetch(url.toString(), {
+      headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.monthlyTarget !== undefined) setMonthlyTarget(d.monthlyTarget); })
+      .catch(() => {});
+  }, [loginId]);
+
+  async function handleSaveTarget() {
+    setTargetSaving(true);
+    try {
+      const url = new URL(`${API_BASE}/api/settings/monthly-target`);
+      url.searchParams.set("loginId", loginId);
+      await fetch(url.toString(), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}`,
+        },
+        body: JSON.stringify({ monthlyTarget }),
+      });
+      setTargetSaved(true);
+      setTimeout(() => setTargetSaved(false), 2500);
+    } catch { /* silent */ }
+    finally { setTargetSaving(false); }
+  }
 
   // ── Update Password state ─────────────────────────────────────────────────
   const [pwForm, setPwForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
@@ -437,6 +473,69 @@ export default function SettingsPage() {
               Could not load plan details.
             </Typography>
           )}
+        </Box>
+      </Paper>
+
+      {/* ── Recruitment Targets ──────────────────────────────────────────── */}
+      <Paper elevation={0} sx={{
+        border: `1px solid ${BORDER}`, borderRadius: "10px",
+        overflow: "hidden", bgcolor: "#fff"
+      }}>
+        <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}` }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
+            Recruitment Targets
+          </Typography>
+          <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
+            Set your monthly placement goal — tracked on your dashboard
+          </Typography>
+        </Box>
+        <Box sx={{ p: 2.25, display: "flex", flexDirection: "column", gap: 1.5 }}>
+          {targetSaved && (
+            <Alert severity="success" onClose={() => setTargetSaved(false)}
+              sx={{ borderRadius: "8px", fontSize: 12 }}>
+              Monthly target saved.
+            </Alert>
+          )}
+          <Box>
+            <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1.25 }}>
+              <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT }}>
+                Monthly Target
+              </Typography>
+              <Typography sx={{ fontSize: 13, fontWeight: 700, color: PURPLE }}>
+                {monthlyTarget} candidates
+              </Typography>
+            </Box>
+            <Slider
+              value={monthlyTarget}
+              onChange={(_, v) => setMonthlyTarget(v)}
+              min={0} max={100} step={5}
+              marks={[
+                { value: 0,   label: "0"   },
+                { value: 25,  label: "25"  },
+                { value: 50,  label: "50"  },
+                { value: 75,  label: "75"  },
+                { value: 100, label: "100" },
+              ]}
+              sx={{
+                color: PURPLE,
+                "& .MuiSlider-markLabel": { fontSize: 10, color: MUTED },
+                "& .MuiSlider-thumb": {
+                  "&:hover, &.Mui-focusVisible": { boxShadow: "0 0 0 8px rgba(124,58,237,0.12)" },
+                },
+              }}
+            />
+          </Box>
+          <Button
+            variant="contained"
+            onClick={handleSaveTarget}
+            disabled={targetSaving}
+            sx={{
+              alignSelf: "flex-start", fontSize: 12, fontWeight: 500,
+              bgcolor: PURPLE, borderRadius: "8px", textTransform: "none",
+              boxShadow: "none", "&:hover": { bgcolor: "#6D28D9", boxShadow: "none" }
+            }}>
+            {targetSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Save Target"}
+          </Button>
         </Box>
       </Paper>
 

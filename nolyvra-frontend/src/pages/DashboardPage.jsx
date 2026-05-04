@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Box, Paper, Typography, Table, TableHead, TableRow,
-  TableCell, TableBody, Button, Alert, InputBase,
+  TableCell, TableBody, Button, Alert,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
@@ -253,24 +253,424 @@ function PipelineBar({ label, count, pct, color }) {
   );
 }
 
-// ── AI Prompt Card (Change 1) ──────────────────────────────────────────────
-function AiPromptCard({ onAsk }) {
-  const [input, setInput] = useState("");
-  const nav = useNavigate();
+// ── Hiring Insights card ───────────────────────────────────────────────────
+const STAGE_COLORS = ["#E05A27", "#D97706", "#16A34A", "#7C3AED"];
 
-  function handleAsk() {
-    const q = input.trim();
-    if (!q) return;
-    nav("/coworker", { state: { prefillMessage: q } });
+function HiringInsightsCard({ data }) {
+  if (!data) return (
+    <Paper elevation={0} sx={{ ...CARD_BASE, height: "100%" }}>
+      <CardHead title="Hiring Insights" />
+      <Box sx={{ p: 2 }}><Typography sx={{ fontSize: 12, color: MUTED }}>Loading…</Typography></Box>
+    </Paper>
+  );
+
+  const { totalCandidates, stages, thisWeekCount, lastWeekCount } = data;
+  const ratio = lastWeekCount > 0
+    ? Math.round((thisWeekCount - lastWeekCount) / lastWeekCount * 100)
+    : thisWeekCount > 0 ? 100 : 0;
+
+  return (
+    <Paper elevation={0} sx={{ ...CARD_BASE, display: "flex", flexDirection: "column", height: "100%" }}>
+      <CardHead title="Hiring Insights" />
+      <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.75, flex: 1 }}>
+        {stages.map((s, i) => (
+          <Box key={s.label}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
+              <Typography sx={{ fontSize: 12, color: TEXT }}>{s.label}</Typography>
+              <Typography sx={{ fontSize: 12, fontWeight: 600, color: STAGE_COLORS[i] }}>
+                {totalCandidates > 0 ? `${s.pct}%` : "—"}
+              </Typography>
+            </Box>
+            <Box sx={{ height: 6, bgcolor: "#F0F2F6", borderRadius: "3px", overflow: "hidden" }}>
+              <Box sx={{ width: `${s.pct}%`, height: "100%", bgcolor: STAGE_COLORS[i], borderRadius: "3px", transition: "width .4s" }} />
+            </Box>
+          </Box>
+        ))}
+
+        <Box sx={{ mt: "auto", pt: 1.5, borderTop: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+          <Typography sx={{ fontSize: 12, color: MUTED }}>Applying Ratio</Typography>
+          <Box sx={{ textAlign: "right" }}>
+            <Typography sx={{ fontSize: 22, fontWeight: 800, color: ratio >= 0 ? SUCCESS : DANGER, lineHeight: 1.1 }}>
+              {ratio >= 0 ? "+" : ""}{ratio}%
+            </Typography>
+            <Typography sx={{ fontSize: 10, color: MUTED }}>This Week</Typography>
+          </Box>
+        </Box>
+      </Box>
+    </Paper>
+  );
+}
+
+// ── Skill Gap radar chart ──────────────────────────────────────────────────
+function RadarChart({ skills }) {
+  const cx = 105, cy = 100, r = 72, n = skills.length;
+
+  function pt(i, val) {
+    const a = (i * 2 * Math.PI / n) - Math.PI / 2;
+    const d = (Math.max(0, Math.min(100, val)) / 100) * r;
+    return [cx + d * Math.cos(a), cy + d * Math.sin(a)];
   }
+
+  function labelPt(i) {
+    const a = (i * 2 * Math.PI / n) - Math.PI / 2;
+    return [cx + (r + 20) * Math.cos(a), cy + (r + 20) * Math.sin(a)];
+  }
+
+  const poly = (pts) =>
+    pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ") + "Z";
+
+  const rings  = [25, 50, 75, 100].map(v => poly(Array.from({ length: n }, (_, i) => pt(i, v))));
+  const reqPath  = poly(skills.map((s, i) => pt(i, s.requiredPct)));
+  const poolPath = poly(skills.map((s, i) => pt(i, s.poolPct)));
+
+  return (
+    <svg width="210" height="210" viewBox="0 0 210 210" style={{ display: "block", margin: "0 auto" }}>
+      {rings.map((d, i) => (
+        <path key={i} d={d} fill={i === 3 ? "#F8F9FB" : "none"} stroke="#E8ECF2" strokeWidth="1" />
+      ))}
+      {Array.from({ length: n }, (_, i) => {
+        const [x, y] = pt(i, 100);
+        return <line key={i} x1={cx} y1={cy} x2={x.toFixed(1)} y2={y.toFixed(1)} stroke="#E8ECF2" strokeWidth="1" />;
+      })}
+      <path d={reqPath}  fill="rgba(29,114,232,0.12)" stroke={ACCENT}   strokeWidth="2" strokeLinejoin="round" />
+      <path d={poolPath} fill="rgba(22,163,74,0.12)"  stroke={SUCCESS}  strokeWidth="2" strokeLinejoin="round" />
+      {skills.map((s, i) => {
+        const [lx, ly] = labelPt(i);
+        return (
+          <text key={i} x={lx.toFixed(1)} y={ly.toFixed(1)}
+            textAnchor="middle" dominantBaseline="middle"
+            fontSize="9" fill={MUTED} style={{ fontFamily: "inherit" }}>
+            {s.skill.length > 10 ? s.skill.slice(0, 9) + "…" : s.skill}
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
+function SkillGapCard({ data }) {
+  const hasData = data && data.length >= 3;
+  return (
+    <Paper elevation={0} sx={{ ...CARD_BASE, display: "flex", flexDirection: "column", height: "100%" }}>
+      <CardHead title="Skill Gap Analysis" />
+      <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1, flex: 1 }}>
+        <Typography sx={{ fontSize: 11, color: MUTED }}>
+          Average candidate pool vs. job requirements
+        </Typography>
+        {hasData ? (
+          <>
+            <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <RadarChart skills={data.slice(0, 6)} />
+            </Box>
+            <Box sx={{ display: "flex", justifyContent: "center", gap: 2.5, mt: 0.5 }}>
+              {[{ color: ACCENT, label: "Required" }, { color: SUCCESS, label: "Current Pool" }].map(({ color, label }) => (
+                <Box key={label} sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+                  <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: color, flexShrink: 0 }} />
+                  <Typography sx={{ fontSize: 11, color: MUTED }}>{label}</Typography>
+                </Box>
+              ))}
+            </Box>
+          </>
+        ) : (
+          <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Typography sx={{ fontSize: 12, color: MUTED, textAlign: "center" }}>
+              Add jobs and candidates to see skill gap analysis.
+            </Typography>
+          </Box>
+        )}
+      </Box>
+    </Paper>
+  );
+}
+
+// ── Bottleneck Alert card ──────────────────────────────────────────────────
+function BottleneckCard({ data }) {
+  function dotColor(days) {
+    return days >= 7 ? DANGER : days >= 4 ? WARN : SUCCESS;
+  }
+
+  return (
+    <Paper elevation={0} sx={{ ...CARD_BASE, display: "flex", flexDirection: "column", height: "100%" }}>
+      <CardHead title="Bottleneck Alert" />
+      <Box sx={{ px: 2, pt: 0.5, pb: 2, flex: 1 }}>
+        <Typography sx={{ fontSize: 11, color: MUTED, mb: 1.5 }}>
+          Roles lagging in the hiring process
+        </Typography>
+        {!data || data.length === 0 ? (
+          <Typography sx={{ fontSize: 12, color: MUTED, py: 2, textAlign: "center" }}>
+            No bottlenecks detected.
+          </Typography>
+        ) : (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
+            {data.slice(0, 4).map((item, i) => {
+              const color = dotColor(item.daysInStage);
+              const pct   = Math.min(100, Math.round(item.daysInStage / 14 * 100));
+              return (
+                <Box key={i} sx={{ border: `1px solid ${BORDER}`, borderRadius: "10px", p: "11px 14px" }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <Box sx={{ flex: 1, pr: 1 }}>
+                      <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {item.jobTitle}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.2 }}>Stage: {item.stage}</Typography>
+                    </Box>
+                    <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: color, flexShrink: 0, mt: "3px" }} />
+                  </Box>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 1, mb: 0.75 }}>
+                    <Typography sx={{ fontSize: 11, color: MUTED }}>Days in stage:</Typography>
+                    <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{item.daysInStage} days</Typography>
+                  </Box>
+                  <Box sx={{ height: 5, bgcolor: "#F0F2F6", borderRadius: "3px", overflow: "hidden" }}>
+                    <Box sx={{ width: `${pct}%`, height: "100%", bgcolor: color, borderRadius: "3px", transition: "width .4s" }} />
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+        )}
+      </Box>
+    </Paper>
+  );
+}
+
+// ── Profile Source Quality card ───────────────────────────────────────────
+function ProfileSourceCard({ data }) {
+  const sources = [
+    data?.find(d => d.source === "Direct Apply") ?? { source: "Direct Apply", count: 0, avgScore: 0, topPicksPct: 0 },
+    data?.find(d => d.source === "CoreSignal")   ?? { source: "CoreSignal",   count: 0, avgScore: 0, topPicksPct: 0 },
+  ];
+  const total   = sources.reduce((sum, s) => sum + s.count, 0);
+  const hasData = total > 0;
+
+  function SourceBlock({ src }) {
+    const isCS       = src.source === "CoreSignal";
+    const barColor   = isCS ? PURPLE : ACCENT;
+    const pct        = total > 0 ? Math.round(src.count / total * 100) : 0;
+    const scoreColor = src.avgScore >= 80 ? SUCCESS : src.avgScore >= 60 ? WARN : DANGER;
+    return (
+      <Box sx={{ flex: 1, border: `1px solid ${BORDER}`, borderRadius: "10px", p: 1.75 }}>
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+            <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: barColor, flexShrink: 0 }} />
+            <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT }}>{src.source}</Typography>
+          </Box>
+          <Typography sx={{ fontSize: 20, fontWeight: 800, color: TEXT }}>{src.count}</Typography>
+        </Box>
+        <Box sx={{ height: 4, bgcolor: "#F0F2F6", borderRadius: "2px", overflow: "hidden", mb: 1.5 }}>
+          <Box sx={{ width: `${pct}%`, height: "100%", bgcolor: barColor, borderRadius: "2px", transition: "width .4s" }} />
+        </Box>
+        <Box sx={{ display: "flex", gap: 1.5, alignItems: "flex-start" }}>
+          <Box>
+            <Typography sx={{ fontSize: 9.5, color: MUTED, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              Avg Score
+            </Typography>
+            <Typography sx={{ fontSize: 15, fontWeight: 800, color: src.count > 0 ? scoreColor : MUTED }}>
+              {src.count > 0 ? `${src.avgScore}%` : "—"}
+            </Typography>
+          </Box>
+          <Box sx={{ width: "1px", height: 36, bgcolor: BORDER, alignSelf: "center" }} />
+          <Box>
+            <Typography sx={{ fontSize: 9.5, color: MUTED, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+              Top Picks
+            </Typography>
+            <Typography sx={{ fontSize: 15, fontWeight: 800, color: src.count > 0 ? SUCCESS : MUTED }}>
+              {src.count > 0 ? `${src.topPicksPct}%` : "—"}
+            </Typography>
+          </Box>
+        </Box>
+      </Box>
+    );
+  }
+
+  return (
+    <Paper elevation={0} sx={{ ...CARD_BASE, display: "flex", flexDirection: "column", height: "100%" }}>
+      <CardHead title="Profile Source Quality" isNew />
+      <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5, flex: 1 }}>
+        <Typography sx={{ fontSize: 11, color: MUTED }}>Candidate quality by acquisition channel</Typography>
+        {!hasData ? (
+          <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Typography sx={{ fontSize: 12, color: MUTED, textAlign: "center" }}>
+              Add candidates to see source quality.
+            </Typography>
+          </Box>
+        ) : (
+          <>
+            <Box sx={{ display: "flex", gap: 1.5 }}>
+              {sources.map(src => <SourceBlock key={src.source} src={src} />)}
+            </Box>
+            <Box sx={{ pt: 1.25, borderTop: `1px solid ${BORDER}`, textAlign: "center" }}>
+              <Typography sx={{ fontSize: 11, color: MUTED }}>
+                {total} total active profiles · Top Picks = capability score ≥ 80
+              </Typography>
+            </Box>
+          </>
+        )}
+      </Box>
+    </Paper>
+  );
+}
+
+// ── Pipeline Health (Leaky Funnel) card ───────────────────────────────────
+const FUNNEL_COLORS = [ACCENT, "#4B82D8", WARN, PURPLE, "#9D6AEF", SUCCESS];
+
+function PipelineFunnelCard({ data }) {
+  const stages  = data?.stages ?? [];
+  const total   = data?.total ?? 0;
+  const hasData = total > 0;
+
+  return (
+    <Paper elevation={0} sx={{ ...CARD_BASE, display: "flex", flexDirection: "column", height: "100%" }}>
+      <CardHead title="Pipeline Health" isNew />
+      <Box sx={{ p: 2, flex: 1, display: "flex", flexDirection: "column" }}>
+        <Typography sx={{ fontSize: 11, color: MUTED, mb: 1.5 }}>
+          The leaky funnel — where candidates drop off
+        </Typography>
+        {!hasData ? (
+          <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Typography sx={{ fontSize: 12, color: MUTED, textAlign: "center" }}>
+              Add candidates to see pipeline health.
+            </Typography>
+          </Box>
+        ) : (
+          <Box sx={{ display: "flex", flexDirection: "column" }}>
+            {stages.map((stage, i) => {
+              const barPct = total > 0 ? Math.max(3, Math.round(stage.count / total * 100)) : 0;
+              const color  = FUNNEL_COLORS[i] ?? MUTED;
+              return (
+                <Box key={stage.name}>
+                  {i > 0 && stage.dropOffPct > 0 && (
+                    <Box sx={{ pl: "86px", py: "3px" }}>
+                      <Box sx={{
+                        display: "inline-flex", alignItems: "center",
+                        bgcolor: DANGER_L, border: `1px solid #FECACA`,
+                        borderRadius: "10px", px: 1, py: "1.5px",
+                        fontSize: 9.5, fontWeight: 700, color: DANGER,
+                      }}>
+                        ↓ -{stage.dropOffPct}% drop-off
+                      </Box>
+                    </Box>
+                  )}
+                  {i > 0 && stage.dropOffPct === 0 && <Box sx={{ height: 4 }} />}
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Typography sx={{ fontSize: 10.5, color: MUTED, width: 78, flexShrink: 0, textAlign: "right" }}>
+                      {stage.name}
+                    </Typography>
+                    <Box sx={{ flex: 1, height: 20, bgcolor: "#F0F2F6", borderRadius: "4px", overflow: "hidden" }}>
+                      <Box sx={{
+                        width: `${barPct}%`, height: "100%", bgcolor: color,
+                        borderRadius: "4px", transition: "width .5s ease",
+                      }} />
+                    </Box>
+                    <Typography sx={{ fontSize: 12, fontWeight: 700, color: TEXT, width: 22, textAlign: "right", flexShrink: 0 }}>
+                      {stage.count}
+                    </Typography>
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+        )}
+      </Box>
+    </Paper>
+  );
+}
+
+// ── Monthly Target gauge ───────────────────────────────────────────────────
+function GaugeArc({ fulfilled, target }) {
+  const pct     = target > 0 ? Math.min(1, fulfilled / target) : 0;
+  const color   = pct >= 1 ? SUCCESS : pct >= 0.6 ? PURPLE : ACCENT;
+  const cx = 70, cy = 70, r = 58;
+
+  const bgPath   = `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`;
+  const angle    = Math.PI * (1 - pct);
+  const ex       = (cx + r * Math.cos(angle)).toFixed(1);
+  const ey       = (cy - r * Math.sin(angle)).toFixed(1);
+  const fillPath = pct > 0 ? `M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${ex} ${ey}` : "";
+
+  return (
+    <svg width="140" height="82" viewBox="0 0 140 82" style={{ display: "block" }}>
+      <path d={bgPath} fill="none" stroke="#E8ECF2" strokeWidth="13" strokeLinecap="round" />
+      {pct > 0 && (
+        <path d={fillPath} fill="none" stroke={color} strokeWidth="13" strokeLinecap="round" />
+      )}
+      <text x={cx} y={cy - 10} textAnchor="middle" fontSize="26" fontWeight="800" fill={TEXT}
+        style={{ fontFamily: "inherit" }}>{fulfilled}</text>
+      <text x={cx} y={cy + 9} textAnchor="middle" fontSize="11" fill={MUTED}
+        style={{ fontFamily: "inherit" }}>of {target}</text>
+    </svg>
+  );
+}
+
+function MonthlyTargetCard({ fulfilled, target }) {
+  const remaining = Math.max(0, target - fulfilled);
+  const pct       = target > 0 ? Math.min(100, Math.round((fulfilled / target) * 100)) : 0;
+  const isComplete = fulfilled >= target;
+  const monthLabel = new Date().toLocaleString("en-GB", { month: "long", year: "numeric" });
+
+  return (
+    <Paper elevation={0} sx={{ ...CARD_BASE, display: "flex", flexDirection: "column", height: "100%" }}>
+      <CardHead title="Monthly Target" />
+      <Box sx={{
+        p: 2, flex: 1,
+        display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", gap: 1.5,
+      }}>
+        {/* Gauge */}
+        <GaugeArc fulfilled={fulfilled} target={target} />
+
+        {/* Label */}
+        <Box sx={{ textAlign: "center" }}>
+          <Typography sx={{ fontSize: 12, fontWeight: 600, color: isComplete ? SUCCESS : TEXT }}>
+            {isComplete ? "Monthly target achieved!" : `${remaining} more to reach goal`}
+          </Typography>
+          <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
+            {pct}% complete · {monthLabel}
+          </Typography>
+        </Box>
+
+        {/* Stats row */}
+        <Box sx={{
+          display: "flex", width: "100%",
+          bgcolor: "#FAFBFD", border: `1px solid ${BORDER}`,
+          borderRadius: "8px", p: "10px 0",
+          justifyContent: "space-evenly", alignItems: "center",
+        }}>
+          {[
+            { val: fulfilled, label: "Placed"   },
+            { val: target,    label: "Target"   },
+            { val: `${pct}%`, label: "Progress" },
+          ].map(({ val, label }, i, arr) => (
+            <React.Fragment key={label}>
+              <Box sx={{ textAlign: "center" }}>
+                <Typography sx={{ fontSize: 18, fontWeight: 800, color: TEXT }}>{val}</Typography>
+                <Typography sx={{ fontSize: 10, color: MUTED, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                  {label}
+                </Typography>
+              </Box>
+              {i < arr.length - 1 && (
+                <Box sx={{ width: "1px", height: 30, bgcolor: BORDER }} />
+              )}
+            </React.Fragment>
+          ))}
+        </Box>
+      </Box>
+    </Paper>
+  );
+}
+
+// ── AI Prompt Card (Change 1) ──────────────────────────────────────────────
+function AiPromptCard() {
+  const nav = useNavigate();
 
   return (
     <Paper elevation={0} sx={{
       background: "linear-gradient(135deg, #EEF4FF 0%, #F0EEFF 100%)",
       border: `1px solid #D4E2FF`,
       borderRadius: "16px",
-      p: 3,
+      p: 2,
       display: "flex", flexDirection: "column", gap: 1.5,
+      height: "100%", boxSizing: "border-box",
     }}>
       {/* Icon */}
       <Box sx={{
@@ -284,7 +684,7 @@ function AiPromptCard({ onAsk }) {
 
       {/* Heading */}
       <Box>
-        <Typography sx={{ fontSize: 18, fontWeight: 700, color: TEXT, lineHeight: 1.3 }}>
+        <Typography sx={{ fontSize: 15, fontWeight: 700, color: TEXT, lineHeight: 1.3 }}>
           Ready To Find Top Candidates Or Revisit Your Pipeline?
         </Typography>
         <Typography sx={{ fontSize: 13, color: MUTED, mt: 0.5 }}>
@@ -292,43 +692,30 @@ function AiPromptCard({ onAsk }) {
         </Typography>
       </Box>
 
-      {/* Input row */}
+      {/* CTA button */}
       <Box
-        onClick={() => document.getElementById("ai-prompt-input").focus()}
+        onClick={() => nav("/coworker")}
         sx={{
-          display: "flex", alignItems: "center", gap: 1,
-          bgcolor: SURFACE, border: `1px solid ${BORDER}`,
-          borderRadius: "10px", px: 1.75, py: 0.75,
-          cursor: "text", mt: 0.5,
-          boxShadow: "0 1px 3px rgba(15,22,35,0.06)",
-          transition: "border-color .15s, box-shadow .15s",
-          "&:focus-within": {
-            borderColor: ACCENT,
-            boxShadow: "0 0 0 3px rgba(29,114,232,0.08)",
+          mt: "auto",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 1,
+          background: "linear-gradient(135deg, #1D72E8 0%, #7C3AED 100%)",
+          borderRadius: "50px",
+          px: 3, py: 1.25,
+          cursor: "pointer", userSelect: "none",
+          boxShadow: "0 4px 16px rgba(29,114,232,0.28)",
+          transition: "opacity .15s, transform .15s, box-shadow .15s",
+          "&:hover": {
+            opacity: 0.92,
+            transform: "translateY(-1px)",
+            boxShadow: "0 6px 22px rgba(29,114,232,0.38)",
           },
+          "&:active": { transform: "translateY(0)", opacity: 1 },
         }}>
-        <InputBase
-          id="ai-prompt-input"
-          fullWidth
-          placeholder="Ask me anything..."
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && handleAsk()}
-          sx={{
-            fontSize: 13, color: ACCENT, fontWeight: 500,
-            "& input::placeholder": { color: ACCENT, opacity: 0.7 },
-          }}
-        />
-        {input.trim() && (
-          <Button size="small" variant="contained" onClick={handleAsk}
-            sx={{
-              fontSize: 11, fontWeight: 600, bgcolor: ACCENT, borderRadius: "6px",
-              textTransform: "none", boxShadow: "none", flexShrink: 0,
-              "&:hover": { bgcolor: "#1660CC", boxShadow: "none" },
-            }}>
-            Ask
-          </Button>
-        )}
+        <IcoSpark color="#fff" />
+        <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#fff", letterSpacing: "0.1px" }}>
+          Open AI Co-worker
+        </Typography>
+        <Typography sx={{ fontSize: 15, color: "rgba(255,255,255,0.8)", lineHeight: 1 }}>→</Typography>
       </Box>
     </Paper>
   );
@@ -430,6 +817,9 @@ export default function DashboardPage() {
   const [recentAnalyses,      setRecentAnalyses]      = useState([]);
   const [reminders,           setReminders]           = useState([]);
   const [candidateCountByJob, setCandidateCountByJob] = useState({});
+  const [monthlyStats,        setMonthlyStats]        = useState({ fulfilledThisMonth: 0, monthlyTarget: 35 });
+  const [upcomingInterviews,     setUpcomingInterviews]     = useState([]);
+  const [insights,               setInsights]               = useState(null);
   const [loading,             setLoading]             = useState(true);
   const [error,               setError]               = useState(null);
 
@@ -439,10 +829,13 @@ export default function DashboardPage() {
 
     async function load() {
       try {
-        const [jobs, analyses, rems] = await Promise.all([
+        const [jobs, analyses, rems, stats, interviews, ins] = await Promise.all([
           apiGet("/api/jobs"),
           apiGet("/api/analyses/recent"),
           apiGet("/api/reminders?filter=today"),
+          apiGet("/api/dashboard/monthly-stats").catch(() => ({ fulfilledThisMonth: 0, monthlyTarget: 35 })),
+          apiGet("/api/interviews").catch(() => []),
+          apiGet("/api/dashboard/insights").catch(() => null),
         ]);
         if (cancelled) return;
 
@@ -464,6 +857,17 @@ export default function DashboardPage() {
         setRecentAnalyses(analyses ?? []);
         setReminders(rems ?? []);
         setCandidateCountByJob(countMap);
+        if (stats) setMonthlyStats(stats);
+        if (ins)   setInsights(ins);
+        const now = new Date();
+        setUpcomingInterviews(
+          (interviews ?? [])
+            .filter(iv => iv.scheduledAt
+              && iv.status === "Scheduled"
+              && new Date(iv.scheduledAt) >= now)
+            .sort((a, b) => new Date(a.scheduledAt) - new Date(b.scheduledAt))
+            .slice(0, 5)
+        );
       } catch (e) {
         if (!cancelled) setError(e.message);
       } finally {
@@ -565,222 +969,267 @@ export default function DashboardPage() {
           iconBg={DANGER_L} icon={<IcoShield color={DANGER} />} />
       </Box>
 
-      {/* ── Change 1: AI Prompt Card ── */}
-      <AiPromptCard />
-
-      {/* Middle row: Jobs + Analyses (left) | Reminders + Pipeline + Risk (right) */}
+      {/* AI Prompt + Monthly Target row */}
       <Box sx={{ display: "flex", gap: 2, alignItems: "stretch" }}>
-
-        {/* LEFT column — Recent Jobs + Recent Candidate Analyses */}
-        <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-
-          {/* Recent Jobs cards */}
-          <Card>
-            <CardHead title="Recent Jobs"
-              action={<GhostBtn onClick={() => nav("/jobs")}>View All →</GhostBtn>} />
-            <Box sx={{ p: 2, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
-              {recentJobs.map(j => (
-                <Box key={j.id} onClick={() => nav("/jobs")} sx={{
-                  border: `1px solid ${BORDER}`, borderRadius: "12px",
-                  p: 2.25, cursor: "pointer", bgcolor: SURFACE,
-                  transition: "box-shadow .15s, border-color .15s",
-                  "&:hover": { boxShadow: "0 4px 16px rgba(15,22,35,0.08)", borderColor: "#C8D4E8" },
-                }}>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 0.75 }}>
-                    <Typography sx={{ fontSize: 14, fontWeight: 700, color: TEXT, lineHeight: 1.3, flex: 1, pr: 1 }}>
-                      {j.title}
-                    </Typography>
-                    <Box sx={{
-                      display: "flex", alignItems: "center", gap: 0.5,
-                      bgcolor: "#F1F3F7", borderRadius: "20px", px: 1.25, py: 0.4, flexShrink: 0,
-                    }}>
-                      <IcoUsers color={MUTED} />
-                      <Typography sx={{ fontSize: 12, fontWeight: 600, color: MUTED }}>
-                        {candidateCountByJob[j.id] ?? 0}
-                      </Typography>
-                    </Box>
-                  </Box>
-                  <Typography sx={{ fontSize: 12, color: MUTED, mb: 1.25 }}>
-                    {j.company || "—"}&nbsp;·&nbsp;{j.jobType || "Full-time"}
-                  </Typography>
-                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, alignItems: "center" }}>
-                    <Badge
-                      label={j.status ?? "Active"}
-                      variant={j.status === "Complete" ? "neutral" : j.status === "Fulfilling" ? "warning" : "success"}
-                    />
-                    {(j.stackTags ?? []).slice(0, 2).map(tag => (
-                      <Box key={tag} sx={{
-                        bgcolor: "#F1F3F7", border: `1px solid ${BORDER}`,
-                        borderRadius: "6px", px: 1, py: "2px",
-                        fontSize: 11, fontWeight: 500, color: MUTED,
-                      }}>{tag}</Box>
-                    ))}
-                  </Box>
-                </Box>
-              ))}
-              {!loading && recentJobs.length === 0 && (
-                <Box sx={{ gridColumn: "1 / -1", py: 4, textAlign: "center" }}>
-                  <Typography sx={{ fontSize: 12, color: MUTED }}>
-                    No jobs yet — create your first job to get started.
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          </Card>
-
-          {/* Recent Candidate Analyses — fills remaining height to align with sidebar */}
-          <Card sx={{ flex: 1 }}>
-            <CardHead title="Recent Candidate Analyses"
-              action={<GhostBtn onClick={() => nav("/candidates")}>View All →</GhostBtn>} />
-
-            {/* Header row */}
-            <Box sx={{
-              display: "flex", alignItems: "center",
-              px: 2.5, py: 1.25, borderBottom: `1px solid ${BORDER}`, bgcolor: "#FAFBFD",
-            }}>
-              <Typography sx={{ flex: 1, fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                Name
-              </Typography>
-              <Typography sx={{ width: 100, fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "center" }}>
-                All Scores
-              </Typography>
-              <Typography sx={{ width: 180, fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "right" }}>
-                Applied Role
-              </Typography>
-            </Box>
-
-            {/* Rows — show up to 5, pad with empty rows to fill height */}
-            {(() => {
-              const MAX_ROWS = 5;
-              const rows = recentAnalyses.slice(0, MAX_ROWS);
-              const emptyCount = MAX_ROWS - rows.length;
-              return (
-                <Box sx={{ display: "flex", flexDirection: "column" }}>
-                  {rows.map((row, idx) => {
-                    const initials = (row.candidate_name ?? "")
-                      .split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
-                    const score = row?.capabilityScore ?? row?.consistencyScore ?? null;
-                    const scoreColor = score >= 85 ? SUCCESS : score >= 70 ? WARN : DANGER;
-                    const scoreBg   = score >= 85 ? SUCCESS_L : score >= 70 ? WARN_L : DANGER_L;
-                    return (
-                      <Box key={row.id}
-                        onClick={() => nav(`/candidates/${row.candidateId}/workflow`)}
-                        sx={{
-                          display: "flex", alignItems: "center",
-                          px: 2.5, py: 1.5,
-                          borderBottom: `1px solid ${BORDER}`,
-                          cursor: "pointer", transition: "background .12s",
-                          "&:hover": { bgcolor: "#F2F5FF" },
-                        }}>
-                        <Box sx={{ flex: 1, display: "flex", alignItems: "center", gap: 1.5 }}>
-                          <Box sx={{
-                            width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
-                            bgcolor: "#E8EDF5", display: "flex", alignItems: "center",
-                            justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#5A6480",
-                          }}>
-                            {initials}
-                          </Box>
-                          <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
-                            {row.candidate_name}
-                          </Typography>
-                        </Box>
-                        <Box sx={{ width: 100, display: "flex", justifyContent: "center" }}>
-                          {score != null ? (
-                            <Box sx={{
-                              bgcolor: scoreBg, borderRadius: "20px", px: 1.5, py: "3px",
-                              fontSize: 12, fontWeight: 700, color: scoreColor,
-                            }}>
-                              {score}%
-                            </Box>
-                          ) : (
-                            <Typography sx={{ fontSize: 12, color: MUTED }}>—</Typography>
-                          )}
-                        </Box>
-                        <Typography sx={{
-                          width: 180, fontSize: 13, color: MUTED, fontWeight: 500, textAlign: "right",
-                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                        }}>
-                          {jobTitleMap[row.jobId] ?? "—"}
-                        </Typography>
-                      </Box>
-                    );
-                  })}
-
-                  {/* Empty placeholder rows to fill height */}
-                  {Array.from({ length: emptyCount }).map((_, i) => (
-                    <Box key={`empty-${i}`} sx={{
-                      display: "flex", alignItems: "center",
-                      px: 2.5, py: 1.5, borderBottom: `1px solid ${BORDER}`,
-                      minHeight: 57,
-                    }}>
-                      <Typography sx={{ fontSize: 12, color: "#F0F2F6" }}>—</Typography>
-                    </Box>
-                  ))}
-
-                  {!loading && recentAnalyses.length === 0 && (
-                    <Box sx={{ py: 3, textAlign: "center" }}>
-                      <Typography sx={{ fontSize: 12, color: MUTED }}>
-                        No analyses yet — run analysis on a candidate to see results here.
-                      </Typography>
-                    </Box>
-                  )}
-                </Box>
-              );
-            })()}
-          </Card>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <AiPromptCard />
         </Box>
-
-        {/* RIGHT sidebar — Reminders + Pipeline + Risk */}
-        <Box sx={{ flex: "0 0 280px", display: "flex", flexDirection: "column", gap: 2 }}>
-
-          {/* Reminders */}
-          <Card>
-            <CardHead title="Reminders"
-              action={<GhostBtn onClick={() => nav("/reminders")}>View All →</GhostBtn>} />
-            <Box sx={{ p: 1.25, display: "flex", flexDirection: "column", gap: 0.5 }}>
-              {todayTasks.length === 0 ? (
-                <Typography sx={{ fontSize: 12, color: MUTED, py: 1.5, px: 1 }}>
-                  All clear — no tasks due today.
-                </Typography>
-              ) : (
-                todayTasks.slice(0, 4).map((r, i) => (
-                  <ReminderRow key={r.id} reminder={r} isFirst={i === 0} />
-                ))
-              )}
-            </Box>
-          </Card>
-
-          {/* Pipeline */}
-          <Card>
-            <CardHead title="Pipeline" />
-            <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.75 }}>
-              <PipelineBar label="High Match ≥80%" count={high}   pct={Math.round(high   / total * 100)} color={SUCCESS} />
-              <PipelineBar label="Moderate 60–79%"  count={medium} pct={Math.round(medium / total * 100)} color={WARN}    />
-              <PipelineBar label="Low Match <60%"   count={low}    pct={Math.round(low    / total * 100)} color={DANGER}  />
-            </Box>
-          </Card>
-
-          {/* Risk Summary */}
-          <Card sx={{ flex: 1 }}>
-            <CardHead title="Risk Summary" />
-            <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
-              {[
-                { dot: DANGER, label: "High Risk", count: recentAnalyses.filter(a => a?.riskLevel === "High").length,   variant: "danger"  },
-                { dot: WARN,   label: "Medium",    count: recentAnalyses.filter(a => a?.riskLevel === "Medium").length, variant: "warning" },
-                { dot: ACCENT, label: "Low",       count: recentAnalyses.filter(a => a?.riskLevel === "Low").length,    variant: "accent"  },
-              ].map(({ dot, label, count, variant }) => (
-                <Box key={label} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
-                    <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: dot, flexShrink: 0 }} />
-                    <Typography sx={{ fontSize: 12, color: TEXT }}>{label}</Typography>
-                  </Box>
-                  <Badge label={String(count)} variant={variant} />
-                </Box>
-              ))}
-            </Box>
-          </Card>
+        <Box sx={{ flex: "0 0 280px" }}>
+          <MonthlyTargetCard
+            fulfilled={monthlyStats.fulfilledThisMonth}
+            target={monthlyStats.monthlyTarget}
+          />
         </Box>
       </Box>
+
+      {/* ── Row: Reminders | Pipeline | Schedule ── */}
+      <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 2 }}>
+
+        {/* Reminders */}
+        <Card>
+          <CardHead title="Reminders"
+            action={<GhostBtn onClick={() => nav("/reminders")}>View All →</GhostBtn>} />
+          <Box sx={{ p: 1.25, display: "flex", flexDirection: "column", gap: 0.5 }}>
+            {todayTasks.length === 0 ? (
+              <Typography sx={{ fontSize: 12, color: MUTED, py: 1.5, px: 1 }}>
+                All clear — no tasks due today.
+              </Typography>
+            ) : (
+              todayTasks.slice(0, 4).map((r, i) => (
+                <ReminderRow key={r.id} reminder={r} isFirst={i === 0} />
+              ))
+            )}
+          </Box>
+        </Card>
+
+        {/* Pipeline */}
+        <Card>
+          <CardHead title="Pipeline" />
+          <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.75 }}>
+            <PipelineBar label="High Match ≥80%" count={high}   pct={Math.round(high   / total * 100)} color={SUCCESS} />
+            <PipelineBar label="Moderate 60–79%"  count={medium} pct={Math.round(medium / total * 100)} color={WARN}    />
+            <PipelineBar label="Low Match <60%"   count={low}    pct={Math.round(low    / total * 100)} color={DANGER}  />
+          </Box>
+        </Card>
+
+        {/* Schedule */}
+        <Card>
+          <CardHead title="Schedule"
+            action={<GhostBtn onClick={() => nav("/scheduler")}>View All →</GhostBtn>} />
+          <Box sx={{ px: 2, pt: 0.5, pb: 1.5, display: "flex", flexDirection: "column" }}>
+            {upcomingInterviews.length === 0 ? (
+              <Typography sx={{ fontSize: 12, color: MUTED, py: 1.5 }}>
+                No upcoming interviews scheduled.
+              </Typography>
+            ) : (
+              upcomingInterviews.map((iv, i) => {
+                const d           = new Date(iv.scheduledAt);
+                const now2        = new Date();
+                const timeStr     = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+                const dateLabel   = d.toDateString() === now2.toDateString()
+                                    ? "Today"
+                                    : d.toDateString() === new Date(now2.getTime() + 86400000).toDateString()
+                                    ? "Tomorrow"
+                                    : d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+                const time        = `${dateLabel} · ${timeStr}`;
+                const title       = iv.candidateName ? `Interview with ${iv.candidateName}` : "Interview";
+                const subtitle    = iv.interviewType || iv.location || "—";
+                return (
+                  <Box key={iv.id ?? i} sx={{
+                    display: "flex", gap: 2, alignItems: "flex-start",
+                    py: 1.5,
+                    borderBottom: i < upcomingInterviews.length - 1 ? `1px solid ${BORDER}` : "none",
+                  }}>
+                    <Typography sx={{ fontSize: 12, color: MUTED, fontWeight: 500, minWidth: 36, mt: "2px", flexShrink: 0 }}>
+                      {time}
+                    </Typography>
+                    <Box>
+                      <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{title}</Typography>
+                      <Typography sx={{ fontSize: 12, color: MUTED, mt: 0.25 }}>{subtitle}</Typography>
+                    </Box>
+                  </Box>
+                );
+              })
+            )}
+            <Box onClick={() => nav("/scheduler")} sx={{
+              mt: 1, fontSize: 13, fontWeight: 600, color: WARN,
+              cursor: "pointer", userSelect: "none",
+              "&:hover": { textDecoration: "underline" },
+            }}>
+              View Full Calendar →
+            </Box>
+          </Box>
+        </Card>
+      </Box>
+
+      {/* ── AI Performance & Insights ── */}
+      <Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>AI Performance & Insights</Typography>
+          <Box sx={{
+            fontSize: 9, fontWeight: 700, color: PURPLE, bgcolor: PURPLE_L,
+            border: `1px solid ${PURPLE_BR}`, borderRadius: "4px", px: "6px", py: "2px",
+          }}>NEW</Box>
+        </Box>
+        <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 2, alignItems: "stretch" }}>
+          <HiringInsightsCard data={insights?.hiringInsights} />
+          <SkillGapCard       data={insights?.skillGap} />
+          <BottleneckCard     data={insights?.bottlenecks} />
+        </Box>
+      </Box>
+
+      {/* ── Profile Source Quality + Pipeline Health ── */}
+      <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2, alignItems: "stretch" }}>
+        <ProfileSourceCard data={insights?.profileSource} />
+        <PipelineFunnelCard data={insights?.pipelineHealth} />
+      </Box>
+
+      {/* ── Recent Jobs — full width ── */}
+      <Card>
+        <CardHead title="Recent Jobs"
+          action={<GhostBtn onClick={() => nav("/jobs")}>View All →</GhostBtn>} />
+        <Box sx={{ p: 2, display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 1.5 }}>
+          {recentJobs.map(j => (
+            <Box key={j.id} onClick={() => nav("/jobs")} sx={{
+              border: `1px solid ${BORDER}`, borderRadius: "12px",
+              p: 2.25, cursor: "pointer", bgcolor: SURFACE,
+              transition: "box-shadow .15s, border-color .15s",
+              "&:hover": { boxShadow: "0 4px 16px rgba(15,22,35,0.08)", borderColor: "#C8D4E8" },
+            }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 0.75 }}>
+                <Typography sx={{ fontSize: 14, fontWeight: 700, color: TEXT, lineHeight: 1.3, flex: 1, pr: 1 }}>
+                  {j.title}
+                </Typography>
+                <Box sx={{
+                  display: "flex", alignItems: "center", gap: 0.5,
+                  bgcolor: "#F1F3F7", borderRadius: "20px", px: 1.25, py: 0.4, flexShrink: 0,
+                }}>
+                  <IcoUsers color={MUTED} />
+                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: MUTED }}>
+                    {candidateCountByJob[j.id] ?? 0}
+                  </Typography>
+                </Box>
+              </Box>
+              <Typography sx={{ fontSize: 12, color: MUTED, mb: 1.25 }}>
+                {j.company || "—"}&nbsp;·&nbsp;{j.jobType || "Full-time"}
+              </Typography>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, alignItems: "center" }}>
+                <Badge
+                  label={j.status ?? "Active"}
+                  variant={j.status === "Complete" ? "neutral" : j.status === "Fulfilling" ? "warning" : "success"}
+                />
+                {(j.stackTags ?? []).slice(0, 2).map(tag => (
+                  <Box key={tag} sx={{
+                    bgcolor: "#F1F3F7", border: `1px solid ${BORDER}`,
+                    borderRadius: "6px", px: 1, py: "2px",
+                    fontSize: 11, fontWeight: 500, color: MUTED,
+                  }}>{tag}</Box>
+                ))}
+              </Box>
+            </Box>
+          ))}
+          {!loading && recentJobs.length === 0 && (
+            <Box sx={{ gridColumn: "1 / -1", py: 4, textAlign: "center" }}>
+              <Typography sx={{ fontSize: 12, color: MUTED }}>
+                No jobs yet — create your first job to get started.
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      </Card>
+
+      {/* ── Recent Candidate Analyses — full width ── */}
+      <Card>
+        <CardHead title="Recent Candidate Analyses"
+          action={<GhostBtn onClick={() => nav("/candidates")}>View All →</GhostBtn>} />
+
+        <Box sx={{
+          display: "flex", alignItems: "center",
+          px: 2.5, py: 1.25, borderBottom: `1px solid ${BORDER}`, bgcolor: "#FAFBFD",
+        }}>
+          <Typography sx={{ flex: 1, fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            Name
+          </Typography>
+          <Typography sx={{ width: 100, fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "center" }}>
+            All Scores
+          </Typography>
+          <Typography sx={{ width: 180, fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.5px", textAlign: "right" }}>
+            Applied Role
+          </Typography>
+        </Box>
+
+        {(() => {
+          const MAX_ROWS = 5;
+          const rows = recentAnalyses.slice(0, MAX_ROWS);
+          const emptyCount = MAX_ROWS - rows.length;
+          return (
+            <Box sx={{ display: "flex", flexDirection: "column" }}>
+              {rows.map((row) => {
+                const initials   = (row.candidate_name ?? "").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+                const score      = row?.capabilityScore ?? row?.consistencyScore ?? null;
+                const scoreColor = score >= 85 ? SUCCESS : score >= 70 ? WARN : DANGER;
+                const scoreBg    = score >= 85 ? SUCCESS_L : score >= 70 ? WARN_L : DANGER_L;
+                return (
+                  <Box key={row.id}
+                    onClick={() => nav(`/candidates/${row.candidateId}/workflow`)}
+                    sx={{
+                      display: "flex", alignItems: "center",
+                      px: 2.5, py: 1.5, borderBottom: `1px solid ${BORDER}`,
+                      cursor: "pointer", transition: "background .12s",
+                      "&:hover": { bgcolor: "#F2F5FF" },
+                    }}>
+                    <Box sx={{ flex: 1, display: "flex", alignItems: "center", gap: 1.5 }}>
+                      <Box sx={{
+                        width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+                        bgcolor: "#E8EDF5", display: "flex", alignItems: "center",
+                        justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#5A6480",
+                      }}>
+                        {initials}
+                      </Box>
+                      <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
+                        {row.candidate_name}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ width: 100, display: "flex", justifyContent: "center" }}>
+                      {score != null ? (
+                        <Box sx={{
+                          bgcolor: scoreBg, borderRadius: "20px", px: 1.5, py: "3px",
+                          fontSize: 12, fontWeight: 700, color: scoreColor,
+                        }}>
+                          {score}%
+                        </Box>
+                      ) : (
+                        <Typography sx={{ fontSize: 12, color: MUTED }}>—</Typography>
+                      )}
+                    </Box>
+                    <Typography sx={{
+                      width: 180, fontSize: 13, color: MUTED, fontWeight: 500, textAlign: "right",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>
+                      {jobTitleMap[row.jobId] ?? "—"}
+                    </Typography>
+                  </Box>
+                );
+              })}
+              {Array.from({ length: emptyCount }).map((_, i) => (
+                <Box key={`empty-${i}`} sx={{
+                  display: "flex", alignItems: "center",
+                  px: 2.5, py: 1.5, borderBottom: `1px solid ${BORDER}`, minHeight: 57,
+                }}>
+                  <Typography sx={{ fontSize: 12, color: "#F0F2F6" }}>—</Typography>
+                </Box>
+              ))}
+              {!loading && recentAnalyses.length === 0 && (
+                <Box sx={{ py: 3, textAlign: "center" }}>
+                  <Typography sx={{ fontSize: 12, color: MUTED }}>
+                    No analyses yet — run analysis on a candidate to see results here.
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          );
+        })()}
+      </Card>
 
       {/* Footer */}
       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap", pb: 0.5 }}>

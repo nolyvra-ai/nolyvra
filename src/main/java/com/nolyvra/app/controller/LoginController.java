@@ -57,4 +57,39 @@ public class LoginController {
             return ResponseEntity.badRequest().body(Map.of("error", "Current password is incorrect."));
         return ResponseEntity.ok(Map.of("status", "updated"));
     }
+
+    @GetMapping("/settings")
+    public Map<String, Object> getSettings(@RequestParam String loginId) {
+        int target = loginService.getMonthlyTarget(loginId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("monthlyTarget", target);
+        return result;
+    }
+
+    @PutMapping("/settings/monthly-target")
+    public ResponseEntity<?> saveMonthlyTarget(
+            @RequestParam String loginId,
+            @RequestBody Map<String, Object> body) {
+        Object raw = body.get("monthlyTarget");
+        if (raw == null)
+            return ResponseEntity.badRequest().body(Map.of("error", "monthlyTarget is required"));
+        int target = Math.max(0, Math.min(100, ((Number) raw).intValue()));
+        loginService.saveMonthlyTarget(loginId, target);
+        return ResponseEntity.ok(Map.of("status", "saved"));
+    }
+
+    @GetMapping("/dashboard/insights")
+    public Map<String, Object> getDashboardInsights(@RequestParam String loginId) {
+        return loginService.getDashboardInsights(loginId);
+    }
+
+    @GetMapping("/dashboard/monthly-stats")
+    public Map<String, Object> getDashboardMonthlyStats(@RequestParam String loginId) {
+        int fulfilled = loginService.getFulfilledThisMonth(loginId);
+        int target    = loginService.getMonthlyTarget(loginId);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("fulfilledThisMonth", fulfilled);
+        result.put("monthlyTarget", target);
+        return result;
+    }
 }

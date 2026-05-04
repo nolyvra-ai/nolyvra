@@ -7,5 +7,6 @@ public record LoginResponse(
     String name,
     String company,
     String email,
-    Instant createdAt
+    Instant createdAt,
+    Integer monthlyTarget
 ) {}
