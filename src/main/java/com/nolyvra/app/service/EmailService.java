@@ -20,16 +20,19 @@ public class EmailService {
     private final JdbcTemplate jdbc;
     private final WorkflowService workflowService;
     private final MicrosoftOAuthService microsoftOAuthService;
+    private final GoogleOAuthService googleOAuthService;
 
     public EmailService(
             JavaMailSender mailSender,
             JdbcTemplate jdbc,
             WorkflowService workflowService,
-            @Lazy MicrosoftOAuthService microsoftOAuthService) {
+            @Lazy MicrosoftOAuthService microsoftOAuthService,
+            @Lazy GoogleOAuthService googleOAuthService) {
         this.mailSender             = mailSender;
         this.jdbc                   = jdbc;
         this.workflowService        = workflowService;
         this.microsoftOAuthService  = microsoftOAuthService;
+        this.googleOAuthService     = googleOAuthService;
     }
 
     private static final RowMapper<EmailHistoryResponse> HISTORY_MAPPER = (rs, rowNum) -> {
@@ -62,11 +65,16 @@ public class EmailService {
     public EmailHistoryResponse sendEmail(EmailSendRequest req, String loginId) {
         String status = "Sent";
         try {
+            String gmailToken = null;
             String outlookToken = null;
+            try { gmailToken = googleOAuthService.getValidAccessToken(loginId); }
+            catch (Exception ignored) {}
             try { outlookToken = microsoftOAuthService.getValidAccessToken(loginId); }
             catch (Exception ignored) {}
 
-            if (outlookToken != null) {
+            if (gmailToken != null) {
+                googleOAuthService.sendEmailViaGmail(loginId, req.toAddress(), req.subject(), req.body());
+            } else if (outlookToken != null) {
                 microsoftOAuthService.sendEmailViaOutlook(loginId, req.toAddress(), req.subject(), req.body());
             } else {
                 SimpleMailMessage message = new SimpleMailMessage();

@@ -14,3 +14,9 @@ analysis-jobs:
   max-parallel: 3
   max-attempts: 3
   worker-delay-ms: 1000
+
+google:
+  client-id: your-google-client-id
+  client-secret: your-google-client-secret
+  redirect-uri: http://localhost:8080/auth/google/callback
+  frontend-url: http://localhost:5173
