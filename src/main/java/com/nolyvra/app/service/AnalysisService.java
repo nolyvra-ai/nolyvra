@@ -330,13 +330,14 @@ public class AnalysisService {
                 (Integer) rs.getObject("timeline_match_percent"));
     };
 
-    public List<AnalysisResponse> getAnalysesFromDb(String loginId) {
+    public List<AnalysisResponse> getAnalysesFromDb(String loginId, int limit, int offset) {
         return jdbc.query("""
                 select id, candidate_id, candidate_name, job_id, analyzed_at,
                        consistency_score, capability_score, risk_level, timeline_match_percent
                 from analyses where login_id = ?
                 order by analyzed_at desc
-                """, ANALYSIS_MAPPER, loginId);
+                limit ? offset ?
+                """, ANALYSIS_MAPPER, loginId, limit, offset);
     }
 
     public List<AnalysisResponse> getAnalysisForCandidate(String candidateId) {

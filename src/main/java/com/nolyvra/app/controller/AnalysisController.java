@@ -12,6 +12,9 @@ import java.util.List;
 @RequestMapping("/api")
 public class AnalysisController {
 
+    private static final int DEFAULT_RECENT_ANALYSES_SIZE = 50;
+    private static final int MAX_RECENT_ANALYSES_SIZE = 100;
+
     private final AnalysisService analysisService;
 
     public AnalysisController(AnalysisService analysisService) {
@@ -45,8 +48,14 @@ public class AnalysisController {
     }
 
     @GetMapping("/analyses/recent")
-    public List<AnalysisResponse> getRecentAnalyses(@RequestParam String loginId) {
-        return analysisService.getAnalysesFromDb(loginId);
+    public List<AnalysisResponse> getRecentAnalyses(
+            @RequestParam String loginId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "" + DEFAULT_RECENT_ANALYSES_SIZE) int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = Math.min(Math.max(size, 1), MAX_RECENT_ANALYSES_SIZE);
+        int offset = safePage * safeSize;
+        return analysisService.getAnalysesFromDb(loginId, safeSize, offset);
     }
 
     // ── MVP2: AI Candidate Summary ────────────────────────────────────────────
