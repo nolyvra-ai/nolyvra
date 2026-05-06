@@ -6,9 +6,16 @@ spring:
     url: jdbc:postgresql://localhost:5432/nolyvra
     username: nolyvra
     password: nolyvrapass
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
 
 nolyvra:
   mock-ai: true
+
+coworker:
+  analysis-pool-size: 3
 
 analysis-jobs:
   max-parallel: 3

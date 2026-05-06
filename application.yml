@@ -1,6 +1,10 @@
 server:
   port: ${PORT:8080}
 spring:
+  servlet:
+    multipart:
+      max-file-size: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:10MB}
+      max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:12MB}
   jackson:
     serialization:
       write-dates-as-timestamps: false
@@ -20,6 +24,10 @@ spring:
           auth: true
           starttls:
             enable: true
+
+coworker:
+  analysis-pool-size: ${COWORKER_ANALYSIS_POOL_SIZE:3}
+
 openai:
   api-key: ${OPENAI_API_KEY:}
   model: gpt-4o-mini

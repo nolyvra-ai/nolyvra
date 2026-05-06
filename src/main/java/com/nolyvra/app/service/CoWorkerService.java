@@ -1,6 +1,7 @@
 package com.nolyvra.app.service;
 
 import com.nolyvra.app.model.*;
+import com.nolyvra.app.config.CoWorkerAnalysisExecutor;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openai.client.OpenAIClient;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
@@ -14,7 +15,6 @@ import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 @Service
 public class CoWorkerService {
@@ -25,9 +25,7 @@ public class CoWorkerService {
     private final String model;
     private final TokenService tokenService;
     private final AnalysisService analysisService; // Change 1: added
-
-    // Fixed thread pool — 3 threads for parallel analysis (safe for all OpenAI tiers)
-    private static final ExecutorService ANALYSIS_POOL = Executors.newFixedThreadPool(3);
+    private final ExecutorService analysisPool;
 
     public CoWorkerService(
             OpenAIClient openAI,
@@ -35,12 +33,14 @@ public class CoWorkerService {
             JdbcTemplate jdbc,
             TokenService tokenService,
             @Lazy AnalysisService analysisService, // Change 1: added (@Lazy avoids circular dependency)
+            CoWorkerAnalysisExecutor analysisExecutor,
             @Value("${openai.model:gpt-4o-mini}") String model) {
         this.openAI = openAI;
         this.objectMapper = objectMapper;
         this.jdbc = jdbc;
         this.tokenService = tokenService;
         this.analysisService = analysisService; // Change 1: added
+        this.analysisPool = analysisExecutor.executorService();
         this.model = model;
     }
 
@@ -354,7 +354,7 @@ public class CoWorkerService {
                             System.err.println("[CoWorker] executeRunAnalysis() error for "
                                     + candidateId + ": " + e.getMessage());
                         }
-                    }, ANALYSIS_POOL))
+                    }, analysisPool))
                     .toList();
 
             // Wait for all candidates to finish, then mark done
