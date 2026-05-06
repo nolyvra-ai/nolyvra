@@ -103,6 +103,7 @@ export default function PricingPage() {
           <a onClick={() => nav("/")} className="pricing-nav-link" style={{ cursor:"pointer" }}>How It Works</a>
         </div>
         <div style={{ display:"flex",gap:10 }}>
+          <button onClick={() => nav("/dashboard")} style={{ padding:"7px 18px",borderRadius:7,fontSize:13,fontWeight:500,border:"1px solid rgba(255,255,255,.2)",color:"rgba(255,255,255,.8)",background:"transparent",cursor:"pointer",fontFamily:"inherit" }}>← Dashboard</button>
           <button onClick={() => nav("/login")} style={{ padding:"7px 18px",borderRadius:7,fontSize:13,fontWeight:500,border:"1px solid rgba(255,255,255,.2)",color:"rgba(255,255,255,.8)",background:"transparent",cursor:"pointer",fontFamily:"inherit" }}>Login</button>
           <button onClick={() => nav("/")} style={{ padding:"7px 18px",borderRadius:7,fontSize:13,fontWeight:600,background:"#1D72E8",color:"#fff",border:"none",cursor:"pointer",fontFamily:"inherit" }}>Register Interest</button>
         </div>

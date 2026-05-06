@@ -19,6 +19,7 @@ class CoWorkerServiceTest {
             jdbc,
             null,
             null,
+            null,
             "gpt-4o-mini");
 
     @Test
