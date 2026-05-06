@@ -90,16 +90,30 @@ export default function SettingsPage() {
   const outlookConnected = outlookOAuthConnected || outlookEmail.trim() !== "";
   const displayEmail     = outlookOAuthEmail || outlookEmail;
 
+  // Gmail OAuth
+  const [gmailSuccess, setGmailSuccess] = useState(searchParams.get("gmail") === "connected");
+  const [gmailError, setGmailError] = useState(searchParams.get("gmail") === "error");
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [gmailEmail, setGmailEmail] = useState("");
+
   useEffect(() => {
     if (!loginId) return;
     fetch(`${API_BASE}/auth/microsoft/status?loginId=${encodeURIComponent(loginId)}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.connected) { setOutlookOAuthConnected(true); setOutlookOAuthEmail(d.email || ""); } })
       .catch(() => {});
+    fetch(`${API_BASE}/auth/google/status?loginId=${encodeURIComponent(loginId)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.connected) { setGmailConnected(true); setGmailEmail(d.email || ""); } })
+      .catch(() => {});
   }, [loginId]);
 
   function handleOutlookConnect() {
     window.location.href = `${API_BASE}/auth/microsoft/connect?loginId=${encodeURIComponent(loginId)}`;
+  }
+
+  function handleGmailConnect() {
+    window.location.href = `${API_BASE}/auth/google/connect?loginId=${encodeURIComponent(loginId)}`;
   }
 
   function handleOutlookSave() {
@@ -118,6 +132,13 @@ export default function SettingsPage() {
     setOutlookOAuthEmail("");
     setOutlookEmail("");
     setOutlookInput("");
+  }
+
+  async function handleGmailDisconnect() {
+    await fetch(`${API_BASE}/auth/google/disconnect?loginId=${encodeURIComponent(loginId)}`,
+      { method: "DELETE" }).catch(() => {});
+    setGmailConnected(false);
+    setGmailEmail("");
   }
 
   // Plan usage from shared hook
@@ -349,6 +370,18 @@ export default function SettingsPage() {
         <Alert severity="error" onClose={() => setOutlookError(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           Failed to connect Microsoft Outlook. Please try again.
+        </Alert>
+      )}
+      {gmailSuccess && (
+        <Alert severity="success" onClose={() => setGmailSuccess(false)}
+          sx={{ borderRadius: "10px", fontSize: 13 }}>
+          Gmail connected successfully. Emails will now be sent via your Gmail account.
+        </Alert>
+      )}
+      {gmailError && (
+        <Alert severity="error" onClose={() => setGmailError(false)}
+          sx={{ borderRadius: "10px", fontSize: 13 }}>
+          Failed to connect Gmail. Please try again.
         </Alert>
       )}
 
@@ -775,6 +808,50 @@ export default function SettingsPage() {
           </Typography>
         </Box>
         <Box sx={{ p: 2.25, display: "flex", flexDirection: "column", gap: 1.5 }}>
+
+          {/* Gmail row */}
+          <Box sx={{
+            p: "12px 14px",
+            bgcolor: gmailConnected ? SUCCESS_BG : SURFACE,
+            border: `1px solid ${gmailConnected ? SUCCESS_BR : BORDER}`,
+            borderRadius: "8px",
+            display: "flex", flexDirection: "column", gap: 1.25
+          }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+              <Box sx={{ fontSize: 20, lineHeight: 1 }}>G</Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
+                  Gmail
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: gmailConnected ? SUCCESS : MUTED, mt: 0.25 }}>
+                  {gmailConnected ? `Connected · ${gmailEmail}` : "Not connected"}
+                </Typography>
+              </Box>
+              {gmailConnected && (
+                <Button size="small" variant="outlined"
+                  onClick={handleGmailDisconnect}
+                  sx={{
+                    fontSize: 11, borderRadius: "6px", textTransform: "none",
+                    borderColor: DANGER_BR, color: DANGER, flexShrink: 0,
+                    "&:hover": { bgcolor: DANGER_BG, borderColor: DANGER }
+                  }}>
+                  Remove
+                </Button>
+              )}
+            </Box>
+
+            <Button
+              variant="contained"
+              onClick={handleGmailConnect}
+              fullWidth
+              sx={{
+                fontSize: 12, fontWeight: 600, bgcolor: "#EA4335", borderRadius: "8px",
+                textTransform: "none", boxShadow: "none",
+                "&:hover": { bgcolor: "#D93025", boxShadow: "none" }
+              }}>
+              Connect with Google
+            </Button>
+          </Box>
 
           {outlookSaved && (
             <Alert severity="success" onClose={() => setOutlookSaved(false)}

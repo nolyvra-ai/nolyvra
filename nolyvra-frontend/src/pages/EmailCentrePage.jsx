@@ -188,8 +188,13 @@ export default function EmailCentrePage() {
   const [signature,       setSignature]       = useState(
     () => localStorage.getItem("emailSignature") || ""
   );
+  const [gmailEmail, setGmailEmail] = useState("");
   const [outlookEmail, setOutlookEmail] = useState("");
-  const outlookConnected = outlookEmail.trim() !== "";
+  const connectedEmailProvider = gmailEmail.trim()
+    ? { name: "Gmail", email: gmailEmail }
+    : outlookEmail.trim()
+      ? { name: "Outlook", email: outlookEmail }
+      : null;
 
   const [form, setForm] = useState({
     toAddress: "", subject: "", body: "", candidateId: "", jobId: "", templateType: "",
@@ -199,16 +204,17 @@ export default function EmailCentrePage() {
 
   useEffect(() => {
     if (!loginId) return;
-    fetch(`${API_BASE}/auth/microsoft/status?loginId=${encodeURIComponent(loginId)}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (d?.connected) {
-          setOutlookEmail(d.email || "");
-        } else {
-          setOutlookEmail(localStorage.getItem("outlookEmail") || "");
-        }
-      })
-      .catch(() => setOutlookEmail(localStorage.getItem("outlookEmail") || ""));
+    Promise.allSettled([
+      fetch(`${API_BASE}/auth/google/status?loginId=${encodeURIComponent(loginId)}`)
+        .then(r => r.ok ? r.json() : null),
+      fetch(`${API_BASE}/auth/microsoft/status?loginId=${encodeURIComponent(loginId)}`)
+        .then(r => r.ok ? r.json() : null),
+    ]).then(([gmailResult, outlookResult]) => {
+      const gmail = gmailResult.status === "fulfilled" ? gmailResult.value : null;
+      const outlook = outlookResult.status === "fulfilled" ? outlookResult.value : null;
+      setGmailEmail(gmail?.connected ? (gmail.email || "") : "");
+      setOutlookEmail(outlook?.connected ? (outlook.email || "") : localStorage.getItem("outlookEmail") || "");
+    }).catch(() => setOutlookEmail(localStorage.getItem("outlookEmail") || ""));
   }, [loginId]);
 
   useEffect(() => {
@@ -432,14 +438,14 @@ export default function EmailCentrePage() {
                     "&:hover":{ bgcolor:"#1660CC", boxShadow:"none" } }}>
                   {sending ? <CircularProgress size={14} sx={{ color:"#fff" }} /> : "✉ Send Email"}
                 </Button>
-                {outlookConnected && (
+                {connectedEmailProvider && (
                   <Box sx={{
                     display:"inline-flex", alignItems:"center", gap:0.5,
                     bgcolor:"#EFF6FF", border:"1px solid #BFDBFE",
                     borderRadius:"20px", px:1.25, py:0.4,
                     fontSize:11, fontWeight:500, color:"#1D4ED8"
                   }}>
-                    📧 Sending via {outlookEmail || "Outlook"}
+                    Sending via {connectedEmailProvider.email || connectedEmailProvider.name}
                   </Box>
                 )}
               </Box>
