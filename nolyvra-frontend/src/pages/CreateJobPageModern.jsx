@@ -290,15 +290,14 @@ export default function CreateJobPageModern() {
   const [existingCompanies, setExistingCompanies] = useState([]);
 
   useEffect(() => {
-    const url = new URL(`${API_BASE}/api/jobs`);
+    const url = new URL(`${API_BASE}/api/clients`);
     url.searchParams.set("loginId", loginId);
     fetch(url.toString(), {
       headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
     })
       .then(r => r.ok ? r.json() : [])
-      .then(jobs => {
-        const companies = [...new Set((jobs || []).map(j => j.company).filter(Boolean))];
-        setExistingCompanies(companies);
+      .then(clients => {
+        setExistingCompanies((clients || []).map(c => c.companyName).filter(Boolean));
       })
       .catch(() => {});
   }, [loginId]);

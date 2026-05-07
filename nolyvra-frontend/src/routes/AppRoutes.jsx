@@ -20,6 +20,7 @@ import SettingsPage           from "../pages/SettingsPage";
 import CoWorkerPage           from "../pages/CoWorkerPage";
 import AgentEconomyPage       from "../pages/AgentEconomyPage";
 import InterviewAnalysisPage  from "../pages/InterviewAnalysisPage";
+import ClientTrackerPage       from "../pages/ClientTrackerPage";
 
 export default function AppRoutes() {
   return (
@@ -50,6 +51,7 @@ export default function AppRoutes() {
       <Route path="/reminders"                          element={<RemindersPage />} />
       <Route path="/settings"                           element={<SettingsPage />} />
       <Route path="/coworker"                           element={<CoWorkerPage />} />
+      <Route path="/clients"                            element={<ClientTrackerPage />} />
       <Route path="*"                                   element={<Navigate to="/" replace />} />
     </Routes>
   );

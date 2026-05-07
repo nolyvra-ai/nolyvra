@@ -71,6 +71,8 @@ public class JobService {
                 id, req.title(), req.company(), req.jobType(),
                 req.jdText(), req.location(), loginId);
 
+        autoCreateClientIfNew(req.company(), req.location(), loginId);
+
         return new JobResponse(
                 id, req.title(), req.company(), req.jobType(),
                 req.seniority(), req.jdText(), req.location(),
@@ -117,7 +119,22 @@ public class JobService {
                 req.location(), req.jobStatus() != null ? req.jobStatus() : "Fulfilling", jobId, loginId);
         if (updated == 0)
             return Optional.empty();
+        autoCreateClientIfNew(req.company(), req.location(), loginId);
         return getJob(jobId, loginId);
+    }
+
+    // ─── Auto-create client entry when a new company is introduced via a job ──
+
+    private void autoCreateClientIfNew(String company, String location, String loginId) {
+        if (company == null || company.isBlank()) return;
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM clients WHERE login_id = ? AND lower(company_name) = lower(?)",
+                Integer.class, loginId, company);
+        if (count == null || count == 0) {
+            jdbc.update(
+                    "INSERT INTO clients (login_id, company_name, location) VALUES (?, ?, ?)",
+                    loginId, company, location);
+        }
     }
 
     // ─── Soft delete ──────────────────────────────────────────────────────────

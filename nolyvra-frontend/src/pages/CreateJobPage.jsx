@@ -121,6 +121,7 @@ export default function CreateJobPage() {
   const [limitDialog, setLimitDialog] = useState(false);
 
   const [form, setForm] = useState({ title: "", company: "", location: "", jobType: "Full-time", jdText: "", jobStatus: "Fulfilling" });
+  const [clientCompanies, setClientCompanies] = useState([]);
   const [briefText, setBriefText] = useState("");
   const [briefResult, setBriefResult] = useState(null);
   const [briefLoading, setBriefLoading] = useState(false);
@@ -167,6 +168,17 @@ export default function CreateJobPage() {
       .catch(e => setError(e.message))
       .finally(() => setLoadingJob(false));
   }, [jobId]);
+
+  useEffect(() => {
+    const url = new URL(`${API_BASE}/api/clients`);
+    url.searchParams.set("loginId", loginId);
+    fetch(url.toString(), {
+      headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+    })
+      .then(r => r.ok ? r.json() : [])
+      .then(clients => setClientCompanies((clients || []).map(c => c.companyName).filter(Boolean)))
+      .catch(() => {});
+  }, [loginId]);
 
   async function handleAnalyzeBrief() {
     if (!briefText.trim()) return;
@@ -314,7 +326,11 @@ export default function CreateJobPage() {
                   <TextField fullWidth size="small" value={form.company}
                     onChange={e => updateForm("company", e.target.value)}
                     placeholder="e.g. FinTech Co."
+                    inputProps={{ list: "client-company-list" }}
                     sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }} />
+                  <datalist id="client-company-list">
+                    {clientCompanies.map(c => <option key={c} value={c} />)}
+                  </datalist>
                 </Box>
               </Box>
               <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.75 }}>

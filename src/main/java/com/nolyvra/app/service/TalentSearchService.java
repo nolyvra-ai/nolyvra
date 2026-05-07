@@ -74,24 +74,22 @@ public class TalentSearchService {
                 ? searchCoreSignal(filters, loginId, req.query())
                 : List.of();
 
-        // Step 4: Score and merge
-        List<TalentSearchResult> all = new ArrayList<>();
-        all.addAll(internalResults);
-        all.addAll(externalResults);
+        // Step 4: Paginate internal results separately; always surface CoreSignal on page 0
+        internalResults.sort(Comparator.comparingInt(TalentSearchResult::matchScore).reversed());
+        externalResults.sort(Comparator.comparingInt(TalentSearchResult::matchScore).reversed());
 
-        // Sort by matchScore desc
-        all.sort(Comparator.comparingInt(TalentSearchResult::matchScore).reversed());
-
-        // Paginate
         int page = req.page() != null ? req.page() : 0;
         int pageSize = req.pageSize() != null ? req.pageSize() : 9;
         int from = page * pageSize;
-        int to = Math.min(from + pageSize, all.size());
-        List<TalentSearchResult> paged = from < all.size() ? all.subList(from, to) : List.of();
+        int to = Math.min(from + pageSize, internalResults.size());
+        List<TalentSearchResult> paged = new ArrayList<>(
+                from < internalResults.size() ? internalResults.subList(from, to) : List.of());
+        if (page == 0) paged.addAll(externalResults);
+        paged.sort(Comparator.comparingInt(TalentSearchResult::matchScore).reversed());
 
         return new TalentSearchResponse(
                 req.query(),
-                all.size(),
+                internalResults.size() + externalResults.size(),
                 internalResults.size(),
                 externalResults.size(),
                 paged);
@@ -133,8 +131,22 @@ public class TalentSearchService {
                     .orElse("{}");
             String clean = content.strip()
                     .replaceAll("(?s)^```[a-z]*\\n?", "").replaceAll("```$", "").strip();
-            return objectMapper.readValue(clean, SearchFilters.class);
+            SearchFilters raw = objectMapper.readValue(clean, SearchFilters.class);
+            // AI occasionally returns the string "null" instead of JSON null for optional fields
+            SearchFilters result = new SearchFilters(
+                    raw.skills(),
+                    "null".equalsIgnoreCase(raw.seniority())  ? null : raw.seniority(),
+                    "null".equalsIgnoreCase(raw.industry())   ? null : raw.industry(),
+                    raw.minYearsExperience(),
+                    raw.keywords(),
+                    "null".equalsIgnoreCase(raw.location())   ? null : raw.location());
+            System.out.println("[TalentSearch] extracted filters: skills=" + result.skills()
+                    + " seniority=" + result.seniority()
+                    + " keywords=" + result.keywords()
+                    + " location=" + result.location());
+            return result;
         } catch (Exception e) {
+            System.err.println("[TalentSearch] extractFilters failed (" + e.getMessage() + "), using empty filters");
             return new SearchFilters(List.of(), null, null, 0, List.of(), null);
         }
     }
@@ -215,21 +227,26 @@ public class TalentSearchService {
 
             // Fix 3 / Fix 4: POST ES DSL query to search endpoint
             Map<String, Object> esDslQuery = buildEsDslQuery(filters);
+            try {
+                System.out.println("[TalentSearch] ES DSL query: " + objectMapper.writeValueAsString(esDslQuery));
+            } catch (Exception ignored) {}
             HttpEntity<Map<String, Object>> searchEntity = new HttpEntity<>(esDslQuery, searchHeaders);
 
             ResponseEntity<String> searchResp = restTemplate.exchange(
                     coreSignalBaseUrl + "/employee_clean/search/es_dsl",
                     HttpMethod.POST, searchEntity, String.class);
 
-            System.out.println("[CoreSignal] search status=" + searchResp.getStatusCode() + " body=" + searchResp.getBody());
-            if (!searchResp.getStatusCode().is2xxSuccessful() || searchResp.getBody() == null) {
+            String searchBody = searchResp.getBody();
+            System.out.println("[TalentSearch] search HTTP=" + searchResp.getStatusCode()
+                    + " body=" + (searchBody != null ? searchBody.substring(0, Math.min(300, searchBody.length())) : "null"));
+            if (!searchResp.getStatusCode().is2xxSuccessful() || searchBody == null) {
                 return List.of();
             }
 
             // Response is a plain integer array: [44067891, 69356050, ...]
-            JsonNode idsNode = objectMapper.readTree(searchResp.getBody());
+            JsonNode idsNode = objectMapper.readTree(searchBody);
             if (!idsNode.isArray()) {
-                System.out.println("[CoreSignal] unexpected response (not an array): " + searchResp.getBody());
+                System.out.println("[TalentSearch] unexpected response (not an array): " + searchBody);
                 return List.of();
             }
 
@@ -238,7 +255,8 @@ public class TalentSearchService {
             for (int i = 0; i < Math.min(3, idsNode.size()); i++) {
                 ids.add(idsNode.get(i).asLong());
             }
-            System.out.println("[CoreSignal] got " + idsNode.size() + " IDs, fetching first " + ids.size());
+            System.out.println("[TalentSearch] search returned " + idsNode.size() + " IDs"
+                    + (idsNode.size() == 0 ? " — no CoreSignal results for this query" : ", fetching first " + ids.size()));
             if (ids.isEmpty()) return List.of();
 
             // Collect profiles in parallel with a fixed thread pool of 3
