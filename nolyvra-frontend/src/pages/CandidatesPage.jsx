@@ -12,6 +12,7 @@ import {
   MenuItem,
   InputAdornment,
   Chip,
+  CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -261,6 +262,7 @@ export default function CandidatesPage() {
   const { checkCandidateLimit, usage } = usePlanLimit();
   const [limitDialog,    setLimitDialog]    = useState(false);
   const [analysisDialog, setAnalysisDialog] = useState(false); // Change 4
+  const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [search, setSearch] = useState("");
@@ -307,6 +309,8 @@ export default function CandidatesPage() {
         setCandidates(allCandidates);
       } catch (e) {
         console.error("Failed to load candidates page", e);
+      } finally {
+        setLoading(false);
       }
     }
     load();
@@ -458,7 +462,19 @@ export default function CandidatesPage() {
       {/* ── Scrollable content ─────────────────────────────────────────── */}
       <Box sx={{ flex: 1, overflow: "auto", p: 2.5 }}>
 
+        {/* Loading state */}
+        {loading && (
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center",
+            justifyContent: "center", py: "80px", gap: "16px" }}>
+            <CircularProgress size={36} sx={{ color: ACCENT }} />
+            <Typography sx={{ fontSize: 13, color: MUTED }}>
+              Loading candidates…
+            </Typography>
+          </Box>
+        )}
+
         {/* Risk filter chips + count */}
+        {!loading && (
         <Box
           sx={{
             display: "flex",
@@ -669,6 +685,7 @@ export default function CandidatesPage() {
             />
           ))}
         </Box>
+        )}
       </Box>
 
       {/* Plan limit dialog */}
