@@ -475,6 +475,7 @@ export default function CandidatesPage() {
 
         {/* Risk filter chips + count */}
         {!loading && (
+        <>
         <Box
           sx={{
             display: "flex",
@@ -685,6 +686,7 @@ export default function CandidatesPage() {
             />
           ))}
         </Box>
+        </>
         )}
       </Box>
 
