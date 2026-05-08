@@ -61,127 +61,20 @@ function WelcomeScreen() {
       alignItems: "center", justifyContent: "center",
       px: 4, textAlign: "center", gap: 2,
     }}>
-      {/* Nolyvra AI icon — neural spark constellation with animations */}
+      {/* Bot icon — large rounded square */}
       <Box sx={{
-        position: "relative",
-        width: 80, height: 80,
+        width: 80, height: 80, borderRadius: "22px",
+        background: "linear-gradient(135deg, #7C3AED, #6D57E8)",
         display: "flex", alignItems: "center", justifyContent: "center",
+        boxShadow: "0 8px 32px rgba(124,58,237,0.22)",
         mb: 0.5,
       }}>
-
-        {/* Ripple ring 1 */}
-        <Box sx={{
-          position: "absolute",
-          width: 80, height: 80, borderRadius: "50%",
-          border: "1.5px solid rgba(124,58,237,0.5)",
-          animation: "ripple1 2.4s ease-out infinite",
-          "@keyframes ripple1": {
-            "0%":    { transform: "scale(1)",    opacity: 0.7 },
-            "100%":  { transform: "scale(1.7)",  opacity: 0 },
-          },
-        }} />
-
-        {/* Ripple ring 2 — offset */}
-        <Box sx={{
-          position: "absolute",
-          width: 80, height: 80, borderRadius: "50%",
-          border: "1.5px solid rgba(29,114,232,0.4)",
-          animation: "ripple2 2.4s ease-out 0.9s infinite",
-          "@keyframes ripple2": {
-            "0%":    { transform: "scale(1)",    opacity: 0.6 },
-            "100%":  { transform: "scale(1.65)", opacity: 0 },
-          },
-        }} />
-
-        {/* Ripple ring 3 — offset further */}
-        <Box sx={{
-          position: "absolute",
-          width: 80, height: 80, borderRadius: "50%",
-          border: "1px solid rgba(124,58,237,0.25)",
-          animation: "ripple3 2.4s ease-out 1.6s infinite",
-          "@keyframes ripple3": {
-            "0%":    { transform: "scale(1)",    opacity: 0.5 },
-            "100%":  { transform: "scale(1.55)", opacity: 0 },
-          },
-        }} />
-
-        {/* Breathing outer glow */}
-        <Box sx={{
-          position: "absolute", inset: -8, borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(124,58,237,0.22) 0%, rgba(29,114,232,0.08) 50%, transparent 75%)",
-          animation: "breathe 3s ease-in-out infinite",
-          "@keyframes breathe": {
-            "0%, 100%": { transform: "scale(0.95)", opacity: 0.7 },
-            "50%":       { transform: "scale(1.08)", opacity: 1   },
-          },
-        }} />
-
-        {/* Icon container — subtle scale breathe */}
-        <Box sx={{
-          width: 80, height: 80, borderRadius: "50%",
-          background: "linear-gradient(145deg, #1D72E8 0%, #7C3AED 55%, #5B21B6 100%)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: "0 8px 32px rgba(124,58,237,0.4), 0 2px 8px rgba(29,114,232,0.25)",
-          position: "relative", overflow: "hidden",
-          animation: "iconBreathe 3s ease-in-out infinite",
-          "@keyframes iconBreathe": {
-            "0%":    { transform: "scale(0.82)", boxShadow: "0 4px 16px rgba(124,58,237,0.2), 0 1px 4px rgba(29,114,232,0.15)" },
-            "50%":   { transform: "scale(1)",    boxShadow: "0 10px 40px rgba(124,58,237,0.55), 0 4px 16px rgba(29,114,232,0.3)" },
-            "100%":  { transform: "scale(0.82)", boxShadow: "0 4px 16px rgba(124,58,237,0.2), 0 1px 4px rgba(29,114,232,0.15)" },
-          },
-        }}>
-
-          {/* Rotating shimmer sweep */}
-          <Box sx={{
-            position: "absolute", inset: 0, borderRadius: "50%",
-            background: "conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.12) 20%, transparent 40%)",
-            animation: "shimmerSpin 4s linear infinite",
-            "@keyframes shimmerSpin": {
-              from: { transform: "rotate(0deg)"   },
-              to:   { transform: "rotate(360deg)" },
-            },
-          }} />
-
-          {/* Static top-left highlight */}
-          <Box sx={{
-            position: "absolute", inset: 0, borderRadius: "50%",
-            background: "linear-gradient(135deg, rgba(255,255,255,0.18) 0%, transparent 55%)",
-            pointerEvents: "none",
-          }} />
-
-          <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
-            <defs>
-              <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stopColor="rgba(255,255,255,0.98)" />
-                <stop offset="100%" stopColor="rgba(255,255,255,0.6)" />
-              </radialGradient>
-            </defs>
-            {/* Connection lines — neural network spokes */}
-            <line x1="22" y1="22" x2="9"  y2="10" stroke="rgba(255,255,255,0.45)" strokeWidth="1.4" strokeLinecap="round"/>
-            <line x1="22" y1="22" x2="35" y2="10" stroke="rgba(255,255,255,0.45)" strokeWidth="1.4" strokeLinecap="round"/>
-            <line x1="22" y1="22" x2="9"  y2="34" stroke="rgba(255,255,255,0.45)" strokeWidth="1.4" strokeLinecap="round"/>
-            <line x1="22" y1="22" x2="35" y2="34" stroke="rgba(255,255,255,0.45)" strokeWidth="1.4" strokeLinecap="round"/>
-            <line x1="22" y1="22" x2="22" y2="5"  stroke="rgba(255,255,255,0.3)"  strokeWidth="1.4" strokeLinecap="round"/>
-            <line x1="22" y1="22" x2="5"  y2="22" stroke="rgba(255,255,255,0.3)"  strokeWidth="1.4" strokeLinecap="round"/>
-            <line x1="22" y1="22" x2="39" y2="22" stroke="rgba(255,255,255,0.3)"  strokeWidth="1.4" strokeLinecap="round"/>
-            {/* Outer nodes */}
-            <circle cx="9"  cy="10" r="2.8" fill="rgba(255,255,255,0.75)"/>
-            <circle cx="35" cy="10" r="2.8" fill="rgba(255,255,255,0.75)"/>
-            <circle cx="9"  cy="34" r="2.8" fill="rgba(255,255,255,0.75)"/>
-            <circle cx="35" cy="34" r="2.8" fill="rgba(255,255,255,0.75)"/>
-            <circle cx="22" cy="5"  r="2.2" fill="rgba(255,255,255,0.55)"/>
-            <circle cx="5"  cy="22" r="2.2" fill="rgba(255,255,255,0.55)"/>
-            <circle cx="39" cy="22" r="2.2" fill="rgba(255,255,255,0.55)"/>
-            {/* Center core */}
-            <circle cx="22" cy="22" r="6.5" fill="url(#centerGlow)"/>
-            {/* Center spark — 4-pointed star */}
-            <path
-              d="M22 16.5 L23.4 20.6 L27.5 22 L23.4 23.4 L22 27.5 L20.6 23.4 L16.5 22 L20.6 20.6 Z"
-              fill="#7C3AED"
-              opacity="0.9"
-            />
-          </svg>
-        </Box>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="8" width="18" height="12" rx="2"/>
+          <circle cx="8.5" cy="14" r="1.4" fill="#fff" stroke="none"/>
+          <circle cx="15.5" cy="14" r="1.4" fill="#fff" stroke="none"/>
+          <path d="M12 4v4M9 4h6"/>
+        </svg>
       </Box>
 
       <Typography sx={{ fontSize: 22, fontWeight: 700, color: C.purple, letterSpacing: "-0.3px", lineHeight: 1.2 }}>
@@ -199,27 +92,15 @@ function AiBubble({ message, pendingAction, onConfirm, onCancel, isLoading }) {
   return (
     <Box sx={{ display: "flex", gap: 1.25, alignItems: "flex-start" }}>
       <Box sx={{
-        width: 28, height: 28, borderRadius: "50%", flexShrink: 0, mt: "2px",
-        background: "linear-gradient(145deg, #1D72E8 0%, #7C3AED 100%)",
+        width: 28, height: 28, borderRadius: "8px", flexShrink: 0, mt: "2px",
+        background: "linear-gradient(135deg,#7C3AED,#1D72E8)",
         display: "flex", alignItems: "center", justifyContent: "center",
-        boxShadow: "0 2px 8px rgba(124,58,237,0.3)",
       }}>
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          {/* Mini connection lines */}
-          <line x1="8" y1="8" x2="3"  y2="3.5" stroke="rgba(255,255,255,0.45)" strokeWidth="1.1" strokeLinecap="round"/>
-          <line x1="8" y1="8" x2="13" y2="3.5" stroke="rgba(255,255,255,0.45)" strokeWidth="1.1" strokeLinecap="round"/>
-          <line x1="8" y1="8" x2="3"  y2="12.5" stroke="rgba(255,255,255,0.45)" strokeWidth="1.1" strokeLinecap="round"/>
-          <line x1="8" y1="8" x2="13" y2="12.5" stroke="rgba(255,255,255,0.45)" strokeWidth="1.1" strokeLinecap="round"/>
-          {/* Outer nodes */}
-          <circle cx="3"  cy="3.5"  r="1.4" fill="rgba(255,255,255,0.75)"/>
-          <circle cx="13" cy="3.5"  r="1.4" fill="rgba(255,255,255,0.75)"/>
-          <circle cx="3"  cy="12.5" r="1.4" fill="rgba(255,255,255,0.75)"/>
-          <circle cx="13" cy="12.5" r="1.4" fill="rgba(255,255,255,0.75)"/>
-          {/* Center core */}
-          <circle cx="8" cy="8" r="3" fill="rgba(255,255,255,0.95)"/>
-          {/* Mini spark */}
-          <path d="M8 5.8 L8.7 7.3 L10.2 8 L8.7 8.7 L8 10.2 L7.3 8.7 L5.8 8 L7.3 7.3 Z"
-            fill="#7C3AED" opacity="0.9"/>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="8" width="18" height="12" rx="2"/>
+          <circle cx="8.5" cy="14" r="1.2" fill="#fff" stroke="none"/>
+          <circle cx="15.5" cy="14" r="1.2" fill="#fff" stroke="none"/>
+          <path d="M12 4v4M9 4h6"/>
         </svg>
       </Box>
       <Box sx={{ maxWidth: "80%" }}>
