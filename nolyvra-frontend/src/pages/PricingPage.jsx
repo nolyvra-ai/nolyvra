@@ -158,7 +158,7 @@ export default function PricingPage() {
               <div style={{ fontSize:12,color:"#9AA3B4",marginTop:3 }}>1 month trial · No card needed</div>
             </div>
             <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20 }}>
-              {limitItem("3","Candidates")}{limitItem("10","Jobs")}{limitItem("100","Tokens")}{limitItem("1","User")}
+              {limitItem("30","Candidates")}{limitItem("10","Jobs")}{limitItem("100","Tokens")}{limitItem("1","User")}
             </div>
             <div style={{ height:1,background:"#E2E6ED",margin:"18px 0" }} />
             <div style={{ display:"flex",flexDirection:"column",gap:9,flex:1,marginBottom:22 }}>
