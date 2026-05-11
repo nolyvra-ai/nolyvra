@@ -98,6 +98,19 @@ export default function LandingPage() {
         .lp-btn-primary:hover { background:#3B8BFF;transform:translateY(-1px); }
         .lp-btn-secondary { padding:14px 32px;border-radius:8px;font-size:15px;font-weight:500;background:transparent;color:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.2);cursor:pointer;font-family:inherit;transition:all .2s; }
         .lp-btn-secondary:hover { border-color:rgba(255,255,255,.5);color:#fff; }
+        @keyframes marqueeScroll { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+        .lp-marquee-track { display:flex; width:max-content; animation:marqueeScroll 28s linear infinite; }
+        .lp-marquee-track:hover { animation-play-state:paused; }
+        .lp-integration-chip { display:flex; align-items:center; gap:10px; background:#F7F8FA; border:1px solid #E2E6ED; border-radius:40px; padding:10px 22px; margin:0 12px; white-space:nowrap; font-size:14px; font-weight:600; color:#3D4A63; transition:border-color .2s,box-shadow .2s; }
+        .lp-integration-chip:hover { border-color:#1D72E8; box-shadow:0 0 0 3px rgba(29,114,232,.08); }
+        .lp-feedback-card { background:#fff; border:1px solid #E2E6ED; border-radius:12px; padding:28px; position:relative; transition:box-shadow .2s; }
+        .lp-feedback-card:hover { box-shadow:0 8px 32px rgba(0,0,0,.08); }
+        .lp-feedback-card.featured { background:linear-gradient(135deg,#EBF2FF,#F0F4FF); border-color:#BFDBFE; }
+        .lp-new-badge { display:inline-block; font-size:9px; font-weight:700; color:#fff; background:#1D72E8; border-radius:4px; padding:2px 6px; margin-left:6px; vertical-align:middle; text-transform:uppercase; letter-spacing:.5px; }
+        @media (max-width: 768px) {
+          .lp-feedback-grid { grid-template-columns: 1fr !important; }
+          .lp-feedback-bottom { grid-template-columns: 1fr !important; }
+        }
 
         /* ── Mobile responsive ─────────────────────────────────────────────── */
         @media (max-width: 768px) {
@@ -151,7 +164,7 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="lp-nav-links" style={{ display:"flex",gap:28 }}>
-          {[["Why nolyvra","#problem"],["Features","#features"],["How It Works","#how"]].map(([l,h]) => (
+          {[["Why nolyvra","#problem"],["Features","#features"],["How It Works","#how"],["Early Feedback","#feedback"],["See It In Action","#video"]].map(([l,h]) => (
             <a key={l} href={h} className="lp-nav-link">{l}</a>
           ))}
           <button
@@ -251,8 +264,100 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
+
+          {/* ── ADDITIONAL FEATURES ── */}
+          <div style={{ display:"flex",alignItems:"center",gap:16,margin:"40px 0 32px" }}>
+            <div style={{ flex:1,height:1,background:"#E2E6ED" }} />
+            <span style={{ fontSize:11,fontWeight:700,color:"#1D72E8",textTransform:"uppercase",letterSpacing:"1.2px",whiteSpace:"nowrap" }}>Also included</span>
+            <div style={{ flex:1,height:1,background:"#E2E6ED" }} />
+          </div>
+          <div className="lp-grid-3" style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:20 }}>
+            {[["🔍","#EBF2FF","Deep Candidate Analysis","Go beyond surface-level CVs. Understand real capability, not just keyword matches."],
+              ["📊","#F0FDF4","Smart Dashboards & Insights","Identify pipeline bottlenecks and improve visibility across every active role."],
+              ["🧠","#F5F3FF","AI Co-worker","Automates repetitive admin tasks so your team focuses on what humans do best."],
+              ["📅","#FEF2F2","Calendar Integration","Interview scheduling synced with Google Calendar and Outlook — no double booking, no back-and-forth."],
+              ["📧","#EBF2FF","Email Integration","Seamless Gmail and Outlook integration for all candidate communications in one place."],
+              ["🎯","#FFFBEB","Candidate Sourcing","Source candidates across LinkedIn, Seek, and Indeed — without leaving your platform."],
+            ].map(([icon,bg,title,desc]) => (
+              <div key={title} className="lp-feature-card" style={{ borderColor:"#BFDBFE",background:"linear-gradient(135deg,#F0F7FF,#fff)" }}>
+                <div style={{ width:44,height:44,borderRadius:10,background:bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,marginBottom:16 }}>{icon}</div>
+                <div style={{ fontSize:15,fontWeight:700,color:"#0F1623",marginBottom:8 }}>{title}<span className="lp-new-badge">New</span></div>
+                <div style={{ fontSize:13,color:"#9AA3B4",lineHeight:1.7 }}>{desc}</div>
+              </div>
+            ))}
+          </div>
+          {/* ATS full-width card */}
+          <div className="lp-feature-card" style={{ borderColor:"#BFDBFE",background:"linear-gradient(135deg,#EBF2FF,#F0F4FF)",marginTop:20,display:"flex",alignItems:"center",gap:24 }}>
+            <div style={{ width:52,height:52,borderRadius:10,background:"#fff",border:"1px solid #BFDBFE",display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0 }}>🗂️</div>
+            <div style={{ flex:1 }}>
+              <div style={{ fontSize:16,fontWeight:700,color:"#0F1623",marginBottom:6 }}>Built-in ATS Workflows<span className="lp-new-badge">New</span></div>
+              <div style={{ fontSize:13,color:"#9AA3B4",lineHeight:1.7 }}>Manage candidates from screening to offer — all in one place, designed around how recruiters actually work. No need to overhaul your existing process.</div>
+            </div>
+            <div style={{ fontSize:13,fontWeight:600,color:"#1D72E8",whiteSpace:"nowrap",flexShrink:0 }}>All in one platform →</div>
+          </div>
         </div>
       </section>
+
+      {/* ── INTEGRATIONS ── */}
+      <div style={{ background:"#fff",padding:"52px 0",borderTop:"1px solid #E2E6ED",borderBottom:"1px solid #E2E6ED",overflow:"hidden" }}>
+        <div style={{ textAlign:"center",fontSize:12,fontWeight:600,color:"#9AA3B4",textTransform:"uppercase",letterSpacing:"1.5px",marginBottom:32 }}>
+          Works seamlessly with your existing tools
+        </div>
+        <div style={{ overflow:"hidden" }}>
+          <div className="lp-marquee-track">
+            {[
+              { name:"Gmail", bg:"#fff", el:(
+                <svg width="22" height="22" viewBox="0 0 48 48"><path fill="#EA4335" d="M6 40h6V22.5L4 16v20a4 4 0 0 0 4 4z"/><path fill="#34A853" d="M36 40h6a4 4 0 0 0 4-4V16l-10 6.5z"/><path fill="#4A90E2" d="M36 8H12L24 16.5z"/><path fill="#FBBC05" d="M12 22.5V8L4 16z"/><path fill="#EA4335" d="M4 16l8 6.5L24 14 40 22.5 48 16 24 0z"/></svg>
+              )},
+              { name:"Outlook", bg:"#fff", el:(
+                <svg width="22" height="22" viewBox="0 0 48 48"><rect width="48" height="48" rx="6" fill="#0078D4"/><path fill="#fff" d="M28 10v10h10L28 10z"/><path fill="#fff" fillOpacity=".8" d="M28 10h-6a2 2 0 0 0-2 2v6l8 6 10-6V20L28 10z"/><path fill="#fff" d="M20 18v20h18V20l-10 6-8-6v-2z"/><ellipse cx="13" cy="28" rx="7" ry="9" fill="#fff"/><ellipse cx="13" cy="28" rx="4.5" ry="6" fill="#0078D4"/></svg>
+              )},
+              { name:"LinkedIn", bg:"#0A66C2", el:(
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+              )},
+              { name:"Seek", bg:"#E60278", el:(
+                <svg width="22" height="22" viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="#E60278"/><text x="24" y="32" textAnchor="middle" fill="#fff" fontSize="22" fontWeight="700" fontFamily="Arial">S</text></svg>
+              )},
+              { name:"Indeed", bg:"#003A9B", el:(
+                <svg width="22" height="22" viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="#003A9B"/><text x="24" y="32" textAnchor="middle" fill="#fff" fontSize="20" fontWeight="700" fontFamily="Arial">i</text></svg>
+              )},
+              { name:"AWS", bg:"#FF9900", el:(
+                <svg width="22" height="22" viewBox="0 0 48 48"><rect width="48" height="48" rx="6" fill="#232F3E"/><path fill="#FF9900" d="M14 28c0 1.1.9 1.6 2 1.2l6-2.4V22l-8 3v3zm16 0c0 1.1-.9 1.6-2 1.2l-6-2.4V22l8 3v3zM24 12l-8 4v4l8-3 8 3v-4l-8-4z"/><path fill="#FF9900" d="M10 35h28v2H10z"/></svg>
+              )},
+              { name:"Render", bg:"#46E3B7", el:(
+                <svg width="22" height="22" viewBox="0 0 48 48"><rect width="48" height="48" rx="6" fill="#46E3B7"/><text x="24" y="33" textAnchor="middle" fill="#0F1623" fontSize="24" fontWeight="800" fontFamily="Arial">R</text></svg>
+              )},
+            ].concat([
+              { name:"Gmail", bg:"#fff", el:(
+                <svg width="22" height="22" viewBox="0 0 48 48"><path fill="#EA4335" d="M6 40h6V22.5L4 16v20a4 4 0 0 0 4 4z"/><path fill="#34A853" d="M36 40h6a4 4 0 0 0 4-4V16l-10 6.5z"/><path fill="#4A90E2" d="M36 8H12L24 16.5z"/><path fill="#FBBC05" d="M12 22.5V8L4 16z"/><path fill="#EA4335" d="M4 16l8 6.5L24 14 40 22.5 48 16 24 0z"/></svg>
+              )},
+              { name:"Outlook", bg:"#fff", el:(
+                <svg width="22" height="22" viewBox="0 0 48 48"><rect width="48" height="48" rx="6" fill="#0078D4"/><path fill="#fff" d="M28 10v10h10L28 10z"/><path fill="#fff" fillOpacity=".8" d="M28 10h-6a2 2 0 0 0-2 2v6l8 6 10-6V20L28 10z"/><path fill="#fff" d="M20 18v20h18V20l-10 6-8-6v-2z"/><ellipse cx="13" cy="28" rx="7" ry="9" fill="#fff"/><ellipse cx="13" cy="28" rx="4.5" ry="6" fill="#0078D4"/></svg>
+              )},
+              { name:"LinkedIn", bg:"#0A66C2", el:(
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+              )},
+              { name:"Seek", bg:"#E60278", el:(
+                <svg width="22" height="22" viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="#E60278"/><text x="24" y="32" textAnchor="middle" fill="#fff" fontSize="22" fontWeight="700" fontFamily="Arial">S</text></svg>
+              )},
+              { name:"Indeed", bg:"#003A9B", el:(
+                <svg width="22" height="22" viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="#003A9B"/><text x="24" y="32" textAnchor="middle" fill="#fff" fontSize="20" fontWeight="700" fontFamily="Arial">i</text></svg>
+              )},
+              { name:"AWS", bg:"#FF9900", el:(
+                <svg width="22" height="22" viewBox="0 0 48 48"><rect width="48" height="48" rx="6" fill="#232F3E"/><path fill="#FF9900" d="M14 28c0 1.1.9 1.6 2 1.2l6-2.4V22l-8 3v3zm16 0c0 1.1-.9 1.6-2 1.2l-6-2.4V22l8 3v3zM24 12l-8 4v4l8-3 8 3v-4l-8-4z"/><path fill="#FF9900" d="M10 35h28v2H10z"/></svg>
+              )},
+              { name:"Render", bg:"#46E3B7", el:(
+                <svg width="22" height="22" viewBox="0 0 48 48"><rect width="48" height="48" rx="6" fill="#46E3B7"/><text x="24" y="33" textAnchor="middle" fill="#0F1623" fontSize="24" fontWeight="800" fontFamily="Arial">R</text></svg>
+              )},
+            ]).map(({ name, bg, el }, idx) => (
+              <div key={`${name}-${idx}`} className="lp-integration-chip">
+                <div style={{ width:32,height:32,borderRadius:8,background:bg,border:"1px solid #E2E6ED",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>{el}</div>
+                {name}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* ── HOW IT WORKS ── */}
       <section id="how" className="lp-section" style={{ padding:"96px 48px",background:"linear-gradient(160deg,#0F1623 0%,#1B2A4A 100%)",position:"relative",overflow:"hidden" }}>
@@ -274,6 +379,66 @@ export default function LandingPage() {
                 <div style={{ fontSize:12,color:"rgba(255,255,255,.4)",lineHeight:1.6 }}>{desc}</div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── EARLY FEEDBACK ── */}
+      <section id="feedback" className="lp-section" style={{ padding:"96px 48px",background:"#F7F8FA" }}>
+        <div style={{ maxWidth:1100,margin:"0 auto" }}>
+          <div style={{ textAlign:"center",marginBottom:48 }}>
+            <span style={{ fontSize:11,fontWeight:700,color:"#1D72E8",textTransform:"uppercase",letterSpacing:"1.2px",display:"inline-block",marginBottom:12 }}>Early Feedback</span>
+            <h2 style={{ fontSize:36,fontWeight:700,color:"#0F1623",letterSpacing:"-.8px",lineHeight:1.2,marginBottom:14 }}>What recruiters are saying.</h2>
+            <p style={{ fontSize:16,color:"#9AA3B4",lineHeight:1.7,maxWidth:600,margin:"0 auto" }}>Real feedback from recruiters using Nolyvra in Australian hiring markets.</p>
+          </div>
+          <div className="lp-feedback-grid" style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:20 }}>
+            {[
+              { quote:"This tool really provides valuable suggestions in AI analysis and balance with human communications.", author:"National Director", role:"Recruitment Agency · NSW", featured:true },
+              { quote:"This is exactly where hiring is heading — we need something like this.", author:"Recruitment Executive", role:"Melbourne", featured:false },
+              { quote:"It helps me ask better questions and validate candidates more confidently.", author:"Tech Recruiter", role:"Queensland", featured:false },
+            ].map(({ quote, author, role, featured }) => (
+              <div key={author} className={`lp-feedback-card${featured ? " featured" : ""}`}>
+                <div style={{ fontSize:48,lineHeight:1,color:featured?"#BFDBFE":"#E2E6ED",fontFamily:"Georgia,serif",position:"absolute",top:16,right:20 }}>"</div>
+                <div style={{ color:"#F59E0B",fontSize:13,letterSpacing:1,marginBottom:12 }}>★★★★★</div>
+                <p style={{ fontSize:14,color:"#3D4A63",lineHeight:1.8,marginBottom:20,fontStyle:"italic" }}>{quote}</p>
+                <div style={{ fontSize:12,fontWeight:700,color:"#0F1623" }}>{author}</div>
+                <div style={{ fontSize:11,color:"#9AA3B4",marginTop:2 }}>{role}</div>
+              </div>
+            ))}
+          </div>
+          <div className="lp-feedback-bottom" style={{ display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:20,marginTop:20 }}>
+            {[
+              { quote:"Promising product with exciting possibilities ahead.", author:"Tech Recruiter", role:"Startup · Melbourne", featured:false },
+              { quote:"Strong potential recognised particularly in high-volume hiring environments.", author:"Talent Partner", role:"Melbourne", featured:true },
+            ].map(({ quote, author, role, featured }) => (
+              <div key={author} className={`lp-feedback-card${featured ? " featured" : ""}`}>
+                <div style={{ fontSize:48,lineHeight:1,color:featured?"#BFDBFE":"#E2E6ED",fontFamily:"Georgia,serif",position:"absolute",top:16,right:20 }}>"</div>
+                <div style={{ color:"#F59E0B",fontSize:13,letterSpacing:1,marginBottom:12 }}>★★★★★</div>
+                <p style={{ fontSize:14,color:"#3D4A63",lineHeight:1.8,marginBottom:20,fontStyle:"italic" }}>{quote}</p>
+                <div style={{ fontSize:12,fontWeight:700,color:"#0F1623" }}>{author}</div>
+                <div style={{ fontSize:11,color:"#9AA3B4",marginTop:2 }}>{role}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── VIDEO SECTION ── */}
+      <section id="video" className="lp-section" style={{ padding:"96px 48px",background:"#fff" }}>
+        <div style={{ maxWidth:1100,margin:"0 auto" }}>
+          <div style={{ textAlign:"center",marginBottom:48 }}>
+            <span style={{ fontSize:11,fontWeight:700,color:"#1D72E8",textTransform:"uppercase",letterSpacing:"1.2px",display:"inline-block",marginBottom:12 }}>See It In Action</span>
+            <h2 style={{ fontSize:36,fontWeight:700,color:"#0F1623",letterSpacing:"-.8px",lineHeight:1.2,marginBottom:14 }}>Watch how Nolyvra works.</h2>
+            <p style={{ fontSize:16,color:"#9AA3B4",lineHeight:1.7,maxWidth:560,margin:"0 auto" }}>A 90-second walkthrough — from dashboard to candidate analysis to pipeline management.</p>
+          </div>
+          <div style={{ position:"relative",paddingBottom:"56.25%",height:0,borderRadius:16,overflow:"hidden",boxShadow:"0 24px 80px rgba(0,0,0,.12)",border:"1px solid #E2E6ED" }}>
+            <iframe
+              src="https://www.youtube.com/embed/IBskXO8TPL8?rel=0&modestbranding=1"
+              title="Nolyvra Product Walkthrough"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              style={{ position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none" }}
+            />
           </div>
         </div>
       </section>
