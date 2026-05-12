@@ -306,7 +306,7 @@ export default function LandingPage() {
             </h1>
 
             <p style={{ fontSize:18.5,lineHeight:1.55,color:"rgba(255,255,255,.68)",maxWidth:620,margin:"0 auto 36px",animation:"nlUp 1.1s .25s ease both" }}>
-              Stop stitching together CV parsers, ATS plugins and inbox tools. nolyvra verifies, matches, schedules and drafts — all in one canvas.
+              Stop stitching together CV parsers, ATS plugins and inbox tools. nolyvra verifies, matches, schedules and drafts — so you can focus on people.
             </p>
 
             <div style={{ display:"flex",gap:12,justifyContent:"center",alignItems:"center",flexWrap:"wrap",animation:"nlUp 1.1s .4s ease both",marginBottom:52 }}>
@@ -556,16 +556,16 @@ export default function LandingPage() {
         </div>
         <div style={{ overflow:"hidden" }}>
           <div className="nl-marq">
-            {[
+            {(arr=>[...arr,...arr])([
               {name:"Gmail",   bg:"#fff",     el:<svg width="22" height="22" viewBox="0 0 48 48"><path fill="#EA4335" d="M6 40h6V22.5L4 16v20a4 4 0 0 0 4 4z"/><path fill="#34A853" d="M36 40h6a4 4 0 0 0 4-4V16l-10 6.5z"/><path fill="#4A90E2" d="M36 8H12L24 16.5z"/><path fill="#FBBC05" d="M12 22.5V8L4 16z"/><path fill="#EA4335" d="M4 16l8 6.5L24 14 40 22.5 48 16 24 0z"/></svg>},
               {name:"Outlook", bg:"#fff",     el:<svg width="22" height="22" viewBox="0 0 48 48"><rect width="48" height="48" rx="6" fill="#0078D4"/><path fill="#fff" d="M28 10v10h10L28 10z"/><path fill="#fff" fillOpacity=".8" d="M28 10h-6a2 2 0 0 0-2 2v6l8 6 10-6V20L28 10z"/><path fill="#fff" d="M20 18v20h18V20l-10 6-8-6v-2z"/><ellipse cx="13" cy="28" rx="7" ry="9" fill="#fff"/><ellipse cx="13" cy="28" rx="4.5" ry="6" fill="#0078D4"/></svg>},
               {name:"LinkedIn",bg:"#0A66C2",  el:<svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>},
               {name:"Seek",    bg:"#E60278",  el:<svg width="22" height="22" viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="#E60278"/><text x="24" y="32" textAnchor="middle" fill="#fff" fontSize="22" fontWeight="700" fontFamily="Arial">S</text></svg>},
               {name:"Indeed",  bg:"#003A9B",  el:<svg width="22" height="22" viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="#003A9B"/><text x="24" y="32" textAnchor="middle" fill="#fff" fontSize="20" fontWeight="700" fontFamily="Arial">i</text></svg>},
-              {name:"AWS",     bg:"#FF9900",  el:<svg width="22" height="22" viewBox="0 0 48 48"><rect width="48" height="48" rx="6" fill="#232F3E"/><path fill="#FF9900" d="M14 28c0 1.1.9 1.6 2 1.2l6-2.4V22l-8 3v3zm16 0c0 1.1-.9 1.6-2 1.2l-6-2.4V22l8 3v3zM24 12l-8 4v4l8-3 8 3v-4l-8-4z"/><path fill="#FF9900" d="M10 35h28v2H10z"/></svg>},
+              {name:"AWS",     bg:"#fff",     el:<img src="/aws_logo.png" alt="AWS" style={{width:28,height:18,objectFit:"contain",display:"block"}} />},
               {name:"Render",  bg:"#46E3B7",  el:<svg width="22" height="22" viewBox="0 0 48 48"><rect width="48" height="48" rx="6" fill="#46E3B7"/><text x="24" y="33" textAnchor="middle" fill="#0F1623" fontSize="24" fontWeight="800" fontFamily="Arial">R</text></svg>},
-            ].flatMap((item,i)=>[{...item,k:`a${i}`},{...item,k:`b${i}`}]).map(({name,bg,el,k})=>(
-              <div key={k} className="nl-int-chip">
+            ]).map(({name,bg,el},i)=>(
+              <div key={i} className="nl-int-chip">
                 <div style={{ width:32,height:32,borderRadius:8,background:bg,border:`1px solid ${C.line}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>{el}</div>
                 {name}
               </div>
