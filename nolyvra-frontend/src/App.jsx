@@ -3,7 +3,7 @@ import AppShell from "./components/AppShell";
 import AppRoutes from "./routes/AppRoutes";
 
 // Routes that are fully public — no auth check, no AppShell
-const PUBLIC_ROUTES = ["/", "/pricing", "/login", "/ai-in-recruitment"];
+const PUBLIC_ROUTES = ["/", "/pricing", "/login", "/ai-in-recruitment", "/privacy", "/terms"];
 
 function Layout() {
   const { pathname } = useLocation();

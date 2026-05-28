@@ -21,6 +21,8 @@ import CoWorkerPage           from "../pages/CoWorkerPage";
 import AgentEconomyPage       from "../pages/AgentEconomyPage";
 import InterviewAnalysisPage  from "../pages/InterviewAnalysisPage";
 import ClientTrackerPage       from "../pages/ClientTrackerPage";
+import PrivacyPage             from "../pages/PrivacyPage";
+import TermsPage               from "../pages/TermsPage";
 
 export default function AppRoutes() {
   return (
@@ -29,7 +31,9 @@ export default function AppRoutes() {
       <Route path="/"                                   element={<LandingPage />} />
       <Route path="/pricing"                            element={<PricingPage />} />
       <Route path="/login"                              element={<LoginPage />} />
-      <Route path="/ai-in-recruitment"                  element={<AgentEconomyPage />} /> {/* ← NEW */}
+      <Route path="/ai-in-recruitment"                  element={<AgentEconomyPage />} />
+      <Route path="/privacy"                            element={<PrivacyPage />} />
+      <Route path="/terms"                              element={<TermsPage />} />
 
       {/* App pages */}
       <Route path="/dashboard"                          element={<DashboardPage />} />

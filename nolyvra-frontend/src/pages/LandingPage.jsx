@@ -691,9 +691,18 @@ export default function LandingPage() {
             <div style={{ fontSize:11,color:"rgba(255,255,255,.2)",fontStyle:"italic" }}>Intelligence. Evolved</div>
           </div>
         </div>
-        <div style={{ fontSize:12,color:"rgba(255,255,255,.25)",lineHeight:1.6 }}>
+        <div style={{ fontSize:12,color:"rgba(255,255,255,.25)",lineHeight:1.6,textAlign:"center" }}>
           © 2026 nolyvra · All rights reserved<br/>
           <span style={{ fontSize:11 }}>ABN 54 673 612 603 · Melbourne, Victoria</span>
+          <div style={{ marginTop:8,display:"flex",gap:16,justifyContent:"center" }}>
+            <a href="/privacy" style={{ fontSize:11,color:"rgba(255,255,255,.35)",textDecoration:"none",transition:"color .15s" }}
+              onMouseEnter={e=>e.currentTarget.style.color="rgba(255,255,255,.7)"}
+              onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,.35)"}>Privacy Policy</a>
+            <span style={{ color:"rgba(255,255,255,.15)" }}>·</span>
+            <a href="/terms" style={{ fontSize:11,color:"rgba(255,255,255,.35)",textDecoration:"none",transition:"color .15s" }}
+              onMouseEnter={e=>e.currentTarget.style.color="rgba(255,255,255,.7)"}
+              onMouseLeave={e=>e.currentTarget.style.color="rgba(255,255,255,.35)"}>Terms of Service</a>
+          </div>
         </div>
         <div style={{ display:"flex",alignItems:"center",gap:16 }}>
           <div style={{ fontSize:12,color:"rgba(255,255,255,.2)" }}>This AI tool is designed to assist, not replace professional judgment.</div>
