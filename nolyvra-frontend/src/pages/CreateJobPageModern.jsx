@@ -264,6 +264,39 @@ function GenerateBtn({ onClick, loading, disabled }) {
   );
 }
 
+// ── Local skill extractor (used for paste-JD path — no API call needed) ───
+function extractSkillsFromJd(jdText) {
+  if (!jdText.trim()) return { technical: [], soft: [], seniority: null };
+  const lower = jdText.toLowerCase();
+  const techKeywords = [
+    "java", "kotlin", "spring boot", "spring", "python", "javascript", "typescript",
+    "react", "node.js", "node", "angular", "vue", "golang", "rust", "c#", ".net",
+    "php", "ruby", "rails", "django", "flask", "fastapi", "aws", "azure", "gcp",
+    "docker", "kubernetes", "k8s", "terraform", "ansible", "jenkins", "github actions",
+    "postgresql", "postgres", "mysql", "mongodb", "redis", "elasticsearch",
+    "kafka", "rabbitmq", "microservices", "rest api", "graphql", "grpc",
+    "machine learning", "tensorflow", "pytorch", "sql", "nosql", "git", "linux",
+  ];
+  const softKeywords = [
+    "leadership", "mentoring", "communication", "collaboration", "teamwork",
+    "problem solving", "analytical", "agile", "scrum", "code review",
+  ];
+  const seniorityRules = [
+    { keys: ["senior", "sr.", "lead", "principal", "staff", "architect"], label: "Senior · 5+ yrs" },
+    { keys: ["junior", "jr.", "entry", "graduate"],                        label: "Junior · 0-2 yrs" },
+    { keys: ["mid-level", "mid level", "intermediate"],                    label: "Mid-level · 2-5 yrs" },
+    { keys: ["manager", "head of", "director", "vp "],                    label: "Manager" },
+  ];
+  const cap = s => s.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  const technical = techKeywords.filter(k => lower.includes(k)).map(cap).slice(0, 10);
+  const soft      = softKeywords.filter(k => lower.includes(k)).map(cap).slice(0, 6);
+  let seniority = null;
+  for (const rule of seniorityRules) {
+    if (rule.keys.some(k => lower.includes(k))) { seniority = rule.label; break; }
+  }
+  return { technical, soft, seniority };
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 export default function CreateJobPageModern() {
   const nav = useNavigate();
@@ -278,6 +311,12 @@ export default function CreateJobPageModern() {
   const [aiResponse, setAiResponse] = useState(null);
   const [editedJD, setEditedJD] = useState("");
   const [jdEditable, setJdEditable] = useState(false);
+
+  // Paste-existing-JD path
+  const [showExistingJD, setShowExistingJD] = useState(false);
+  const [pastedJD, setPastedJD] = useState("");
+  const [manualSkills, setManualSkills] = useState([]);
+  const [skillInput, setSkillInput] = useState("");
 
   // Step 2
   const [form, setForm] = useState({
@@ -302,8 +341,40 @@ export default function CreateJobPageModern() {
       .catch(() => {});
   }, [loginId]);
 
+  function handleSkillKeyDown(e) {
+    if ((e.key === " " || e.key === "Enter") && skillInput.trim()) {
+      e.preventDefault();
+      const s = skillInput.trim();
+      if (!manualSkills.includes(s)) setManualSkills(p => [...p, s]);
+      setSkillInput("");
+    }
+    if (e.key === "Backspace" && !skillInput && manualSkills.length > 0) {
+      setManualSkills(p => p.slice(0, -1));
+    }
+  }
+
   async function handleGenerate() {
-    if (!brief.trim()) return;
+    const hasBrief = brief.trim();
+    const hasJD    = pastedJD.trim();
+    if (!hasBrief && !hasJD) return;
+
+    // Paste path — no API call; extract skills locally and use JD as-is
+    if (!hasBrief && hasJD) {
+      const extracted = extractSkillsFromJd(pastedJD);
+      setAiResponse({
+        generatedJdText: pastedJD,
+        extractedSkills: extracted.technical,
+        softSkills:      extracted.soft,
+        seniorityLevel:  extracted.seniority,
+        roleType:  null,
+        industry:  null,
+      });
+      setEditedJD(pastedJD);
+      setJdEditable(false);
+      return;
+    }
+
+    // Brief path — call AI API
     setLoading(true);
     setBriefError(null);
     try {
@@ -356,10 +427,11 @@ export default function CreateJobPageModern() {
           jobStatus: form.jobStatus,
           jdText:    editedJD,
           seniority: aiResponse?.seniorityLevel || null,
-          stackTags: [
+          stackTags: [...new Set([
             ...(aiResponse?.extractedSkills || []),
             ...(aiResponse?.softSkills || []),
-          ],
+            ...manualSkills,
+          ])],
         }),
       });
       if (!res.ok) throw new Error(await res.text());
@@ -450,7 +522,134 @@ export default function CreateJobPageModern() {
 
           {briefError && <Alert severity="error" sx={{ mb: 2, borderRadius: "10px" }}>{briefError}</Alert>}
 
-          <GenerateBtn onClick={handleGenerate} loading={loading} disabled={!brief.trim()} />
+          {/* "Already have existing JD?" toggle */}
+          <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1.5 }}>
+            <Box
+              onClick={() => setShowExistingJD(p => !p)}
+              sx={{
+                fontSize: 13, fontWeight: 500, color: showExistingJD ? MUTED : ACCENT,
+                cursor: "pointer", textDecoration: "underline",
+                textDecorationColor: showExistingJD ? MUTED : ACCENT,
+                textUnderlineOffset: "2px",
+                "&:hover": { opacity: 0.75 },
+              }}
+            >
+              {showExistingJD ? "× Hide existing JD" : "Already have an existing JD?"}
+            </Box>
+          </Box>
+
+          {/* Expandable paste-JD section */}
+          {showExistingJD && (
+            <Box sx={{
+              border: `1px solid ${BORDER}`, borderRadius: "12px",
+              bgcolor: "#FAFBFD", p: "20px 22px", mb: 2,
+            }}>
+              {/* Section header */}
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.75 }}>
+                <Box sx={{
+                  width: 28, height: 28, borderRadius: "8px", bgcolor: ACCENT_L,
+                  border: `1px solid ${ACCENT_BR}`, display: "flex",
+                  alignItems: "center", justifyContent: "center", flexShrink: 0,
+                }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                    stroke={ACCENT} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14 2 14 8 20 8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                  </svg>
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: TEXT, lineHeight: 1.2 }}>
+                    Paste Existing Job Description
+                  </Typography>
+                  <Typography sx={{ fontSize: 11.5, color: MUTED, mt: 0.25 }}>
+                    Skip AI generation — paste your JD and we'll extract skills automatically
+                  </Typography>
+                </Box>
+              </Box>
+
+              {/* JD textarea */}
+              <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT, mb: 0.75 }}>
+                Job Description
+              </Typography>
+              <TextField
+                multiline rows={8} fullWidth
+                value={pastedJD}
+                onChange={e => setPastedJD(e.target.value)}
+                placeholder="Paste the full job description here…"
+                sx={{
+                  mb: 2,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "10px", fontSize: 13.5, bgcolor: "#fff",
+                    "& fieldset": { borderColor: BORDER },
+                    "&:hover fieldset": { borderColor: "#C0C8D8" },
+                    "&.Mui-focused fieldset": { borderColor: ACCENT },
+                  },
+                }}
+              />
+
+              {/* Skills tag input */}
+              <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT, mb: 0.75 }}>
+                Add Skills <Box component="span" sx={{ fontSize: 11.5, fontWeight: 400, color: MUTED }}>
+                  — type a skill and press Space to add
+                </Box>
+              </Typography>
+              <Box
+                onClick={() => document.getElementById("modern-skill-input").focus()}
+                sx={{
+                  display: "flex", flexWrap: "wrap", gap: 0.75, alignItems: "center",
+                  border: `1px solid ${BORDER}`, borderRadius: "10px",
+                  p: "8px 12px", minHeight: 46, bgcolor: "#fff", cursor: "text",
+                  transition: "border-color .15s, box-shadow .15s",
+                  "&:focus-within": {
+                    borderColor: ACCENT,
+                    boxShadow: `0 0 0 3px rgba(29,114,232,0.08)`,
+                  },
+                }}
+              >
+                {manualSkills.map(s => (
+                  <Box key={s} sx={{
+                    display: "inline-flex", alignItems: "center", gap: 0.5,
+                    bgcolor: ACCENT_L, border: `1px solid ${ACCENT_BR}`,
+                    borderRadius: "20px", px: 1.25, py: "3px",
+                    fontSize: 11.5, fontWeight: 600, color: ACCENT,
+                  }}>
+                    {s}
+                    <Box
+                      onClick={e => { e.stopPropagation(); setManualSkills(p => p.filter(x => x !== s)); }}
+                      sx={{ cursor: "pointer", fontSize: 14, lineHeight: 1, opacity: 0.5, "&:hover": { opacity: 1 } }}
+                    >×</Box>
+                  </Box>
+                ))}
+                <Box
+                  id="modern-skill-input"
+                  component="input"
+                  value={skillInput}
+                  onChange={e => setSkillInput(e.target.value)}
+                  onKeyDown={handleSkillKeyDown}
+                  placeholder={manualSkills.length === 0 ? "e.g. Kafka   Docker   FinTech…" : ""}
+                  sx={{
+                    border: "none", outline: "none", background: "transparent",
+                    fontSize: 13, color: TEXT, fontFamily: "inherit",
+                    minWidth: 160, flex: 1, p: "2px 4px",
+                    "&::placeholder": { color: MUTED },
+                  }}
+                />
+              </Box>
+              {manualSkills.length > 0 && (
+                <Typography sx={{ fontSize: 11.5, color: MUTED, mt: 0.75 }}>
+                  {manualSkills.length} skill{manualSkills.length !== 1 ? "s" : ""} added
+                </Typography>
+              )}
+
+              <Typography sx={{ fontSize: 11.5, color: MUTED, mt: 1.5, lineHeight: 1.5 }}>
+                Click "Generate Job Description" below — your pasted JD will be used as-is and skills will be extracted automatically.
+              </Typography>
+            </Box>
+          )}
+
+          <GenerateBtn onClick={handleGenerate} loading={loading} disabled={!brief.trim() && !pastedJD.trim()} />
 
           {/* ── Output section (appears after generation) ── */}
           {aiResponse && (
@@ -459,7 +658,7 @@ export default function CreateJobPageModern() {
               {/* JD label + NEW badge + Edit toggle */}
               <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
                 <Typography sx={{ fontSize: 15, fontWeight: 700, color: TEXT }}>
-                  AI Generated Job Description
+                  {brief.trim() ? "AI Generated Job Description" : "Job Description"}
                 </Typography>
                 <Box sx={{
                   fontSize: 9, fontWeight: 700, color: PURPLE, bgcolor: PURPLE_L,
