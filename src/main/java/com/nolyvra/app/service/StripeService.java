@@ -31,6 +31,10 @@ public class StripeService {
     private String webhookSecret;
 
     // ── Price IDs from application.yml ────────────────────────────────────────
+    @Value("${stripe.price-ids.token-pack-100:}")      private String token100Price;
+    @Value("${stripe.price-ids.token-pack-250:}")      private String token250Price;
+    @Value("${stripe.price-ids.token-pack-600:}")      private String token600Price;
+    @Value("${stripe.price-ids.token-pack-1500:}")     private String token1500Price;
     @Value("${stripe.price-ids.plan-payg-monthly:}")   private String paygMonthly;
     @Value("${stripe.price-ids.plan-payg-yearly:}")    private String paygYearly;
     @Value("${stripe.price-ids.plan-bronze-monthly:}") private String bronzeMonthly;
@@ -94,6 +98,32 @@ public class StripeService {
         return portalSession.getUrl();
     }
 
+    // ─── Create Token Pack Checkout Session (one-time payment) ───────────────
+
+    public String createTokenCheckoutSession(String loginId, String packId,
+                                              String successUrl, String cancelUrl) throws Exception {
+        Stripe.apiKey = secretKey;
+
+        String priceId    = resolveTokenPackPriceId(packId);
+        String customerId = getOrCreateCustomer(loginId);
+
+        SessionCreateParams params = SessionCreateParams.builder()
+                .setMode(SessionCreateParams.Mode.PAYMENT)
+                .setCustomer(customerId)
+                .addLineItem(SessionCreateParams.LineItem.builder()
+                        .setPrice(priceId)
+                        .setQuantity(1L)
+                        .build())
+                .putMetadata("loginId", loginId)
+                .putMetadata("packId",  packId)
+                .setSuccessUrl(successUrl + "?session_id={CHECKOUT_SESSION_ID}&tokens_purchased=true")
+                .setCancelUrl(cancelUrl)
+                .build();
+
+        Session session = Session.create(params);
+        return session.getUrl();
+    }
+
     // ─── Handle incoming Stripe webhook ──────────────────────────────────────
     // Uses getRawJson() + GSON for deserialization to avoid API version
     // mismatch issues that cause getObject().isPresent() to return false.
@@ -122,10 +152,14 @@ public class StripeService {
                             deserializer.getRawJson(), Session.class);
                     String loginId = session.getMetadata().get("loginId");
                     String planId  = session.getMetadata().get("planId");
+                    String packId  = session.getMetadata().get("packId");
                     System.out.println("[Stripe] checkout metadata — loginId: "
-                            + loginId + " planId: " + planId);
+                            + loginId + " planId: " + planId + " packId: " + packId);
                     if (loginId != null && planId != null) {
                         activatePlan(loginId, planId);
+                    } else if (loginId != null && packId != null) {
+                        int tokenCount = resolveTokenPackCount(packId);
+                        if (tokenCount > 0) addTokens(loginId, tokenCount);
                     }
                 } catch (Exception e) {
                     System.err.println("[Stripe] Failed to deserialize checkout.session.completed: "
@@ -223,6 +257,18 @@ public class StripeService {
         System.out.println("[Stripe] activatePlan() — updated " + rows + " rows");
     }
 
+    // ─── Add purchased tokens to user account ────────────────────────────────
+
+    public void addTokens(String loginId, int tokenCount) {
+        jdbc.update("""
+                update login
+                set additional_tokens = coalesce(additional_tokens, 0) + ?,
+                    tokens_remaining  = coalesce(tokens_remaining,  0) + ?
+                where id = ?
+                """, tokenCount, tokenCount, loginId);
+        System.out.println("[Stripe] addTokens() — added " + tokenCount + " tokens to " + loginId);
+    }
+
     // ─── Shared helper: activate plan from Subscription object ───────────────
 
     private void activatePlanFromSubscription(Subscription sub, String eventName) {
@@ -243,6 +289,36 @@ public class StripeService {
                         + ": " + planId + " for " + ids.get(0));
             }
         }
+    }
+
+    // ─── Resolve token packId → Stripe Price ID ──────────────────────────────
+
+    private String resolveTokenPackPriceId(String packId) {
+        String priceId = switch (packId) {
+            case "token-pack-100"  -> token100Price;
+            case "token-pack-250"  -> token250Price;
+            case "token-pack-600"  -> token600Price;
+            case "token-pack-1500" -> token1500Price;
+            default -> throw new IllegalArgumentException("Unknown token pack: " + packId);
+        };
+        if (priceId == null || priceId.isBlank()) {
+            throw new IllegalStateException(
+                "Token pack '" + packId + "' is not yet configured. " +
+                "Please set the corresponding STRIPE_PRICE_TOKEN_* environment variable.");
+        }
+        return priceId;
+    }
+
+    // ─── Resolve token packId → token count ──────────────────────────────────
+
+    private int resolveTokenPackCount(String packId) {
+        return switch (packId) {
+            case "token-pack-100"  -> 100;
+            case "token-pack-250"  -> 250;
+            case "token-pack-600"  -> 600;
+            case "token-pack-1500" -> 1500;
+            default -> 0;
+        };
     }
 
     // ─── Resolve planId + billing → Stripe Price ID ───────────────────────────

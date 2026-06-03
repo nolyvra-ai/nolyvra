@@ -73,6 +73,9 @@ export default function SettingsPage() {
   const [upgradeSuccess, setUpgradeSuccess] = useState(
     searchParams.get("upgraded") === "true"
   );
+  const [tokensPurchased, setTokensPurchased] = useState(
+    searchParams.get("tokens_purchased") === "true"
+  );
 
   // Outlook OAuth
   const [outlookSuccess,      setOutlookSuccess]      = useState(searchParams.get("outlook") === "connected");
@@ -315,6 +318,41 @@ export default function SettingsPage() {
     nav("/login");
   }
 
+  // ── Buy Tokens ────────────────────────────────────────────────────────────
+  const TOKEN_PACKS = [
+    { id: "token-pack-100",  tokens: 100,   price: 5,  perToken: "5¢" },
+    { id: "token-pack-250",  tokens: 250,   price: 10, perToken: "4¢", popular: true },
+    { id: "token-pack-600",  tokens: 600,   price: 20, perToken: "3.3¢" },
+    { id: "token-pack-1500", tokens: 1500,  price: 50, perToken: "3.3¢", best: true },
+  ];
+  const [selectedPack, setSelectedPack] = useState(null);
+  const [buyLoading,   setBuyLoading]   = useState(false);
+
+  async function handleBuyTokens() {
+    if (!selectedPack) return;
+    setBuyLoading(true);
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/stripe/token-checkout?` +
+        `loginId=${encodeURIComponent(loginId)}` +
+        `&packId=${encodeURIComponent(selectedPack)}` +
+        `&successUrl=${encodeURIComponent(window.location.origin + "/settings")}` +
+        `&cancelUrl=${encodeURIComponent(window.location.origin + "/settings")}`,
+        { method: "POST", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } }
+      );
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.error || "Failed to start checkout. Please try again.");
+      }
+    } catch {
+      alert("Network error. Please try again.");
+    } finally {
+      setBuyLoading(false);
+    }
+  }
+
   // ── Manage Subscription (Stripe Portal) ──────────────────────────────────
   const [portalLoading, setPortalLoading] = useState(false);
 
@@ -356,6 +394,14 @@ export default function SettingsPage() {
         <Alert severity="success" onClose={() => setUpgradeSuccess(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           🎉 Your plan has been upgraded successfully! Your new limits are now active.
+        </Alert>
+      )}
+
+      {/* ── Token purchase success banner ─────────────────────────────────── */}
+      {tokensPurchased && (
+        <Alert severity="success" onClose={() => setTokensPurchased(false)}
+          sx={{ borderRadius: "10px", fontSize: 13 }}>
+          🪙 Tokens added to your account successfully! Your balance has been updated.
         </Alert>
       )}
 
@@ -506,6 +552,75 @@ export default function SettingsPage() {
               Could not load plan details.
             </Typography>
           )}
+        </Box>
+      </Paper>
+
+      {/* ── Buy Tokens ────────────────────────────────────────────────────── */}
+      <Paper elevation={0} sx={{
+        border: `1px solid ${BORDER}`, borderRadius: "10px",
+        overflow: "hidden", bgcolor: "#fff"
+      }}>
+        <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}` }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>🪙 Buy Tokens</Typography>
+          <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
+            Top up your token balance. Tokens are added instantly after payment.
+          </Typography>
+        </Box>
+        <Box sx={{ p: 2.25, display: "flex", flexDirection: "column", gap: 1.5 }}>
+          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.25 }}>
+            {TOKEN_PACKS.map(pack => {
+              const isSelected = selectedPack === pack.id;
+              return (
+                <Box key={pack.id} onClick={() => setSelectedPack(pack.id)}
+                  sx={{
+                    position: "relative", p: "12px 14px", borderRadius: "8px", cursor: "pointer",
+                    border: `1.5px solid ${isSelected ? ACCENT : BORDER}`,
+                    bgcolor: isSelected ? ACCENT_BG : SURFACE,
+                    transition: "all .15s",
+                    "&:hover": { borderColor: ACCENT, bgcolor: ACCENT_BG },
+                  }}>
+                  {pack.popular && (
+                    <Box sx={{
+                      position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)",
+                      bgcolor: ACCENT, color: "#fff", fontSize: 9, fontWeight: 700,
+                      px: 1, py: 0.25, borderRadius: "10px", whiteSpace: "nowrap",
+                      letterSpacing: ".4px", textTransform: "uppercase"
+                    }}>Popular</Box>
+                  )}
+                  {pack.best && (
+                    <Box sx={{
+                      position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)",
+                      bgcolor: SUCCESS, color: "#fff", fontSize: 9, fontWeight: 700,
+                      px: 1, py: 0.25, borderRadius: "10px", whiteSpace: "nowrap",
+                      letterSpacing: ".4px", textTransform: "uppercase"
+                    }}>Best Value</Box>
+                  )}
+                  <Typography sx={{ fontSize: 18, fontWeight: 700, color: isSelected ? ACCENT : TEXT, lineHeight: 1 }}>
+                    {pack.tokens.toLocaleString()}
+                  </Typography>
+                  <Typography sx={{ fontSize: 10, color: MUTED, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".4px", mt: 0.25 }}>
+                    tokens
+                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5, mt: 1 }}>
+                    <Typography sx={{ fontSize: 16, fontWeight: 700, color: isSelected ? ACCENT : TEXT }}>
+                      ${pack.price}
+                    </Typography>
+                    <Typography sx={{ fontSize: 10, color: MUTED }}>· {pack.perToken} / token</Typography>
+                  </Box>
+                </Box>
+              );
+            })}
+          </Box>
+          <Button variant="contained" onClick={handleBuyTokens}
+            disabled={!selectedPack || buyLoading}
+            sx={{
+              alignSelf: "stretch", fontSize: 13, fontWeight: 600,
+              bgcolor: ACCENT, borderRadius: "8px", textTransform: "none",
+              boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" },
+              "&.Mui-disabled": { bgcolor: ACCENT_BG, color: ACCENT }
+            }}>
+            {buyLoading ? <CircularProgress size={16} sx={{ color: "#fff" }} /> : "Checkout →"}
+          </Button>
         </Box>
       </Paper>
 

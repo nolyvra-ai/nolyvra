@@ -64,6 +64,34 @@ public class StripeController {
         }
     }
 
+    // ─── POST /api/stripe/token-checkout ─────────────────────────────────────
+    // Called from SettingsPage when user buys a token pack (one-time payment).
+
+    @PostMapping("/token-checkout")
+    public ResponseEntity<?> tokenCheckout(
+            @RequestParam String loginId,
+            @RequestParam String packId,
+            @RequestParam String successUrl,
+            @RequestParam String cancelUrl) {
+
+        if (loginId == null || loginId.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "loginId is required."));
+        }
+
+        try {
+            String url = stripeService.createTokenCheckoutSession(
+                    loginId, packId, successUrl, cancelUrl);
+            return ResponseEntity.ok(Map.of("url", url));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            System.err.println("[Stripe] Token checkout failed: " + e.getMessage());
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Failed to create token checkout session."));
+        }
+    }
+
     // ─── POST /api/stripe/portal ──────────────────────────────────────────────
     // Opens the Stripe Customer Portal for managing / cancelling subscriptions.
 
