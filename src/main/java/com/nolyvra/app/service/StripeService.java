@@ -31,6 +31,8 @@ public class StripeService {
     private String webhookSecret;
 
     // ── Price IDs from application.yml ────────────────────────────────────────
+    @Value("${stripe.price-ids.plan-payg-monthly:}")   private String paygMonthly;
+    @Value("${stripe.price-ids.plan-payg-yearly:}")    private String paygYearly;
     @Value("${stripe.price-ids.plan-bronze-monthly:}") private String bronzeMonthly;
     @Value("${stripe.price-ids.plan-bronze-yearly:}")  private String bronzeYearly;
     @Value("${stripe.price-ids.plan-silver-monthly:}") private String silverMonthly;
@@ -248,6 +250,7 @@ public class StripeService {
     private String resolvePriceId(String planId, String billing) {
         boolean yearly = "yearly".equalsIgnoreCase(billing);
         return switch (planId) {
+            case "plan-payg"   -> yearly ? paygYearly   : paygMonthly;
             case "plan-bronze" -> yearly ? bronzeYearly : bronzeMonthly;
             case "plan-silver" -> yearly ? silverYearly : silverMonthly;
             case "plan-gold"   -> yearly ? goldYearly   : goldMonthly;
@@ -259,6 +262,7 @@ public class StripeService {
 
     private String resolvePlanIdFromPrice(String priceId) {
         if (priceId == null) return null;
+        if (priceId.equals(paygMonthly)   || priceId.equals(paygYearly))   return "plan-payg";
         if (priceId.equals(bronzeMonthly) || priceId.equals(bronzeYearly)) return "plan-bronze";
         if (priceId.equals(silverMonthly) || priceId.equals(silverYearly)) return "plan-silver";
         if (priceId.equals(goldMonthly)   || priceId.equals(goldYearly))   return "plan-gold";

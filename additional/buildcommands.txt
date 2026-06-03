@@ -3,7 +3,9 @@ Backend:
 ./mvnw spring-boot:run
 
 FrontEnd:
+rm -rf node_modules/.vite
 npm run dev
+
 
 
 Docker Run commands:
