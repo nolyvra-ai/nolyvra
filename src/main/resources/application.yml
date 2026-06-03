@@ -68,9 +68,15 @@ stripe:
   publishable-key: ${STRIPE_PUBLISHABLE_KEY:}
   webhook-secret: ${STRIPE_WEBHOOK_SECRET:}
   price-ids:
+    token-pack-100:      ${STRIPE_PRICE_TOKEN_100:}
+    token-pack-250:      ${STRIPE_PRICE_TOKEN_250:}
+    token-pack-600:      ${STRIPE_PRICE_TOKEN_600:}
+    token-pack-1500:     ${STRIPE_PRICE_TOKEN_1500:}
+    plan-payg-monthly:   ${STRIPE_PRICE_PAYG_MONTHLY:}
+    plan-payg-yearly:    ${STRIPE_PRICE_PAYG_YEARLY:}
     plan-bronze-monthly: ${STRIPE_PRICE_BRONZE_MONTHLY:}
-    plan-bronze-yearly: ${STRIPE_PRICE_BRONZE_YEARLY:}
+    plan-bronze-yearly:  ${STRIPE_PRICE_BRONZE_YEARLY:}
     plan-silver-monthly: ${STRIPE_PRICE_SILVER_MONTHLY:}
-    plan-silver-yearly: ${STRIPE_PRICE_SILVER_YEARLY:}
-    plan-gold-monthly: ${STRIPE_PRICE_GOLD_MONTHLY:}
-    plan-gold-yearly: ${STRIPE_PRICE_GOLD_YEARLY:}
+    plan-silver-yearly:  ${STRIPE_PRICE_SILVER_YEARLY:}
+    plan-gold-monthly:   ${STRIPE_PRICE_GOLD_MONTHLY:}
+    plan-gold-yearly:    ${STRIPE_PRICE_GOLD_YEARLY:}
