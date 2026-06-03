@@ -150,20 +150,32 @@ public class StripeService {
                 try {
                     Session session = ApiResource.GSON.fromJson(
                             deserializer.getRawJson(), Session.class);
-                    String loginId = session.getMetadata().get("loginId");
-                    String planId  = session.getMetadata().get("planId");
-                    String packId  = session.getMetadata().get("packId");
+                    if (session == null) {
+                        System.err.println("[Stripe] checkout.session.completed: session is null after deserialization");
+                        break;
+                    }
+                    java.util.Map<String, String> meta = session.getMetadata();
+                    if (meta == null) {
+                        System.err.println("[Stripe] checkout.session.completed: metadata is null — mode=" + session.getMode());
+                        break;
+                    }
+                    String loginId = meta.get("loginId");
+                    String planId  = meta.get("planId");
+                    String packId  = meta.get("packId");
                     System.out.println("[Stripe] checkout metadata — loginId: "
-                            + loginId + " planId: " + planId + " packId: " + packId);
+                            + loginId + " planId: " + planId + " packId: " + packId + " mode: " + session.getMode());
                     if (loginId != null && planId != null) {
                         activatePlan(loginId, planId);
                     } else if (loginId != null && packId != null) {
                         int tokenCount = resolveTokenPackCount(packId);
+                        System.out.println("[Stripe] token pack resolved — packId: " + packId + " tokenCount: " + tokenCount);
                         if (tokenCount > 0) addTokens(loginId, tokenCount);
+                    } else {
+                        System.err.println("[Stripe] checkout.session.completed: unhandled — loginId=" + loginId + " planId=" + planId + " packId=" + packId);
                     }
                 } catch (Exception e) {
-                    System.err.println("[Stripe] Failed to deserialize checkout.session.completed: "
-                            + e.getMessage());
+                    System.err.println("[Stripe] Failed to deserialize checkout.session.completed: " + e.getMessage());
+                    e.printStackTrace();
                 }
             }
 
