@@ -58,10 +58,10 @@ stripe:
   publishable-key: ${STRIPE_PUBLISHABLE_KEY:pk_test_51TDuGlFnY4rJ5ynhFHcrIEklbzwFBhBMIgWD1W1SG0Jh3ARU5QbEXwskAHtfRRZTu8Nu9pJ6T9zgzd119YdMK5XG00OjG7JKQ6}
   webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_34e994cd3a6d5114043804bdc7b24965d4e64f13308ecd323aa3775d6c1b9e6e}
   price-ids:
-    token-pack-100:      ${STRIPE_PRICE_TOKEN_100:price_1TeDJbCNhVcjXcZqEeGH0kd8}
-    token-pack-250:      ${STRIPE_PRICE_TOKEN_250:price_1TeDLXCNhVcjXcZqgdUiN3aL}
-    token-pack-600:      ${STRIPE_PRICE_TOKEN_600:price_1TeDLSCNhVcjXcZqk0B2wiXo}
-    token-pack-1500:     ${STRIPE_PRICE_TOKEN_1500:price_1TeDLQCNhVcjXcZqw7dNcd9p}
+    token-pack-100:      ${STRIPE_PRICE_TOKEN_100:price_1TeDJNFnY4rJ5ynhScd4UDgM}
+    token-pack-250:      ${STRIPE_PRICE_TOKEN_250:price_1TeDK8FnY4rJ5ynhLCsEn1Oa}
+    token-pack-600:      ${STRIPE_PRICE_TOKEN_600:price_1TeDKvFnY4rJ5ynhVoHgq0Ap}
+    token-pack-1500:     ${STRIPE_PRICE_TOKEN_1500:price_1TeDLKFnY4rJ5ynhCS5IBL2M}
     plan-payg-monthly:   ${STRIPE_PRICE_PAYG_MONTHLY:price_1TdhNpFnY4rJ5ynh5U1NQTIN}
     plan-payg-yearly:    ${STRIPE_PRICE_PAYG_YEARLY:price_1TdhNLFnY4rJ5ynhOlzdmVha}
     plan-bronze-monthly: ${STRIPE_PRICE_BRONZE_MONTHLY:price_1TDxlCFnY4rJ5ynhJ6pqbWqA}
