@@ -890,9 +890,10 @@ export default function SettingsPage() {
                 {u.planId === "registered" && (
                   <Box sx={{
                     display: "grid",
-                    gridTemplateColumns: { xs: "1fr", md: "minmax(220px, 0.7fr) minmax(320px, 1.3fr)" },
+                    gridTemplateColumns: "1fr",
                     gap: 1.25,
                     mt: 1.25,
+                    maxWidth: 760,
                   }}>
                     <TextField
                       size="small"
@@ -905,10 +906,16 @@ export default function SettingsPage() {
                       size="small"
                       label="Approval email body"
                       multiline
-                      minRows={4}
+                      minRows={8}
                       value={onboardEmails[u.id]?.body ?? DEFAULT_APPROVAL_BODY}
                       onChange={e => updateOnboardEmail(u.id, "body", e.target.value)}
-                      sx={fieldSx}
+                      sx={{
+                        ...fieldSx,
+                        "& textarea": {
+                          whiteSpace: "pre-wrap",
+                          overflowWrap: "break-word",
+                        },
+                      }}
                       helperText="Available placeholders: {name}, {email}, {password}"
                     />
                   </Box>
