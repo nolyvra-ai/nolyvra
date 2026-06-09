@@ -1,6 +1,8 @@
 package com.nolyvra.app.controller;
 
 import com.nolyvra.app.service.SessionService;
+import com.nolyvra.app.service.AdminSettingsService;
+import com.nolyvra.app.service.RegisterInterestNotificationService;
 import com.nolyvra.app.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,10 +16,18 @@ public class AuthController {
 
     private final UserService userService;
     private final SessionService sessionService;
+    private final AdminSettingsService adminSettingsService;
+    private final RegisterInterestNotificationService registerInterestNotificationService;
 
-    public AuthController(UserService userService, SessionService sessionService) {
+    public AuthController(
+            UserService userService,
+            SessionService sessionService,
+            AdminSettingsService adminSettingsService,
+            RegisterInterestNotificationService registerInterestNotificationService) {
         this.userService = userService;
         this.sessionService = sessionService;
+        this.adminSettingsService = adminSettingsService;
+        this.registerInterestNotificationService = registerInterestNotificationService;
     }
 
     // POST /api/auth/change-password?loginId=x
@@ -67,6 +77,7 @@ public class AuthController {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "An account with this email already exists."));
         }
+        registerInterestNotificationService.notifyNewRegistration(firstName, lastName, company, email, phone);
         return ResponseEntity.ok(Map.of("status", "registered"));
     }
 
@@ -151,5 +162,43 @@ public class AuthController {
 
         userService.onboardUser(targetId);
         return ResponseEntity.ok(Map.of("status", "onboarded"));
+    }
+
+    // GET /api/auth/admin/register-interest-notifications?loginId=x
+    // Admin only — returns the email recipients notified when someone registers interest
+    @GetMapping("/admin/register-interest-notifications")
+    public ResponseEntity<?> getRegisterInterestNotifications(@RequestParam String loginId) {
+        if (!userService.isAdmin(loginId)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied."));
+        }
+        return ResponseEntity.ok(Map.of(
+                "emails", adminSettingsService.getRegisterInterestNotificationEmails()));
+    }
+
+    // PUT /api/auth/admin/register-interest-notifications?loginId=x
+    // Admin only — saves the notification recipient list
+    @PutMapping("/admin/register-interest-notifications")
+    public ResponseEntity<?> saveRegisterInterestNotifications(
+            @RequestParam String loginId,
+            @RequestBody Map<String, Object> body) {
+
+        if (!userService.isAdmin(loginId)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied."));
+        }
+
+        Object rawEmails = body.get("emails");
+        String emailText = "";
+        if (rawEmails instanceof List<?> list) {
+            emailText = String.join(",", list.stream().map(String::valueOf).toList());
+        } else if (rawEmails != null) {
+            emailText = String.valueOf(rawEmails);
+        }
+
+        try {
+            List<String> emails = adminSettingsService.saveRegisterInterestNotificationEmails(emailText);
+            return ResponseEntity.ok(Map.of("status", "saved", "emails", emails));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 }
