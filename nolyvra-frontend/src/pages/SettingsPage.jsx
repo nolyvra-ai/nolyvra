@@ -15,6 +15,24 @@ const DANGER = "#DC2626", DANGER_BG = "#FEF2F2", DANGER_BR = "#FECACA";
 const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
 const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
 const SURFACE = "#FAFBFD";
+const fieldSx = {
+  "& .MuiOutlinedInput-root": { borderRadius: "6px", fontSize: 12, bgcolor: "#fff" },
+  "& .MuiInputLabel-root": { fontSize: 12 },
+  "& .MuiFormHelperText-root": { fontSize: 10, color: MUTED, mx: 0 },
+};
+
+const DEFAULT_APPROVAL_SUBJECT = "Welcome to Nolyvra - registration approved";
+const DEFAULT_APPROVAL_BODY = `Hi {name},
+
+Congratulations, your Nolyvra registration has been approved.
+
+You can now sign in using your registered email address. Your temporary password is:
+{password}
+
+Please change your password after your first login.
+
+Best regards,
+Nolyvra Team`;
 
 // ── Usage bar component ───────────────────────────────────────────────────────
 function UsageBar({ label, used, max, remainingLabel }) {
@@ -194,6 +212,7 @@ export default function SettingsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminUsers, setAdminUsers] = useState([]);
   const [onboarding, setOnboarding] = useState(null);
+  const [onboardEmails, setOnboardEmails] = useState({});
   const [selectedAdminUser, setSelectedAdminUser] = useState("");
   const [additionalLimits, setAdditionalLimits] = useState({ tokens: "", jobs: "", candidates: "" });
   const [limitsUpdating, setLimitsUpdating] = useState(false);
@@ -209,11 +228,16 @@ export default function SettingsPage() {
 
   async function handleOnboard(targetId) {
     setOnboarding(targetId);
+    const draft = onboardEmails[targetId] || {};
     try {
       await fetch(`${API_BASE}/api/auth/admin/onboard?loginId=${encodeURIComponent(loginId)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
-        body: JSON.stringify({ targetLoginId: targetId }),
+        body: JSON.stringify({
+          targetLoginId: targetId,
+          emailSubject: draft.subject ?? DEFAULT_APPROVAL_SUBJECT,
+          emailBody: draft.body ?? DEFAULT_APPROVAL_BODY,
+        }),
       });
       setAdminUsers(prev => prev.map(u =>
         u.id === targetId ? { ...u, planId: "plan-free", planName: "Free" } : u));
@@ -222,6 +246,17 @@ export default function SettingsPage() {
     } finally {
       setOnboarding(null);
     }
+  }
+
+  function updateOnboardEmail(targetId, field, value) {
+    setOnboardEmails(prev => ({
+      ...prev,
+      [targetId]: {
+        subject: prev[targetId]?.subject ?? DEFAULT_APPROVAL_SUBJECT,
+        body: prev[targetId]?.body ?? DEFAULT_APPROVAL_BODY,
+        [field]: value,
+      },
+    }));
   }
 
   function handleAdminUserSelect(userId) {
@@ -798,56 +833,86 @@ export default function SettingsPage() {
               <Typography sx={{ fontSize: 12, color: MUTED, p: 2.25 }}>No users found.</Typography>
             ) : adminUsers.map(u => (
               <Box key={u.id} sx={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
                 px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`,
                 "&:last-child": { borderBottom: "none" },
               }}>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{
-                    fontSize: 12, fontWeight: 600, color: TEXT,
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
-                  }}>
-                    {u.name || u.id}
-                  </Typography>
-                  <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
-                    {u.id}
-                    {u.createdAt && ` · Joined ${new Date(u.createdAt).toLocaleDateString("en-GB",
-                      { day: "numeric", month: "short", year: "numeric" })}`}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexShrink: 0, ml: 2 }}>
-                  {/* Plan badge */}
-                  <Box sx={{
-                    display: "inline-flex", alignItems: "center",
-                    bgcolor: u.planId === "registered" ? WARN_BG
-                      : u.planId === "plan-free" ? "#F1F3F7"
-                        : ACCENT_BG,
-                    border: `1px solid ${u.planId === "registered" ? WARN_BR
-                      : u.planId === "plan-free" ? BORDER
-                        : ACCENT_BR}`,
-                    borderRadius: "20px", px: 1.25, py: 0.25,
-                    fontSize: 11, fontWeight: 600,
-                    color: u.planId === "registered" ? WARN
-                      : u.planId === "plan-free" ? MUTED
-                        : ACCENT,
-                  }}>
-                    {u.planName}
+                <Box sx={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  gap: 2,
+                }}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{
+                      fontSize: 12, fontWeight: 600, color: TEXT,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+                    }}>
+                      {u.name || u.id}
+                    </Typography>
+                    <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
+                      {u.id}
+                      {u.createdAt && ` · Joined ${new Date(u.createdAt).toLocaleDateString("en-GB",
+                        { day: "numeric", month: "short", year: "numeric" })}`}
+                    </Typography>
                   </Box>
-                  {/* Onboard button — only for registered users */}
-                  {u.planId === "registered" && (
-                    <Button size="small" variant="contained"
-                      disabled={onboarding === u.id}
-                      onClick={() => handleOnboard(u.id)}
-                      sx={{
-                        fontSize: 11, bgcolor: WARN, borderRadius: "6px",
-                        textTransform: "none", boxShadow: "none", whiteSpace: "nowrap",
-                        "&:hover": { bgcolor: "#B45309", boxShadow: "none" },
-                        "&.Mui-disabled": { bgcolor: WARN_BG, color: "#92400E" }
-                      }}>
-                      {onboarding === u.id ? "Onboarding…" : "Onboard"}
-                    </Button>
-                  )}
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexShrink: 0 }}>
+                    {/* Plan badge */}
+                    <Box sx={{
+                      display: "inline-flex", alignItems: "center",
+                      bgcolor: u.planId === "registered" ? WARN_BG
+                        : u.planId === "plan-free" ? "#F1F3F7"
+                          : ACCENT_BG,
+                      border: `1px solid ${u.planId === "registered" ? WARN_BR
+                        : u.planId === "plan-free" ? BORDER
+                          : ACCENT_BR}`,
+                      borderRadius: "20px", px: 1.25, py: 0.25,
+                      fontSize: 11, fontWeight: 600,
+                      color: u.planId === "registered" ? WARN
+                        : u.planId === "plan-free" ? MUTED
+                          : ACCENT,
+                    }}>
+                      {u.planName}
+                    </Box>
+                    {/* Onboard button — only for registered users */}
+                    {u.planId === "registered" && (
+                      <Button size="small" variant="contained"
+                        disabled={onboarding === u.id}
+                        onClick={() => handleOnboard(u.id)}
+                        sx={{
+                          fontSize: 11, bgcolor: WARN, borderRadius: "6px",
+                          textTransform: "none", boxShadow: "none", whiteSpace: "nowrap",
+                          "&:hover": { bgcolor: "#B45309", boxShadow: "none" },
+                          "&.Mui-disabled": { bgcolor: WARN_BG, color: "#92400E" }
+                        }}>
+                        {onboarding === u.id ? "Onboarding…" : "Onboard"}
+                      </Button>
+                    )}
+                  </Box>
                 </Box>
+                {u.planId === "registered" && (
+                  <Box sx={{
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1fr", md: "minmax(220px, 0.7fr) minmax(320px, 1.3fr)" },
+                    gap: 1.25,
+                    mt: 1.25,
+                  }}>
+                    <TextField
+                      size="small"
+                      label="Approval email subject"
+                      value={onboardEmails[u.id]?.subject ?? DEFAULT_APPROVAL_SUBJECT}
+                      onChange={e => updateOnboardEmail(u.id, "subject", e.target.value)}
+                      sx={fieldSx}
+                    />
+                    <TextField
+                      size="small"
+                      label="Approval email body"
+                      multiline
+                      minRows={4}
+                      value={onboardEmails[u.id]?.body ?? DEFAULT_APPROVAL_BODY}
+                      onChange={e => updateOnboardEmail(u.id, "body", e.target.value)}
+                      sx={fieldSx}
+                      helperText="Available placeholders: {name}, {email}, {password}"
+                    />
+                  </Box>
+                )}
               </Box>
             ))}
           </Box>
