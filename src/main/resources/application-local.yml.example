@@ -27,3 +27,10 @@ google:
   client-secret: your-google-client-secret
   redirect-uri: http://localhost:8080/auth/google/callback
   frontend-url: http://localhost:5173
+
+sms:
+  provider: disabled
+  twilio:
+    account-sid: your-twilio-account-sid
+    auth-token: your-twilio-auth-token
+    from-number: "+15551234567"

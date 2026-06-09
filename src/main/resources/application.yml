@@ -63,6 +63,13 @@ google:
   redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/auth/google/callback}
   frontend-url: ${GOOGLE_FRONTEND_URL:http://localhost:5173}
 
+sms:
+  provider: ${SMS_PROVIDER:disabled}
+  twilio:
+    account-sid: ${TWILIO_ACCOUNT_SID:}
+    auth-token: ${TWILIO_AUTH_TOKEN:}
+    from-number: ${TWILIO_FROM_NUMBER:}
+
 stripe:
   secret-key: ${STRIPE_SECRET_KEY:}
   publishable-key: ${STRIPE_PUBLISHABLE_KEY:}

@@ -143,6 +143,7 @@ public class WorkflowService {
             case "ANALYSIS_RUN" -> "AI analysis completed";
             case "STAGE_CHANGED" -> "Pipeline stage updated";
             case "EMAIL_SENT" -> "Email sent to candidate";
+            case "SMS_SENT" -> "SMS sent to candidate";
             case "INTERVIEW_SCHEDULED" -> "Interview scheduled";
             case "NOTE_ADDED" -> "Recruiter note added";
             case "MESSAGE_GENERATED" -> "AI message generated";

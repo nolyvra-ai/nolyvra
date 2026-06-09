@@ -20,6 +20,7 @@ truncate table
     jobs,
     oauth_tokens,
     reminders,
+    sms_history,
     user_sessions
 restart identity cascade;
 
