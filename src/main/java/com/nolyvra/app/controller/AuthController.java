@@ -149,7 +149,11 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "targetLoginId is required."));
         }
 
-        userService.onboardUser(targetId);
+        userService.onboardUser(
+                targetId,
+                loginId,
+                body.getOrDefault("emailSubject", ""),
+                body.getOrDefault("emailBody", ""));
         return ResponseEntity.ok(Map.of("status", "onboarded"));
     }
 }

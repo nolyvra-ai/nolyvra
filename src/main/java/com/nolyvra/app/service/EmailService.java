@@ -4,6 +4,7 @@ import com.nolyvra.app.model.EmailHistoryResponse;
 import com.nolyvra.app.model.EmailSendRequest;
 import com.nolyvra.app.model.EmailTemplateResponse;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.mail.SimpleMailMessage;
@@ -21,18 +22,21 @@ public class EmailService {
     private final WorkflowService workflowService;
     private final MicrosoftOAuthService microsoftOAuthService;
     private final GoogleOAuthService googleOAuthService;
+    private final String mailFrom;
 
     public EmailService(
             JavaMailSender mailSender,
             JdbcTemplate jdbc,
             WorkflowService workflowService,
             @Lazy MicrosoftOAuthService microsoftOAuthService,
-            @Lazy GoogleOAuthService googleOAuthService) {
+            @Lazy GoogleOAuthService googleOAuthService,
+            @Value("${spring.mail.username:}") String mailFrom) {
         this.mailSender             = mailSender;
         this.jdbc                   = jdbc;
         this.workflowService        = workflowService;
         this.microsoftOAuthService  = microsoftOAuthService;
         this.googleOAuthService     = googleOAuthService;
+        this.mailFrom               = mailFrom;
     }
 
     private static final RowMapper<EmailHistoryResponse> HISTORY_MAPPER = (rs, rowNum) -> {
@@ -124,6 +128,27 @@ public class EmailService {
                 req.templateType(),
                 finalStatus,
                 java.time.Instant.now());
+    }
+
+    public boolean sendSystemEmail(String toAddress, String subject, String body) {
+        if (toAddress == null || toAddress.isBlank()) {
+            return false;
+        }
+
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setTo(toAddress);
+            if (mailFrom != null && !mailFrom.isBlank()) {
+                message.setFrom(mailFrom);
+            }
+            message.setSubject(subject);
+            message.setText(body);
+            mailSender.send(message);
+            return true;
+        } catch (Exception e) {
+            System.err.println("Failed to send system email to " + toAddress + ": " + e.getMessage());
+            return false;
+        }
     }
 
     // ─── GET /api/emails/history ──────────────────────────────────────────────
