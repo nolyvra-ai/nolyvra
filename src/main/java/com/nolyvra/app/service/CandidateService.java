@@ -164,6 +164,7 @@ public class CandidateService {
                     select id, consistency_score, capability_score, risk_level, timeline_match_percent
                     from analyses
                     where candidate_id = c.id
+                      and login_id = c.login_id
                     order by analyzed_at desc
                     limit 1
                 ) a on true

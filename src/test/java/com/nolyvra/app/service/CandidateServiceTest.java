@@ -56,6 +56,7 @@ class CandidateServiceTest {
 
         verify(jdbc).query(
                 argThat(sql -> sql.contains("left join lateral")
+                        && sql.contains("login_id = c.login_id")
                         && sql.contains("order by c.created_at desc")
                         && !sql.contains("cv_text")),
                 anyCandidateListMapper(),
