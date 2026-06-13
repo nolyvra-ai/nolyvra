@@ -16,6 +16,10 @@ import java.util.Map;
 @Service
 public class RegisterInterestNotificationService {
 
+    private static final int MAX_RESEND_ATTEMPTS = 4;
+    private static final long INITIAL_BACKOFF_MS = 700L;
+    private static final long BETWEEN_EMAIL_DELAY_MS = 550L;
+
     private final AdminSettingsService adminSettingsService;
     private final JdbcTemplate jdbc;
     private final String apiKey;
@@ -95,7 +99,7 @@ public class RegisterInterestNotificationService {
                     .subject(subject)
                     .html(html)
                     .build();
-            CreateEmailResponse response = resend.emails().send(params);
+            CreateEmailResponse response = sendEmailWithRetry(resend, params, recipient);
             System.out.println("Register interest email sent via Resend to "
                     + recipient + ": " + response.getId());
             recordNotification(submittedEmail, recipient, "Sent", response.getId(), null);
@@ -107,6 +111,47 @@ public class RegisterInterestNotificationService {
             System.err.println("Failed to send register interest email to "
                     + recipient + ": " + e.getMessage());
             recordNotification(submittedEmail, recipient, "Failed", null, e.getMessage());
+        } finally {
+            sleepQuietly(BETWEEN_EMAIL_DELAY_MS);
+        }
+    }
+
+    private CreateEmailResponse sendEmailWithRetry(
+            Resend resend,
+            CreateEmailOptions params,
+            String recipient) throws ResendException {
+        long backoffMs = INITIAL_BACKOFF_MS;
+        ResendException lastException = null;
+
+        for (int attempt = 1; attempt <= MAX_RESEND_ATTEMPTS; attempt++) {
+            try {
+                return resend.emails().send(params);
+            } catch (ResendException e) {
+                lastException = e;
+                if (!isRateLimit(e) || attempt == MAX_RESEND_ATTEMPTS) {
+                    throw e;
+                }
+
+                System.err.println("Resend rate limit for " + recipient
+                        + "; retrying in " + backoffMs + "ms"
+                        + " (attempt " + attempt + " of " + MAX_RESEND_ATTEMPTS + ").");
+                sleepQuietly(backoffMs);
+                backoffMs *= 2;
+            }
+        }
+
+        throw lastException;
+    }
+
+    private boolean isRateLimit(ResendException e) {
+        return e.getStatusCode() != null && e.getStatusCode() == 429;
+    }
+
+    private void sleepQuietly(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
