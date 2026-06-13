@@ -23,6 +23,16 @@ public class AdminSettingsService {
             "register_interest_notification_subject";
     private static final String REGISTER_INTEREST_NOTIFICATION_HTML =
             "register_interest_notification_html";
+    private static final String ONBOARDING_NOTIFICATION_EMAILS =
+            "onboarding_notification_emails";
+    private static final String ONBOARDING_CONFIRMATION_SUBJECT =
+            "onboarding_confirmation_subject";
+    private static final String ONBOARDING_CONFIRMATION_HTML =
+            "onboarding_confirmation_html";
+    private static final String ONBOARDING_NOTIFICATION_SUBJECT =
+            "onboarding_notification_subject";
+    private static final String ONBOARDING_NOTIFICATION_HTML =
+            "onboarding_notification_html";
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
 
     public static final String DEFAULT_CONFIRMATION_SUBJECT =
@@ -42,6 +52,29 @@ public class AdminSettingsService {
               <tr><td><strong>Email</strong></td><td>{{email}}</td></tr>
               <tr><td><strong>Company</strong></td><td>{{company}}</td></tr>
               <tr><td><strong>Phone</strong></td><td>{{phone}}</td></tr>
+            </table>
+            """;
+    public static final String DEFAULT_ONBOARDING_CONFIRMATION_SUBJECT =
+            "Welcome to Nolyvra - registration approved";
+    public static final String DEFAULT_ONBOARDING_CONFIRMATION_HTML = """
+            <p>Hi {{name}},</p>
+            <p>Congratulations, your Nolyvra registration has been approved.</p>
+            <p>You can now sign in using your registered email address. Your temporary password is:</p>
+            <p><strong>{{password}}</strong></p>
+            <p>Please change your password after your first login.</p>
+            <p>Best regards,<br>Nolyvra Team</p>
+            """;
+    public static final String DEFAULT_ONBOARDING_NOTIFICATION_SUBJECT =
+            "Nolyvra registration approved: {{name}}";
+    public static final String DEFAULT_ONBOARDING_NOTIFICATION_HTML = """
+            <h2>Registration Approved</h2>
+            <p>A registered user was successfully onboarded and the approval email was sent.</p>
+            <table cellpadding="6" cellspacing="0" style="border-collapse:collapse">
+              <tr><td><strong>Name</strong></td><td>{{name}}</td></tr>
+              <tr><td><strong>Email</strong></td><td>{{email}}</td></tr>
+              <tr><td><strong>Company</strong></td><td>{{company}}</td></tr>
+              <tr><td><strong>Plan</strong></td><td>Free trial</td></tr>
+              <tr><td><strong>Approved by</strong></td><td>{{adminLoginId}}</td></tr>
             </table>
             """;
 
@@ -84,6 +117,28 @@ public class AdminSettingsService {
         return emails;
     }
 
+    public List<String> getOnboardingNotificationEmails() {
+        List<String> values = jdbc.query("""
+                select setting_value
+                from app_settings
+                where setting_key = ?
+                """, (rs, rowNum) -> rs.getString("setting_value"), ONBOARDING_NOTIFICATION_EMAILS);
+
+        if (values.isEmpty() || values.get(0) == null || values.get(0).isBlank()) {
+            return List.of();
+        }
+        return parseEmails(values.get(0));
+    }
+
+    public List<String> saveOnboardingNotificationEmails(String rawEmails) {
+        List<String> emails = parseEmails(rawEmails);
+        String value = String.join(",", emails);
+
+        saveSetting(ONBOARDING_NOTIFICATION_EMAILS, value);
+
+        return emails;
+    }
+
     public Map<String, String> getRegisterInterestEmailTemplates() {
         Map<String, String> templates = new LinkedHashMap<>();
         templates.put("confirmationSubject", getSetting(
@@ -111,6 +166,35 @@ public class AdminSettingsService {
         saveSetting(REGISTER_INTEREST_NOTIFICATION_HTML,
                 valueOrDefault(notificationHtml, DEFAULT_NOTIFICATION_HTML));
         return getRegisterInterestEmailTemplates();
+    }
+
+    public Map<String, String> getOnboardingEmailTemplates() {
+        Map<String, String> templates = new LinkedHashMap<>();
+        templates.put("confirmationSubject", getSetting(
+                ONBOARDING_CONFIRMATION_SUBJECT, DEFAULT_ONBOARDING_CONFIRMATION_SUBJECT));
+        templates.put("confirmationHtml", getSetting(
+                ONBOARDING_CONFIRMATION_HTML, DEFAULT_ONBOARDING_CONFIRMATION_HTML));
+        templates.put("notificationSubject", getSetting(
+                ONBOARDING_NOTIFICATION_SUBJECT, DEFAULT_ONBOARDING_NOTIFICATION_SUBJECT));
+        templates.put("notificationHtml", getSetting(
+                ONBOARDING_NOTIFICATION_HTML, DEFAULT_ONBOARDING_NOTIFICATION_HTML));
+        return templates;
+    }
+
+    public Map<String, String> saveOnboardingEmailTemplates(
+            String confirmationSubject,
+            String confirmationHtml,
+            String notificationSubject,
+            String notificationHtml) {
+        saveSetting(ONBOARDING_CONFIRMATION_SUBJECT,
+                valueOrDefault(confirmationSubject, DEFAULT_ONBOARDING_CONFIRMATION_SUBJECT));
+        saveSetting(ONBOARDING_CONFIRMATION_HTML,
+                valueOrDefault(confirmationHtml, DEFAULT_ONBOARDING_CONFIRMATION_HTML));
+        saveSetting(ONBOARDING_NOTIFICATION_SUBJECT,
+                valueOrDefault(notificationSubject, DEFAULT_ONBOARDING_NOTIFICATION_SUBJECT));
+        saveSetting(ONBOARDING_NOTIFICATION_HTML,
+                valueOrDefault(notificationHtml, DEFAULT_ONBOARDING_NOTIFICATION_HTML));
+        return getOnboardingEmailTemplates();
     }
 
     private String getSetting(String key, String defaultValue) {

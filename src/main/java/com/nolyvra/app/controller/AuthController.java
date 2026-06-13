@@ -160,8 +160,8 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", "targetLoginId is required."));
         }
 
-        userService.onboardUser(targetId);
-        return ResponseEntity.ok(Map.of("status", "onboarded"));
+        Map<String, Object> result = userService.onboardUser(targetId, loginId);
+        return ResponseEntity.ok(result);
     }
 
     // GET /api/auth/admin/register-interest-notifications?loginId=x
@@ -199,6 +199,56 @@ public class AuthController {
         try {
             List<String> emails = adminSettingsService.saveRegisterInterestNotificationEmails(emailText);
             Map<String, String> templates = adminSettingsService.saveRegisterInterestEmailTemplates(
+                    stringValue(body.get("confirmationSubject")),
+                    stringValue(body.get("confirmationHtml")),
+                    stringValue(body.get("notificationSubject")),
+                    stringValue(body.get("notificationHtml")));
+
+            Map<String, Object> response = new java.util.LinkedHashMap<>();
+            response.put("status", "saved");
+            response.put("emails", emails);
+            response.putAll(templates);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // GET /api/auth/admin/onboarding-notifications?loginId=x
+    // Admin only — returns the email recipients notified after successful onboarding
+    @GetMapping("/admin/onboarding-notifications")
+    public ResponseEntity<?> getOnboardingNotifications(@RequestParam String loginId) {
+        if (!userService.isAdmin(loginId)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied."));
+        }
+        Map<String, Object> response = new java.util.LinkedHashMap<>();
+        response.put("emails", adminSettingsService.getOnboardingNotificationEmails());
+        response.putAll(adminSettingsService.getOnboardingEmailTemplates());
+        return ResponseEntity.ok(response);
+    }
+
+    // PUT /api/auth/admin/onboarding-notifications?loginId=x
+    // Admin only — saves onboarding email recipients and templates
+    @PutMapping("/admin/onboarding-notifications")
+    public ResponseEntity<?> saveOnboardingNotifications(
+            @RequestParam String loginId,
+            @RequestBody Map<String, Object> body) {
+
+        if (!userService.isAdmin(loginId)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied."));
+        }
+
+        Object rawEmails = body.get("emails");
+        String emailText = "";
+        if (rawEmails instanceof List<?> list) {
+            emailText = String.join(",", list.stream().map(String::valueOf).toList());
+        } else if (rawEmails != null) {
+            emailText = String.valueOf(rawEmails);
+        }
+
+        try {
+            List<String> emails = adminSettingsService.saveOnboardingNotificationEmails(emailText);
+            Map<String, String> templates = adminSettingsService.saveOnboardingEmailTemplates(
                     stringValue(body.get("confirmationSubject")),
                     stringValue(body.get("confirmationHtml")),
                     stringValue(body.get("notificationSubject")),

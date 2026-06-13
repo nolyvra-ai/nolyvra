@@ -12,6 +12,7 @@ public class UserService {
 
     private final JdbcTemplate jdbc;
     private final SessionService sessionService;
+    private final OnboardingEmailService onboardingEmailService;
 
     // SHA-256 of "123456" — set when admin onboards a registered user
    /* private static final String DEFAULT_PASSWORD_HASH =
@@ -21,9 +22,13 @@ public class UserService {
     private static final String DEFAULT_PASSWORD_HASH =
             "7e19e31ae82d749034fc921f777f717ba5b57c6add9add889eb536ac6effcde0";
 
-    public UserService(JdbcTemplate jdbc, SessionService sessionService) {
+    public UserService(
+            JdbcTemplate jdbc,
+            SessionService sessionService,
+            OnboardingEmailService onboardingEmailService) {
         this.jdbc = jdbc;
         this.sessionService = sessionService;
+        this.onboardingEmailService = onboardingEmailService;
     }
 
     // ─── Change password ──────────────────────────────────────────────────────
@@ -153,7 +158,7 @@ public class UserService {
 
     // ─── Onboard a registered user ────────────────────────────────────────────
 
-    public void onboardUser(String targetLoginId) {
+    public Map<String, Object> onboardUser(String targetLoginId, String adminLoginId) {
         jdbc.update("""
                 update login
                 set password_hash = ?,
@@ -162,6 +167,20 @@ public class UserService {
                     renew_date = current_date + INTERVAL '30 days'
                 where id = ?
                 """, DEFAULT_PASSWORD_HASH, targetLoginId);
+
+        OnboardingEmailService.OnboardingEmailResult emailResult =
+                onboardingEmailService.sendOnboardingEmails(targetLoginId, adminLoginId);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("status", "onboarded");
+        result.put("userEmailSent", emailResult.userEmailSent());
+        result.put("internalNotificationSent", emailResult.internalNotificationSent());
+        result.put("internalNotificationsSent", emailResult.internalNotificationsSent());
+        result.put("internalNotificationsFailed", emailResult.internalNotificationsFailed());
+        if (emailResult.errorMessage() != null && !emailResult.errorMessage().isBlank()) {
+            result.put("emailError", emailResult.errorMessage());
+        }
+        return result;
     }
 
     // ─── Update additional limits for a user (admin only) ────────────────────

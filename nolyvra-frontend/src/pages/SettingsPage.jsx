@@ -15,7 +15,6 @@ const DANGER = "#DC2626", DANGER_BG = "#FEF2F2", DANGER_BR = "#FECACA";
 const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
 const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
 const SURFACE = "#FAFBFD";
-
 // ── Usage bar component ───────────────────────────────────────────────────────
 function UsageBar({ label, used, max, remainingLabel }) {
   const pct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
@@ -209,6 +208,17 @@ export default function SettingsPage() {
     notificationSubject: "",
     notificationHtml: "",
   });
+  const [onboardingRecipients, setOnboardingRecipients] = useState("");
+  const [onboardingRecipientsLoading, setOnboardingRecipientsLoading] = useState(false);
+  const [onboardingRecipientsSaving, setOnboardingRecipientsSaving] = useState(false);
+  const [onboardingRecipientsSaved, setOnboardingRecipientsSaved] = useState(false);
+  const [onboardingRecipientsError, setOnboardingRecipientsError] = useState("");
+  const [onboardingTemplates, setOnboardingTemplates] = useState({
+    confirmationSubject: "",
+    confirmationHtml: "",
+    notificationSubject: "",
+    notificationHtml: "",
+  });
 
   useEffect(() => {
     if (!loginId) return;
@@ -238,14 +248,37 @@ export default function SettingsPage() {
       .finally(() => setInterestRecipientsLoading(false));
   }, [loginId, isAdmin]);
 
+  useEffect(() => {
+    if (!loginId || !isAdmin) return;
+    setOnboardingRecipientsLoading(true);
+    fetch(`${API_BASE}/api/auth/admin/onboarding-notifications?loginId=${encodeURIComponent(loginId)}`, {
+      headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+    })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => {
+        setOnboardingRecipients((d.emails || []).join(", "));
+        setOnboardingTemplates({
+          confirmationSubject: d.confirmationSubject || "",
+          confirmationHtml: d.confirmationHtml || "",
+          notificationSubject: d.notificationSubject || "",
+          notificationHtml: d.notificationHtml || "",
+        });
+      })
+      .catch(() => setOnboardingRecipientsError("Could not load onboarding notification settings."))
+      .finally(() => setOnboardingRecipientsLoading(false));
+  }, [loginId, isAdmin]);
+
   async function handleOnboard(targetId) {
     setOnboarding(targetId);
     try {
-      await fetch(`${API_BASE}/api/auth/admin/onboard?loginId=${encodeURIComponent(loginId)}`, {
+      const res = await fetch(`${API_BASE}/api/auth/admin/onboard?loginId=${encodeURIComponent(loginId)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
         body: JSON.stringify({ targetLoginId: targetId }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Onboard failed.");
+      if (data.emailError) console.warn(data.emailError);
       setAdminUsers(prev => prev.map(u =>
         u.id === targetId ? { ...u, planId: "plan-free", planName: "Free" } : u));
     } catch (e) {
@@ -320,6 +353,40 @@ export default function SettingsPage() {
     setInterestTemplates(p => ({ ...p, [key]: value }));
     setInterestRecipientsError("");
     setInterestRecipientsSaved(false);
+  }
+
+  async function handleSaveOnboardingRecipients() {
+    setOnboardingRecipientsSaving(true);
+    setOnboardingRecipientsSaved(false);
+    setOnboardingRecipientsError("");
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/admin/onboarding-notifications?loginId=${encodeURIComponent(loginId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+        body: JSON.stringify({ emails: onboardingRecipients, ...onboardingTemplates }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to save onboarding notification settings.");
+      setOnboardingRecipients((data.emails || []).join(", "));
+      setOnboardingTemplates({
+        confirmationSubject: data.confirmationSubject || "",
+        confirmationHtml: data.confirmationHtml || "",
+        notificationSubject: data.notificationSubject || "",
+        notificationHtml: data.notificationHtml || "",
+      });
+      setOnboardingRecipientsSaved(true);
+      setTimeout(() => setOnboardingRecipientsSaved(false), 2500);
+    } catch (e) {
+      setOnboardingRecipientsError(e.message);
+    } finally {
+      setOnboardingRecipientsSaving(false);
+    }
+  }
+
+  function updateOnboardingTemplate(key, value) {
+    setOnboardingTemplates(p => ({ ...p, [key]: value }));
+    setOnboardingRecipientsError("");
+    setOnboardingRecipientsSaved(false);
   }
 
   function updatePw(k, v) {
@@ -863,55 +930,59 @@ export default function SettingsPage() {
               <Typography sx={{ fontSize: 12, color: MUTED, p: 2.25 }}>No users found.</Typography>
             ) : adminUsers.map(u => (
               <Box key={u.id} sx={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
                 px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`,
                 "&:last-child": { borderBottom: "none" },
               }}>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{
-                    fontSize: 12, fontWeight: 600, color: TEXT,
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
-                  }}>
-                    {u.name || u.id}
-                  </Typography>
-                  <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
-                    {u.id}
-                    {u.createdAt && ` · Joined ${new Date(u.createdAt).toLocaleDateString("en-GB",
-                      { day: "numeric", month: "short", year: "numeric" })}`}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexShrink: 0, ml: 2 }}>
-                  {/* Plan badge */}
-                  <Box sx={{
-                    display: "inline-flex", alignItems: "center",
-                    bgcolor: u.planId === "registered" ? WARN_BG
-                      : u.planId === "plan-free" ? "#F1F3F7"
-                        : ACCENT_BG,
-                    border: `1px solid ${u.planId === "registered" ? WARN_BR
-                      : u.planId === "plan-free" ? BORDER
-                        : ACCENT_BR}`,
-                    borderRadius: "20px", px: 1.25, py: 0.25,
-                    fontSize: 11, fontWeight: 600,
-                    color: u.planId === "registered" ? WARN
-                      : u.planId === "plan-free" ? MUTED
-                        : ACCENT,
-                  }}>
-                    {u.planName}
+                <Box sx={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  gap: 2,
+                }}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{
+                      fontSize: 12, fontWeight: 600, color: TEXT,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+                    }}>
+                      {u.name || u.id}
+                    </Typography>
+                    <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
+                      {u.id}
+                      {u.createdAt && ` · Joined ${new Date(u.createdAt).toLocaleDateString("en-GB",
+                        { day: "numeric", month: "short", year: "numeric" })}`}
+                    </Typography>
                   </Box>
-                  {/* Onboard button — only for registered users */}
-                  {u.planId === "registered" && (
-                    <Button size="small" variant="contained"
-                      disabled={onboarding === u.id}
-                      onClick={() => handleOnboard(u.id)}
-                      sx={{
-                        fontSize: 11, bgcolor: WARN, borderRadius: "6px",
-                        textTransform: "none", boxShadow: "none", whiteSpace: "nowrap",
-                        "&:hover": { bgcolor: "#B45309", boxShadow: "none" },
-                        "&.Mui-disabled": { bgcolor: WARN_BG, color: "#92400E" }
-                      }}>
-                      {onboarding === u.id ? "Onboarding…" : "Onboard"}
-                    </Button>
-                  )}
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexShrink: 0 }}>
+                    {/* Plan badge */}
+                    <Box sx={{
+                      display: "inline-flex", alignItems: "center",
+                      bgcolor: u.planId === "registered" ? WARN_BG
+                        : u.planId === "plan-free" ? "#F1F3F7"
+                          : ACCENT_BG,
+                      border: `1px solid ${u.planId === "registered" ? WARN_BR
+                        : u.planId === "plan-free" ? BORDER
+                          : ACCENT_BR}`,
+                      borderRadius: "20px", px: 1.25, py: 0.25,
+                      fontSize: 11, fontWeight: 600,
+                      color: u.planId === "registered" ? WARN
+                        : u.planId === "plan-free" ? MUTED
+                          : ACCENT,
+                    }}>
+                      {u.planName}
+                    </Box>
+                    {/* Onboard button — only for registered users */}
+                    {u.planId === "registered" && (
+                      <Button size="small" variant="contained"
+                        disabled={onboarding === u.id}
+                        onClick={() => handleOnboard(u.id)}
+                        sx={{
+                          fontSize: 11, bgcolor: WARN, borderRadius: "6px",
+                          textTransform: "none", boxShadow: "none", whiteSpace: "nowrap",
+                          "&:hover": { bgcolor: "#B45309", boxShadow: "none" },
+                          "&.Mui-disabled": { bgcolor: WARN_BG, color: "#92400E" }
+                        }}>
+                        {onboarding === u.id ? "Onboarding…" : "Onboard"}
+                      </Button>
+                    )}
+                  </Box>
                 </Box>
               </Box>
             ))}
@@ -969,6 +1040,120 @@ export default function SettingsPage() {
               sx={{ alignSelf: "flex-start", fontSize: 12, bgcolor: WARN, borderRadius: "6px",
                 textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#B45309", boxShadow: "none" } }}>
               {limitsUpdating ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Update Limits"}
+            </Button>
+          </Box>
+        </Paper>
+      )}
+
+      {/* ── Admin: Onboarding Email Notifications ──────────────────────── */}
+      {isAdmin && (
+        <Paper elevation={0} sx={{ border: `1px solid ${WARN_BR}`, borderRadius: "10px", overflow: "hidden", bgcolor: "#fff" }}>
+          <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`, bgcolor: WARN_BG }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#92400E" }}>
+              Onboarding Email Notifications
+            </Typography>
+            <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
+              Email templates for approved users and internal onboarding alerts
+            </Typography>
+          </Box>
+          <Box sx={{ p: 2.25, display: "flex", flexDirection: "column", gap: 1.5 }}>
+            {onboardingRecipientsSaved && (
+              <Alert severity="success" onClose={() => setOnboardingRecipientsSaved(false)}>
+                Onboarding email settings saved.
+              </Alert>
+            )}
+            {onboardingRecipientsError && (
+              <Alert severity="error" onClose={() => setOnboardingRecipientsError("")}>
+                {onboardingRecipientsError}
+              </Alert>
+            )}
+            <Box>
+              <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT, mb: 0.5 }}>
+                Internal Recipient Emails
+              </Typography>
+              <TextField
+                fullWidth
+                multiline
+                minRows={3}
+                size="small"
+                value={onboardingRecipients}
+                onChange={e => {
+                  setOnboardingRecipients(e.target.value);
+                  setOnboardingRecipientsError("");
+                  setOnboardingRecipientsSaved(false);
+                }}
+                disabled={onboardingRecipientsLoading}
+                placeholder="info@nolyvra.com, admin@nolyvra.com"
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+              />
+              <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.5 }}>
+                Internal emails are sent only after the approved user email succeeds.
+              </Typography>
+            </Box>
+
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, pt: 0.5 }}>
+              <Typography sx={{ fontSize: 12, fontWeight: 700, color: TEXT }}>
+                Approved User Email Template
+              </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                value={onboardingTemplates.confirmationSubject}
+                onChange={e => updateOnboardingTemplate("confirmationSubject", e.target.value)}
+                disabled={onboardingRecipientsLoading}
+                placeholder="Welcome to Nolyvra - registration approved"
+                label="Subject"
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+              />
+              <TextField
+                fullWidth
+                multiline
+                minRows={5}
+                size="small"
+                value={onboardingTemplates.confirmationHtml}
+                onChange={e => updateOnboardingTemplate("confirmationHtml", e.target.value)}
+                disabled={onboardingRecipientsLoading}
+                placeholder="<p>Hi {{name}},</p>"
+                label="HTML Body"
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+              />
+            </Box>
+
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, pt: 0.5 }}>
+              <Typography sx={{ fontSize: 12, fontWeight: 700, color: TEXT }}>
+                Internal Notification Template
+              </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                value={onboardingTemplates.notificationSubject}
+                onChange={e => updateOnboardingTemplate("notificationSubject", e.target.value)}
+                disabled={onboardingRecipientsLoading}
+                placeholder="Nolyvra registration approved: {{name}}"
+                label="Subject"
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+              />
+              <TextField
+                fullWidth
+                multiline
+                minRows={6}
+                size="small"
+                value={onboardingTemplates.notificationHtml}
+                onChange={e => updateOnboardingTemplate("notificationHtml", e.target.value)}
+                disabled={onboardingRecipientsLoading}
+                placeholder="<h2>Registration Approved</h2>"
+                label="HTML Body"
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+              />
+              <Typography sx={{ fontSize: 11, color: MUTED, mt: -0.5 }}>
+                Available variables: {"{{name}}"}, {"{{email}}"}, {"{{company}}"}, {"{{password}}"}, {"{{adminLoginId}}"}.
+              </Typography>
+            </Box>
+            <Button variant="contained" onClick={handleSaveOnboardingRecipients}
+              disabled={onboardingRecipientsSaving || onboardingRecipientsLoading}
+              sx={{ alignSelf: "flex-start", fontSize: 12, bgcolor: WARN, borderRadius: "6px",
+                textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#B45309", boxShadow: "none" } }}>
+              {onboardingRecipientsSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Save Onboarding Email Settings"}
             </Button>
           </Box>
         </Paper>
