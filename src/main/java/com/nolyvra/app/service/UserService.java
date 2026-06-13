@@ -12,7 +12,7 @@ public class UserService {
 
     private final JdbcTemplate jdbc;
     private final SessionService sessionService;
-    private final EmailService emailService;
+    private final OnboardingEmailService onboardingEmailService;
 
     // SHA-256 of "123456" — set when admin onboards a registered user
    /* private static final String DEFAULT_PASSWORD_HASH =
@@ -22,10 +22,13 @@ public class UserService {
     private static final String DEFAULT_PASSWORD_HASH =
             "7e19e31ae82d749034fc921f777f717ba5b57c6add9add889eb536ac6effcde0";
 
-    public UserService(JdbcTemplate jdbc, SessionService sessionService, EmailService emailService) {
+    public UserService(
+            JdbcTemplate jdbc,
+            SessionService sessionService,
+            OnboardingEmailService onboardingEmailService) {
         this.jdbc = jdbc;
         this.sessionService = sessionService;
-        this.emailService = emailService;
+        this.onboardingEmailService = onboardingEmailService;
     }
 
     // ─── Change password ──────────────────────────────────────────────────────
@@ -155,7 +158,7 @@ public class UserService {
 
     // ─── Onboard a registered user ────────────────────────────────────────────
 
-    public void onboardUser(String targetLoginId, String adminLoginId, String emailSubject, String emailBody) {
+    public Map<String, Object> onboardUser(String targetLoginId, String adminLoginId) {
         jdbc.update("""
                 update login
                 set password_hash = ?,
@@ -165,98 +168,20 @@ public class UserService {
                 where id = ?
                 """, DEFAULT_PASSWORD_HASH, targetLoginId);
 
-        sendOnboardingEmails(targetLoginId, adminLoginId, emailSubject, emailBody);
-    }
+        OnboardingEmailService.OnboardingEmailResult emailResult =
+                onboardingEmailService.sendOnboardingEmails(targetLoginId, adminLoginId);
 
-    private void sendOnboardingEmails(String targetLoginId, String adminLoginId, String emailSubject, String emailBody) {
-        Optional<UserContact> targetUser = findUserContact(targetLoginId);
-        Optional<UserContact> adminUser = findUserContact(adminLoginId);
-
-        if (targetUser.isEmpty()) {
-            System.err.println("Skipping onboarding emails: approved user not found: " + targetLoginId);
-            return;
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("status", "onboarded");
+        result.put("userEmailSent", emailResult.userEmailSent());
+        result.put("internalNotificationSent", emailResult.internalNotificationSent());
+        result.put("internalNotificationsSent", emailResult.internalNotificationsSent());
+        result.put("internalNotificationsFailed", emailResult.internalNotificationsFailed());
+        if (emailResult.errorMessage() != null && !emailResult.errorMessage().isBlank()) {
+            result.put("emailError", emailResult.errorMessage());
         }
-
-        UserContact target = targetUser.get();
-        String targetName = target.name() != null && !target.name().isBlank() ? target.name() : target.id();
-        String subject = emailSubject != null && !emailSubject.isBlank()
-                ? fillApprovalTemplate(emailSubject.trim(), targetName, target.email())
-                : defaultApprovalSubject();
-        String body = emailBody != null && !emailBody.isBlank()
-                ? fillApprovalTemplate(emailBody, targetName, target.email())
-                : defaultApprovalBody(targetName);
-
-        emailService.sendSystemEmail(
-                target.email(),
-                subject,
-                body);
-
-        adminUser.ifPresent(admin -> emailService.sendSystemEmail(
-                admin.email(),
-                "Nolyvra registration approved - " + targetName,
-                """
-                Hi %s,
-
-                You approved a Nolyvra registration successfully.
-
-                Approved user: %s
-                Email: %s
-                Plan: Free trial
-
-                Best regards,
-                Nolyvra Team
-                """.formatted(
-                        admin.name() != null && !admin.name().isBlank() ? admin.name() : admin.id(),
-                        targetName,
-                        target.email())));
+        return result;
     }
-
-    private String defaultApprovalSubject() {
-        return "Welcome to Nolyvra - registration approved";
-    }
-
-    private String fillApprovalTemplate(String template, String targetName, String targetEmail) {
-        return template
-                .replace("{name}", targetName)
-                .replace("{email}", targetEmail != null ? targetEmail : "")
-                .replace("{password}", "Welcome1");
-    }
-
-    private String defaultApprovalBody(String targetName) {
-        return """
-                Hi %s,
-
-                Congratulations, your Nolyvra registration has been approved.
-
-                You can now sign in using your registered email address. Your temporary password is:
-                Welcome1
-
-                Please change your password after your first login.
-
-                Best regards,
-                Nolyvra Team
-                """.formatted(targetName);
-    }
-
-    private Optional<UserContact> findUserContact(String loginIdOrEmail) {
-        if (loginIdOrEmail == null || loginIdOrEmail.isBlank()) {
-            return Optional.empty();
-        }
-
-        return jdbc.query("""
-                select id, name, email
-                from login
-                where id = ? or email = ?
-                limit 1
-                """,
-                (rs, r) -> new UserContact(
-                        rs.getString("id"),
-                        rs.getString("name"),
-                        rs.getString("email")),
-                loginIdOrEmail, loginIdOrEmail).stream().findFirst();
-    }
-
-    private record UserContact(String id, String name, String email) {}
 
     // ─── Update additional limits for a user (admin only) ────────────────────
     // Change 2: new method to set extra tokens/jobs/candidates on top of plan limits

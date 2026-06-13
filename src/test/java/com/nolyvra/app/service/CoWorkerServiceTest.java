@@ -1,11 +1,16 @@
 package com.nolyvra.app.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nolyvra.app.config.CoWorkerAnalysisExecutor;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -13,14 +18,29 @@ import static org.mockito.Mockito.*;
 class CoWorkerServiceTest {
 
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
-    private final CoWorkerService service = new CoWorkerService(
-            null,
-            new ObjectMapper(),
-            jdbc,
-            null,
-            null,
-            null,
-            "gpt-4o-mini");
+    private ExecutorService analysisPool;
+    private CoWorkerService service;
+
+    @BeforeEach
+    void setUp() {
+        analysisPool = Executors.newSingleThreadExecutor();
+        CoWorkerAnalysisExecutor analysisExecutor = mock(CoWorkerAnalysisExecutor.class);
+        when(analysisExecutor.executorService()).thenReturn(analysisPool);
+
+        service = new CoWorkerService(
+                null,
+                new ObjectMapper(),
+                jdbc,
+                null,
+                null,
+                analysisExecutor,
+                "gpt-4o-mini");
+    }
+
+    @AfterEach
+    void tearDown() {
+        analysisPool.shutdownNow();
+    }
 
     @Test
     void getTasksUsesParameterizedStatusFilter() {
