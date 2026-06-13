@@ -4,69 +4,126 @@ import com.resend.Resend;
 import com.resend.core.exception.ResendException;
 import com.resend.services.emails.model.CreateEmailOptions;
 import com.resend.services.emails.model.CreateEmailResponse;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class RegisterInterestNotificationService {
 
     private final AdminSettingsService adminSettingsService;
+    private final JdbcTemplate jdbc;
     private final String apiKey;
     private final String fromAddress;
 
     public RegisterInterestNotificationService(
             AdminSettingsService adminSettingsService,
+            JdbcTemplate jdbc,
             @Value("${resend.api-key:}") String apiKey,
             @Value("${resend.from:Nolyvra <onboarding@resend.dev>}") String fromAddress) {
         this.adminSettingsService = adminSettingsService;
+        this.jdbc = jdbc;
         this.apiKey = apiKey;
         this.fromAddress = fromAddress;
     }
 
+    @PostConstruct
+    public void ensureTable() {
+        jdbc.execute("""
+                create table if not exists register_interest_notification_log (
+                    id bigserial primary key,
+                    submitted_email text not null,
+                    recipient_email text,
+                    status text not null,
+                    resend_id text,
+                    error_message text,
+                    created_at timestamp with time zone not null default now()
+                )
+                """);
+    }
+
     public void notifyNewRegistration(String firstName, String lastName, String company, String email, String phone) {
-        List<String> recipients = adminSettingsService.getRegisterInterestNotificationEmails();
-        if (recipients.isEmpty()) {
-            System.out.println("Register interest notification skipped: no admin recipients configured.");
-            return;
-        }
         if (apiKey == null || apiKey.isBlank() || "re_xxxxxxxxx".equals(apiKey.trim())) {
             System.err.println("Register interest notification skipped: RESEND_API_KEY is not configured.");
+            recordNotification(email, null, "Skipped", null, "RESEND_API_KEY is not configured.");
             return;
         }
 
         String fullName = (safe(firstName) + " " + safe(lastName)).trim();
-        String subject = "New register interest submission" + (fullName.isBlank() ? "" : ": " + fullName);
-        String html = """
-                <h2>New Register Interest Submission</h2>
-                <p>A new user submitted the landing page register interest form.</p>
-                <table cellpadding="6" cellspacing="0" style="border-collapse:collapse">
-                  <tr><td><strong>Name</strong></td><td>%s</td></tr>
-                  <tr><td><strong>Email</strong></td><td>%s</td></tr>
-                  <tr><td><strong>Company</strong></td><td>%s</td></tr>
-                  <tr><td><strong>Phone</strong></td><td>%s</td></tr>
-                </table>
-                """.formatted(
-                escapeHtml(fullName.isBlank() ? "-" : fullName),
-                escapeHtml(email),
-                escapeHtml(company),
-                escapeHtml(phone == null || phone.isBlank() ? "-" : phone));
+        Map<String, String> values = templateValues(fullName, company, email, phone);
+        Map<String, String> templates = adminSettingsService.getRegisterInterestEmailTemplates();
 
+        Resend resend = new Resend(apiKey.trim());
+        sendWithResend(
+                resend,
+                email,
+                renderTemplate(templates.get("confirmationSubject"), values),
+                renderTemplate(templates.get("confirmationHtml"), values),
+                email);
+
+        List<String> recipients = adminSettingsService.getRegisterInterestNotificationEmails();
+        if (recipients.isEmpty()) {
+            System.out.println("Register interest notification skipped: no admin recipients configured.");
+            recordNotification(email, null, "Skipped", null, "No admin recipients configured.");
+            return;
+        }
+        for (String recipient : recipients) {
+            sendWithResend(
+                    resend,
+                    recipient,
+                    renderTemplate(templates.get("notificationSubject"), values),
+                    renderTemplate(templates.get("notificationHtml"), values),
+                    email);
+        }
+    }
+
+    private void sendWithResend(
+            Resend resend,
+            String recipient,
+            String subject,
+            String html,
+            String submittedEmail) {
         try {
-            Resend resend = new Resend(apiKey.trim());
             CreateEmailOptions params = CreateEmailOptions.builder()
                     .from(fromAddress)
-                    .to(recipients.toArray(String[]::new))
+                    .to(recipient)
                     .subject(subject)
                     .html(html)
                     .build();
             CreateEmailResponse response = resend.emails().send(params);
-            System.out.println("Register interest notification sent via Resend: " + response.getId());
+            System.out.println("Register interest email sent via Resend to "
+                    + recipient + ": " + response.getId());
+            recordNotification(submittedEmail, recipient, "Sent", response.getId(), null);
         } catch (ResendException e) {
-            System.err.println("Failed to send register interest notification via Resend: " + e.getMessage());
+            System.err.println("Failed to send register interest email via Resend to "
+                    + recipient + ": " + e.getMessage());
+            recordNotification(submittedEmail, recipient, "Failed", null, e.getMessage());
         } catch (Exception e) {
-            System.err.println("Failed to send register interest notification: " + e.getMessage());
+            System.err.println("Failed to send register interest email to "
+                    + recipient + ": " + e.getMessage());
+            recordNotification(submittedEmail, recipient, "Failed", null, e.getMessage());
+        }
+    }
+
+    private void recordNotification(
+            String submittedEmail,
+            String recipientEmail,
+            String status,
+            String resendId,
+            String errorMessage) {
+        try {
+            jdbc.update("""
+                    insert into register_interest_notification_log
+                        (submitted_email, recipient_email, status, resend_id, error_message)
+                    values (?, ?, ?, ?, ?)
+                    """, submittedEmail, recipientEmail, status, resendId, errorMessage);
+        } catch (Exception e) {
+            System.err.println("Failed to record register interest notification log: " + e.getMessage());
         }
     }
 
@@ -81,5 +138,22 @@ public class RegisterInterestNotificationService {
                 .replace(">", "&gt;")
                 .replace("\"", "&quot;")
                 .replace("'", "&#39;");
+    }
+
+    private Map<String, String> templateValues(String fullName, String company, String email, String phone) {
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put("name", escapeHtml(fullName.isBlank() ? "there" : fullName));
+        values.put("email", escapeHtml(email));
+        values.put("company", escapeHtml(company == null || company.isBlank() ? "-" : company));
+        values.put("phone", escapeHtml(phone == null || phone.isBlank() ? "-" : phone));
+        return values;
+    }
+
+    private String renderTemplate(String template, Map<String, String> values) {
+        String rendered = template == null ? "" : template;
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            rendered = rendered.replace("{{" + entry.getKey() + "}}", entry.getValue());
+        }
+        return rendered;
     }
 }

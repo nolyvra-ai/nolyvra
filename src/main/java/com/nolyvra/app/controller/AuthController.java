@@ -171,8 +171,10 @@ public class AuthController {
         if (!userService.isAdmin(loginId)) {
             return ResponseEntity.status(403).body(Map.of("error", "Access denied."));
         }
-        return ResponseEntity.ok(Map.of(
-                "emails", adminSettingsService.getRegisterInterestNotificationEmails()));
+        Map<String, Object> response = new java.util.LinkedHashMap<>();
+        response.put("emails", adminSettingsService.getRegisterInterestNotificationEmails());
+        response.putAll(adminSettingsService.getRegisterInterestEmailTemplates());
+        return ResponseEntity.ok(response);
     }
 
     // PUT /api/auth/admin/register-interest-notifications?loginId=x
@@ -196,9 +198,23 @@ public class AuthController {
 
         try {
             List<String> emails = adminSettingsService.saveRegisterInterestNotificationEmails(emailText);
-            return ResponseEntity.ok(Map.of("status", "saved", "emails", emails));
+            Map<String, String> templates = adminSettingsService.saveRegisterInterestEmailTemplates(
+                    stringValue(body.get("confirmationSubject")),
+                    stringValue(body.get("confirmationHtml")),
+                    stringValue(body.get("notificationSubject")),
+                    stringValue(body.get("notificationHtml")));
+
+            Map<String, Object> response = new java.util.LinkedHashMap<>();
+            response.put("status", "saved");
+            response.put("emails", emails);
+            response.putAll(templates);
+            return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
 }
