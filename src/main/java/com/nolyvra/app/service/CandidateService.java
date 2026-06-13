@@ -173,6 +173,16 @@ public class CandidateService {
                 """, CANDIDATE_LIST_MAPPER, loginId);
     }
 
+    public int getActiveCandidateCount(String loginId) {
+        Integer count = jdbc.queryForObject("""
+                select count(*)
+                from candidates
+                where login_id = ?
+                  and is_active = true
+                """, Integer.class, loginId);
+        return count != null ? count : 0;
+    }
+
     // ─── Update stage ─────────────────────────────────────────────────────────
 
     public boolean updateStage(String candidateId, StageUpdateRequest req, String loginId) {

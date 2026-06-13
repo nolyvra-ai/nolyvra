@@ -66,6 +66,11 @@ public class CandidatesController {
         }
     }
 
+    @GetMapping("/candidates/count")
+    public Map<String, Integer> getCandidateCount(@RequestParam String loginId) {
+        return Map.of("count", candidateService.getActiveCandidateCount(loginId));
+    }
+
     @GetMapping("/candidates/{candidateId}")
     public CandidateResponse getCandidate(
             @PathVariable String candidateId,
