@@ -254,7 +254,7 @@ export default function SchedulerPage() {
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    Promise.all([apiGet("/api/candidates"), apiGet("/api/interviews")])
+    Promise.all([apiGet("/api/candidates/list"), apiGet("/api/interviews")])
       .then(([c, s]) => { setCandidates(c.filter(cand => cand.jobId)); setScheduled(s); })
       .catch(e => setError(e.message));
   }, [loginId]);
