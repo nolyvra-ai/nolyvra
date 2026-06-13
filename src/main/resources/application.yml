@@ -63,6 +63,10 @@ google:
   redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/auth/google/callback}
   frontend-url: ${GOOGLE_FRONTEND_URL:http://localhost:5173}
 
+resend:
+  api-key: ${RESEND_API_KEY:}
+  from: ${RESEND_FROM:Nolyvra <onboarding@resend.dev>}
+
 stripe:
   secret-key: ${STRIPE_SECRET_KEY:}
   publishable-key: ${STRIPE_PUBLISHABLE_KEY:}
