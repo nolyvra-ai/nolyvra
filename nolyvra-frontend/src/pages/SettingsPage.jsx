@@ -203,6 +203,12 @@ export default function SettingsPage() {
   const [interestRecipientsSaving, setInterestRecipientsSaving] = useState(false);
   const [interestRecipientsSaved, setInterestRecipientsSaved] = useState(false);
   const [interestRecipientsError, setInterestRecipientsError] = useState("");
+  const [interestTemplates, setInterestTemplates] = useState({
+    confirmationSubject: "",
+    confirmationHtml: "",
+    notificationSubject: "",
+    notificationHtml: "",
+  });
 
   useEffect(() => {
     if (!loginId) return;
@@ -219,7 +225,15 @@ export default function SettingsPage() {
       headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
     })
       .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => setInterestRecipients((d.emails || []).join(", ")))
+      .then(d => {
+        setInterestRecipients((d.emails || []).join(", "));
+        setInterestTemplates({
+          confirmationSubject: d.confirmationSubject || "",
+          confirmationHtml: d.confirmationHtml || "",
+          notificationSubject: d.notificationSubject || "",
+          notificationHtml: d.notificationHtml || "",
+        });
+      })
       .catch(() => setInterestRecipientsError("Could not load notification recipients."))
       .finally(() => setInterestRecipientsLoading(false));
   }, [loginId, isAdmin]);
@@ -282,11 +296,17 @@ export default function SettingsPage() {
       const res = await fetch(`${API_BASE}/api/auth/admin/register-interest-notifications?loginId=${encodeURIComponent(loginId)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
-        body: JSON.stringify({ emails: interestRecipients }),
+        body: JSON.stringify({ emails: interestRecipients, ...interestTemplates }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to save notification recipients.");
       setInterestRecipients((data.emails || []).join(", "));
+      setInterestTemplates({
+        confirmationSubject: data.confirmationSubject || "",
+        confirmationHtml: data.confirmationHtml || "",
+        notificationSubject: data.notificationSubject || "",
+        notificationHtml: data.notificationHtml || "",
+      });
       setInterestRecipientsSaved(true);
       setTimeout(() => setInterestRecipientsSaved(false), 2500);
     } catch (e) {
@@ -294,6 +314,12 @@ export default function SettingsPage() {
     } finally {
       setInterestRecipientsSaving(false);
     }
+  }
+
+  function updateInterestTemplate(key, value) {
+    setInterestTemplates(p => ({ ...p, [key]: value }));
+    setInterestRecipientsError("");
+    setInterestRecipientsSaved(false);
   }
 
   function updatePw(k, v) {
@@ -993,11 +1019,70 @@ export default function SettingsPage() {
                 Separate multiple emails with commas, spaces or new lines.
               </Typography>
             </Box>
+
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, pt: 0.5 }}>
+              <Typography sx={{ fontSize: 12, fontWeight: 700, color: TEXT }}>
+                Thank-you Email Template
+              </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                value={interestTemplates.confirmationSubject}
+                onChange={e => updateInterestTemplate("confirmationSubject", e.target.value)}
+                disabled={interestRecipientsLoading}
+                placeholder="Thanks for your interest in Nolyvra"
+                label="Subject"
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+              />
+              <TextField
+                fullWidth
+                multiline
+                minRows={5}
+                size="small"
+                value={interestTemplates.confirmationHtml}
+                onChange={e => updateInterestTemplate("confirmationHtml", e.target.value)}
+                disabled={interestRecipientsLoading}
+                placeholder="<p>Hi {{name}},</p>"
+                label="HTML Body"
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+              />
+            </Box>
+
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, pt: 0.5 }}>
+              <Typography sx={{ fontSize: 12, fontWeight: 700, color: TEXT }}>
+                Internal Notification Template
+              </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                value={interestTemplates.notificationSubject}
+                onChange={e => updateInterestTemplate("notificationSubject", e.target.value)}
+                disabled={interestRecipientsLoading}
+                placeholder="New register interest submission: {{name}}"
+                label="Subject"
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+              />
+              <TextField
+                fullWidth
+                multiline
+                minRows={6}
+                size="small"
+                value={interestTemplates.notificationHtml}
+                onChange={e => updateInterestTemplate("notificationHtml", e.target.value)}
+                disabled={interestRecipientsLoading}
+                placeholder="<h2>New Register Interest Submission</h2>"
+                label="HTML Body"
+                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+              />
+              <Typography sx={{ fontSize: 11, color: MUTED, mt: -0.5 }}>
+                Available variables: {"{{name}}"}, {"{{email}}"}, {"{{company}}"}, {"{{phone}}"}.
+              </Typography>
+            </Box>
             <Button variant="contained" onClick={handleSaveInterestRecipients}
               disabled={interestRecipientsSaving || interestRecipientsLoading}
               sx={{ alignSelf: "flex-start", fontSize: 12, bgcolor: WARN, borderRadius: "6px",
                 textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#B45309", boxShadow: "none" } }}>
-              {interestRecipientsSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Save Recipients"}
+              {interestRecipientsSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Save Notification Settings"}
             </Button>
           </Box>
         </Paper>
