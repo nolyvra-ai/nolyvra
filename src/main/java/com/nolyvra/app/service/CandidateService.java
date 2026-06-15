@@ -1,6 +1,7 @@
 package com.nolyvra.app.service;
 
 import com.nolyvra.app.model.CandidateCreateRequest;
+import com.nolyvra.app.model.CandidateListItemResponse;
 import com.nolyvra.app.model.CandidateResponse;
 import com.nolyvra.app.model.StageUpdateRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -33,6 +34,26 @@ public class CandidateService {
                 odt != null ? odt.toInstant() : null,
                 rs.getString("stage"),
                 rs.getString("cv_text"));
+    };
+
+    private static final RowMapper<CandidateListItemResponse> CANDIDATE_LIST_MAPPER = (rs, rowNum) -> {
+        OffsetDateTime createdAt = rs.getObject("created_at", OffsetDateTime.class);
+        Long analysisId = (Long) rs.getObject("analysis_id");
+        return new CandidateListItemResponse(
+                rs.getString("id"),
+                rs.getString("job_id"),
+                rs.getString("job_title"),
+                rs.getString("job_company"),
+                rs.getString("name"),
+                rs.getString("email"),
+                rs.getString("linkedin_url"),
+                createdAt != null ? createdAt.toInstant() : null,
+                rs.getString("stage"),
+                (Integer) rs.getObject("consistency_score"),
+                (Integer) rs.getObject("capability_score"),
+                rs.getString("risk_level"),
+                (Integer) rs.getObject("timeline_match_percent"),
+                analysisId != null ? "Analysed" : "Pending");
     };
 
     // ─── Duplicate check ──────────────────────────────────────────────────────
@@ -125,6 +146,42 @@ public class CandidateService {
                   and is_active = true
                 order by created_at desc
                 """, CANDIDATE_MAPPER, loginId);
+    }
+
+    public List<CandidateListItemResponse> getCandidateList(String loginId) {
+        return jdbc.query("""
+                select c.id, c.job_id, c.name, c.email, c.linkedin_url, c.created_at, c.stage,
+                       coalesce(j.title, 'Not Assigned') as job_title,
+                       coalesce(j.company, '') as job_company,
+                       a.id as analysis_id,
+                       a.consistency_score,
+                       a.capability_score,
+                       a.risk_level,
+                       a.timeline_match_percent
+                from candidates c
+                left join jobs j on j.id = c.job_id
+                left join lateral (
+                    select id, consistency_score, capability_score, risk_level, timeline_match_percent
+                    from analyses
+                    where candidate_id = c.id
+                      and login_id = c.login_id
+                    order by analyzed_at desc
+                    limit 1
+                ) a on true
+                where c.login_id = ?
+                  and c.is_active = true
+                order by c.created_at desc
+                """, CANDIDATE_LIST_MAPPER, loginId);
+    }
+
+    public int getActiveCandidateCount(String loginId) {
+        Integer count = jdbc.queryForObject("""
+                select count(*)
+                from candidates
+                where login_id = ?
+                  and is_active = true
+                """, Integer.class, loginId);
+        return count != null ? count : 0;
     }
 
     // ─── Update stage ─────────────────────────────────────────────────────────

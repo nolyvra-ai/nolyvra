@@ -219,7 +219,7 @@ export default function EmailCentrePage() {
 
   useEffect(() => {
     Promise.allSettled([
-      apiGet("/api/candidates"),
+      apiGet("/api/candidates/list"),
       apiGet("/api/jobs"),
       apiGet("/api/emails/templates"),
       apiGet("/api/emails/history"),

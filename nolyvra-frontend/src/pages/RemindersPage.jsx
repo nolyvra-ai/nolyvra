@@ -131,7 +131,7 @@ export default function RemindersPage() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([apiGet("/api/reminders"), apiGet("/api/candidates")])
+    Promise.all([apiGet("/api/reminders"), apiGet("/api/candidates/list")])
       .then(([r, c]) => { setReminders(r); setCandidates(c); })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));

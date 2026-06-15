@@ -269,44 +269,25 @@ export default function CandidatesPage() {
   const [jobFilter, setJobFilter] = useState("all");
   const [riskFilter, setRiskFilter] = useState("All");
 
-  // ── Data loading (unchanged) ─────────────────────────────────────────────
+  // ── Data loading ─────────────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
       try {
-        const jobsResp = await apiGet("/api/jobs");
-        setJobs(jobsResp ?? []);
-
-        const allCandidates = [];
-        for (const job of jobsResp ?? []) {
-          try {
-            const candidatesResp = await apiGet(`/api/jobs/${job.id}/candidates`);
-            for (const c of candidatesResp ?? []) {
-              try {
-                const analysis = await apiGet(`/api/candidates/${c.id}/analysis`);
-                allCandidates.push({
-                  ...c,
-                  jobTitle: job.title,
-                  consistencyScore: analysis?.consistencyScore ?? null,
-                  capabilityScore: analysis?.capabilityScore ?? null,
-                  risk: analysis?.riskLevel ?? null,
-                  status: "Analysed",
-                });
-              } catch {
-                allCandidates.push({
-                  ...c,
-                  jobTitle: job.title,
-                  consistencyScore: null,
-                  capabilityScore: null,
-                  risk: null,
-                  status: "Pending",
-                });
-              }
-            }
-          } catch (e) {
-            console.warn("Failed to load candidates for job", job.id, e);
-          }
-        }
-        setCandidates(allCandidates);
+        const listResp = await apiGet("/api/candidates/list");
+        const list = (listResp ?? []).map((c) => ({
+          ...c,
+          risk: c.riskLevel ?? null,
+          status: c.status ?? (c.capabilityScore != null || c.consistencyScore != null ? "Analysed" : "Pending"),
+        }));
+        const jobOptions = Array.from(
+          new Map(
+            list
+              .filter((c) => c.jobId)
+              .map((c) => [c.jobId, { id: c.jobId, title: c.jobTitle || c.jobId }])
+          ).values()
+        );
+        setJobs(jobOptions);
+        setCandidates(list);
       } catch (e) {
         console.error("Failed to load candidates page", e);
       } finally {

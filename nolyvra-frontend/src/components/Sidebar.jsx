@@ -114,9 +114,9 @@ export default function Sidebar() {
       .then(r => r.ok ? r.json() : [])
       .then(d => setJobCount(Array.isArray(d) ? d.length : null))
       .catch(() => {});
-    fetch(`${API_BASE}/api/candidates?loginId=${encodeURIComponent(loginIdVal)}`, { headers: authHeader })
-      .then(r => r.ok ? r.json() : [])
-      .then(d => setCandidateCount(Array.isArray(d) ? d.length : null))
+    fetch(`${API_BASE}/api/candidates/count?loginId=${encodeURIComponent(loginIdVal)}`, { headers: authHeader })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setCandidateCount(typeof d?.count === "number" ? d.count : null))
       .catch(() => {});
   }, [loginIdVal]);
 

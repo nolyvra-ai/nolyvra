@@ -3,6 +3,7 @@ package com.nolyvra.app.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nolyvra.app.model.CandidateCreateRequest;
+import com.nolyvra.app.model.CandidateListItemResponse;
 import com.nolyvra.app.model.CandidateResponse;
 import com.nolyvra.app.model.StageUpdateRequest;
 import com.nolyvra.app.service.CandidateService;
@@ -65,6 +66,11 @@ public class CandidatesController {
         }
     }
 
+    @GetMapping("/candidates/count")
+    public Map<String, Integer> getCandidateCount(@RequestParam String loginId) {
+        return Map.of("count", candidateService.getActiveCandidateCount(loginId));
+    }
+
     @GetMapping("/candidates/{candidateId}")
     public CandidateResponse getCandidate(
             @PathVariable String candidateId,
@@ -85,6 +91,11 @@ public class CandidatesController {
     @GetMapping("/candidates")
     public List<CandidateResponse> getAllCandidates(@RequestParam String loginId) {
         return candidateService.getAllCandidates(loginId);
+    }
+
+    @GetMapping("/candidates/list")
+    public List<CandidateListItemResponse> getCandidateList(@RequestParam String loginId) {
+        return candidateService.getCandidateList(loginId);
     }
 
     // ── MVP2: Delete candidate ───────────────────────────────────────────────
