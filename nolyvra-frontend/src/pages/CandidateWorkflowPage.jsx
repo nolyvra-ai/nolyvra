@@ -418,7 +418,7 @@ export default function CandidateWorkflowPage() {
           {/* AI Message Generator */}
           <Card isNew>
             <CardHead title="AI Message Generator" isNew
-              action={<Typography sx={{fontSize:10,color:MUTED,fontStyle:"italic"}}>POST /api/messages/generate</Typography>} />
+              />
             <Box sx={{p:2.25}}>
               <Typography sx={{fontSize:12,fontWeight:600,color:TEXT,mb:0.75}}>What message do you need?</Typography>
               <Box sx={{display:"flex",gap:1,flexWrap:"wrap",mb:1}}>

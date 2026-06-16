@@ -1,5 +1,6 @@
 package com.nolyvra.app.controller;
 
+import com.nolyvra.app.model.CoreSignalProfileResponse;
 import com.nolyvra.app.model.TalentSearchRequest;
 import com.nolyvra.app.model.TalentSearchResponse;
 import com.nolyvra.app.service.TalentSearchService;
@@ -21,5 +22,12 @@ public class TalentSearchController {
             @Valid @RequestBody TalentSearchRequest req,
             @RequestParam String loginId) {
         return talentSearchService.search(req, loginId);
+    }
+
+    @GetMapping("/coresignal/{coresignalId}")
+    public CoreSignalProfileResponse getCoreSignalProfile(
+            @PathVariable Long coresignalId,
+            @RequestParam String loginId) {
+        return talentSearchService.getCoreSignalProfile(coresignalId);
     }
 }

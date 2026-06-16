@@ -1,5 +1,6 @@
 package com.nolyvra.app.service;
 
+import com.nolyvra.app.model.CoreSignalProfileResponse;
 import com.nolyvra.app.model.TalentSearchRequest;
 import com.nolyvra.app.model.TalentSearchResponse;
 import com.nolyvra.app.model.TalentSearchResult;
@@ -95,6 +96,43 @@ public class TalentSearchService {
                 paged);
     }
 
+    // ─── GET /api/talent-search/coresignal/{id} ──────────────────────────────
+
+    public CoreSignalProfileResponse getCoreSignalProfile(Long coresignalId) {
+        return jdbc.query("""
+                select coresignal_id, full_name, job_title, current_company,
+                       location_city, location_country, linkedin_url,
+                       years_experience, management_level, description,
+                       skills, raw_json
+                from coresignal_cache
+                where coresignal_id = ?
+                """,
+                (rs, rowNum) -> {
+                    List<String> skills = new ArrayList<>();
+                    try {
+                        JsonNode node = objectMapper.readTree(
+                                rs.getString("skills") != null ? rs.getString("skills") : "[]");
+                        if (node.isArray()) node.forEach(s -> skills.add(s.asText()));
+                    } catch (Exception ignored) {}
+                    return new CoreSignalProfileResponse(
+                            rs.getLong("coresignal_id"),
+                            rs.getString("full_name"),
+                            rs.getString("job_title"),
+                            rs.getString("current_company"),
+                            rs.getString("location_city"),
+                            rs.getString("location_country"),
+                            rs.getString("linkedin_url"),
+                            rs.getObject("years_experience") != null ? rs.getInt("years_experience") : null,
+                            rs.getString("management_level"),
+                            rs.getString("description"),
+                            skills,
+                            rs.getString("raw_json"));
+                }, coresignalId)
+                .stream().findFirst()
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Profile not found in cache: " + coresignalId));
+    }
+
     // ─── Step 1: AI extracts structured filters ───────────────────────────────
 
     private SearchFilters extractFilters(String query) {
@@ -157,7 +195,7 @@ public class TalentSearchService {
 
         // Get all candidates for this login with their latest analysis
         return jdbc.query("""
-                select c.id, c.name, c.linkedin_url, c.cv_text, c.job_id,
+                select c.id, c.name, c.email, c.phone_number, c.linkedin_url, c.cv_text, c.job_id,
                        coalesce(j.title, 'Not Assigned') as job_title,
                        coalesce(j.company, '') as company,
                        a.capability_score, a.risk_level
@@ -187,8 +225,10 @@ public class TalentSearchService {
                             rs.getString("job_title"),
                             rs.getString("company"),
                             rs.getString("linkedin_url"),
+                            rs.getString("email"),
+                            rs.getString("phone_number"),
                             matched, gaps, score, 0,
-                            "INTERNAL", true);
+                            "INTERNAL", true, null);
                 }, loginId);
     }
 
@@ -212,8 +252,10 @@ public class TalentSearchService {
                         TalentSearchResult p = cached.get(i);
                         scored.add(new TalentSearchResult(
                                 p.candidateId(), p.name(), p.currentTitle(), p.currentCompany(),
-                                p.linkedinUrl(), p.matchedSkills(), p.gapSkills(),
-                                aiScores.get(i), p.yearsExperience(), p.source(), p.alreadyInPipeline()));
+                                p.linkedinUrl(), p.email(), p.phone(),
+                                p.matchedSkills(), p.gapSkills(),
+                                aiScores.get(i), p.yearsExperience(), p.source(), p.alreadyInPipeline(),
+                                p.coresignalId()));
                     }
                     return scored;
                 }
@@ -283,8 +325,10 @@ public class TalentSearchService {
                     TalentSearchResult p = profiles.get(i);
                     scored.add(new TalentSearchResult(
                             p.candidateId(), p.name(), p.currentTitle(), p.currentCompany(),
-                            p.linkedinUrl(), p.matchedSkills(), p.gapSkills(),
-                            aiScores.get(i), p.yearsExperience(), p.source(), p.alreadyInPipeline()));
+                            p.linkedinUrl(), p.email(), p.phone(),
+                            p.matchedSkills(), p.gapSkills(),
+                            aiScores.get(i), p.yearsExperience(), p.source(), p.alreadyInPipeline(),
+                            p.coresignalId()));
                 }
                 return scored;
             }
@@ -392,9 +436,9 @@ public class TalentSearchService {
             }
 
             return new TalentSearchResult(
-                    null, name, title, company, linkedinUrl,
+                    null, name, title, company, linkedinUrl, null, null,
                     matched, gaps, score, yearsExp,
-                    "CORESIGNAL", false);
+                    "CORESIGNAL", false, id);
 
         } catch (org.springframework.web.client.HttpClientErrorException e) {
             System.err.println("[CoreSignal] profile " + id + " HTTP " + e.getStatusCode() + " – " + e.getResponseBodyAsString());
@@ -467,9 +511,10 @@ public class TalentSearchService {
                     rs.getString("job_title"),
                     rs.getString("current_company"),
                     rs.getString("linkedin_url"),
+                    null, null,
                     matched, gaps, score,
                     rs.getInt("years_experience"),
-                    "CORESIGNAL", false);
+                    "CORESIGNAL", false, rs.getLong("coresignal_id"));
             }, args.toArray());
 
         } catch (Exception e) {

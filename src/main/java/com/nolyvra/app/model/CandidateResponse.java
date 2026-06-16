@@ -7,6 +7,7 @@ public record CandidateResponse(
     String jobId,
     String name,
     String email,
+    String phone,
     String linkedinUrl,
     Instant createdAt,
     String stage,

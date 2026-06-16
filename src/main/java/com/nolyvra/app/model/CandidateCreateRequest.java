@@ -13,6 +13,8 @@ public record CandidateCreateRequest(
 
     String linkedinUrl,
 
-    String cvText
+    String cvText,
+
+    String phone
 
 ) {}

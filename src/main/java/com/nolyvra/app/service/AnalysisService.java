@@ -306,6 +306,7 @@ public class AnalysisService {
                 (rs, r) -> new CandidateResponse(
                         rs.getString("id"), rs.getString("job_id"),
                         rs.getString("name"), rs.getString("email"),
+                        null,
                         rs.getString("linkedin_url"),
                         rs.getTimestamp("created_at") != null
                                 ? rs.getTimestamp("created_at").toInstant()
