@@ -8,6 +8,8 @@ import com.nolyvra.app.model.OutreachRequest;
 import com.nolyvra.app.model.PotentialClientResponse;
 import com.openai.client.OpenAIClient;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -17,13 +19,11 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
 @Service
 public class ClientService {
+
+    private static final Logger log = LoggerFactory.getLogger(ClientService.class);
 
     private final JdbcTemplate jdbc;
     private final OpenAIClient openAI;
@@ -183,81 +183,130 @@ public class ClientService {
 
     // ─── GET /api/clients/potential ───────────────────────────────────────────
 
-    public List<PotentialClientResponse> getPotentialClients(String loginId) {
+    public List<PotentialClientResponse> getPotentialClients(
+            String loginId, String industry, String country,
+            String companySize, String keyword) {
         if (coreSignalApiKey == null || coreSignalApiKey.isBlank()) {
+            log.warn("[ClientSearch] CoreSignal API key is not configured — returning empty");
             return List.of();
         }
+        log.info("[ClientSearch] Params — industry='{}' country='{}' companySize='{}' keyword='{}'",
+                industry, country, companySize, keyword);
         try {
-            return fetchFromCoreSignal(loginId);
+            return fetchFromCoreSignal(loginId, industry, country, companySize, keyword);
         } catch (Exception e) {
+            log.error("[ClientSearch] Unhandled exception in fetchFromCoreSignal: {}", e.getMessage(), e);
             return List.of();
         }
     }
 
     // ─── CoreSignal: search + collect company profiles ────────────────────────
 
-    private List<PotentialClientResponse> fetchFromCoreSignal(String loginId) throws Exception {
+    private List<PotentialClientResponse> fetchFromCoreSignal(
+            String loginId, String industry, String country,
+            String companySize, String keyword) throws Exception {
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("apikey", coreSignalApiKey);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        Map<String, Object> query = Map.of("query", Map.of("match_all", Map.of()));
+        // Build ES DSL query with filters applied at source — never fetch more than 4 IDs
+        List<Map<String, Object>> mustClauses = new ArrayList<>();
+        if (isPresent(country))     mustClauses.add(Map.of("match", Map.of("location_hq_country", country)));
+        if (isPresent(industry))    mustClauses.add(Map.of("match", Map.of("industry", industry)));
+        if (isPresent(companySize)) {
+            List<String> ranges = mapSizeToRanges(companySize);
+            if (!ranges.isEmpty()) mustClauses.add(Map.of("terms", Map.of("size_range", ranges)));
+        }
+        if (isPresent(keyword))     mustClauses.add(Map.of("match", Map.of("name", keyword)));
 
-        HttpEntity<Map<String, Object>> searchEntity = new HttpEntity<>(query, headers);
+        Map<String, Object> queryBody = mustClauses.isEmpty()
+            ? Map.of("query", Map.of("match_all", Map.of()))
+            : Map.of("query", Map.of("bool", Map.of("must", mustClauses)));
+
+        String searchUrl = coreSignalBaseUrl + "/company_clean/search/es_dsl";
+        log.info("[ClientSearch] POST {} body={}", searchUrl, objectMapper.writeValueAsString(queryBody));
+
+        HttpEntity<Map<String, Object>> searchEntity = new HttpEntity<>(queryBody, headers);
         ResponseEntity<String> searchResp = restTemplate.exchange(
-            coreSignalBaseUrl + "/company_clean/search/es_dsl",
-            HttpMethod.POST, searchEntity, String.class);
+            searchUrl, HttpMethod.POST, searchEntity, String.class);
 
         String rawBody = searchResp.getBody();
+        log.info("[ClientSearch] Search status={} bodyLength={}",
+                searchResp.getStatusCode(), rawBody != null ? rawBody.length() : 0);
+
         if (!searchResp.getStatusCode().is2xxSuccessful() || rawBody == null) {
+            log.warn("[ClientSearch] Non-2xx or empty body — aborting");
             return List.of();
         }
 
         JsonNode idsNode = objectMapper.readTree(rawBody);
-        if (!idsNode.isArray() || idsNode.size() == 0) return List.of();
+        int count = idsNode.isArray() ? Math.min(idsNode.size(), 4) : 0;
+        log.info("[ClientSearch] IDs returned: {} (collecting {})", idsNode.isArray() ? idsNode.size() : 0, count);
+        if (count == 0) return List.of();
 
         List<Integer> ids = new ArrayList<>();
-        for (int i = 0; i < Math.min(8, idsNode.size()); i++) {
-            ids.add(idsNode.get(i).asInt());
+        for (int i = 0; i < count; i++) ids.add(idsNode.get(i).asInt());
+        log.info("[ClientSearch] Collecting IDs: {}", ids);
+
+        List<PotentialClientResponse> results = new ArrayList<>();
+        for (int id : ids) {
+            PotentialClientResponse pc = collectCompany(id, headers);
+            if (pc != null) results.add(pc);
         }
 
-        ExecutorService pool = Executors.newFixedThreadPool(3);
-        List<CompletableFuture<PotentialClientResponse>> futures = ids.stream()
-            .map(id -> CompletableFuture.supplyAsync(() -> collectCompany(id, headers), pool))
-            .collect(Collectors.toList());
-
-        List<PotentialClientResponse> results = futures.stream()
-            .map(CompletableFuture::join)
-            .filter(Objects::nonNull)
-            .sorted(Comparator.comparingInt(PotentialClientResponse::matchScore).reversed())
-            .limit(4)
-            .collect(Collectors.toList());
-
-        pool.shutdown();
+        results.sort(Comparator.comparingInt(PotentialClientResponse::matchScore).reversed());
         return results;
+    }
+
+    private List<String> mapSizeToRanges(String size) {
+        return switch (size.toLowerCase()) {
+            case "small"      -> List.of("1-10 employees", "11-50 employees");
+            case "medium"     -> List.of("51-200 employees", "201-500 employees");
+            case "large"      -> List.of("501-1000 employees", "1001-5000 employees");
+            case "enterprise" -> List.of("5001-10000 employees", "10001+ employees");
+            default           -> List.of();
+        };
+    }
+
+    private boolean isPresent(String val) {
+        return val != null && !val.isBlank();
     }
 
     // ─── Collect a single company profile by ID ───────────────────────────────
 
     private PotentialClientResponse collectCompany(int id, HttpHeaders headers) {
         try {
+            String collectUrl = coreSignalBaseUrl + "/company_clean/collect/" + id;
+            log.info("[ClientSearch] GET {}", collectUrl);
             HttpEntity<Void> entity = new HttpEntity<>(headers);
             ResponseEntity<String> resp = restTemplate.exchange(
-                coreSignalBaseUrl + "/company_clean/collect/" + id,
-                HttpMethod.GET, entity, String.class);
+                collectUrl, HttpMethod.GET, entity, String.class);
 
-            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) return null;
+            log.info("[ClientSearch] Collect id={} status={}", id, resp.getStatusCode());
+            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
+                log.warn("[ClientSearch] Collect id={} failed or empty body", id);
+                return null;
+            }
 
             JsonNode c = objectMapper.readTree(resp.getBody());
 
-            String companyName = c.path("name").asText("Unknown");
-            String industry    = c.path("industry").asText("");
-            String sizeRange   = c.path("size_range").asText("");
-            String city        = c.path("hq_city").asText("");
-            String country     = c.path("hq_country").asText("");
-            String location    = city.isBlank() ? country : city + ", " + country;
-            int openRoles      = c.path("active_job_postings_count").asInt(0);
+            String companyName   = c.path("name").asText("Unknown");
+            String industry      = c.path("industry").asText("");
+            String sizeRange     = c.path("size_range").asText("");
+            String city          = c.path("location_hq_city").asText("");
+            String country       = c.path("location_hq_country").asText("");
+            String location      = city.isBlank() ? country : city + ", " + country;
+
+            log.info("[ClientSearch] Parsed id={} name='{}' industry='{}' size_range='{}' country='{}' city='{}'",
+                    id, companyName, industry, sizeRange, country, city);
+            int openRoles        = c.path("active_job_postings_count").asInt(0);
+            int totalEmployees   = c.path("size_employees_count").asInt(0);
+            String description   = c.path("description").asText("");
+            String websiteUrl    = c.path("websites_main").asText("");
+            String linkedinUrl   = c.path("websites_linkedin").asText("");
+            String foundedYear   = c.path("founded").asText("");
+            String companyType   = c.path("type").asText("");
 
             double growthPct         = c.path("employees_count_change")
                 .path("change_yearly_percentage").asDouble(0);
@@ -311,7 +360,7 @@ public class ClientService {
             List<PotentialClientResponse.DecisionMaker> decisionMakers = new ArrayList<>();
             JsonNode executives = c.path("key_executives");
             if (executives.isArray()) {
-                for (int i = 0; i < Math.min(3, executives.size()); i++) {
+                for (int i = 0; i < executives.size(); i++) {
                     JsonNode exec = executives.get(i);
                     String name  = exec.path("member_full_name").asText("");
                     String title = exec.path("member_position_title").asText("");
@@ -321,13 +370,36 @@ public class ClientService {
                 }
             }
 
+            List<String> specialties = new ArrayList<>();
+            JsonNode specs = c.path("specialities");
+            if (specs.isArray()) {
+                for (JsonNode s : specs) {
+                    String spec = s.asText("");
+                    if (!spec.isBlank()) specialties.add(spec);
+                }
+            }
+
+            List<PotentialClientResponse.NewsArticle> newsArticles = new ArrayList<>();
+            if (news.isArray()) {
+                for (JsonNode article : news) {
+                    String headline = article.path("headline").asText("");
+                    String date     = article.path("date").asText("");
+                    if (!headline.isBlank())
+                        newsArticles.add(new PotentialClientResponse.NewsArticle(headline, date));
+                }
+            }
+
             return new PotentialClientResponse(
                 companyName, industry, sizeRange, location,
                 fundingEvent != null ? fundingEvent : hiringSignal + " hiring signal",
                 signals, openRoles, matchScore, (int) Math.round(growthPct),
-                decisionMakers);
+                decisionMakers,
+                description, websiteUrl, linkedinUrl, foundedYear, companyType,
+                specialties, newsArticles, totalEmployees, postingsGrowthPct,
+                city, country);
 
         } catch (Exception e) {
+            log.error("[ClientSearch] collectCompany id={} threw: {}", id, e.getMessage(), e);
             return null;
         }
     }

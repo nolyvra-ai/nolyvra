@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, CircularProgress } from "@mui/material";
+import { Box, CircularProgress, Dialog, DialogContent } from "@mui/material";
 import AddClientDialog from "./AddClientDialog";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -24,6 +24,19 @@ const CARD_BASE = {
   borderRadius: "12px",
   boxShadow: "0 1px 4px rgba(15,22,35,0.05)",
   overflow: "hidden",
+};
+
+const inputStyle = {
+  width: "100%",
+  boxSizing: "border-box",
+  padding: "7px 10px",
+  border: `1px solid ${BORDER}`,
+  borderRadius: "8px",
+  fontSize: 12,
+  color: TEXT,
+  outline: "none",
+  fontFamily: "inherit",
+  background: SURFACE,
 };
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -61,16 +74,6 @@ const SearchIcon = () => (
     <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
   </svg>
 );
-const ChevronDown = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="6 9 12 15 18 9"/>
-  </svg>
-);
-const ChevronUp = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="18 15 12 9 6 15"/>
-  </svg>
-);
 const SparkIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
@@ -90,6 +93,11 @@ const EditIcon = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+  </svg>
+);
+const CloseIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
   </svg>
 );
 
@@ -144,76 +152,89 @@ function JobStatusTag({ status }) {
   );
 }
 
+// ─── Section label (used in detail modal) ─────────────────────────────────────
+function SectionLabel({ children }) {
+  return (
+    <Box sx={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase",
+      letterSpacing: ".7px", mb: "8px" }}>
+      {children}
+    </Box>
+  );
+}
+
+// ─── Detail row (used in detail modal) ───────────────────────────────────────
+function DetailRow({ label, value, valueColor = TEXT }) {
+  if (value === null || value === undefined || value === "" || value === 0) return null;
+  return (
+    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: "5px" }}>
+      <Box sx={{ fontSize: 12, color: MUTED, flexShrink: 0, mr: "8px" }}>{label}</Box>
+      <Box sx={{ fontSize: 12, fontWeight: 500, color: valueColor, textAlign: "right" }}>{value}</Box>
+    </Box>
+  );
+}
+
 // ─── Client row ───────────────────────────────────────────────────────────────
 function ClientRow({ client, onEdit }) {
   return (
-    <>
-      {/* Row */}
-      <Box sx={{
-        display: "grid",
-        gridTemplateColumns: "2fr 1.5fr 1fr 2fr 1fr",
-        alignItems: "center",
-        px: "16px", py: "12px",
-        borderBottom: `1px solid ${BORDER}`,
-      }}>
-        {/* Client */}
-        <Box>
-          <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{client.companyName}</Box>
-          <Box sx={{ fontSize: 11, color: MUTED, mt: "2px" }}>
-            {[client.industry, client.location].filter(Boolean).join(" • ")}
-          </Box>
-        </Box>
-        {/* Contact */}
-        <Box>
-          {client.contactPerson
-            ? <Box sx={{ fontSize: 13, color: TEXT }}>{client.contactPerson}</Box>
-            : <Box sx={{ fontSize: 12, color: MUTED }}>—</Box>}
-          {client.contactEmail && <Box sx={{ fontSize: 11, color: MUTED, mt: "1px" }}>{client.contactEmail}</Box>}
-        </Box>
-        {/* Active Jobs */}
-        <Box>
-          <Box sx={{ fontSize: 13, fontWeight: 600, color: client.activeJobCount > 0 ? SUCCESS : MUTED }}>
-            {client.activeJobCount} Active
-          </Box>
-          {client.totalJobCount > 0 && (
-            <Box sx={{ fontSize: 11, color: MUTED }}>{client.totalJobCount} Total</Box>
-          )}
-        </Box>
-        {/* Job Details */}
-        <Box>
-          {client.recentJobs?.length > 0 ? (
-            client.recentJobs.slice(0, 2).map((job, i) => (
-              <Box key={i} sx={{ display: "flex", alignItems: "center", gap: "6px", mb: "3px" }}>
-                <Box sx={{ fontSize: 12, color: TEXT, fontWeight: 500, flexShrink: 0 }}>{job.title}</Box>
-                <Box sx={{ fontSize: 11, color: MUTED, flexShrink: 0 }}>· {job.daysOld}d</Box>
-                <JobStatusTag status={job.status} />
-              </Box>
-            ))
-          ) : (
-            <Box sx={{ fontSize: 12, color: MUTED }}>No jobs</Box>
-          )}
-          {client.recentJobs?.length > 2 && (
-            <Box sx={{ fontSize: 11, color: MUTED }}>+{client.recentJobs.length - 2} more</Box>
-          )}
-        </Box>
-        {/* Actions */}
-        <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
-          <Box onClick={e => { e.stopPropagation(); onEdit(client); }} sx={{
-            px: "8px", py: "5px", borderRadius: "6px", fontSize: 12,
-            border: `1px solid ${BORDER}`, color: MUTED, bgcolor: SURFACE,
-            display: "flex", alignItems: "center", gap: "4px", cursor: "pointer",
-            "&:hover": { color: ACCENT, borderColor: ACCENT }, transition: "all .12s",
-          }}>
-            <EditIcon />
-          </Box>
+    <Box sx={{
+      display: "grid",
+      gridTemplateColumns: "2fr 1.5fr 1fr 2fr 1fr",
+      alignItems: "center",
+      px: "16px", py: "12px",
+      borderBottom: `1px solid ${BORDER}`,
+    }}>
+      <Box>
+        <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{client.companyName}</Box>
+        <Box sx={{ fontSize: 11, color: MUTED, mt: "2px" }}>
+          {[client.industry, client.location].filter(Boolean).join(" • ")}
         </Box>
       </Box>
-    </>
+      <Box>
+        {client.contactPerson
+          ? <Box sx={{ fontSize: 13, color: TEXT }}>{client.contactPerson}</Box>
+          : <Box sx={{ fontSize: 12, color: MUTED }}>—</Box>}
+        {client.contactEmail && <Box sx={{ fontSize: 11, color: MUTED, mt: "1px" }}>{client.contactEmail}</Box>}
+      </Box>
+      <Box>
+        <Box sx={{ fontSize: 13, fontWeight: 600, color: client.activeJobCount > 0 ? SUCCESS : MUTED }}>
+          {client.activeJobCount} Active
+        </Box>
+        {client.totalJobCount > 0 && (
+          <Box sx={{ fontSize: 11, color: MUTED }}>{client.totalJobCount} Total</Box>
+        )}
+      </Box>
+      <Box>
+        {client.recentJobs?.length > 0 ? (
+          client.recentJobs.slice(0, 2).map((job, i) => (
+            <Box key={i} sx={{ display: "flex", alignItems: "center", gap: "6px", mb: "3px" }}>
+              <Box sx={{ fontSize: 12, color: TEXT, fontWeight: 500, flexShrink: 0 }}>{job.title}</Box>
+              <Box sx={{ fontSize: 11, color: MUTED, flexShrink: 0 }}>· {job.daysOld}d</Box>
+              <JobStatusTag status={job.status} />
+            </Box>
+          ))
+        ) : (
+          <Box sx={{ fontSize: 12, color: MUTED }}>No jobs</Box>
+        )}
+        {client.recentJobs?.length > 2 && (
+          <Box sx={{ fontSize: 11, color: MUTED }}>+{client.recentJobs.length - 2} more</Box>
+        )}
+      </Box>
+      <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+        <Box onClick={e => { e.stopPropagation(); onEdit(client); }} sx={{
+          px: "8px", py: "5px", borderRadius: "6px",
+          border: `1px solid ${BORDER}`, color: MUTED, bgcolor: SURFACE,
+          display: "flex", alignItems: "center", cursor: "pointer",
+          "&:hover": { color: ACCENT, borderColor: ACCENT }, transition: "all .12s",
+        }}>
+          <EditIcon />
+        </Box>
+      </Box>
+    </Box>
   );
 }
 
 // ─── Potential client card ─────────────────────────────────────────────────────
-function PotentialCard({ pc }) {
+function PotentialCard({ pc, onViewDetail }) {
   const [outreachMsg, setMsg]   = useState("");
   const [generating, setGen]    = useState(false);
   const [genError, setGenError] = useState("");
@@ -242,7 +263,6 @@ function PotentialCard({ pc }) {
 
   return (
     <Box sx={{ ...CARD_BASE, p: "18px 20px", display: "flex", flexDirection: "column", gap: "12px" }}>
-      {/* Header */}
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
         <Box>
           <Box sx={{ fontSize: 14, fontWeight: 700, color: TEXT }}>{pc.companyName}</Box>
@@ -254,13 +274,11 @@ function PotentialCard({ pc }) {
         </Box>
       </Box>
 
-      {/* Industry + hiring signal */}
       <Box sx={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
         {pc.industry && <Tag color={PURPLE} bg={PURPLE_L}>{pc.industry}</Tag>}
         <Tag color={WARN} bg={WARN_L}>{pc.hiringSignal}</Tag>
       </Box>
 
-      {/* Signal reasons */}
       {pc.signalReasons?.length > 0 && (
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
           {pc.signalReasons.map((s, i) => (
@@ -272,7 +290,6 @@ function PotentialCard({ pc }) {
         </Box>
       )}
 
-      {/* Stats row */}
       <Box sx={{ display: "flex", gap: "20px" }}>
         <Box>
           <Box sx={{ fontSize: 18, fontWeight: 700, color: TEXT }}>{pc.openRoles}</Box>
@@ -284,12 +301,11 @@ function PotentialCard({ pc }) {
         </Box>
       </Box>
 
-      {/* Decision makers */}
       {pc.decisionMakers?.length > 0 && (
         <Box>
           <Box sx={{ fontSize: 11, color: MUTED, fontWeight: 600, textTransform: "uppercase",
             letterSpacing: ".5px", mb: "6px" }}>Key Contacts</Box>
-          {pc.decisionMakers.map((dm, i) => (
+          {pc.decisionMakers.slice(0, 3).map((dm, i) => (
             <Box key={i} sx={{ fontSize: 12, color: TEXT, mb: "2px" }}>
               <strong>{dm.name}</strong>
               <Box component="span" sx={{ color: MUTED }}> — {dm.title}</Box>
@@ -298,7 +314,6 @@ function PotentialCard({ pc }) {
         </Box>
       )}
 
-      {/* Generate outreach */}
       {genError && (
         <Box sx={{ p: "8px 10px", borderRadius: "6px", bgcolor: "rgba(220,38,38,0.06)",
           border: "1px solid rgba(220,38,38,0.15)", color: "#DC2626", fontSize: 11 }}>
@@ -311,6 +326,7 @@ function PotentialCard({ pc }) {
           {outreachMsg}
         </Box>
       )}
+
       <Box sx={{ display: "flex", gap: "8px", alignItems: "center" }}>
         <Box onClick={generating ? undefined : generateOutreach} sx={{
           display: "inline-flex", alignItems: "center", gap: "5px",
@@ -330,8 +346,254 @@ function PotentialCard({ pc }) {
             Copy
           </Box>
         )}
+        <Box sx={{ flex: 1 }} />
+        <Box onClick={onViewDetail} sx={{
+          px: "12px", py: "6px", borderRadius: "7px", fontSize: 12, fontWeight: 500,
+          border: `1px solid ${BORDER}`, color: MUTED, cursor: "pointer",
+          "&:hover": { color: ACCENT, borderColor: ACCENT }, transition: "all .12s",
+        }}>
+          View Details
+        </Box>
       </Box>
     </Box>
+  );
+}
+
+// ─── Potential client detail modal ────────────────────────────────────────────
+function PotentialDetailModal({ pc, onClose, onAddToClients }) {
+  const [outreachMsg, setMsg]   = useState("");
+  const [generating, setGen]    = useState(false);
+  const [genError, setGenError] = useState("");
+
+  const scoreColor = pc.matchScore >= 80 ? SUCCESS : pc.matchScore >= 60 ? WARN : MUTED;
+  const scoreBg    = pc.matchScore >= 80 ? SUCCESS_L : pc.matchScore >= 60 ? WARN_L : "rgba(138,148,166,0.08)";
+
+  async function generateOutreach() {
+    setGen(true);
+    setGenError("");
+    try {
+      const msg = await apiPost("/api/clients/outreach", {
+        clientId: "",
+        clientName: pc.companyName,
+        contactName: pc.decisionMakers?.[0]?.name || "",
+        industry: pc.industry,
+        recentSignals: pc.signalReasons?.join("; ") || pc.hiringSignal,
+      });
+      setMsg(msg);
+    } catch (e) {
+      setGenError(e.message || "Generation failed.");
+    } finally {
+      setGen(false);
+    }
+  }
+
+  return (
+    <Dialog open onClose={onClose} maxWidth="md" fullWidth
+      PaperProps={{ sx: { borderRadius: "16px", overflow: "hidden", m: "24px" } }}>
+      <DialogContent sx={{ p: 0 }}>
+
+        {/* Header */}
+        <Box sx={{ px: "28px", pt: "24px", pb: "16px", borderBottom: `1px solid ${BORDER}`,
+          display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <Box sx={{ flex: 1, mr: "16px" }}>
+            <Box sx={{ fontSize: 20, fontWeight: 700, color: TEXT }}>{pc.companyName}</Box>
+            <Box sx={{ fontSize: 13, color: MUTED, mt: "4px" }}>
+              {[pc.companyType, pc.industry, pc.foundedYear ? `Est. ${pc.foundedYear}` : ""].filter(Boolean).join(" · ")}
+            </Box>
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+            <Box sx={{ px: "10px", py: "4px", borderRadius: "20px", fontSize: 12, fontWeight: 700,
+              color: scoreColor, bgcolor: scoreBg }}>
+              {pc.matchScore}% match
+            </Box>
+            <Box onClick={onClose} sx={{ cursor: "pointer", color: MUTED, lineHeight: 0,
+              "&:hover": { color: TEXT }, transition: "color .12s" }}>
+              <CloseIcon />
+            </Box>
+          </Box>
+        </Box>
+
+        {/* Body */}
+        <Box sx={{ px: "28px", py: "20px", maxHeight: "60vh", overflowY: "auto" }}>
+
+          {pc.description && (
+            <Box sx={{ mb: "20px" }}>
+              <SectionLabel>About</SectionLabel>
+              <Box sx={{ fontSize: 13, color: TEXT, lineHeight: 1.65 }}>{pc.description}</Box>
+            </Box>
+          )}
+
+          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", mb: "20px" }}>
+            <Box sx={{ ...CARD_BASE, p: "14px 16px" }}>
+              <SectionLabel>Company Details</SectionLabel>
+              <DetailRow label="HQ" value={[pc.hqCity, pc.hqCountry].filter(Boolean).join(", ") || pc.location} />
+              <DetailRow label="Size" value={pc.size} />
+              {pc.totalEmployees > 0 && (
+                <DetailRow label="Employees" value={pc.totalEmployees.toLocaleString()} />
+              )}
+              {pc.companyType && <DetailRow label="Type" value={pc.companyType} />}
+              {pc.foundedYear && <DetailRow label="Founded" value={pc.foundedYear} />}
+            </Box>
+            <Box sx={{ ...CARD_BASE, p: "14px 16px" }}>
+              <SectionLabel>Hiring Signals</SectionLabel>
+              <DetailRow label="Open Roles" value={pc.openRoles || null} />
+              <DetailRow
+                label="Team Growth"
+                value={pc.growthPct > 0 ? `+${pc.growthPct}%` : pc.growthPct < 0 ? `${pc.growthPct}%` : null}
+                valueColor={pc.growthPct > 0 ? SUCCESS : MUTED}
+              />
+              {pc.postingsGrowthPct > 0 && (
+                <DetailRow label="Job Postings" value={`+${Math.round(pc.postingsGrowthPct)}% this month`}
+                  valueColor={SUCCESS} />
+              )}
+              <Box sx={{ mt: "8px" }}>
+                <Tag color={WARN} bg={WARN_L}>{pc.hiringSignal}</Tag>
+              </Box>
+            </Box>
+          </Box>
+
+          {pc.signalReasons?.some(s => s.startsWith("💰")) && (
+            <Box sx={{ ...CARD_BASE, p: "12px 16px", mb: "20px" }}>
+              <SectionLabel>Last Funding Round</SectionLabel>
+              <Box sx={{ fontSize: 13, color: TEXT }}>
+                {pc.signalReasons.find(s => s.startsWith("💰"))?.replace("💰 ", "")}
+              </Box>
+            </Box>
+          )}
+
+          {(pc.websiteUrl || pc.linkedinUrl) && (
+            <Box sx={{ display: "flex", gap: "8px", mb: "20px" }}>
+              {pc.websiteUrl && (
+                <Box component="a" href={pc.websiteUrl} target="_blank" rel="noopener noreferrer" sx={{
+                  display: "inline-flex", alignItems: "center", gap: "5px",
+                  px: "12px", py: "6px", borderRadius: "7px",
+                  border: `1px solid ${BORDER}`, color: ACCENT, fontSize: 12, fontWeight: 500,
+                  textDecoration: "none", "&:hover": { bgcolor: ACCENT_L }, transition: "all .12s",
+                }}>
+                  🌐 Website
+                </Box>
+              )}
+              {pc.linkedinUrl && (
+                <Box component="a" href={pc.linkedinUrl} target="_blank" rel="noopener noreferrer" sx={{
+                  display: "inline-flex", alignItems: "center", gap: "5px",
+                  px: "12px", py: "6px", borderRadius: "7px",
+                  border: `1px solid ${BORDER}`, color: ACCENT, fontSize: 12, fontWeight: 500,
+                  textDecoration: "none", "&:hover": { bgcolor: ACCENT_L }, transition: "all .12s",
+                }}>
+                  💼 LinkedIn
+                </Box>
+              )}
+            </Box>
+          )}
+
+          {pc.decisionMakers?.length > 0 && (
+            <Box sx={{ mb: "20px" }}>
+              <SectionLabel>Key Executives</SectionLabel>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {pc.decisionMakers.map((dm, i) => (
+                  <Box key={i} sx={{ display: "flex", alignItems: "center", gap: "10px",
+                    p: "8px 12px", borderRadius: "8px", bgcolor: "#F8FAFC", border: `1px solid ${BORDER}` }}>
+                    <Box sx={{ width: 28, height: 28, borderRadius: "50%", bgcolor: ACCENT_L,
+                      color: ACCENT, fontSize: 11, fontWeight: 700, flexShrink: 0,
+                      display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {dm.name?.[0]?.toUpperCase() || "?"}
+                    </Box>
+                    <Box>
+                      <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{dm.name}</Box>
+                      <Box sx={{ fontSize: 11, color: MUTED }}>{dm.title}</Box>
+                    </Box>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {pc.specialties?.length > 0 && (
+            <Box sx={{ mb: "20px" }}>
+              <SectionLabel>Specialties</SectionLabel>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {pc.specialties.map((s, i) => (
+                  <Box key={i} sx={{ fontSize: 11, color: MUTED, bgcolor: "#F4F6FA",
+                    border: `1px solid ${BORDER}`, borderRadius: "5px", px: "8px", py: "3px" }}>
+                    {s}
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {pc.newsArticles?.length > 0 && (
+            <Box sx={{ mb: "20px" }}>
+              <SectionLabel>Recent News</SectionLabel>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {pc.newsArticles.map((a, i) => (
+                  <Box key={i} sx={{ p: "8px 12px", borderRadius: "8px",
+                    bgcolor: "#F8FAFC", border: `1px solid ${BORDER}` }}>
+                    <Box sx={{ fontSize: 12, color: TEXT, lineHeight: 1.4 }}>📰 {a.headline}</Box>
+                    {a.date && <Box sx={{ fontSize: 11, color: MUTED, mt: "2px" }}>{a.date}</Box>}
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {genError && (
+            <Box sx={{ p: "8px 10px", borderRadius: "6px", bgcolor: "rgba(220,38,38,0.06)",
+              border: "1px solid rgba(220,38,38,0.15)", color: "#DC2626", fontSize: 11, mb: "12px" }}>
+              {genError}
+            </Box>
+          )}
+          {outreachMsg && (
+            <Box sx={{ p: "14px", bgcolor: "#F8FAFC", border: `1px solid ${BORDER}`, borderRadius: "8px",
+              fontSize: 12, color: TEXT, lineHeight: 1.7, whiteSpace: "pre-wrap",
+              maxHeight: 200, overflowY: "auto" }}>
+              {outreachMsg}
+            </Box>
+          )}
+        </Box>
+
+        {/* Footer */}
+        <Box sx={{ px: "28px", py: "16px", borderTop: `1px solid ${BORDER}`,
+          display: "flex", alignItems: "center", gap: "8px" }}>
+          <Box onClick={generating ? undefined : generateOutreach} sx={{
+            display: "inline-flex", alignItems: "center", gap: "5px",
+            px: "14px", py: "8px", borderRadius: "8px",
+            bgcolor: generating ? ACCENT_L : ACCENT, color: generating ? ACCENT : "#fff",
+            fontSize: 12, fontWeight: 600, cursor: generating ? "default" : "pointer",
+            transition: "all .15s", "&:hover": generating ? {} : { bgcolor: "#1558C0" },
+          }}>
+            {generating
+              ? <><CircularProgress size={12} sx={{ color: ACCENT }} /> Generating…</>
+              : <><SparkIcon /> {outreachMsg ? "Regenerate Outreach" : "Generate Outreach"}</>}
+          </Box>
+          {outreachMsg && (
+            <Box component="span" onClick={() => navigator.clipboard?.writeText(outreachMsg)}
+              sx={{ fontSize: 11, color: ACCENT, cursor: "pointer",
+                "&:hover": { textDecoration: "underline" } }}>
+              Copy
+            </Box>
+          )}
+          <Box sx={{ flex: 1 }} />
+          <Box onClick={() => onAddToClients(pc)} sx={{
+            display: "inline-flex", alignItems: "center", gap: "5px",
+            px: "14px", py: "8px", borderRadius: "8px",
+            border: `1px solid ${ACCENT}`, color: ACCENT,
+            fontSize: 12, fontWeight: 600, cursor: "pointer",
+            "&:hover": { bgcolor: ACCENT_L }, transition: "all .15s",
+          }}>
+            <PlusIcon /> Add to My Clients
+          </Box>
+          <Box onClick={onClose} sx={{
+            px: "14px", py: "8px", borderRadius: "8px",
+            border: `1px solid ${BORDER}`, color: MUTED,
+            fontSize: 12, fontWeight: 600, cursor: "pointer",
+            "&:hover": { bgcolor: "#F4F6FA" }, transition: "all .15s",
+          }}>
+            Close
+          </Box>
+        </Box>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -349,6 +611,12 @@ export default function ClientTrackerPage() {
   const [potentialLoading,  setPotentialLoading]  = useState(false);
   const [potentialSearched, setPotentialSearched] = useState(false);
   const [potentialError,    setPotentialError]    = useState("");
+  const [searchIndustry,    setSearchIndustry]    = useState("");
+  const [searchCountry,     setSearchCountry]     = useState("");
+  const [searchSize,        setSearchSize]        = useState("");
+  const [searchKeyword,     setSearchKeyword]     = useState("");
+  const [detailCard,        setDetailCard]        = useState(null);
+  const [addFromPotential,  setAddFromPotential]  = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -369,13 +637,34 @@ export default function ClientTrackerPage() {
     setPotentialError("");
     setPotentialSearched(true);
     try {
-      const p = await apiGet("/api/clients/potential?");
+      const params = new URLSearchParams();
+      if (searchIndustry.trim()) params.set("industry",    searchIndustry.trim());
+      if (searchCountry.trim())  params.set("country",     searchCountry.trim());
+      if (searchSize)            params.set("companySize", searchSize);
+      if (searchKeyword.trim())  params.set("keyword",     searchKeyword.trim());
+      const qs = params.toString();
+      const p = await apiGet(`/api/clients/potential${qs ? "?" + qs : ""}`);
       setPotential(p);
     } catch (e) {
       setPotentialError(e.message || "Failed to fetch potential clients.");
     } finally {
       setPotentialLoading(false);
     }
+  }
+
+  function handleAddFromPotential(pc) {
+    setDetailCard(null);
+    setAddFromPotential({
+      companyName:   pc.companyName   || "",
+      industry:      "",
+      companySize:   "",
+      location:      [pc.hqCity, pc.hqCountry].filter(Boolean).join(", ") || pc.location || "",
+      contactPerson: pc.decisionMakers?.[0]?.name  || "",
+      contactEmail:  "",
+      contactTitle:  pc.decisionMakers?.[0]?.title || "",
+      linkedinUrl:   pc.linkedinUrl   || "",
+      notes:         pc.signalReasons?.join("; ")  || "",
+    });
   }
 
   const filtered = clients.filter(c =>
@@ -385,8 +674,9 @@ export default function ClientTrackerPage() {
     c.contactPerson?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalActive  = clients.reduce((s, c) => s + c.activeJobCount, 0);
-  const totalFilled  = clients.reduce((s, c) => s + c.filledJobCount, 0);
+  const totalActive = clients.reduce((s, c) => s + c.activeJobCount, 0);
+  const totalFilled = clients.reduce((s, c) => s + c.filledJobCount, 0);
+  const hasFilters  = searchIndustry || searchCountry || searchSize || searchKeyword;
 
   function handleSaved(savedClient) {
     setClients(prev => {
@@ -428,7 +718,6 @@ export default function ClientTrackerPage() {
             </Box>
           </Box>
         </Box>
-
         <Box onClick={() => setShowAdd(true)} sx={{
           display: "flex", alignItems: "center", gap: "6px",
           px: "16px", py: "9px", borderRadius: "9px",
@@ -468,7 +757,6 @@ export default function ClientTrackerPage() {
         <>
           {/* Your Clients table */}
           <Box sx={{ ...CARD_BASE, mb: "24px" }}>
-            {/* Table header */}
             <Box sx={{ px: "20px", py: "14px", borderBottom: `1px solid ${BORDER}`,
               display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <Box sx={{ fontSize: 14, fontWeight: 600, color: TEXT }}>
@@ -477,7 +765,6 @@ export default function ClientTrackerPage() {
                   ({filtered.length})
                 </Box>
               </Box>
-              {/* Search */}
               <Box sx={{ position: "relative", width: 240 }}>
                 <Box sx={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)" }}>
                   <SearchIcon />
@@ -496,11 +783,9 @@ export default function ClientTrackerPage() {
               </Box>
             </Box>
 
-            {/* Column headers */}
             <Box sx={{
               display: "grid", gridTemplateColumns: "2fr 1.5fr 1fr 2fr 1fr",
-              px: "16px", py: "8px", borderBottom: `1px solid ${BORDER}`,
-              bgcolor: "#F8FAFC",
+              px: "16px", py: "8px", borderBottom: `1px solid ${BORDER}`, bgcolor: "#F8FAFC",
             }}>
               {["Client", "Contact", "Active Jobs", "Job Details", ""].map((h, i) => (
                 <Box key={i} sx={{ fontSize: 11, fontWeight: 600, color: MUTED,
@@ -511,7 +796,6 @@ export default function ClientTrackerPage() {
               ))}
             </Box>
 
-            {/* Rows */}
             {filtered.length === 0 ? (
               <Box sx={{ py: "48px", textAlign: "center" }}>
                 <Box sx={{ fontSize: 13, color: MUTED }}>
@@ -519,39 +803,75 @@ export default function ClientTrackerPage() {
                 </Box>
               </Box>
             ) : (
-              filtered.map(c => (
-                <ClientRow
-                  key={c.id}
-                  client={c}
-                  onEdit={setEditingClient}
-                />
-              ))
+              filtered.map(c => <ClientRow key={c.id} client={c} onEdit={setEditingClient} />)
             )}
           </Box>
 
           {/* Potential Clients */}
           <Box sx={{ mb: "8px" }}>
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: "14px" }}>
-              <Box sx={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <Box sx={{ fontSize: 16, fontWeight: 700, color: TEXT }}>Potential Clients</Box>
-                <Box sx={{ px: "8px", py: "2px", borderRadius: "20px", bgcolor: WARN_L,
-                  color: WARN, fontSize: 11, fontWeight: 600 }}>
-                  AI-powered signals
+            <Box sx={{ display: "flex", alignItems: "center", gap: "10px", mb: "14px" }}>
+              <Box sx={{ fontSize: 16, fontWeight: 700, color: TEXT }}>Potential Clients</Box>
+              <Box sx={{ px: "8px", py: "2px", borderRadius: "20px", bgcolor: WARN_L,
+                color: WARN, fontSize: 11, fontWeight: 600 }}>
+                AI-powered signals
+              </Box>
+            </Box>
+
+            {/* Search filter card */}
+            <Box sx={{ ...CARD_BASE, p: "16px 20px", mb: "14px" }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "10px", mb: "14px" }}>
+                <Box>
+                  <Box sx={{ fontSize: 11, fontWeight: 600, color: MUTED, textTransform: "uppercase",
+                    letterSpacing: ".4px", mb: "5px" }}>Industry</Box>
+                  <input value={searchIndustry} onChange={e => setSearchIndustry(e.target.value)}
+                    placeholder="e.g. Technology" style={inputStyle} />
+                </Box>
+                <Box>
+                  <Box sx={{ fontSize: 11, fontWeight: 600, color: MUTED, textTransform: "uppercase",
+                    letterSpacing: ".4px", mb: "5px" }}>Country</Box>
+                  <input value={searchCountry} onChange={e => setSearchCountry(e.target.value)}
+                    placeholder="e.g. United Kingdom" style={inputStyle} />
+                </Box>
+                <Box>
+                  <Box sx={{ fontSize: 11, fontWeight: 600, color: MUTED, textTransform: "uppercase",
+                    letterSpacing: ".4px", mb: "5px" }}>Company Size</Box>
+                  <select value={searchSize} onChange={e => setSearchSize(e.target.value)} style={inputStyle}>
+                    <option value="">Any size</option>
+                    <option value="small">Small (1–50)</option>
+                    <option value="medium">Medium (51–200)</option>
+                    <option value="large">Large (201–1,000)</option>
+                    <option value="enterprise">Enterprise (1,000+)</option>
+                  </select>
+                </Box>
+                <Box>
+                  <Box sx={{ fontSize: 11, fontWeight: 600, color: MUTED, textTransform: "uppercase",
+                    letterSpacing: ".4px", mb: "5px" }}>Company Keyword</Box>
+                  <input value={searchKeyword} onChange={e => setSearchKeyword(e.target.value)}
+                    placeholder="e.g. Acme Corp" style={inputStyle} />
                 </Box>
               </Box>
-              <Box onClick={potentialLoading ? undefined : handleFindPotential} sx={{
-                display: "inline-flex", alignItems: "center", gap: "6px",
-                px: "14px", py: "8px", borderRadius: "8px",
-                bgcolor: potentialLoading ? WARN_L : WARN,
-                color: potentialLoading ? WARN : "#fff",
-                fontSize: 13, fontWeight: 600,
-                cursor: potentialLoading ? "default" : "pointer",
-                transition: "all .15s",
-                "&:hover": potentialLoading ? {} : { bgcolor: "#B45309" },
-              }}>
-                {potentialLoading
-                  ? <><CircularProgress size={13} sx={{ color: WARN }} /> Searching…</>
-                  : <><SparkIcon /> {potentialSearched ? "Refresh" : "Find Potential Clients"}</>}
+              <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "10px" }}>
+                {hasFilters && (
+                  <Box onClick={() => { setSearchIndustry(""); setSearchCountry(""); setSearchSize(""); setSearchKeyword(""); }}
+                    sx={{ fontSize: 12, color: MUTED, cursor: "pointer",
+                      "&:hover": { color: TEXT }, transition: "color .12s" }}>
+                    Clear filters
+                  </Box>
+                )}
+                <Box onClick={potentialLoading ? undefined : handleFindPotential} sx={{
+                  display: "inline-flex", alignItems: "center", gap: "6px",
+                  px: "14px", py: "8px", borderRadius: "8px",
+                  bgcolor: potentialLoading ? WARN_L : WARN,
+                  color: potentialLoading ? WARN : "#fff",
+                  fontSize: 13, fontWeight: 600,
+                  cursor: potentialLoading ? "default" : "pointer",
+                  transition: "all .15s",
+                  "&:hover": potentialLoading ? {} : { bgcolor: "#B45309" },
+                }}>
+                  {potentialLoading
+                    ? <><CircularProgress size={13} sx={{ color: WARN }} /> Searching…</>
+                    : <><SparkIcon /> {potentialSearched ? "Refresh" : "Find Potential Clients"}</>}
+                </Box>
               </Box>
             </Box>
 
@@ -561,8 +881,8 @@ export default function ClientTrackerPage() {
                 <Box sx={{ fontSize: 14, fontWeight: 600, color: TEXT, mb: "6px" }}>
                   Discover companies actively hiring
                 </Box>
-                <Box sx={{ fontSize: 12, color: MUTED, maxWidth: 380, mx: "auto" }}>
-                  Click <strong>Find Potential Clients</strong> to search for companies showing live hiring signals — funding rounds, job posting spikes, and team growth.
+                <Box sx={{ fontSize: 12, color: MUTED, maxWidth: 420, mx: "auto" }}>
+                  Filter by industry, country, size, or keyword — then click <strong>Find Potential Clients</strong> to surface companies showing live hiring signals.
                 </Box>
               </Box>
             )}
@@ -577,20 +897,32 @@ export default function ClientTrackerPage() {
             {potentialSearched && !potentialLoading && !potentialError && potential.length === 0 && (
               <Box sx={{ ...CARD_BASE, p: "48px 24px", textAlign: "center" }}>
                 <Box sx={{ fontSize: 13, color: MUTED }}>
-                  No potential clients found. Try again later.
+                  No potential clients found for these filters. Try broadening your search.
                 </Box>
               </Box>
             )}
 
             {potential.length > 0 && (
               <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                {potential.map((pc, i) => <PotentialCard key={i} pc={pc} />)}
+                {potential.map((pc, i) => (
+                  <PotentialCard key={i} pc={pc} onViewDetail={() => setDetailCard(pc)} />
+                ))}
               </Box>
             )}
           </Box>
         </>
       )}
 
+      {/* Detail modal */}
+      {detailCard && (
+        <PotentialDetailModal
+          pc={detailCard}
+          onClose={() => setDetailCard(null)}
+          onAddToClients={handleAddFromPotential}
+        />
+      )}
+
+      {/* Dialogs */}
       <AddClientDialog open={showAdd} onClose={() => setShowAdd(false)} onSaved={handleSaved} />
       <AddClientDialog
         open={editingClient !== null}
@@ -598,6 +930,12 @@ export default function ClientTrackerPage() {
         onSaved={handleSaved}
         initialData={editingClient}
         clientId={editingClient?.id}
+      />
+      <AddClientDialog
+        open={addFromPotential !== null}
+        onClose={() => setAddFromPotential(null)}
+        onSaved={(saved) => { handleSaved(saved); setAddFromPotential(null); }}
+        initialData={addFromPotential}
       />
     </Box>
   );

@@ -41,8 +41,13 @@ public class ClientController {
     }
 
     @GetMapping("/potential")
-    public ResponseEntity<List<PotentialClientResponse>> getPotentialClients(@RequestParam String loginId) {
-        return ResponseEntity.ok(clientService.getPotentialClients(loginId));
+    public ResponseEntity<List<PotentialClientResponse>> getPotentialClients(
+            @RequestParam String loginId,
+            @RequestParam(required = false) String industry,
+            @RequestParam(required = false) String country,
+            @RequestParam(required = false) String companySize,
+            @RequestParam(required = false) String keyword) {
+        return ResponseEntity.ok(clientService.getPotentialClients(loginId, industry, country, companySize, keyword));
     }
 
     @PostMapping("/outreach")
