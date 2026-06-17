@@ -899,7 +899,7 @@ export default function LandingPage() {
           <p style={{ fontSize:17,lineHeight:1.6,color:C.dim,maxWidth:560,margin:"0 auto" }}>A 90-second walkthrough — from dashboard to candidate analysis to pipeline management.</p>
         </div>
         <div style={{ position:"relative",paddingBottom:"56.25%",height:0,borderRadius:18,overflow:"hidden",boxShadow:C.shadowLg,border:`1px solid ${C.line}` }}>
-          <iframe src="https://www.youtube.com/embed/IBskXO8TPL8?rel=0&modestbranding=1" title="Nolyvra Product Walkthrough" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen style={{ position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none" }} />
+          <iframe src="https://www.youtube.com/embed/uFaXh0eATyw?rel=0&modestbranding=1" title="Nolyvra Product Walkthrough" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen style={{ position:"absolute",top:0,left:0,width:"100%",height:"100%",border:"none" }} />
         </div>
       </section>
 
