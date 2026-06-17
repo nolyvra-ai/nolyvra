@@ -438,13 +438,13 @@ function BottleneckCard({ data }) {
 function ProfileSourceCard({ data }) {
   const sources = [
     data?.find(d => d.source === "Direct Apply") ?? { source: "Direct Apply", count: 0, avgScore: 0, topPicksPct: 0 },
-    data?.find(d => d.source === "CoreSignal")   ?? { source: "CoreSignal",   count: 0, avgScore: 0, topPicksPct: 0 },
+    { ...(data?.find(d => d.source === "CoreSignal") ?? { count: 0, avgScore: 0, topPicksPct: 0 }), source: "LinkedIn" },
   ];
   const total   = sources.reduce((sum, s) => sum + s.count, 0);
   const hasData = total > 0;
 
   function SourceBlock({ src }) {
-    const isCS       = src.source === "CoreSignal";
+    const isCS       = src.source === "LinkedIn";
     const barColor   = isCS ? PURPLE : ACCENT;
     const pct        = total > 0 ? Math.round(src.count / total * 100) : 0;
     const scoreColor = src.avgScore >= 80 ? SUCCESS : src.avgScore >= 60 ? WARN : DANGER;

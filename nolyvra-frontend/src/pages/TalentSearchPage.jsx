@@ -69,7 +69,7 @@ function SourceBadge({ source }) {
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", gap: "6px", px: "9px", py: "3px", bgcolor: ACCENT_BG, border: `1px solid ${ACCENT_BR}`, borderRadius: "20px", fontSize: 10.5, fontWeight: 600, color: ACCENT, mb: 1 }}>
       <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: ACCENT, flexShrink: 0 }} />
-      Source · CoreSignal
+      Source · LinkedIn
     </Box>
   );
 }

@@ -825,6 +825,36 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ══════════════ APSCo PARTNER BADGE ══════════════ */}
+      <section style={{ maxWidth:1280,margin:"0 auto",padding:"0 56px 64px",textAlign:"center" }}>
+        <div style={{ display:"inline-flex",alignItems:"center",gap:14,background:"#fff",border:`1px solid ${C.line}`,borderRadius:40,padding:"10px 24px 10px 10px",boxShadow:C.shadowSm }}>
+          <img src="/apsco_logo.png" alt="APSCo" style={{ width:40,height:40,borderRadius:"50%",objectFit:"cover",flexShrink:0 }} />
+          <span style={{ fontSize:13.5,fontWeight:600,color:C.ink2,letterSpacing:"-.2px" }}>Official Partner of APSCo</span>
+        </div>
+      </section>
+
+      {/* ══════════════ OUR CLIENTS ══════════════ */}
+      <div style={{ background:"#fff",padding:"52px 0",borderTop:`1px solid ${C.line}`,borderBottom:`1px solid ${C.line}`,overflow:"hidden" }}>
+        <div style={{ textAlign:"center",fontSize:11,fontWeight:600,color:C.muted,textTransform:"uppercase",letterSpacing:"1.5px",marginBottom:32,fontFamily:"'DM Mono',monospace" }}>
+          Our clients
+        </div>
+        <div style={{ overflow:"hidden" }}>
+          <div className="nl-marq">
+            {(arr=>[...arr,...arr])([
+              { name:"BrightSide",  src:"/brightside_logo.png" },
+              { name:"OneTracker",  src:"/onetracker_logo.png" },
+              { name:"Hyperon",     src:"/hyperon_logo.png" },
+              { name:"Lúxi Living", src:"/luxi_logo.png" },
+              { name:"ConnecTed",   src:"/connected_logo.png" },
+            ]).map(({name,src},i)=>(
+              <div key={i} className="nl-int-chip" style={{ padding:"10px 18px" }}>
+                <img src={src} alt={name} style={{ height:28,maxWidth:120,objectFit:"contain",display:"block" }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* ══════════════ TESTIMONIALS ══════════════ */}
       <section id="social" style={{ maxWidth:1280,margin:"0 auto",padding:"0 56px 120px" }}>
         <div style={{ textAlign:"center",marginBottom:40 }}>
