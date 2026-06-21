@@ -98,6 +98,13 @@ export default function SettingsPage() {
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailEmail, setGmailEmail] = useState("");
 
+  // Xero OAuth
+  const [xeroSuccess, setXeroSuccess] = useState(searchParams.get("xero") === "connected");
+  const [xeroError, setXeroError] = useState(searchParams.get("xero") === "error");
+  const [xeroConnected, setXeroConnected] = useState(false);
+  const [xeroTenantName, setXeroTenantName] = useState("");
+  const [xeroReconnectRequired, setXeroReconnectRequired] = useState(false);
+
   useEffect(() => {
     if (!loginId) return;
     fetch(`${API_BASE}/auth/microsoft/status?loginId=${encodeURIComponent(loginId)}`)
@@ -108,6 +115,15 @@ export default function SettingsPage() {
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.connected) { setGmailConnected(true); setGmailEmail(d.email || ""); } })
       .catch(() => {});
+    fetch(`${API_BASE}/auth/xero/status?loginId=${encodeURIComponent(loginId)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d) return;
+        setXeroConnected(!!d.connected);
+        setXeroTenantName(d.tenantName || "");
+        setXeroReconnectRequired(!!d.reconnectRequired);
+      })
+      .catch(() => {});
   }, [loginId]);
 
   function handleOutlookConnect() {
@@ -116,6 +132,18 @@ export default function SettingsPage() {
 
   function handleGmailConnect() {
     window.location.href = `${API_BASE}/auth/google/connect?loginId=${encodeURIComponent(loginId)}`;
+  }
+
+  function handleXeroConnect() {
+    window.location.href = `${API_BASE}/auth/xero/connect?loginId=${encodeURIComponent(loginId)}`;
+  }
+
+  async function handleXeroDisconnect() {
+    await fetch(`${API_BASE}/auth/xero/disconnect?loginId=${encodeURIComponent(loginId)}`,
+      { method: "DELETE" }).catch(() => {});
+    setXeroConnected(false);
+    setXeroTenantName("");
+    setXeroReconnectRequired(false);
   }
 
   function handleOutlookSave() {
@@ -560,6 +588,18 @@ export default function SettingsPage() {
         <Alert severity="error" onClose={() => setGmailError(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           Failed to connect Gmail. Please try again.
+        </Alert>
+      )}
+      {xeroSuccess && (
+        <Alert severity="success" onClose={() => setXeroSuccess(false)}
+          sx={{ borderRadius: "10px", fontSize: 13 }}>
+          Xero connected successfully.
+        </Alert>
+      )}
+      {xeroError && (
+        <Alert severity="error" onClose={() => setXeroError(false)}
+          sx={{ borderRadius: "10px", fontSize: 13 }}>
+          Failed to connect Xero. Please try again.
         </Alert>
       )}
 
@@ -1418,6 +1458,60 @@ export default function SettingsPage() {
                 Save
               </Button>
             </Box>
+          </Box>
+
+          {/* Xero row */}
+          <Box sx={{
+            p: "12px 14px",
+            bgcolor: xeroConnected ? SUCCESS_BG : xeroReconnectRequired ? WARN_BG : SURFACE,
+            border: `1px solid ${xeroConnected ? SUCCESS_BR : xeroReconnectRequired ? WARN_BR : BORDER}`,
+            borderRadius: "8px",
+            display: "flex", flexDirection: "column", gap: 1.25
+          }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+              <Box sx={{ fontSize: 20, lineHeight: 1 }}>🧾</Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
+                  Xero
+                </Typography>
+                <Typography sx={{
+                  fontSize: 11,
+                  color: xeroConnected ? SUCCESS : xeroReconnectRequired ? WARN : MUTED,
+                  mt: 0.25
+                }}>
+                  {xeroConnected
+                    ? `Connected · ${xeroTenantName}`
+                    : xeroReconnectRequired
+                      ? "Reconnect required"
+                      : "Not connected"}
+                </Typography>
+              </Box>
+              {xeroConnected && (
+                <Button size="small" variant="outlined"
+                  onClick={handleXeroDisconnect}
+                  sx={{
+                    fontSize: 11, borderRadius: "6px", textTransform: "none",
+                    borderColor: DANGER_BR, color: DANGER, flexShrink: 0,
+                    "&:hover": { bgcolor: DANGER_BG, borderColor: DANGER }
+                  }}>
+                  Disconnect
+                </Button>
+              )}
+            </Box>
+
+            {!xeroConnected && (
+              <Button
+                variant="contained"
+                onClick={handleXeroConnect}
+                fullWidth
+                sx={{
+                  fontSize: 12, fontWeight: 600, bgcolor: "#13B5EA", borderRadius: "8px",
+                  textTransform: "none", boxShadow: "none",
+                  "&:hover": { bgcolor: "#0FA0D1", boxShadow: "none" }
+                }}>
+                {xeroReconnectRequired ? "Reconnect to Xero" : "Connect to Xero"}
+              </Button>
+            )}
           </Box>
         </Box>
       </Paper>

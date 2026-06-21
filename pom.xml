@@ -113,6 +113,12 @@
         <version>2.10.1</version>
     </dependency>
 
+    <!-- Xero -->
+    <dependency>
+      <groupId>com.github.xeroapi</groupId>
+      <artifactId>xero-java</artifactId>
+      <version>17.0.0</version>
+    </dependency>
 
   </dependencies>
 

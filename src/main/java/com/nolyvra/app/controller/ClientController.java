@@ -1,10 +1,12 @@
 package com.nolyvra.app.controller;
 
+import com.nolyvra.app.model.BillablePlacementResponse;
 import com.nolyvra.app.model.ClientRequest;
 import com.nolyvra.app.model.ClientResponse;
 import com.nolyvra.app.model.OutreachRequest;
 import com.nolyvra.app.model.PotentialClientResponse;
 import com.nolyvra.app.service.ClientService;
+import com.nolyvra.app.service.XeroInvoiceService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,9 +17,11 @@ import java.util.List;
 public class ClientController {
 
     private final ClientService clientService;
+    private final XeroInvoiceService xeroInvoiceService;
 
-    public ClientController(ClientService clientService) {
+    public ClientController(ClientService clientService, XeroInvoiceService xeroInvoiceService) {
         this.clientService = clientService;
+        this.xeroInvoiceService = xeroInvoiceService;
     }
 
     @GetMapping
@@ -45,6 +49,13 @@ public class ClientController {
             @PathVariable Long id,
             @RequestParam String loginId) {
         return ResponseEntity.ok(clientService.getClientJobsById(id, loginId));
+    }
+
+    @GetMapping("/{id}/billable-placements")
+    public ResponseEntity<List<BillablePlacementResponse>> getBillablePlacements(
+            @PathVariable Long id,
+            @RequestParam String loginId) {
+        return ResponseEntity.ok(xeroInvoiceService.getBillablePlacements(id, loginId));
     }
 
     @GetMapping("/potential")

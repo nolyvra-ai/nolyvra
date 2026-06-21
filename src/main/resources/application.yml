@@ -63,6 +63,12 @@ google:
   redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8080/auth/google/callback}
   frontend-url: ${GOOGLE_FRONTEND_URL:http://localhost:5173}
 
+xero:
+  client-id: ${XERO_CLIENT_ID:}
+  client-secret: ${XERO_CLIENT_SECRET:}
+  redirect-uri: ${XERO_REDIRECT_URI:http://localhost:8080/auth/xero/callback}
+  frontend-url: ${XERO_FRONTEND_URL:http://localhost:5173}
+
 resend:
   api-key: ${RESEND_API_KEY:}
   from: ${RESEND_FROM:Nolyvra <onboarding@resend.dev>}

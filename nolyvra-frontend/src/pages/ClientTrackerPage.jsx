@@ -1,6 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Box, CircularProgress, Dialog, DialogContent } from "@mui/material";
+import {
+  Box, CircularProgress, Dialog, DialogContent, DialogActions,
+  TextField, MenuItem, Checkbox, Button, Alert,
+} from "@mui/material";
 import AddClientDialog from "./AddClientDialog";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -39,6 +42,16 @@ const inputStyle = {
   background: SURFACE,
 };
 
+const FIELD_SX = {
+  "& .MuiOutlinedInput-root": {
+    borderRadius: "8px", fontSize: 13,
+    "& fieldset": { borderColor: BORDER },
+    "&:hover fieldset": { borderColor: ACCENT },
+    "&.Mui-focused fieldset": { borderColor: ACCENT },
+  },
+  "& .MuiInputLabel-root": { fontSize: 13 },
+};
+
 // ─── API helpers ──────────────────────────────────────────────────────────────
 const API     = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const loginId = () => localStorage.getItem("loginId") || "";
@@ -61,6 +74,15 @@ async function apiPost(path, body) {
   });
   if (!r.ok) throw new Error(await r.text());
   return r.text();
+}
+
+async function apiPostJson(path, body) {
+  const sep = path.includes("?") ? "&" : "?";
+  const r = await fetch(`${API}${path}${sep}loginId=${encodeURIComponent(loginId())}`, {
+    method: "POST", headers: hdrs(), body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -98,6 +120,13 @@ const EditIcon = () => (
 const CloseIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>
+);
+const InvoiceIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 2h9l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/>
+    <path d="M14 2v6h6"/>
+    <line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/>
   </svg>
 );
 
@@ -182,7 +211,7 @@ function formatFeeTotals(totals) {
 }
 
 // ─── Client row ───────────────────────────────────────────────────────────────
-function ClientRow({ client, onEdit, onSelect }) {
+function ClientRow({ client, onEdit, onSelect, onInvoice }) {
   const feeLabel = formatFeeTotals(client.totalFee);
   return (
     <Box onClick={() => onSelect(client)} sx={{
@@ -232,7 +261,15 @@ function ClientRow({ client, onEdit, onSelect }) {
           <Box sx={{ fontSize: 12, color: MUTED }}>No active or fulfilling jobs</Box>
         )}
       </Box>
-      <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+      <Box sx={{ display: "flex", justifyContent: "flex-end", gap: "6px" }}>
+        <Box onClick={e => { e.stopPropagation(); onInvoice(client); }} sx={{
+          px: "8px", py: "5px", borderRadius: "6px",
+          border: `1px solid ${BORDER}`, color: MUTED, bgcolor: SURFACE,
+          display: "flex", alignItems: "center", cursor: "pointer",
+          "&:hover": { color: ACCENT, borderColor: ACCENT }, transition: "all .12s",
+        }}>
+          <InvoiceIcon />
+        </Box>
         <Box onClick={e => { e.stopPropagation(); onEdit(client); }} sx={{
           px: "8px", py: "5px", borderRadius: "6px",
           border: `1px solid ${BORDER}`, color: MUTED, bgcolor: SURFACE,
@@ -329,6 +366,328 @@ function ClientJobsDialog({ client, onClose }) {
             </Box>
           ))}
         </Box>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Create Xero Invoice dialog — billable placements for a client ───────────
+function defaultReference(clientId) {
+  const d = new Date();
+  const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  return `NOLYVRA-${clientId}-${ymd}`;
+}
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+function plusDaysIso(days) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function InvoiceDialog({ client, onClose, onInvoiced }) {
+  const nav = useNavigate();
+
+  const [loading, setLoading] = useState(true);
+  const [err, setErr]         = useState("");
+  const [placements, setPlacements] = useState([]);
+  const [config, setConfig]   = useState(null);
+  const [lines, setLines]     = useState({});
+
+  const [contactPerson, setContactPerson] = useState(client.contactPerson || "");
+  const [contactEmail, setContactEmail]   = useState(client.contactEmail || "");
+  const [invoiceDate, setInvoiceDate]     = useState(todayIso());
+  const [dueDate, setDueDate]             = useState(plusDaysIso(14));
+  const [reference, setReference]         = useState(defaultReference(client.id));
+
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [result, setResult]         = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setErr("");
+    Promise.all([
+      apiGet(`/api/clients/${client.id}/billable-placements`),
+      apiGet("/api/xero/invoice-config"),
+    ])
+      .then(([placementsData, configData]) => {
+        if (cancelled) return;
+        const list = placementsData || [];
+        setPlacements(list);
+        setConfig(configData || { configAvailable: false, accounts: [], taxRates: [] });
+        const initialLines = {};
+        list.forEach(p => {
+          const description = (p.feePercentage != null && p.salary != null)
+            ? `${p.title} — ${p.feePercentage}% of ${p.currency} ${p.salary}`
+            : p.title;
+          initialLines[p.jobId] = {
+            include: true,
+            candidateName: "",
+            description,
+            amount: p.estimatedFee != null ? String(p.estimatedFee) : "",
+            accountCode: configData?.defaultAccountCode || "",
+            taxType: configData?.defaultTaxType || "",
+          };
+        });
+        setLines(initialLines);
+      })
+      .catch(e => { if (!cancelled) setErr(e.message || "Failed to load billable placements."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [client.id]);
+
+  const placementsById = useMemo(
+    () => Object.fromEntries(placements.map(p => [p.jobId, p])),
+    [placements]
+  );
+
+  function updateLine(jobId, field, value) {
+    setLines(prev => ({ ...prev, [jobId]: { ...prev[jobId], [field]: value } }));
+  }
+
+  const includedJobIds = Object.keys(lines).filter(jobId => lines[jobId]?.include);
+  const total = includedJobIds.reduce((sum, jobId) => {
+    const amount = Number(lines[jobId]?.amount);
+    return sum + (Number.isFinite(amount) ? amount : 0);
+  }, 0);
+  const invoiceCurrency = includedJobIds.length > 0
+    ? placementsById[includedJobIds[0]]?.currency
+    : null;
+
+  async function submit(status, sendEmail) {
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      const lineItems = includedJobIds.map(jobId => ({
+        jobId,
+        candidateName: lines[jobId].candidateName,
+        description: lines[jobId].description,
+        amount: Number(lines[jobId].amount),
+        accountCode: lines[jobId].accountCode,
+        taxType: lines[jobId].taxType,
+      }));
+      const res = await apiPostJson("/api/xero/invoices", {
+        clientId: client.id,
+        contactName: contactPerson,
+        contactEmail,
+        lineItems,
+        currency: invoiceCurrency,
+        invoiceDate,
+        dueDate,
+        reference,
+        status,
+        sendEmail,
+      });
+      setResult(res);
+    } catch (e) {
+      setSubmitError(e.message || "Failed to create the invoice.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function handleDone() {
+    onInvoiced();
+    onClose();
+  }
+
+  return (
+    <Dialog open onClose={submitting ? undefined : onClose} maxWidth="sm" fullWidth
+      PaperProps={{ sx: { borderRadius: "16px", overflow: "hidden", m: "24px" } }}>
+      <DialogContent sx={{ p: 0 }}>
+        <Box sx={{ px: "24px", pt: "20px", pb: "14px", borderBottom: `1px solid ${BORDER}`,
+          display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <Box>
+            <Box sx={{ fontSize: 17, fontWeight: 700, color: TEXT }}>Create Xero Invoice</Box>
+            <Box sx={{ fontSize: 12, color: MUTED, mt: "4px" }}>{client.companyName}</Box>
+          </Box>
+          <Box onClick={submitting ? undefined : onClose} sx={{ cursor: submitting ? "default" : "pointer",
+            color: MUTED, lineHeight: 0, "&:hover": submitting ? {} : { color: TEXT }, transition: "color .12s" }}>
+            <CloseIcon />
+          </Box>
+        </Box>
+
+        <Box sx={{ px: "24px", py: "16px", maxHeight: "65vh", overflowY: "auto" }}>
+          {loading && (
+            <Box sx={{ display: "flex", justifyContent: "center", py: "32px" }}>
+              <CircularProgress size={24} sx={{ color: ACCENT }} />
+            </Box>
+          )}
+
+          {!loading && err && (
+            <Box sx={{ fontSize: 13, color: "#DC2626" }}>{err}</Box>
+          )}
+
+          {!loading && !err && result && (
+            <Box sx={{ textAlign: "center", py: "24px" }}>
+              <Box sx={{ fontSize: 32, mb: "10px" }}>✅</Box>
+              <Box sx={{ fontSize: 14, fontWeight: 600, color: TEXT, mb: "4px" }}>
+                Invoice {result.invoiceNumber || ""} created ({result.status})
+              </Box>
+              {result.deepLink && (
+                <Box component="a" href={result.deepLink} target="_blank" rel="noopener noreferrer"
+                  sx={{ fontSize: 12, color: ACCENT, "&:hover": { textDecoration: "underline" } }}>
+                  Open in Xero
+                </Box>
+              )}
+            </Box>
+          )}
+
+          {!loading && !err && !result && placements.length === 0 && (
+            <Box sx={{ fontSize: 13, color: MUTED, textAlign: "center", py: "24px" }}>
+              No billable placements for this client yet — placements must be marked Complete and not already invoiced.
+            </Box>
+          )}
+
+          {!loading && !err && !result && placements.length > 0 && (
+            <>
+              {!config?.configAvailable && (
+                <Alert severity="info" sx={{ mb: "14px", borderRadius: "8px", fontSize: 12 }}>
+                  Xero isn't connected — enter account code and tax type manually, or{" "}
+                  <Box component="span" onClick={() => nav("/settings")}
+                    sx={{ color: ACCENT, cursor: "pointer", fontWeight: 600, "&:hover": { textDecoration: "underline" } }}>
+                    connect Xero in Settings
+                  </Box>.
+                </Alert>
+              )}
+
+              <Box sx={{ mb: "16px" }}>
+                <Box sx={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase",
+                  letterSpacing: ".5px", mb: "8px" }}>Bill To</Box>
+                <Box sx={{ fontSize: 14, fontWeight: 600, color: TEXT, mb: "8px" }}>{client.companyName}</Box>
+                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                  <TextField label="Contact Person" value={contactPerson}
+                    onChange={e => setContactPerson(e.target.value)} size="small" fullWidth sx={FIELD_SX} />
+                  <TextField label="Contact Email" type="email" value={contactEmail}
+                    onChange={e => setContactEmail(e.target.value)} size="small" fullWidth sx={FIELD_SX} />
+                </Box>
+              </Box>
+
+              <Box sx={{ mb: "16px" }}>
+                <Box sx={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase",
+                  letterSpacing: ".5px", mb: "8px" }}>Line Items</Box>
+                {placements.map(p => {
+                  const line = lines[p.jobId] || {};
+                  return (
+                    <Box key={p.jobId} sx={{
+                      display: "flex", flexDirection: "column", gap: "8px",
+                      p: "12px", mb: "8px", borderRadius: "8px",
+                      border: `1px solid ${BORDER}`, bgcolor: line.include ? "#FAFBFD" : SURFACE,
+                    }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <Checkbox size="small" checked={!!line.include}
+                          onChange={e => updateLine(p.jobId, "include", e.target.checked)}
+                          sx={{ p: 0 }} />
+                        <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{p.title}</Box>
+                        <Box sx={{ fontSize: 11, color: MUTED }}>
+                          {p.currency} {p.salary != null ? Number(p.salary).toLocaleString() : "—"}
+                        </Box>
+                      </Box>
+                      <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                        <TextField label="Candidate Name" value={line.candidateName || ""}
+                          onChange={e => updateLine(p.jobId, "candidateName", e.target.value)}
+                          size="small" fullWidth sx={FIELD_SX} />
+                        <TextField label="Amount" type="number" value={line.amount || ""}
+                          onChange={e => updateLine(p.jobId, "amount", e.target.value)}
+                          size="small" fullWidth sx={FIELD_SX} />
+                      </Box>
+                      <TextField label="Description" value={line.description || ""}
+                        onChange={e => updateLine(p.jobId, "description", e.target.value)}
+                        size="small" fullWidth sx={FIELD_SX} />
+                      <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                        {config?.configAvailable ? (
+                          <TextField select label="Account" value={line.accountCode || ""}
+                            onChange={e => updateLine(p.jobId, "accountCode", e.target.value)}
+                            size="small" fullWidth sx={FIELD_SX}>
+                            {(config.accounts || []).map(a => (
+                              <MenuItem key={a.code} value={a.code}>{a.code} — {a.name}</MenuItem>
+                            ))}
+                          </TextField>
+                        ) : (
+                          <TextField label="Account Code" value={line.accountCode || ""}
+                            onChange={e => updateLine(p.jobId, "accountCode", e.target.value)}
+                            size="small" fullWidth sx={FIELD_SX} />
+                        )}
+                        {config?.configAvailable ? (
+                          <TextField select label="Tax" value={line.taxType || ""}
+                            onChange={e => updateLine(p.jobId, "taxType", e.target.value)}
+                            size="small" fullWidth sx={FIELD_SX}>
+                            {(config.taxRates || []).map(t => (
+                              <MenuItem key={t.taxType} value={t.taxType}>{t.name}</MenuItem>
+                            ))}
+                          </TextField>
+                        ) : (
+                          <TextField label="Tax Type" value={line.taxType || ""}
+                            onChange={e => updateLine(p.jobId, "taxType", e.target.value)}
+                            size="small" fullWidth sx={FIELD_SX} />
+                        )}
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Box>
+
+              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", mb: "16px" }}>
+                <TextField label="Invoice Date" type="date" value={invoiceDate}
+                  onChange={e => setInvoiceDate(e.target.value)}
+                  size="small" fullWidth sx={FIELD_SX} InputLabelProps={{ shrink: true }} />
+                <TextField label="Due Date" type="date" value={dueDate}
+                  onChange={e => setDueDate(e.target.value)}
+                  size="small" fullWidth sx={FIELD_SX} InputLabelProps={{ shrink: true }} />
+                <TextField label="Reference" value={reference}
+                  onChange={e => setReference(e.target.value)}
+                  size="small" fullWidth sx={FIELD_SX} />
+              </Box>
+
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                p: "12px 14px", borderRadius: "8px", bgcolor: SUCCESS_L, mb: "8px" }}>
+                <Box sx={{ fontSize: 12, color: TEXT, fontWeight: 600 }}>Total</Box>
+                <Box sx={{ fontSize: 15, fontWeight: 700, color: SUCCESS }}>
+                  {invoiceCurrency || ""} {total.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </Box>
+              </Box>
+
+              {submitError && (
+                <Alert severity="error" sx={{ mb: "8px", borderRadius: "8px", fontSize: 12 }}>{submitError}</Alert>
+              )}
+            </>
+          )}
+        </Box>
+
+        {!loading && !err && !result && placements.length > 0 && (
+          <DialogActions sx={{ px: "24px", pb: "20px", pt: "10px", borderTop: `1px solid ${BORDER}`,
+            display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "6px" }}>
+            <Box sx={{ display: "flex", gap: "8px" }}>
+              <Button onClick={() => submit("DRAFT", false)} disabled={submitting || includedJobIds.length === 0}
+                variant="outlined" sx={{ borderRadius: "8px", textTransform: "none", fontSize: 13,
+                  borderColor: BORDER, color: TEXT, "&:hover": { borderColor: ACCENT, bgcolor: ACCENT_L } }}>
+                {submitting ? <CircularProgress size={14} /> : "Save as Draft"}
+              </Button>
+              <Button onClick={() => submit("AUTHORISED", true)}
+                disabled={submitting || includedJobIds.length === 0 || !contactEmail.trim()}
+                variant="contained" sx={{ borderRadius: "8px", textTransform: "none", fontSize: 13,
+                  fontWeight: 600, bgcolor: ACCENT, boxShadow: "none", "&:hover": { bgcolor: "#1558C0", boxShadow: "none" } }}>
+                {submitting ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Authorise & Send"}
+              </Button>
+            </Box>
+            {!contactEmail.trim() && (
+              <Box sx={{ fontSize: 11, color: MUTED }}>Add a contact email to authorise and send</Box>
+            )}
+          </DialogActions>
+        )}
+
+        {result && (
+          <DialogActions sx={{ px: "24px", pb: "20px", pt: "10px", borderTop: `1px solid ${BORDER}` }}>
+            <Button onClick={handleDone} variant="contained" sx={{ borderRadius: "8px", textTransform: "none",
+              fontSize: 13, fontWeight: 600, bgcolor: ACCENT, boxShadow: "none",
+              "&:hover": { bgcolor: "#1558C0", boxShadow: "none" } }}>
+              Done
+            </Button>
+          </DialogActions>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -719,19 +1078,22 @@ export default function ClientTrackerPage() {
   const [detailCard,        setDetailCard]        = useState(null);
   const [addFromPotential,  setAddFromPotential]  = useState(null);
   const [selectedClient,    setSelectedClient]    = useState(null);
+  const [invoicingClient,   setInvoicingClient]   = useState(null);
+
+  async function loadClients() {
+    setLoading(true);
+    try {
+      const c = await apiGet("/api/clients?");
+      setClients(c);
+    } catch (e) {
+      setError(e.message || "Failed to load clients.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const c = await apiGet("/api/clients?");
-        setClients(c);
-      } catch (e) {
-        setError(e.message || "Failed to load clients.");
-      } finally {
-        setLoading(false);
-      }
-    })();
+    loadClients();
   }, []);
 
   async function handleFindPotential() {
@@ -919,7 +1281,10 @@ export default function ClientTrackerPage() {
                 </Box>
               </Box>
             ) : (
-              filtered.map(c => <ClientRow key={c.id} client={c} onEdit={setEditingClient} onSelect={setSelectedClient} />)
+              filtered.map(c => (
+                <ClientRow key={c.id} client={c} onEdit={setEditingClient}
+                  onSelect={setSelectedClient} onInvoice={setInvoicingClient} />
+              ))
             )}
           </Box>
 
@@ -1055,6 +1420,13 @@ export default function ClientTrackerPage() {
       />
       {selectedClient && (
         <ClientJobsDialog client={selectedClient} onClose={() => setSelectedClient(null)} />
+      )}
+      {invoicingClient && (
+        <InvoiceDialog
+          client={invoicingClient}
+          onClose={() => setInvoicingClient(null)}
+          onInvoiced={loadClients}
+        />
       )}
     </Box>
   );
