@@ -14,6 +14,8 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -46,6 +48,8 @@ public class JobService {
 
     private static final RowMapper<JobResponse> JOB_MAPPER = (rs, rowNum) -> {
         OffsetDateTime created = rs.getObject("created_at", OffsetDateTime.class);
+        BigDecimal salary = rs.getBigDecimal("salary");
+        BigDecimal feePercentage = rs.getBigDecimal("fee_percentage");
         return new JobResponse(
                 rs.getString("id"),
                 rs.getString("title"),
@@ -56,8 +60,20 @@ public class JobService {
                 rs.getString("location"),
                 List.of(),
                 created != null ? created.toInstant() : null,
-                rs.getString("status"));
+                rs.getString("status"),
+                salary,
+                rs.getString("currency"),
+                feePercentage,
+                computeEstimatedFee(salary, feePercentage));
     };
+
+    // ─── Estimated fee = salary * fee% / 100 — always computed, never stored ──
+
+    private static BigDecimal computeEstimatedFee(BigDecimal salary, BigDecimal feePercentage) {
+        if (salary == null || feePercentage == null) return null;
+        return salary.multiply(feePercentage)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+    }
 
     // ─── Create ───────────────────────────────────────────────────────────────
 
@@ -65,11 +81,13 @@ public class JobService {
         String id = "job-" + UUID.randomUUID();
         jdbc.update("""
                 insert into jobs
-                    (id, title, company, job_type, jd_text, location, login_id, status, is_active)
-                values (?, ?, ?, ?, ?, ?, ?, 'Active', true)
+                    (id, title, company, job_type, jd_text, location, login_id, status, is_active,
+                     salary, currency, fee_percentage)
+                values (?, ?, ?, ?, ?, ?, ?, 'Active', true, ?, ?, ?)
                 """,
                 id, req.title(), req.company(), req.jobType(),
-                req.jdText(), req.location(), loginId);
+                req.jdText(), req.location(), loginId,
+                req.salary(), req.currency(), req.feePercentage());
 
         autoCreateClientIfNew(req.company(), req.location(), loginId);
 
@@ -77,14 +95,17 @@ public class JobService {
                 id, req.title(), req.company(), req.jobType(),
                 req.seniority(), req.jdText(), req.location(),
                 req.stackTags() != null ? req.stackTags() : List.of(),
-                Instant.now(), req.jobStatus());
+                Instant.now(), req.jobStatus(),
+                req.salary(), req.currency(), req.feePercentage(),
+                computeEstimatedFee(req.salary(), req.feePercentage()));
     }
 
     // ─── List ─────────────────────────────────────────────────────────────────
 
     public List<JobResponse> listJobs(String loginId) {
         return jdbc.query("""
-                select id, title, company, job_type, jd_text, created_at, location, status
+                select id, title, company, job_type, jd_text, created_at, location, status,
+                       salary, currency, fee_percentage
                 from jobs
                 where login_id = ?
                   and is_active = true
@@ -96,7 +117,8 @@ public class JobService {
 
     public Optional<JobResponse> getJob(String jobId, String loginId) {
         return jdbc.query("""
-                select id, title, company, job_type, jd_text, created_at, location, status
+                select id, title, company, job_type, jd_text, created_at, location, status,
+                       salary, currency, fee_percentage
                 from jobs
                 where id = ?
                   and login_id = ?
@@ -110,13 +132,15 @@ public class JobService {
         int updated = jdbc.update("""
                 update jobs
                 set title = ?, company = ?, job_type = ?, jd_text = ?,
-                    location = ?, status = ?, updated_at = now()
+                    location = ?, status = ?, salary = ?, currency = ?, fee_percentage = ?,
+                    updated_at = now()
                 where id = ?
                   and login_id = ?
                   and is_active = true
                 """,
                 req.title(), req.company(), req.jobType(), req.jdText(),
-                req.location(), req.jobStatus() != null ? req.jobStatus() : "Fulfilling", jobId, loginId);
+                req.location(), req.jobStatus() != null ? req.jobStatus() : "Fulfilling",
+                req.salary(), req.currency(), req.feePercentage(), jobId, loginId);
         if (updated == 0)
             return Optional.empty();
         autoCreateClientIfNew(req.company(), req.location(), loginId);

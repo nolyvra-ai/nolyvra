@@ -312,7 +312,8 @@ public class AnalysisService {
                                 ? rs.getTimestamp("created_at").toInstant()
                                 : null,
                         rs.getString("stage"),
-                        rs.getString("cv_text")),
+                        rs.getString("cv_text"),
+                        null, null, null, null, null, null, null, null, null, null, null, null),
                 candidateId).stream().findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Candidate not found: " + candidateId));
     }

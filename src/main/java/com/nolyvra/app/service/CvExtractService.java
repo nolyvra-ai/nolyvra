@@ -54,7 +54,8 @@ public class CvExtractService {
                 "name",        fields.getOrDefault("name", ""),
                 "email",       fields.getOrDefault("email", ""),
                 "phone",       fields.getOrDefault("phone", ""),
-                "linkedinUrl", fields.getOrDefault("linkedinUrl", ""));
+                "linkedinUrl", fields.getOrDefault("linkedinUrl", ""),
+                "skills",      fields.getOrDefault("skills", java.util.List.of()));
     }
 
     private String extractFromPdf(InputStream inputStream) throws IOException {

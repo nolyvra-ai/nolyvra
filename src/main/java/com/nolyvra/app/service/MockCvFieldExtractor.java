@@ -3,6 +3,7 @@ package com.nolyvra.app.service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -17,7 +18,8 @@ public class MockCvFieldExtractor implements CvFieldExtractor {
                 "name", mockName(rawText, originalFilename),
                 "email", firstMatch(rawText, "[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}"),
                 "phone", firstMatch(rawText, "(?:\\+?\\d[\\d .()\\-]{7,}\\d)"),
-                "linkedinUrl", firstMatch(rawText, "https?://(?:www\\.)?linkedin\\.com/[^\\s)]+"));
+                "linkedinUrl", firstMatch(rawText, "https?://(?:www\\.)?linkedin\\.com/[^\\s)]+"),
+                "skills", List.<String>of());
     }
 
     private static String mockName(String text, String fallbackName) {

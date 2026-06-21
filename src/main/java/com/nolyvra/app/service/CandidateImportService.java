@@ -21,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -119,10 +120,19 @@ public class CandidateImportService {
         List<Map<String, String>> rows = cached.rows();
         IMPORT_CACHE.remove(importToken);
 
-        String nameHdr    = mapping.get("name");
-        String emailHdr   = mapping.get("email");
-        String phoneHdr   = mapping.get("phone_number");
+        String nameHdr     = mapping.get("name");
+        String emailHdr    = mapping.get("email");
+        String phoneHdr    = mapping.get("phone_number");
         String linkedinHdr = mapping.get("linkedin_url");
+        String titleHdr    = mapping.get("current_title");
+        String locationHdr = mapping.get("location");
+        String yearsHdr    = mapping.get("years_experience");
+        String seniorityHdr = mapping.get("seniority_level");
+        String salaryMinHdr = mapping.get("expected_salary_min");
+        String salaryMaxHdr = mapping.get("expected_salary_max");
+        String noticeHdr    = mapping.get("notice_period_weeks");
+        String workRightsHdr = mapping.get("work_rights");
+        String remoteHdr     = mapping.get("remote_flexible");
 
         int importedCount  = 0;
         int duplicateCount = 0;
@@ -134,6 +144,15 @@ public class CandidateImportService {
             String email    = emailHdr    != null ? trimToNull(row.get(emailHdr))    : null;
             String phone    = phoneHdr    != null ? trimToNull(row.get(phoneHdr))    : null;
             String linkedin = linkedinHdr != null ? trimToNull(row.get(linkedinHdr)) : null;
+            String currentTitle = titleHdr    != null ? trimToNull(row.get(titleHdr))    : null;
+            String location     = locationHdr != null ? trimToNull(row.get(locationHdr)) : null;
+            BigDecimal years    = yearsHdr     != null ? parseDecimal(row.get(yearsHdr))     : null;
+            String seniority    = seniorityHdr != null ? trimToNull(row.get(seniorityHdr)) : null;
+            BigDecimal salaryMin = salaryMinHdr != null ? parseDecimal(row.get(salaryMinHdr)) : null;
+            BigDecimal salaryMax = salaryMaxHdr != null ? parseDecimal(row.get(salaryMaxHdr)) : null;
+            Integer notice       = noticeHdr    != null ? parseInt(row.get(noticeHdr))        : null;
+            String workRights    = workRightsHdr != null ? trimToNull(row.get(workRightsHdr)) : null;
+            Boolean remoteFlexible = remoteHdr != null ? parseBool(row.get(remoteHdr)) : null;
 
             // Skip: name blank OR both email and phone blank
             if (name == null || (email == null && phone == null)) {
@@ -157,9 +176,14 @@ public class CandidateImportService {
             jdbc.update("""
                     INSERT INTO candidates
                         (id, login_id, name, email, phone_number, linkedin_url,
+                         current_title, location, years_experience, seniority_level,
+                         expected_salary_min, expected_salary_max, notice_period_weeks,
+                         work_rights, remote_flexible,
                          stage, is_active, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, 'Screening', true, now(), now())
-                    """, id, loginId, name, email, phone, linkedin);
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Screening', true, now(), now())
+                    """, id, loginId, name, email, phone, linkedin,
+                    currentTitle, location, years, seniority,
+                    salaryMin, salaryMax, notice, workRights, remoteFlexible);
             importedCount++;
         }
 
@@ -216,13 +240,22 @@ public class CandidateImportService {
     private Map<String, String> mapColumnsWithAI(List<String> headers) {
         String systemPrompt = """
                 You are mapping spreadsheet column headers to a fixed set of candidate database fields.
-                Target fields: name, email, phone_number, linkedin_url
+                Target fields: name, email, phone_number, linkedin_url, current_title, location,
+                years_experience, seniority_level, expected_salary_min, expected_salary_max,
+                notice_period_weeks, work_rights, remote_flexible
                 Given a list of raw column headers from an uploaded spreadsheet, return a JSON object
                 mapping each target field to the BEST matching raw header from the list, or null if no
                 reasonable match exists. Consider variations like "Full Name", "Candidate Name", "Email Address",
-                "Mobile", "Phone", "LinkedIn", "LinkedIn Profile", "LinkedIn URL" etc.
+                "Mobile", "Phone", "LinkedIn", "LinkedIn Profile", "LinkedIn URL", "Job Title", "Current Role",
+                "City", "Suburb", "Years of Experience", "YOE", "Seniority", "Level", "Min Salary", "Max Salary",
+                "Notice Period (weeks)", "Visa Status", "Work Rights", "Remote OK", "Hybrid/Remote" etc.
                 Return ONLY valid JSON, no markdown, in this exact format:
-                {"name": "raw_header_or_null", "email": "raw_header_or_null", "phone_number": "raw_header_or_null", "linkedin_url": "raw_header_or_null"}
+                {"name": "raw_header_or_null", "email": "raw_header_or_null", "phone_number": "raw_header_or_null",
+                 "linkedin_url": "raw_header_or_null", "current_title": "raw_header_or_null", "location": "raw_header_or_null",
+                 "years_experience": "raw_header_or_null", "seniority_level": "raw_header_or_null",
+                 "expected_salary_min": "raw_header_or_null", "expected_salary_max": "raw_header_or_null",
+                 "notice_period_weeks": "raw_header_or_null", "work_rights": "raw_header_or_null",
+                 "remote_flexible": "raw_header_or_null"}
                 """;
         try {
             String userMessage = objectMapper.writeValueAsString(headers);
@@ -341,5 +374,32 @@ public class CandidateImportService {
         if (s == null) return null;
         String t = s.trim();
         return t.isEmpty() ? null : t;
+    }
+
+    private BigDecimal parseDecimal(String s) {
+        String t = trimToNull(s);
+        if (t == null) return null;
+        try {
+            return new BigDecimal(t.replaceAll("[^0-9.]", ""));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Integer parseInt(String s) {
+        String t = trimToNull(s);
+        if (t == null) return null;
+        try {
+            return Integer.parseInt(t.replaceAll("[^0-9]", ""));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private Boolean parseBool(String s) {
+        String t = trimToNull(s);
+        if (t == null) return null;
+        return t.equalsIgnoreCase("yes") || t.equalsIgnoreCase("true")
+                || t.equalsIgnoreCase("y") || t.equals("1");
     }
 }

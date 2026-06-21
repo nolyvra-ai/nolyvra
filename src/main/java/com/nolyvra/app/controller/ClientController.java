@@ -40,6 +40,13 @@ public class ClientController {
         return ResponseEntity.ok(clientService.updateClient(id, req, loginId));
     }
 
+    @GetMapping("/{id}/jobs")
+    public ResponseEntity<List<ClientResponse.JobSummary>> getClientJobs(
+            @PathVariable Long id,
+            @RequestParam String loginId) {
+        return ResponseEntity.ok(clientService.getClientJobsById(id, loginId));
+    }
+
     @GetMapping("/potential")
     public ResponseEntity<List<PotentialClientResponse>> getPotentialClients(
             @RequestParam String loginId,

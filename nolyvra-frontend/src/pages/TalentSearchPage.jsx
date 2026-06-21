@@ -273,7 +273,7 @@ export function TalentSearchPage() {
 
   // ── Derived display data ──────────────────────────────────────────────────
   const isLoading   = dbMode ? dbLoading : loading;
-  const showSection = dbMode ? dbResults.length > 0 || dbLoading : !!(result || loading);
+  const showSection = dbMode ? true : !!(result || loading);
 
   // Normalise DB candidates into the same shape the card/table renders expect
   const displayResults = dbMode
@@ -413,6 +413,13 @@ export function TalentSearchPage() {
           {isLoading && (
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, justifyContent: "center", py: 6, color: MUTED, fontSize: 13 }}>
               <CircularProgress size={18} sx={{ color: ACCENT }} /> {dbMode ? "Loading candidates…" : "Searching talent…"}
+            </Box>
+          )}
+
+          {/* Empty state */}
+          {!isLoading && displayResults.length === 0 && (
+            <Box sx={{ textAlign: "center", py: 6, color: MUTED, fontSize: 13 }}>
+              No record found.
             </Box>
           )}
 

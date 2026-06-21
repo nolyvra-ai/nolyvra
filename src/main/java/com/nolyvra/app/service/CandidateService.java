@@ -1,15 +1,19 @@
 package com.nolyvra.app.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nolyvra.app.model.CandidateCreateRequest;
 import com.nolyvra.app.model.CandidateListItemResponse;
 import com.nolyvra.app.model.CandidateResponse;
+import com.nolyvra.app.model.CandidateUpdateRequest;
 import com.nolyvra.app.model.StageUpdateRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -18,12 +22,36 @@ import java.util.UUID;
 public class CandidateService {
 
     private final JdbcTemplate jdbc;
+    private final ObjectMapper objectMapper;
 
-    public CandidateService(JdbcTemplate jdbc) {
+    public CandidateService(JdbcTemplate jdbc, ObjectMapper objectMapper) {
         this.jdbc = jdbc;
+        this.objectMapper = objectMapper;
     }
 
-    private static final RowMapper<CandidateResponse> CANDIDATE_MAPPER = (rs, rowNum) -> {
+    private String skillsToJson(List<String> skills) {
+        try {
+            return objectMapper.writeValueAsString(skills != null ? skills : List.of());
+        } catch (Exception e) {
+            return "[]";
+        }
+    }
+
+    private List<String> parseSkills(String json) {
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            var node = objectMapper.readTree(json);
+            List<String> skills = new ArrayList<>();
+            if (node.isArray()) {
+                node.forEach(s -> skills.add(s.asText()));
+            }
+            return skills;
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    private final RowMapper<CandidateResponse> CANDIDATE_MAPPER = (rs, rowNum) -> {
         OffsetDateTime odt = rs.getObject("created_at", OffsetDateTime.class);
         return new CandidateResponse(
                 rs.getString("id"),
@@ -34,7 +62,19 @@ public class CandidateService {
                 rs.getString("linkedin_url"),
                 odt != null ? odt.toInstant() : null,
                 rs.getString("stage"),
-                rs.getString("cv_text"));
+                rs.getString("cv_text"),
+                parseSkills(rs.getString("skills")),
+                rs.getString("current_title"),
+                rs.getString("location"),
+                rs.getString("state"),
+                rs.getBigDecimal("years_experience"),
+                rs.getString("seniority_level"),
+                rs.getBigDecimal("expected_salary_min"),
+                rs.getBigDecimal("expected_salary_max"),
+                rs.getString("salary_currency"),
+                (Integer) rs.getObject("notice_period_weeks"),
+                rs.getString("work_rights"),
+                (Boolean) rs.getObject("remote_flexible"));
     };
 
     private static final RowMapper<CandidateListItemResponse> CANDIDATE_LIST_MAPPER = (rs, rowNum) -> {
@@ -77,6 +117,26 @@ public class CandidateService {
         return count != null && count > 0;
     }
 
+    // Same check, but excludes the candidate's own row — used when editing an
+    // existing candidate so a rename/job-assignment doesn't flag itself.
+    private boolean isDuplicateExcluding(String jobId, String name, String loginId, String excludeCandidateId) {
+        String sql = jobId != null
+            ? """
+              select count(*) from candidates
+              where job_id = ? and login_id = ? and is_active = true
+              and lower(trim(name)) = lower(trim(?)) and id <> ?
+              """
+            : """
+              select count(*) from candidates
+              where job_id is null and login_id = ? and is_active = true
+              and lower(trim(name)) = lower(trim(?)) and id <> ?
+              """;
+        Integer count = jobId != null
+            ? jdbc.queryForObject(sql, Integer.class, jobId, loginId, name, excludeCandidateId)
+            : jdbc.queryForObject(sql, Integer.class, loginId, name, excludeCandidateId);
+        return count != null && count > 0;
+    }
+
     // ─── Create ───────────────────────────────────────────────────────────────
 
     public CandidateResponse addCandidate(String jobId, CandidateCreateRequest req, String loginId) {
@@ -87,14 +147,24 @@ public class CandidateService {
         String id = "cand-" + UUID.randomUUID();
         jdbc.update("""
                 insert into candidates
-                    (id, job_id, login_id, name, email, phone_number, linkedin_url, cv_text, stage, is_active)
-                values (?, ?, ?, ?, ?, ?, ?, ?, 'Screening', true)
+                    (id, job_id, login_id, name, email, phone_number, linkedin_url, cv_text, stage, is_active,
+                     skills, current_title, location, state, years_experience, seniority_level,
+                     expected_salary_min, expected_salary_max, salary_currency,
+                     notice_period_weeks, work_rights, remote_flexible)
+                values (?, ?, ?, ?, ?, ?, ?, ?, 'Screening', true, CAST(? AS jsonb), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 id, jobId, loginId,
-                req.name(), req.email(), req.phone(), req.linkedinUrl(), req.cvText());
+                req.name(), req.email(), req.phone(), req.linkedinUrl(), req.cvText(),
+                skillsToJson(req.skills()),
+                req.currentTitle(), req.location(), req.state(), req.yearsExperience(), req.seniorityLevel(),
+                req.expectedSalaryMin(), req.expectedSalaryMax(), req.salaryCurrency(),
+                req.noticePeriodWeeks(), req.workRights(), req.remoteFlexible());
 
         return new CandidateResponse(id, jobId, req.name(), req.email(),
-                req.phone(), req.linkedinUrl(), Instant.now(), "Screening", req.cvText());
+                req.phone(), req.linkedinUrl(), Instant.now(), "Screening", req.cvText(), req.skills(),
+                req.currentTitle(), req.location(), req.state(), req.yearsExperience(), req.seniorityLevel(),
+                req.expectedSalaryMin(), req.expectedSalaryMax(), req.salaryCurrency(),
+                req.noticePeriodWeeks(), req.workRights(), req.remoteFlexible());
     }
 
     // Create candidate without job assignment (job_id = null — "Not Assigned")
@@ -106,47 +176,64 @@ public class CandidateService {
         String id = "cand-" + UUID.randomUUID();
         jdbc.update("""
                 insert into candidates
-                    (id, job_id, login_id, name, email, phone_number, linkedin_url, cv_text, stage, is_active)
-                values (?, null, ?, ?, ?, ?, ?, ?, 'Screening', true)
+                    (id, job_id, login_id, name, email, phone_number, linkedin_url, cv_text, stage, is_active,
+                     skills, current_title, location, state, years_experience, seniority_level,
+                     expected_salary_min, expected_salary_max, salary_currency,
+                     notice_period_weeks, work_rights, remote_flexible)
+                values (?, null, ?, ?, ?, ?, ?, ?, 'Screening', true, CAST(? AS jsonb), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 id, loginId,
-                req.name(), req.email(), req.phone(), req.linkedinUrl(), req.cvText());
+                req.name(), req.email(), req.phone(), req.linkedinUrl(), req.cvText(),
+                skillsToJson(req.skills()),
+                req.currentTitle(), req.location(), req.state(), req.yearsExperience(), req.seniorityLevel(),
+                req.expectedSalaryMin(), req.expectedSalaryMax(), req.salaryCurrency(),
+                req.noticePeriodWeeks(), req.workRights(), req.remoteFlexible());
 
         return new CandidateResponse(id, null, req.name(), req.email(),
-                req.phone(), req.linkedinUrl(), Instant.now(), "Screening", req.cvText());
+                req.phone(), req.linkedinUrl(), Instant.now(), "Screening", req.cvText(), req.skills(),
+                req.currentTitle(), req.location(), req.state(), req.yearsExperience(), req.seniorityLevel(),
+                req.expectedSalaryMin(), req.expectedSalaryMax(), req.salaryCurrency(),
+                req.noticePeriodWeeks(), req.workRights(), req.remoteFlexible());
     }
 
     // ─── Read ─────────────────────────────────────────────────────────────────
 
+    private static final String CANDIDATE_COLUMNS = """
+            id, job_id, name, email, phone_number, linkedin_url, created_at, stage, cv_text, skills,
+            current_title, location, state, years_experience, seniority_level,
+            expected_salary_min, expected_salary_max, salary_currency,
+            notice_period_weeks, work_rights, remote_flexible
+            """;
+
     public Optional<CandidateResponse> getCandidate(String candidateId, String loginId) {
         return jdbc.query("""
-                select id, job_id, name, email, phone_number, linkedin_url, created_at, stage, cv_text
+                select %s
                 from candidates
                 where id = ?
                   and login_id = ?
                   and is_active = true
-                """, CANDIDATE_MAPPER, candidateId, loginId).stream().findFirst();
+                """.formatted(CANDIDATE_COLUMNS), CANDIDATE_MAPPER, candidateId, loginId).stream().findFirst();
     }
 
     public List<CandidateResponse> getCandidatesByJob(String jobId, String loginId) {
         return jdbc.query("""
-                select id, job_id, name, email, phone_number, linkedin_url, created_at, stage, cv_text
+                select %s
                 from candidates
                 where job_id = ?
                   and login_id = ?
                   and is_active = true
                 order by created_at desc
-                """, CANDIDATE_MAPPER, jobId, loginId);
+                """.formatted(CANDIDATE_COLUMNS), CANDIDATE_MAPPER, jobId, loginId);
     }
 
     public List<CandidateResponse> getAllCandidates(String loginId) {
         return jdbc.query("""
-                select id, job_id, name, email, phone_number, linkedin_url, created_at, stage, cv_text
+                select %s
                 from candidates
                 where login_id = ?
                   and is_active = true
                 order by created_at desc
-                """, CANDIDATE_MAPPER, loginId);
+                """.formatted(CANDIDATE_COLUMNS), CANDIDATE_MAPPER, loginId);
     }
 
     public List<CandidateListItemResponse> getCandidateList(String loginId) {
@@ -183,6 +270,56 @@ public class CandidateService {
                   and is_active = true
                 """, Integer.class, loginId);
         return count != null ? count : 0;
+    }
+
+    // ─── Update profile (Edit Profile) ─────────────────────────────────────────
+    // Job assignment can only change here while the candidate's current job is
+    // unassigned, or no longer open (not Active/Fulfilling) — e.g. once a job
+    // is Filled/Closed, the candidate can be moved onto a new job. While the
+    // current job is still Active/Fulfilling, reassignment is blocked; the
+    // frontend instead offers "Add Candidate to Another Job" (a separate
+    // candidate record via addCandidate, not this method).
+
+    private boolean isJobOpen(String jobId, String loginId) {
+        if (jobId == null) return false;
+        String status = jdbc.query(
+                "select status from jobs where id = ? and login_id = ?",
+                (rs, rowNum) -> rs.getString("status"), jobId, loginId)
+                .stream().findFirst().orElse(null);
+        return status != null && ("active".equalsIgnoreCase(status) || "fulfilling".equalsIgnoreCase(status));
+    }
+
+    public Optional<CandidateResponse> updateCandidate(String candidateId, CandidateUpdateRequest req, String loginId) {
+        Optional<CandidateResponse> existing = getCandidate(candidateId, loginId);
+        if (existing.isEmpty()) {
+            return Optional.empty();
+        }
+        String currentJobId = existing.get().jobId();
+        String effectiveJobId = isJobOpen(currentJobId, loginId) ? currentJobId : req.jobId();
+
+        if (isDuplicateExcluding(effectiveJobId, req.name(), loginId, candidateId)) {
+            throw new IllegalStateException(
+                req.name() + " is already in the pipeline for that job.");
+        }
+
+        jdbc.update("""
+                update candidates
+                set job_id = ?, name = ?, email = ?, phone_number = ?, linkedin_url = ?, cv_text = ?,
+                    current_title = ?, location = ?, state = ?, years_experience = ?, seniority_level = ?,
+                    expected_salary_min = ?, expected_salary_max = ?, salary_currency = ?,
+                    notice_period_weeks = ?, work_rights = ?, remote_flexible = ?,
+                    updated_at = now()
+                where id = ?
+                  and login_id = ?
+                  and is_active = true
+                """,
+                effectiveJobId, req.name(), req.email(), req.phone(), req.linkedinUrl(), req.cvText(),
+                req.currentTitle(), req.location(), req.state(), req.yearsExperience(), req.seniorityLevel(),
+                req.expectedSalaryMin(), req.expectedSalaryMax(), req.salaryCurrency(),
+                req.noticePeriodWeeks(), req.workRights(), req.remoteFlexible(),
+                candidateId, loginId);
+
+        return getCandidate(candidateId, loginId);
     }
 
     // ─── Update stage ─────────────────────────────────────────────────────────

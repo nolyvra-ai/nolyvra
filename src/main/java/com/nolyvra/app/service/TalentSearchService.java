@@ -1,6 +1,9 @@
 package com.nolyvra.app.service;
 
+import com.nolyvra.app.model.CandidateFilterRequest;
+import com.nolyvra.app.model.CandidateSearchResult;
 import com.nolyvra.app.model.CoreSignalProfileResponse;
+import com.nolyvra.app.model.JobResponse;
 import com.nolyvra.app.model.TalentSearchRequest;
 import com.nolyvra.app.model.TalentSearchResponse;
 import com.nolyvra.app.model.TalentSearchResult;
@@ -15,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -76,8 +80,13 @@ public class TalentSearchService {
                 : List.of();
 
         // Step 4: Paginate internal results separately; always surface CoreSignal on page 0
-        internalResults.sort(Comparator.comparingInt(TalentSearchResult::matchScore).reversed());
-        externalResults.sort(Comparator.comparingInt(TalentSearchResult::matchScore).reversed());
+        // Sort via stream (not in-place .sort()) since these lists may be the immutable List.of()
+        internalResults = internalResults.stream()
+                .sorted(Comparator.comparingInt(TalentSearchResult::matchScore).reversed())
+                .collect(Collectors.toList());
+        externalResults = externalResults.stream()
+                .sorted(Comparator.comparingInt(TalentSearchResult::matchScore).reversed())
+                .collect(Collectors.toList());
 
         int page = req.page() != null ? req.page() : 0;
         int pageSize = req.pageSize() != null ? req.pageSize() : 9;
@@ -236,32 +245,63 @@ public class TalentSearchService {
 
     private List<TalentSearchResult> searchCoreSignal(SearchFilters filters, String loginId,
                                                        String originalQuery) {
-        try {
-            // Try cache first
-            List<TalentSearchResult> cached = searchCoreSignalCache(filters);
-            System.out.println("[CoreSignal] cache results: " + cached.size());
-            if (cached.size() >= CACHE_MIN_RESULTS) {
-                System.out.println("[CoreSignal] serving from cache, skipping API call");
-                List<Integer> aiScores = List.of();
-                if (tokenService.deductToken(loginId)) {
-                    aiScores = scoreWithAI(cached, originalQuery);
-                }
-                if (aiScores.size() == cached.size()) {
-                    List<TalentSearchResult> scored = new ArrayList<>();
-                    for (int i = 0; i < cached.size(); i++) {
-                        TalentSearchResult p = cached.get(i);
-                        scored.add(new TalentSearchResult(
-                                p.candidateId(), p.name(), p.currentTitle(), p.currentCompany(),
-                                p.linkedinUrl(), p.email(), p.phone(),
-                                p.matchedSkills(), p.gapSkills(),
-                                aiScores.get(i), p.yearsExperience(), p.source(), p.alreadyInPipeline(),
-                                p.coresignalId()));
-                    }
-                    return scored;
-                }
-                return cached;
+        // Try cache first
+        List<TalentSearchResult> cached = searchCoreSignalCache(filters);
+        System.out.println("[CoreSignal] cache results: " + cached.size());
+        if (cached.size() >= CACHE_MIN_RESULTS) {
+            System.out.println("[CoreSignal] serving from cache, skipping API call");
+            List<Integer> aiScores = List.of();
+            if (tokenService.deductToken(loginId)) {
+                aiScores = scoreWithAI(cached, originalQuery);
             }
+            if (aiScores.size() == cached.size()) {
+                List<TalentSearchResult> scored = new ArrayList<>();
+                for (int i = 0; i < cached.size(); i++) {
+                    TalentSearchResult p = cached.get(i);
+                    scored.add(new TalentSearchResult(
+                            p.candidateId(), p.name(), p.currentTitle(), p.currentCompany(),
+                            p.linkedinUrl(), p.email(), p.phone(),
+                            p.matchedSkills(), p.gapSkills(),
+                            aiScores.get(i), p.yearsExperience(), p.source(), p.alreadyInPipeline(),
+                            p.coresignalId()));
+                }
+                return scored;
+            }
+            return cached;
+        }
 
+        List<TalentSearchResult> profiles = fetchCoreSignalLive(filters);
+        if (profiles.isEmpty()) return List.of();
+
+        // Fix 6: score with OpenAI, fall back to existing scoreCandidate logic
+        List<Integer> aiScores = List.of();
+        if (tokenService.deductToken(loginId)) {
+            aiScores = scoreWithAI(profiles, originalQuery);
+        }
+        if (aiScores.size() == profiles.size()) {
+            List<TalentSearchResult> scored = new ArrayList<>();
+            for (int i = 0; i < profiles.size(); i++) {
+                TalentSearchResult p = profiles.get(i);
+                scored.add(new TalentSearchResult(
+                        p.candidateId(), p.name(), p.currentTitle(), p.currentCompany(),
+                        p.linkedinUrl(), p.email(), p.phone(),
+                        p.matchedSkills(), p.gapSkills(),
+                        aiScores.get(i), p.yearsExperience(), p.source(), p.alreadyInPipeline(),
+                        p.coresignalId()));
+            }
+            return scored;
+        }
+
+        return profiles;
+    }
+
+    // ─── Live CoreSignal API call (search + parallel profile fetch) ──────────
+    // Extracted so job-based searches can reuse it without the NL-query/AI
+    // re-scoring wrapper above. Capped to 3 results — keep it that way; each
+    // result here is a billed CoreSignal API call.
+
+    private List<TalentSearchResult> fetchCoreSignalLive(SearchFilters filters) {
+        try {
             // Fix 2: use apikey header, not Authorization: Bearer
             HttpHeaders searchHeaders = new HttpHeaders();
             searchHeaders.set("apikey", coreSignalApiKey);
@@ -292,7 +332,7 @@ public class TalentSearchService {
                 return List.of();
             }
 
-            // Take first 3 IDs
+            // Take first 3 IDs — each one is a billed CoreSignal API call
             List<Long> ids = new ArrayList<>();
             for (int i = 0; i < Math.min(3, idsNode.size()); i++) {
                 ids.add(idsNode.get(i).asLong());
@@ -307,33 +347,10 @@ public class TalentSearchService {
                             () -> fetchProfile(id, filters), profileFetchExecutor))
                     .collect(Collectors.toList());
 
-            List<TalentSearchResult> profiles = futures.stream()
+            return futures.stream()
                     .map(CompletableFuture::join)
                     .filter(Objects::nonNull)
                     .collect(Collectors.toList());
-
-            if (profiles.isEmpty()) return List.of();
-
-            // Fix 6: score with OpenAI, fall back to existing scoreCandidate logic
-            List<Integer> aiScores = List.of();
-            if (tokenService.deductToken(loginId)) {
-                aiScores = scoreWithAI(profiles, originalQuery);
-            }
-            if (aiScores.size() == profiles.size()) {
-                List<TalentSearchResult> scored = new ArrayList<>();
-                for (int i = 0; i < profiles.size(); i++) {
-                    TalentSearchResult p = profiles.get(i);
-                    scored.add(new TalentSearchResult(
-                            p.candidateId(), p.name(), p.currentTitle(), p.currentCompany(),
-                            p.linkedinUrl(), p.email(), p.phone(),
-                            p.matchedSkills(), p.gapSkills(),
-                            aiScores.get(i), p.yearsExperience(), p.source(), p.alreadyInPipeline(),
-                            p.coresignalId()));
-                }
-                return scored;
-            }
-
-            return profiles;
 
         } catch (org.springframework.web.client.HttpClientErrorException e) {
             System.err.println("[CoreSignal] HTTP " + e.getStatusCode() + " – " + e.getResponseBodyAsString());
@@ -345,6 +362,32 @@ public class TalentSearchService {
             System.err.println("[CoreSignal] search failed: " + e.getClass().getSimpleName() + ": " + e.getMessage());
             return List.of();
         }
+    }
+
+    // ─── Job-based candidate search (Suitable/External Candidates panel) ─────
+    // No OpenAI call, no token deduction — cheap skill/title-overlap scoring
+    // only. Cache is always checked first; live CoreSignal is only called
+    // when the cache has fewer than 3 hits, and always capped to 3 results.
+
+    public List<TalentSearchResult> searchCoreSignalForJob(List<String> skills, String location,
+                                                             String title, String seniority) {
+        if (coreSignalApiKey == null || coreSignalApiKey.isBlank()) return List.of();
+
+        SearchFilters filters = new SearchFilters(
+                skills != null ? skills : List.of(),
+                seniority,
+                null,
+                0,
+                title != null && !title.isBlank() ? List.of(title) : List.of(),
+                location);
+
+        List<TalentSearchResult> cached = searchCoreSignalCache(filters);
+        if (cached.size() >= CACHE_MIN_RESULTS) {
+            return cached.stream().limit(3).collect(Collectors.toList());
+        }
+
+        List<TalentSearchResult> live = fetchCoreSignalLive(filters);
+        return live.stream().limit(3).collect(Collectors.toList());
     }
 
     // ─── Fetch a single profile by ID (used by CompletableFuture) ────────────
@@ -607,6 +650,243 @@ public class TalentSearchService {
         if (filters.seniority() != null) parts.add(filters.seniority());
         if (filters.keywords() != null) parts.addAll(filters.keywords());
         return parts.isEmpty() ? null : String.join(" ", parts);
+    }
+
+    // ─── GET /api/jobs/{jobId}/suitable-candidates ────────────────────────────
+    // Top 10 internal candidates for a job, matched on title + skills + location.
+    // Reuses the same rule-based scoring as the Smart Talent Lens page.
+
+    public List<CandidateSearchResult> suitableInternalCandidatesForJob(JobResponse job, String loginId) {
+        CandidateFilterRequest filters = CandidateFilterRequest.builder()
+                .skills(job.stackTags() != null ? job.stackTags() : List.of())
+                .jobTitleKeywords(job.title())
+                .location(job.location())
+                .build();
+        return scoreInternalCandidates(filters, loginId).stream()
+                .limit(10)
+                .collect(Collectors.toList());
+    }
+
+    // ─── POST /api/candidates/search (Smart Talent Lens structured filters) ──
+    // Rule-based scoring only against internal candidates — no OpenAI call,
+    // no token deduction (unlike the natural-language search() above).
+
+    public List<CandidateSearchResult> scoreInternalCandidates(CandidateFilterRequest filters, String loginId) {
+        List<String> skills = filters.skills() != null ? filters.skills() : List.of();
+
+        // Resolve the search location once; candidate locations are resolved
+        // lazily per unique (suburb, state) pair below to avoid N+1 lookups.
+        double[] searchCoords = resolveLocality(filters.location(), filters.state());
+        Map<String, double[]> localityCache = new HashMap<>();
+
+        return jdbc.query("""
+                select c.id, c.name, c.email, c.phone_number, c.linkedin_url, c.cv_text, c.job_id,
+                       c.current_title, c.location, c.state, c.years_experience, c.seniority_level,
+                       c.expected_salary_min, c.expected_salary_max, c.salary_currency,
+                       c.notice_period_weeks, c.work_rights, c.remote_flexible, c.skills, c.updated_at,
+                       coalesce(j.title, 'Not Assigned') as job_title,
+                       coalesce(j.company, '') as company,
+                       a.id as analysis_id, a.consistency_score, a.capability_score, a.risk_level
+                from candidates c
+                left join jobs j on j.id = c.job_id
+                left join lateral (
+                    select id, consistency_score, capability_score, risk_level
+                    from analyses
+                    where candidate_id = c.id
+                    order by analyzed_at desc limit 1
+                ) a on true
+                where c.login_id = ?
+                  and c.is_active = true
+                """,
+                (rs, rowNum) -> {
+                    String cvText = rs.getString("cv_text");
+                    List<String> matched = extractMatchedSkills(cvText, skills);
+                    List<String> gaps = skills.stream()
+                            .filter(s -> !matched.contains(s))
+                            .collect(Collectors.toList());
+
+                    String candidateLocation = rs.getString("location");
+                    String candidateState = rs.getString("state");
+                    Double distanceKm = null;
+                    if (searchCoords != null && candidateLocation != null && !candidateLocation.isBlank()
+                            && candidateState != null && !candidateState.isBlank()) {
+                        String cacheKey = candidateLocation.trim().toLowerCase() + "|" + candidateState.trim().toUpperCase();
+                        double[] candCoords = localityCache.computeIfAbsent(cacheKey,
+                                k -> resolveLocality(candidateLocation, candidateState));
+                        if (candCoords != null) {
+                            distanceKm = haversineKm(searchCoords[0], searchCoords[1], candCoords[0], candCoords[1]);
+                        }
+                    }
+
+                    Integer capabilityScore = (Integer) rs.getObject("capability_score");
+                    int score = scoreAgainstFilters(filters, matched.size(),
+                            capabilityScore != null ? capabilityScore : 50,
+                            candidateLocation, distanceKm, rs.getString("current_title"),
+                            rs.getBigDecimal("years_experience"),
+                            rs.getString("seniority_level"),
+                            rs.getBigDecimal("expected_salary_min"),
+                            rs.getBigDecimal("expected_salary_max"),
+                            (Integer) rs.getObject("notice_period_weeks"),
+                            rs.getString("work_rights"),
+                            (Boolean) rs.getObject("remote_flexible"));
+
+                    Long analysisId = (Long) rs.getObject("analysis_id");
+                    String linkedinUrl = rs.getString("linkedin_url");
+                    java.time.OffsetDateTime updatedAt = rs.getObject("updated_at", java.time.OffsetDateTime.class);
+
+                    return CandidateSearchResult.builder()
+                            .candidateId(rs.getString("id"))
+                            .name(rs.getString("name"))
+                            .email(rs.getString("email"))
+                            .phone(rs.getString("phone_number"))
+                            .linkedinUrl(linkedinUrl)
+                            .verified(linkedinUrl != null && !linkedinUrl.isBlank())
+                            .jobId(rs.getString("job_id"))
+                            .jobTitle(rs.getString("job_title"))
+                            .currentTitle(rs.getString("current_title"))
+                            .currentCompany(rs.getString("company"))
+                            .location(rs.getString("location"))
+                            .state(rs.getString("state"))
+                            .distanceKm(distanceKm)
+                            .skills(parseSkillsJson(rs.getString("skills")))
+                            .updatedAt(updatedAt != null ? updatedAt.toInstant() : null)
+                            .yearsExperience(rs.getBigDecimal("years_experience"))
+                            .seniorityLevel(rs.getString("seniority_level"))
+                            .expectedSalaryMin(rs.getBigDecimal("expected_salary_min"))
+                            .expectedSalaryMax(rs.getBigDecimal("expected_salary_max"))
+                            .salaryCurrency(rs.getString("salary_currency"))
+                            .noticePeriodWeeks((Integer) rs.getObject("notice_period_weeks"))
+                            .workRights(rs.getString("work_rights"))
+                            .remoteFlexible((Boolean) rs.getObject("remote_flexible"))
+                            .matchedSkills(matched)
+                            .gapSkills(gaps)
+                            .matchScore(score)
+                            .matchTier(matchTier(score))
+                            .consistencyScore((Integer) rs.getObject("consistency_score"))
+                            .capabilityScore(capabilityScore)
+                            .riskLevel(rs.getString("risk_level"))
+                            .status(analysisId != null ? "Analysed" : "Pending")
+                            .build();
+                }, loginId)
+                .stream()
+                .sorted(Comparator.comparingInt(CandidateSearchResult::matchScore).reversed())
+                .collect(Collectors.toList());
+    }
+
+    private int scoreAgainstFilters(CandidateFilterRequest filters, int matchedSkillCount, int baseScore,
+            String candidateLocation, Double distanceKm, String candidateTitle, BigDecimal candidateYears,
+            String candidateSeniority, BigDecimal candidateSalaryMin, BigDecimal candidateSalaryMax,
+            Integer candidateNoticeWeeks, String candidateWorkRights, Boolean candidateRemoteFlexible) {
+
+        int score = baseScore;
+        List<String> skills = filters.skills() != null ? filters.skills() : List.of();
+        score += skills.isEmpty() ? 0 : matchedSkillCount * 10;
+
+        if (filters.jobTitleKeywords() != null && !filters.jobTitleKeywords().isBlank()
+                && candidateTitle != null && !candidateTitle.isBlank()) {
+            // Title match is a bonus signal only — no penalty if it doesn't match,
+            // since recruiters often search across adjacent/related titles too.
+            if (candidateTitle.toLowerCase().contains(filters.jobTitleKeywords().toLowerCase())
+                    || filters.jobTitleKeywords().toLowerCase().contains(candidateTitle.toLowerCase())) {
+                score += 10;
+            }
+        }
+
+        if (filters.radiusKm() != null && distanceKm != null) {
+            // Real distance available (both locations geocoded) — prefer this over text matching.
+            score += distanceKm <= filters.radiusKm() ? 10 : -10;
+        } else if (filters.location() != null && !filters.location().isBlank()) {
+            if (candidateLocation != null
+                    && candidateLocation.toLowerCase().contains(filters.location().toLowerCase())) {
+                score += 10;
+            } else if (candidateLocation != null) {
+                score -= 5;
+            }
+        }
+
+        if (candidateYears != null && (filters.minYears() != null || filters.maxYears() != null)) {
+            boolean withinRange =
+                    (filters.minYears() == null || candidateYears.compareTo(filters.minYears()) >= 0) &&
+                    (filters.maxYears() == null || candidateYears.compareTo(filters.maxYears()) <= 0);
+            score += withinRange ? 5 : -5;
+        }
+
+        if (filters.seniorityLevel() != null && !filters.seniorityLevel().isBlank() && candidateSeniority != null) {
+            score += candidateSeniority.equalsIgnoreCase(filters.seniorityLevel()) ? 5 : -5;
+        }
+
+        if ((filters.salaryMin() != null || filters.salaryMax() != null)
+                && candidateSalaryMin != null && candidateSalaryMax != null) {
+            boolean overlaps =
+                    (filters.salaryMax() == null || candidateSalaryMin.compareTo(filters.salaryMax()) <= 0) &&
+                    (filters.salaryMin() == null || candidateSalaryMax.compareTo(filters.salaryMin()) >= 0);
+            score += overlaps ? 5 : -10;
+        }
+
+        if (filters.noticePeriodMaxWeeks() != null && candidateNoticeWeeks != null) {
+            score += candidateNoticeWeeks <= filters.noticePeriodMaxWeeks() ? 5 : -5;
+        }
+
+        if (filters.workRights() != null && !filters.workRights().isBlank()
+                && !"any".equalsIgnoreCase(filters.workRights()) && candidateWorkRights != null) {
+            score += candidateWorkRights.equalsIgnoreCase(filters.workRights()) ? 5 : -10;
+        }
+
+        if (Boolean.TRUE.equals(filters.remoteFlexible()) && Boolean.TRUE.equals(candidateRemoteFlexible)) {
+            score += 5;
+        }
+
+        return Math.max(5, Math.min(score, 99));
+    }
+
+    private String matchTier(int score) {
+        if (score >= 85) return "Strong Match";
+        if (score >= 65) return "Hidden Gem";
+        if (score >= 40) return "Needs Review";
+        return "Not Recommended";
+    }
+
+    // ─── Proximity (Location Intelligence radius slider) ──────────────────────
+    // Suburb-level lookup against the GeoNames-derived au_localities reference
+    // table. Matches on suburb + state (checking both state code and full name,
+    // since candidate.state is free text and may contain either form).
+
+    private double[] resolveLocality(String suburb, String state) {
+        if (suburb == null || suburb.isBlank() || state == null || state.isBlank()) return null;
+        return jdbc.query("""
+                select latitude, longitude from au_localities
+                where lower(suburb) = lower(?)
+                  and (upper(state_code) = upper(?) or lower(state_name) = lower(?))
+                limit 1
+                """,
+                (rs, rowNum) -> new double[]{ rs.getDouble("latitude"), rs.getDouble("longitude") },
+                suburb.trim(), state.trim(), state.trim())
+                .stream().findFirst().orElse(null);
+    }
+
+    private double haversineKm(double lat1, double lon1, double lat2, double lon2) {
+        double earthRadiusKm = 6371;
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return earthRadiusKm * c;
+    }
+
+    private List<String> parseSkillsJson(String json) {
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            JsonNode node = objectMapper.readTree(json);
+            List<String> skills = new ArrayList<>();
+            if (node.isArray()) {
+                node.forEach(s -> skills.add(s.asText()));
+            }
+            return skills;
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────

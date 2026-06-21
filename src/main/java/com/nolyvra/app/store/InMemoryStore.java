@@ -16,7 +16,7 @@ public class InMemoryStore {
 
   public JobResponse saveJob(String title, String company, String jobType, String seniority, String jdText, String location, List<String> stackTags, String jobStatus) {
     String id = UUID.randomUUID().toString();
-    JobResponse job = new JobResponse(id, title, company, jobType, seniority, jdText,location,stackTags, Instant.now(), jobStatus);
+    JobResponse job = new JobResponse(id, title, company, jobType, seniority, jdText,location,stackTags, Instant.now(), jobStatus, null, null, null, null);
     jobs.put(id, job);
     return job;
   }
@@ -33,7 +33,8 @@ public class InMemoryStore {
 
   public CandidateResponse saveCandidate(String jobId, String name, String email, String linkedinUrl, String stage, String cvText) {
     String id = UUID.randomUUID().toString();
-    CandidateResponse c = new CandidateResponse(id, jobId, name, email, null, linkedinUrl, Instant.now(), stage, cvText);
+    CandidateResponse c = new CandidateResponse(id, jobId, name, email, null, linkedinUrl, Instant.now(), stage, cvText,
+        null, null, null, null, null, null, null, null, null, null, null, null);
     candidates.put(id, c);
     candidateToJob.put(id, jobId);
     return c;

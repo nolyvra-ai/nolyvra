@@ -4,23 +4,25 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Builder;
 
 import java.math.BigDecimal;
-import java.util.List;
 
+// Used by PUT /api/candidates/{id} (Edit Profile). Distinct from CandidateCreateRequest
+// because job assignment is settable here only when the candidate is currently
+// unassigned — the frontend disables the job field once a candidate has a job.
 @Builder
-public record CandidateCreateRequest(
+public record CandidateUpdateRequest(
 
     @NotBlank
     String name,
 
     String email,
 
+    String phone,
+
     String linkedinUrl,
 
     String cvText,
 
-    String phone,
-
-    List<String> skills,
+    String jobId,
 
     String currentTitle,
 

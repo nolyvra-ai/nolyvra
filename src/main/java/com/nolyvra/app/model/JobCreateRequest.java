@@ -1,6 +1,7 @@
 package com.nolyvra.app.model;
 
 import jakarta.validation.constraints.NotBlank;
+import java.math.BigDecimal;
 import java.util.List;
 
 public record JobCreateRequest(
@@ -11,5 +12,8 @@ public record JobCreateRequest(
     @NotBlank String jdText,
     String location,
     List<String> stackTags,
-    String jobStatus
+    String jobStatus,
+    BigDecimal salary,
+    String currency,
+    BigDecimal feePercentage
 ) {}

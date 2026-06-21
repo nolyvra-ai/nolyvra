@@ -16,6 +16,7 @@ const DANGER = "#DC2626", DANGER_BG = "#FEF2F2", DANGER_BR = "#FECACA";
 const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
 const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
 const SURFACE = "#FAFBFD";
+const CURRENCIES = ["AUD", "USD", "GBP", "EUR", "NZD", "SGD"];
 
 function NewTag() {
   return (
@@ -120,7 +121,10 @@ export default function CreateJobPage() {
   const { checkJobLimit, usage } = usePlanLimit();
   const [limitDialog, setLimitDialog] = useState(false);
 
-  const [form, setForm] = useState({ title: "", company: "", location: "", jobType: "Full-time", jdText: "", jobStatus: "Fulfilling" });
+  const [form, setForm] = useState({
+    title: "", company: "", location: "", jobType: "Full-time", jdText: "", jobStatus: "Fulfilling",
+    salary: "", currency: "AUD", feePercentage: "",
+  });
   const [clientCompanies, setClientCompanies] = useState([]);
   const [briefText, setBriefText] = useState("");
   const [briefResult, setBriefResult] = useState(null);
@@ -162,6 +166,9 @@ export default function CreateJobPage() {
           jobType: job.jobType ?? "Full-time",
           jdText: job.jdText ?? "",
           jobStatus: job.jobStatus ?? "Fulfilling",
+          salary: job.salary ?? "",
+          currency: job.currency ?? "AUD",
+          feePercentage: job.feePercentage ?? "",
         });
         if (job.jdText) setPreviewSkills(extractSkillsFromJd(job.jdText));
       })
@@ -216,6 +223,10 @@ export default function CreateJobPage() {
     if (!form.title || !form.jdText) { setError("Job title and description are required."); return; }
     setSaving(true); setError(null);
     try {
+      const feeFields = {
+        salary: form.salary !== "" ? Number(form.salary) : null,
+        feePercentage: form.feePercentage !== "" ? Number(form.feePercentage) : null,
+      };
       if (isEditMode) {
         const url = new URL(`${API_BASE}/api/jobs/${jobId}`);
         url.searchParams.set("loginId", loginId);
@@ -224,6 +235,7 @@ export default function CreateJobPage() {
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
           body: JSON.stringify({
             ...form,
+            ...feeFields,
             seniority: briefResult?.seniorityLevel || null,
             stackTags: [...new Set([...(briefResult?.extractedSkills || []), ...manualSkills])],
           }),
@@ -237,6 +249,7 @@ export default function CreateJobPage() {
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
           body: JSON.stringify({
             ...form,
+            ...feeFields,
             seniority: briefResult?.seniorityLevel || null,
             stackTags: [...new Set([...(briefResult?.extractedSkills || []), ...manualSkills])],
           }),
@@ -351,6 +364,40 @@ export default function CreateJobPage() {
                   </TextField>
                 </Box>
               </Box>
+
+              {/* Salary / Currency / % Fees / Estimated Fee */}
+              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.75, mt: 1.75 }}>
+                <Box>
+                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT, mb: 0.5 }}>Salary</Typography>
+                  <Box sx={{ display: "flex", gap: 0.75 }}>
+                    <TextField select size="small" value={form.currency}
+                      onChange={e => updateForm("currency", e.target.value)}
+                      sx={{ width: 90, "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}>
+                      {CURRENCIES.map(c => <MenuItem key={c} value={c} sx={{ fontSize: 12 }}>{c}</MenuItem>)}
+                    </TextField>
+                    <TextField fullWidth size="small" type="number" value={form.salary}
+                      onChange={e => updateForm("salary", e.target.value)}
+                      placeholder="e.g. 120000"
+                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }} />
+                  </Box>
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT, mb: 0.5 }}>% Fees</Typography>
+                  <TextField fullWidth size="small" type="number" value={form.feePercentage}
+                    onChange={e => updateForm("feePercentage", e.target.value)}
+                    placeholder="e.g. 15"
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }} />
+                </Box>
+              </Box>
+              {form.salary !== "" && form.feePercentage !== "" && (
+                <Box sx={{ mt: 1.25, fontSize: 12, color: MUTED }}>
+                  Estimated Fee:{" "}
+                  <Box component="span" sx={{ fontWeight: 700, color: SUCCESS }}>
+                    {form.currency} {(Number(form.salary) * Number(form.feePercentage) / 100)
+                      .toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </Box>
+                </Box>
+              )}
 
               {/* Change 3: Job Status dropdown — only visible in edit mode */}
               {isEditMode && (

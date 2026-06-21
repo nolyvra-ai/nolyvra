@@ -1,5 +1,6 @@
 package com.nolyvra.app.model;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -21,7 +22,14 @@ public record ClientResponse(
     int    activeJobCount,
     int    filledJobCount,
     int    totalJobCount,
-    List<JobSummary> recentJobs
+    List<JobSummary> recentJobs,
+    List<FeeTotal> totalFee
 ) {
-    public record JobSummary(String title, int daysOld, String status) {}
+    // Sum of estimated fees from Active/Fulfilling jobs only — broken out per currency,
+    // since fees in different currencies cannot be meaningfully added together.
+    public record FeeTotal(String currency, BigDecimal amount) {}
+
+    public record JobSummary(
+        String title, int daysOld, String status,
+        BigDecimal salary, String currency, BigDecimal feePercentage, BigDecimal estimatedFee) {}
 }

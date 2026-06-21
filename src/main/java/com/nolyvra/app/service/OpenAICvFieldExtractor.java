@@ -9,6 +9,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -46,7 +48,8 @@ public class OpenAICvFieldExtractor implements CvFieldExtractor {
                       "name": "Full name of the candidate or null",
                       "email": "Email address or null",
                       "phone": "Phone number or null",
-                      "linkedinUrl": "LinkedIn profile URL or null"
+                      "linkedinUrl": "LinkedIn profile URL or null",
+                      "skills": ["up to 15 core technical/professional skills, ordered by relevance"]
                     }
 
                     CV TEXT:
@@ -63,14 +66,21 @@ public class OpenAICvFieldExtractor implements CvFieldExtractor {
                     .choices().getFirst().message().content().orElse("{}");
 
             var root = objectMapper.readTree(cleanJson(content));
+            List<String> skills = new ArrayList<>();
+            if (root.path("skills").isArray()) {
+                root.path("skills").forEach(s -> {
+                    if (!s.asText("").isBlank()) skills.add(s.asText());
+                });
+            }
             return Map.of(
                     "name", root.path("name").isNull() ? "" : root.path("name").asText(""),
                     "email", root.path("email").isNull() ? "" : root.path("email").asText(""),
                     "phone", root.path("phone").isNull() ? "" : root.path("phone").asText(""),
-                    "linkedinUrl", root.path("linkedinUrl").isNull() ? "" : root.path("linkedinUrl").asText(""));
+                    "linkedinUrl", root.path("linkedinUrl").isNull() ? "" : root.path("linkedinUrl").asText(""),
+                    "skills", skills);
         } catch (Exception e) {
             System.err.println("[CvExtract] Field extraction failed: " + e.getMessage());
-            return Map.of("name", "", "email", "", "phone", "", "linkedinUrl", "");
+            return Map.of("name", "", "email", "", "phone", "", "linkedinUrl", "", "skills", List.of());
         }
     }
 

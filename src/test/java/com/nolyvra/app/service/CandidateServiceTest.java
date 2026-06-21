@@ -1,5 +1,6 @@
 package com.nolyvra.app.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nolyvra.app.model.CandidateListItemResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,7 +17,7 @@ import static org.mockito.Mockito.*;
 class CandidateServiceTest {
 
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
-    private final CandidateService service = new CandidateService(jdbc);
+    private final CandidateService service = new CandidateService(jdbc, new ObjectMapper());
 
     @Test
     void getCandidateListUsesLightweightQueryAndMapsLatestAnalysis() {

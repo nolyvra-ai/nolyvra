@@ -19,6 +19,8 @@ const ACCENT_L  = "#EFF6FF";
 const ACCENT_BR = "#BFDBFE";
 const PURPLE_L  = "#F5F3FF";
 const PURPLE_BR = "#C4B5FD";
+const SUCCESS   = "#16A34A";
+const CURRENCIES = ["AUD", "USD", "GBP", "EUR", "NZD", "SGD"];
 
 const TITLE_SUGGESTIONS = [
   "Software Engineer", "Senior Software Engineer", "Product Manager",
@@ -322,6 +324,7 @@ export default function CreateJobPageModern() {
   const [form, setForm] = useState({
     title: "", company: "", location: "",
     jobType: "Full-time", jobStatus: "Active",
+    salary: "", currency: "AUD", feePercentage: "",
   });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -425,6 +428,9 @@ export default function CreateJobPageModern() {
           location:  form.location,
           jobType:   form.jobType,
           jobStatus: form.jobStatus,
+          salary:    form.salary !== "" ? Number(form.salary) : null,
+          currency:  form.currency,
+          feePercentage: form.feePercentage !== "" ? Number(form.feePercentage) : null,
           jdText:    editedJD,
           seniority: aiResponse?.seniorityLevel || null,
           stackTags: [...new Set([
@@ -821,6 +827,36 @@ export default function CreateJobPageModern() {
                 ))}
               </TextField>
             </Box>
+            <Box>
+              <FieldLabel>Salary</FieldLabel>
+              <Box sx={{ display: "flex", gap: 0.75 }}>
+                <TextField select size="small" value={form.currency}
+                  onChange={e => setForm(p => ({ ...p, currency: e.target.value }))}
+                  sx={{ width: 100, ...fieldSx }}>
+                  {CURRENCIES.map(c => <MenuItem key={c} value={c} sx={{ fontSize: 13 }}>{c}</MenuItem>)}
+                </TextField>
+                <TextField fullWidth size="small" type="number" value={form.salary}
+                  onChange={e => setForm(p => ({ ...p, salary: e.target.value }))}
+                  placeholder="e.g. 120000"
+                  sx={fieldSx} />
+              </Box>
+            </Box>
+            <Box>
+              <FieldLabel>% Fees</FieldLabel>
+              <TextField fullWidth size="small" type="number" value={form.feePercentage}
+                onChange={e => setForm(p => ({ ...p, feePercentage: e.target.value }))}
+                placeholder="e.g. 15"
+                sx={fieldSx} />
+            </Box>
+            {form.salary !== "" && form.feePercentage !== "" && (
+              <Box sx={{ display: "flex", alignItems: "flex-end", fontSize: 13, color: MUTED }}>
+                Estimated Fee:{" "}
+                <Box component="span" sx={{ fontWeight: 700, color: SUCCESS, ml: 0.5 }}>
+                  {form.currency} {(Number(form.salary) * Number(form.feePercentage) / 100)
+                    .toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </Box>
+              </Box>
+            )}
           </Box>
 
           {/* Collapsible JD preview */}

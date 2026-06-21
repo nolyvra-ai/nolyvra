@@ -17,6 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.*;
 
@@ -73,6 +75,7 @@ public class ClientService {
         return jdbc.query(sql, (rs, i) -> {
             String companyName = rs.getString("company_name");
             List<ClientResponse.JobSummary> recentJobs = getClientJobs(companyName, loginId);
+            List<ClientResponse.FeeTotal> totalFee = getClientFeeTotals(companyName, loginId);
             var ts = rs.getTimestamp("created_at");
             return new ClientResponse(
                     rs.getLong("id"),
@@ -92,24 +95,74 @@ public class ClientService {
                     rs.getInt("active_job_count"),
                     rs.getInt("filled_job_count"),
                     rs.getInt("total_job_count"),
-                    recentJobs);
+                    recentJobs,
+                    totalFee);
         }, loginId);
     }
 
-    // ─── Helper: fetch up to 5 recent jobs (title + age + status) for a company
+    // ─── Helper: fetch up to 5 Active/Fulfilling jobs (title + age + status + fee) for a company
 
     public List<ClientResponse.JobSummary> getClientJobs(String companyName, String loginId) {
         return jdbc.query("""
-                SELECT title, status,
+                SELECT title, status, salary, currency, fee_percentage,
                        EXTRACT(DAY FROM now() - created_at)::int AS days_old
                 FROM jobs
                 WHERE login_id = ? AND lower(company) = lower(?)
+                  AND lower(status) IN ('active', 'fulfilling')
                 ORDER BY created_at DESC LIMIT 5
                 """,
-                (rs, i) -> new ClientResponse.JobSummary(
-                        rs.getString("title"),
-                        rs.getInt("days_old"),
-                        rs.getString("status")),
+                (rs, i) -> mapJobSummary(rs),
+                loginId, companyName);
+    }
+
+    // ─── Helper: full (uncapped) job list for a company — used by the client detail view
+
+    public List<ClientResponse.JobSummary> getAllClientJobs(String companyName, String loginId) {
+        return jdbc.query("""
+                SELECT title, status, salary, currency, fee_percentage,
+                       EXTRACT(DAY FROM now() - created_at)::int AS days_old
+                FROM jobs
+                WHERE login_id = ? AND lower(company) = lower(?)
+                ORDER BY created_at DESC
+                """,
+                (rs, i) -> mapJobSummary(rs),
+                loginId, companyName);
+    }
+
+    private ClientResponse.JobSummary mapJobSummary(java.sql.ResultSet rs) throws java.sql.SQLException {
+        BigDecimal salary = rs.getBigDecimal("salary");
+        BigDecimal feePercentage = rs.getBigDecimal("fee_percentage");
+        return new ClientResponse.JobSummary(
+                rs.getString("title"),
+                rs.getInt("days_old"),
+                rs.getString("status"),
+                salary,
+                rs.getString("currency"),
+                feePercentage,
+                computeEstimatedFee(salary, feePercentage));
+    }
+
+    private static BigDecimal computeEstimatedFee(BigDecimal salary, BigDecimal feePercentage) {
+        if (salary == null || feePercentage == null) return null;
+        return salary.multiply(feePercentage)
+                .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+    }
+
+    // ─── Helper: total estimated fee across Active/Fulfilling jobs, grouped by currency ──
+
+    public List<ClientResponse.FeeTotal> getClientFeeTotals(String companyName, String loginId) {
+        return jdbc.query("""
+                SELECT currency, SUM(salary * fee_percentage / 100) AS total
+                FROM jobs
+                WHERE login_id = ? AND lower(company) = lower(?)
+                  AND lower(status) IN ('active', 'fulfilling')
+                  AND salary IS NOT NULL AND fee_percentage IS NOT NULL
+                GROUP BY currency
+                ORDER BY currency
+                """,
+                (rs, i) -> new ClientResponse.FeeTotal(
+                        rs.getString("currency"),
+                        rs.getBigDecimal("total").setScale(2, RoundingMode.HALF_UP)),
                 loginId, companyName);
     }
 
@@ -146,6 +199,7 @@ public class ClientService {
         return jdbc.query(sql, (rs, i) -> {
             String companyName = rs.getString("company_name");
             List<ClientResponse.JobSummary> recentJobs = getClientJobs(companyName, loginId);
+            List<ClientResponse.FeeTotal> totalFee = getClientFeeTotals(companyName, loginId);
             var ts = rs.getTimestamp("created_at");
             return new ClientResponse(
                     rs.getLong("id"), rs.getString("login_id"), companyName,
@@ -155,7 +209,7 @@ public class ClientService {
                     rs.getString("last_funding_event"), rs.getString("last_funding_amount"),
                     ts != null ? ts.toInstant() : null,
                     rs.getInt("active_job_count"), rs.getInt("filled_job_count"), rs.getInt("total_job_count"),
-                    recentJobs);
+                    recentJobs, totalFee);
         }, id, loginId).stream().findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found"));
     }
@@ -178,7 +232,19 @@ public class ClientService {
                 id != null ? id : 0L, loginId, req.companyName(), req.industry(),
                 req.companySize(), req.location(), req.contactPerson(), req.contactEmail(),
                 req.contactTitle(), req.linkedinUrl(), req.notes(),
-                null, null, Instant.now(), 0, 0, 0, List.of());
+                null, null, Instant.now(), 0, 0, 0, List.of(), List.of());
+    }
+
+    // ─── GET /api/clients/{id}/jobs ────────────────────────────────────────────
+    // Full, uncapped job list with fees for a single client — used by the client detail view.
+
+    public List<ClientResponse.JobSummary> getClientJobsById(Long clientId, String loginId) {
+        String companyName = jdbc.query(
+                "SELECT company_name FROM clients WHERE id = ? AND login_id = ?",
+                (rs, i) -> rs.getString("company_name"), clientId, loginId)
+                .stream().findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found"));
+        return getAllClientJobs(companyName, loginId);
     }
 
     // ─── GET /api/clients/potential ───────────────────────────────────────────

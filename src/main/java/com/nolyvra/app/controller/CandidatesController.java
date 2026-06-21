@@ -3,11 +3,15 @@ package com.nolyvra.app.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nolyvra.app.model.CandidateCreateRequest;
+import com.nolyvra.app.model.CandidateFilterRequest;
 import com.nolyvra.app.model.CandidateListItemResponse;
 import com.nolyvra.app.model.CandidateResponse;
+import com.nolyvra.app.model.CandidateSearchResult;
+import com.nolyvra.app.model.CandidateUpdateRequest;
 import com.nolyvra.app.model.StageUpdateRequest;
 import com.nolyvra.app.service.CandidateService;
 import com.nolyvra.app.service.InterviewQuestionsService;
+import com.nolyvra.app.service.TalentSearchService;
 import com.nolyvra.app.service.WorkflowService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -28,15 +32,18 @@ public class CandidatesController {
     private final CandidateService candidateService;
     private final WorkflowService workflowService;
     private final InterviewQuestionsService interviewQuestionsService;
+    private final TalentSearchService talentSearchService;
     private final ObjectMapper objectMapper;
 
     public CandidatesController(CandidateService candidateService,
                                 WorkflowService workflowService,
                                 InterviewQuestionsService interviewQuestionsService,
+                                TalentSearchService talentSearchService,
                                 ObjectMapper objectMapper) {
         this.candidateService          = candidateService;
         this.workflowService           = workflowService;
         this.interviewQuestionsService = interviewQuestionsService;
+        this.talentSearchService       = talentSearchService;
         this.objectMapper              = objectMapper;
     }
 
@@ -75,6 +82,21 @@ public class CandidatesController {
         return Map.of("count", candidateService.getActiveCandidateCount(loginId));
     }
 
+    // ── Edit Profile: update an existing candidate's core fields ─────────────
+    @PutMapping("/candidates/{candidateId}")
+    public CandidateResponse updateCandidate(
+            @PathVariable String candidateId,
+            @RequestParam String loginId,
+            @Valid @RequestBody CandidateUpdateRequest req) {
+        try {
+            return candidateService.updateCandidate(candidateId, req, loginId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "Candidate not found: " + candidateId));
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        }
+    }
+
     @GetMapping("/candidates/{candidateId}")
     public CandidateResponse getCandidate(
             @PathVariable String candidateId,
@@ -100,6 +122,15 @@ public class CandidatesController {
     @GetMapping("/candidates/list")
     public List<CandidateListItemResponse> getCandidateList(@RequestParam String loginId) {
         return candidateService.getCandidateList(loginId);
+    }
+
+    // ── Smart Talent Lens: structured filter search over internal candidates ──
+    // Rule-based match scoring only — no OpenAI call, no token deduction.
+    @PostMapping("/candidates/search")
+    public List<CandidateSearchResult> searchCandidates(
+            @RequestParam String loginId,
+            @RequestBody CandidateFilterRequest filters) {
+        return talentSearchService.scoreInternalCandidates(filters, loginId);
     }
 
     // ── Bulk upload candidates from CSV (Excel requires conversion to CSV) ───
@@ -147,12 +178,12 @@ public class CandidatesController {
                 if (name == null || name.isBlank()) continue;
                 try {
                     candidateService.addCandidateUnassigned(
-                            new CandidateCreateRequest(
-                                    name,
-                                    col(cols, emailIdx),
-                                    col(cols, linkedinIdx),
-                                    null,
-                                    col(cols, phoneIdx)),
+                            CandidateCreateRequest.builder()
+                                    .name(name)
+                                    .email(col(cols, emailIdx))
+                                    .linkedinUrl(col(cols, linkedinIdx))
+                                    .phone(col(cols, phoneIdx))
+                                    .build(),
                             loginId);
                     imported++;
                 } catch (IllegalStateException ignored) {

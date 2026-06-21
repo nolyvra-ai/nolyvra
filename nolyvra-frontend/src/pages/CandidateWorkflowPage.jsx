@@ -515,6 +515,11 @@ export default function CandidateWorkflowPage() {
           <Card>
             <CardHead title="Actions" />
             <Box sx={{p:1.75,display:"flex",flexDirection:"column",gap:1}}>
+              <Button fullWidth variant="outlined" size="small"
+                onClick={() => nav("/candidates/new", { state: { prefill: { candidateId } } })}
+                sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none",justifyContent:"flex-start"}}>
+                ✎ Edit Profile
+              </Button>
               <Button fullWidth variant="outlined" size="small" onClick={() => nav("/email")}
                 sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none",justifyContent:"flex-start"}}>
                 ✉ Send Email

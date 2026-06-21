@@ -1,5 +1,6 @@
 package com.nolyvra.app.model;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -13,5 +14,9 @@ public record JobResponse(
     String location,
     List<String> stackTags,
     Instant createdAt,
-    String status
+    String status,
+    BigDecimal salary,
+    String currency,
+    BigDecimal feePercentage,
+    BigDecimal estimatedFee
 ) {}

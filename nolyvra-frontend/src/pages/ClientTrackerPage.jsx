@@ -173,15 +173,26 @@ function DetailRow({ label, value, valueColor = TEXT }) {
   );
 }
 
+// ─── Format a list of { currency, amount } fee totals into a display string ──
+function formatFeeTotals(totals) {
+  if (!totals || totals.length === 0) return null;
+  return totals
+    .map(t => `${t.currency} ${Number(t.amount).toLocaleString(undefined, { maximumFractionDigits: 2 })}`)
+    .join("  +  ");
+}
+
 // ─── Client row ───────────────────────────────────────────────────────────────
-function ClientRow({ client, onEdit }) {
+function ClientRow({ client, onEdit, onSelect }) {
+  const feeLabel = formatFeeTotals(client.totalFee);
   return (
-    <Box sx={{
+    <Box onClick={() => onSelect(client)} sx={{
       display: "grid",
-      gridTemplateColumns: "2fr 1.5fr 1fr 2fr 1fr",
+      gridTemplateColumns: "2fr 1.5fr 1fr 1.2fr 2fr 1fr",
       alignItems: "center",
       px: "16px", py: "12px",
       borderBottom: `1px solid ${BORDER}`,
+      cursor: "pointer",
+      "&:hover": { bgcolor: "#FAFBFD" },
     }}>
       <Box>
         <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{client.companyName}</Box>
@@ -204,8 +215,13 @@ function ClientRow({ client, onEdit }) {
         )}
       </Box>
       <Box>
+        {feeLabel
+          ? <Box sx={{ fontSize: 13, fontWeight: 700, color: SUCCESS }}>{feeLabel}</Box>
+          : <Box sx={{ fontSize: 12, color: MUTED }}>—</Box>}
+      </Box>
+      <Box>
         {client.recentJobs?.length > 0 ? (
-          client.recentJobs.slice(0, 2).map((job, i) => (
+          client.recentJobs.map((job, i) => (
             <Box key={i} sx={{ display: "flex", alignItems: "center", gap: "6px", mb: "3px" }}>
               <Box sx={{ fontSize: 12, color: TEXT, fontWeight: 500, flexShrink: 0 }}>{job.title}</Box>
               <Box sx={{ fontSize: 11, color: MUTED, flexShrink: 0 }}>· {job.daysOld}d</Box>
@@ -213,10 +229,7 @@ function ClientRow({ client, onEdit }) {
             </Box>
           ))
         ) : (
-          <Box sx={{ fontSize: 12, color: MUTED }}>No jobs</Box>
-        )}
-        {client.recentJobs?.length > 2 && (
-          <Box sx={{ fontSize: 11, color: MUTED }}>+{client.recentJobs.length - 2} more</Box>
+          <Box sx={{ fontSize: 12, color: MUTED }}>No active or fulfilling jobs</Box>
         )}
       </Box>
       <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
@@ -230,6 +243,94 @@ function ClientRow({ client, onEdit }) {
         </Box>
       </Box>
     </Box>
+  );
+}
+
+// ─── Client job detail dialog — full job list + individual fee, on row select ──
+function ClientJobsDialog({ client, onClose }) {
+  const [jobs, setJobs]       = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr]         = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    apiGet(`/api/clients/${client.id}/jobs`)
+      .then(data => { if (!cancelled) setJobs(data || []); })
+      .catch(e => { if (!cancelled) setErr(e.message || "Failed to load jobs."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [client.id]);
+
+  const totalLabel = formatFeeTotals(client.totalFee);
+
+  return (
+    <Dialog open onClose={onClose} maxWidth="sm" fullWidth
+      PaperProps={{ sx: { borderRadius: "16px", overflow: "hidden", m: "24px" } }}>
+      <DialogContent sx={{ p: 0 }}>
+        <Box sx={{ px: "24px", pt: "20px", pb: "14px", borderBottom: `1px solid ${BORDER}`,
+          display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <Box>
+            <Box sx={{ fontSize: 17, fontWeight: 700, color: TEXT }}>{client.companyName}</Box>
+            <Box sx={{ fontSize: 12, color: MUTED, mt: "4px" }}>
+              {jobs.length} job{jobs.length !== 1 ? "s" : ""}
+              {totalLabel && (
+                <>
+                  {" · "}Total Fee (Active/Fulfilling):{" "}
+                  <Box component="span" sx={{ color: SUCCESS, fontWeight: 700 }}>{totalLabel}</Box>
+                </>
+              )}
+            </Box>
+          </Box>
+          <Box onClick={onClose} sx={{ cursor: "pointer", color: MUTED, lineHeight: 0,
+            "&:hover": { color: TEXT }, transition: "color .12s" }}>
+            <CloseIcon />
+          </Box>
+        </Box>
+
+        <Box sx={{ px: "24px", py: "16px", maxHeight: "60vh", overflowY: "auto" }}>
+          {loading && (
+            <Box sx={{ display: "flex", justifyContent: "center", py: "32px" }}>
+              <CircularProgress size={24} sx={{ color: ACCENT }} />
+            </Box>
+          )}
+          {!loading && err && (
+            <Box sx={{ fontSize: 13, color: "#DC2626" }}>{err}</Box>
+          )}
+          {!loading && !err && jobs.length === 0 && (
+            <Box sx={{ fontSize: 13, color: MUTED, textAlign: "center", py: "24px" }}>
+              No jobs for this client yet.
+            </Box>
+          )}
+          {!loading && !err && jobs.map((job, i) => (
+            <Box key={i} sx={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              py: "10px", borderBottom: i < jobs.length - 1 ? `1px solid ${BORDER}` : "none",
+            }}>
+              <Box>
+                <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{job.title}</Box>
+                  <JobStatusTag status={job.status} />
+                </Box>
+                <Box sx={{ fontSize: 11, color: MUTED, mt: "2px" }}>
+                  {job.salary != null ? `${job.currency} ${Number(job.salary).toLocaleString()}` : "No salary set"}
+                  {job.feePercentage != null ? ` · ${job.feePercentage}% fee` : ""}
+                  {` · ${job.daysOld}d`}
+                </Box>
+              </Box>
+              <Box sx={{
+                fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
+                color: job.estimatedFee != null ? SUCCESS : MUTED,
+              }}>
+                {job.estimatedFee != null
+                  ? `${job.currency} ${Number(job.estimatedFee).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                  : "—"}
+              </Box>
+            </Box>
+          ))}
+        </Box>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -617,6 +718,7 @@ export default function ClientTrackerPage() {
   const [searchKeyword,     setSearchKeyword]     = useState("");
   const [detailCard,        setDetailCard]        = useState(null);
   const [addFromPotential,  setAddFromPotential]  = useState(null);
+  const [selectedClient,    setSelectedClient]    = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -678,6 +780,18 @@ export default function ClientTrackerPage() {
   const totalFilled = clients.reduce((s, c) => s + c.filledJobCount, 0);
   const hasFilters  = searchIndustry || searchCountry || searchSize || searchKeyword;
 
+  // Total fee across all clients (Active/Fulfilling jobs only), grouped by currency —
+  // amounts in different currencies cannot be added together meaningfully.
+  const totalFeeByCurrency = clients.reduce((acc, c) => {
+    (c.totalFee || []).forEach(({ currency, amount }) => {
+      acc[currency] = (acc[currency] || 0) + Number(amount);
+    });
+    return acc;
+  }, {});
+  const totalFeeLabel = formatFeeTotals(
+    Object.entries(totalFeeByCurrency).map(([currency, amount]) => ({ currency, amount }))
+  );
+
   function handleSaved(savedClient) {
     setClients(prev => {
       const exists = prev.some(c => c.id === savedClient.id);
@@ -729,13 +843,15 @@ export default function ClientTrackerPage() {
       </Box>
 
       {/* KPI strip */}
-      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "14px", mb: "20px" }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "14px", mb: "20px" }}>
         <KpiCard label="Total Clients" value={clients.length} color={ACCENT} bg={ACCENT_L}
           icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>} />
         <KpiCard label="Active Mandates" value={totalActive} color={SUCCESS} bg={SUCCESS_L}
           icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>} />
         <KpiCard label="Placements" value={totalFilled} color={PURPLE} bg={PURPLE_L}
           icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>} />
+        <KpiCard label="Total Fee (Active/Fulfilling)" value={totalFeeLabel || "—"} color={SUCCESS} bg={SUCCESS_L}
+          icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>} />
         <KpiCard label="Potential Clients" value={potentialSearched ? potential.length : "—"} color={WARN} bg={WARN_L}
           icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>} />
       </Box>
@@ -784,13 +900,13 @@ export default function ClientTrackerPage() {
             </Box>
 
             <Box sx={{
-              display: "grid", gridTemplateColumns: "2fr 1.5fr 1fr 2fr 1fr",
+              display: "grid", gridTemplateColumns: "2fr 1.5fr 1fr 1.2fr 2fr 1fr",
               px: "16px", py: "8px", borderBottom: `1px solid ${BORDER}`, bgcolor: "#F8FAFC",
             }}>
-              {["Client", "Contact", "Active Jobs", "Job Details", ""].map((h, i) => (
+              {["Client", "Contact", "Active Jobs", "Total Fee", "Job Details", ""].map((h, i) => (
                 <Box key={i} sx={{ fontSize: 11, fontWeight: 600, color: MUTED,
                   textTransform: "uppercase", letterSpacing: ".5px",
-                  textAlign: i === 4 ? "right" : "left" }}>
+                  textAlign: i === 5 ? "right" : "left" }}>
                   {h}
                 </Box>
               ))}
@@ -803,7 +919,7 @@ export default function ClientTrackerPage() {
                 </Box>
               </Box>
             ) : (
-              filtered.map(c => <ClientRow key={c.id} client={c} onEdit={setEditingClient} />)
+              filtered.map(c => <ClientRow key={c.id} client={c} onEdit={setEditingClient} onSelect={setSelectedClient} />)
             )}
           </Box>
 
@@ -937,6 +1053,9 @@ export default function ClientTrackerPage() {
         onSaved={(saved) => { handleSaved(saved); setAddFromPotential(null); }}
         initialData={addFromPotential}
       />
+      {selectedClient && (
+        <ClientJobsDialog client={selectedClient} onClose={() => setSelectedClient(null)} />
+      )}
     </Box>
   );
 }

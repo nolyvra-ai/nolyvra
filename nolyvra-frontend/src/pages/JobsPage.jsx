@@ -33,6 +33,7 @@ const SUCCESS = "#16A34A", SUCCESS_BG = "#F0FDF4", SUCCESS_BR = "#BBF7D0";
 const WARN = "#D97706", WARN_BG = "#FFFBEB", WARN_BR = "#FDE68A";
 const DANGER = "#DC2626", DANGER_BG = "#FEF2F2", DANGER_BR = "#FECACA";
 const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
+const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
 const NEUTRAL_BG = "#F1F3F7", SURFACE = "#FAFBFD", SELECTED_BG = "#EBF2FF";
 
 const thSx = {
@@ -224,6 +225,74 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
   );
 }
 
+// ─── Suitable Candidate card (internal DB match) ───────────────────────────────
+function SuitableCandidateCard({ c, onView }) {
+  const tierColor = c.matchTier === "Strong Match" ? SUCCESS
+    : c.matchTier === "Hidden Gem" ? PURPLE
+    : c.matchTier === "Needs Review" ? WARN : DANGER;
+  return (
+    <Box onClick={onView} sx={{
+      display: "flex", alignItems: "center", gap: 1.25, p: "10px 14px",
+      border: `1px solid ${BORDER}`, borderLeft: `3px solid ${tierColor}`, borderRadius: "8px",
+      bgcolor: "#fff", cursor: "pointer", "&:hover": { boxShadow: "0 2px 8px rgba(0,0,0,0.08)" },
+    }}>
+      <Box sx={{ width: 30, height: 30, borderRadius: "50%", bgcolor: ACCENT, color: "#fff", display: "flex",
+        alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+        {(c.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
+      </Box>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: TEXT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {c.name}
+        </Typography>
+        <Typography sx={{ fontSize: 11, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {[c.currentTitle, c.location].filter(Boolean).join(" · ") || "—"}
+        </Typography>
+      </Box>
+      <Box sx={{ textAlign: "right", flexShrink: 0 }}>
+        <Typography sx={{ fontSize: 13, fontWeight: 700, color: tierColor }}>{c.matchScore}%</Typography>
+        <Typography sx={{ fontSize: 9.5, color: MUTED }}>{c.matchTier}</Typography>
+      </Box>
+    </Box>
+  );
+}
+
+// ─── External Candidate card (CoreSignal match) ────────────────────────────────
+function ExternalCandidateCard({ c }) {
+  return (
+    <Box sx={{
+      display: "flex", alignItems: "center", gap: 1.25, p: "10px 14px",
+      border: `1px solid ${PURPLE_BR}`, borderLeft: `3px solid ${PURPLE}`, borderRadius: "8px", bgcolor: "#fff",
+    }}>
+      <Box sx={{ width: 30, height: 30, borderRadius: "50%", bgcolor: PURPLE, color: "#fff", display: "flex",
+        alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
+        {(c.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
+      </Box>
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: TEXT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {c.name}
+        </Typography>
+        <Typography sx={{ fontSize: 11, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {[c.currentTitle, c.currentCompany].filter(Boolean).join(" at ") || "—"}
+        </Typography>
+        {c.matchedSkills?.length > 0 && (
+          <Typography sx={{ fontSize: 10.5, color: SUCCESS, mt: 0.25 }}>
+            Matches: {c.matchedSkills.join(", ")}
+          </Typography>
+        )}
+      </Box>
+      <Box sx={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5 }}>
+        <Typography sx={{ fontSize: 13, fontWeight: 700, color: PURPLE }}>{c.matchScore}%</Typography>
+        {c.linkedinUrl && (
+          <Typography component="a" href={c.linkedinUrl} target="_blank" rel="noreferrer"
+            sx={{ fontSize: 10.5, color: ACCENT, textDecoration: "none", "&:hover": { textDecoration: "underline" } }}>
+            LinkedIn ↗
+          </Typography>
+        )}
+      </Box>
+    </Box>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function JobsPage() {
   const nav = useNavigate();
@@ -237,6 +306,51 @@ export default function JobsPage() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [analysisDialog, setAnalysisDialog] = useState(false); // Change 4
   // ── Removed: editJob, editOpen state — no longer needed ──────────────────
+
+  // ── Suitable / External candidates (per selected job) ────────────────────
+  const [suitableCandidates, setSuitableCandidates] = useState([]);
+  const [suitableLoading, setSuitableLoading]       = useState(false);
+  const [suitableError, setSuitableError]           = useState("");
+  const [suitableFetched, setSuitableFetched]       = useState(false);
+
+  const [externalCandidates, setExternalCandidates] = useState([]);
+  const [externalLoading, setExternalLoading]       = useState(false);
+  const [externalError, setExternalError]           = useState("");
+  const [externalFetched, setExternalFetched]       = useState(false);
+
+  useEffect(() => {
+    // Switching jobs invalidates any previous find/search results
+    setSuitableCandidates([]); setSuitableFetched(false); setSuitableError("");
+    setExternalCandidates([]); setExternalFetched(false); setExternalError("");
+  }, [selectedJobId]);
+
+  async function handleFindSuitableCandidates() {
+    if (!selectedJobId) return;
+    setSuitableLoading(true); setSuitableError("");
+    try {
+      const data = await apiGet(`/api/jobs/${selectedJobId}/suitable-candidates`);
+      setSuitableCandidates(data ?? []);
+      setSuitableFetched(true);
+    } catch (e) {
+      setSuitableError(e?.message || "Failed to find candidates");
+    } finally {
+      setSuitableLoading(false);
+    }
+  }
+
+  async function handleSearchExternalCandidates() {
+    if (!selectedJobId) return;
+    setExternalLoading(true); setExternalError("");
+    try {
+      const data = await apiGet(`/api/jobs/${selectedJobId}/external-candidates`);
+      setExternalCandidates(data ?? []);
+      setExternalFetched(true);
+    } catch (e) {
+      setExternalError(e?.message || "Failed to search external candidates");
+    } finally {
+      setExternalLoading(false);
+    }
+  }
 
   // ── Data loading ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -470,13 +584,14 @@ export default function JobsPage() {
                 <TableCell sx={thSx}>Avg. Match</TableCell>
                 <TableCell sx={thSx}>Status</TableCell>
                 <TableCell sx={thSx}>Created</TableCell>
+                <TableCell sx={thSx}>Est. Fee</TableCell>
                 <TableCell sx={{ ...thSx, textAlign: "right" }} />
               </TableRow>
             </TableHead>
             <TableBody>
               {!loading && visibleJobs.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={10} sx={{ textAlign: "center", py: 5, color: MUTED, fontSize: 13 }}>
+                  <TableCell colSpan={11} sx={{ textAlign: "center", py: 5, color: MUTED, fontSize: 13 }}>
                     No jobs found
                   </TableCell>
                 </TableRow>
@@ -539,20 +654,17 @@ export default function JobsPage() {
                           { day: "numeric", month: "short", year: "numeric" })
                         : "—"}
                     </TableCell>
+                    <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}`, whiteSpace: "nowrap" }}>
+                      {job.estimatedFee != null
+                        ? <Typography sx={{ fontSize: 13, fontWeight: 700, color: SUCCESS }}>
+                            {job.currency} {Number(job.estimatedFee).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                          </Typography>
+                        : <Typography sx={{ fontSize: 12, color: MUTED }}>—</Typography>}
+                    </TableCell>
 
                     <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}`, textAlign: "right" }}
                       onClick={e => e.stopPropagation()}>
                       <Box sx={{ display: "flex", gap: 0.75, justifyContent: "flex-end" }}>
-                        <Button size="small" variant="contained"
-                          startIcon={<AddIcon sx={{ fontSize: 12 }} />}
-                          onClick={() => nav("/candidates/new")}
-                          sx={{
-                            fontSize: 11, fontWeight: 500, bgcolor: ACCENT,
-                            borderRadius: "6px", textTransform: "none", boxShadow: "none",
-                            "&:hover": { bgcolor: "#1660CC", boxShadow: "none" }
-                          }}>
-                          Candidate
-                        </Button>
                         {/* ── Edit now navigates to edit page with job prepopulated ── */}
                         <Button size="small" variant="outlined"
                           onClick={e => { e.stopPropagation(); nav(`/jobs/${job.id}/edit`); }}
@@ -621,6 +733,104 @@ export default function JobsPage() {
               onRemoveCandidate={handleRemoveCandidate}
               onAnalysisStarted={() => setAnalysisDialog(true)}
             />
+          </Paper>
+        )}
+
+        {/* Suitable Candidates from Database */}
+        {selectedJob && (
+          <Paper elevation={0} sx={{
+            border: `1px solid ${BORDER}`, borderRadius: "10px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.05)", overflow: "hidden", mb: 1.75
+          }}>
+            <Box sx={{
+              px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`, bgcolor: "#F7F9FF",
+              display: "flex", alignItems: "center", justifyContent: "space-between"
+            }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Box sx={{ width: 3, height: 18, bgcolor: ACCENT, borderRadius: "2px", flexShrink: 0 }} />
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
+                  Suitable Candidates from Database
+                </Typography>
+              </Box>
+              <Button size="small" variant="contained" onClick={handleFindSuitableCandidates} disabled={suitableLoading}
+                sx={{
+                  fontSize: 11, fontWeight: 500, bgcolor: ACCENT, borderRadius: "6px",
+                  textTransform: "none", boxShadow: "none",
+                  "&:hover": { bgcolor: "#1660CC", boxShadow: "none" }
+                }}>
+                {suitableLoading ? "Searching…" : "Find Candidate"}
+              </Button>
+            </Box>
+            <Box sx={{ p: 2.25 }}>
+              {suitableError && <Alert severity="error" sx={{ mb: 1.5 }}>{suitableError}</Alert>}
+              {!suitableFetched && !suitableLoading && (
+                <Typography sx={{ fontSize: 12.5, color: MUTED, textAlign: "center", py: 1.5 }}>
+                  Click "Find Candidate" to match top candidates in your database against this job's title, skills and location.
+                </Typography>
+              )}
+              {suitableFetched && !suitableLoading && suitableCandidates.length === 0 && !suitableError && (
+                <Typography sx={{ fontSize: 12.5, color: MUTED, textAlign: "center", py: 1.5 }}>
+                  No matching candidates found in your database.
+                </Typography>
+              )}
+              {suitableCandidates.length > 0 && (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  {suitableCandidates.map(c => (
+                    <SuitableCandidateCard key={c.candidateId} c={c}
+                      onView={() => nav(`/candidates/${c.candidateId}/workflow`)} />
+                  ))}
+                </Box>
+              )}
+            </Box>
+          </Paper>
+        )}
+
+        {/* Search External Candidates (CoreSignal) */}
+        {selectedJob && (
+          <Paper elevation={0} sx={{
+            border: `1px solid ${BORDER}`, borderRadius: "10px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.05)", overflow: "hidden", mb: 1.75
+          }}>
+            <Box sx={{
+              px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`, bgcolor: "#FAF8FF",
+              display: "flex", alignItems: "center", justifyContent: "space-between"
+            }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Box sx={{ width: 3, height: 18, bgcolor: PURPLE, borderRadius: "2px", flexShrink: 0 }} />
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
+                  Search External Candidates
+                </Typography>
+                <Typography sx={{ fontSize: 10.5, color: MUTED }}>via CoreSignal · up to 3 results</Typography>
+              </Box>
+              <Button size="small" variant="contained" onClick={handleSearchExternalCandidates} disabled={externalLoading}
+                sx={{
+                  fontSize: 11, fontWeight: 500, bgcolor: PURPLE, borderRadius: "6px",
+                  textTransform: "none", boxShadow: "none",
+                  "&:hover": { bgcolor: "#6D28D9", boxShadow: "none" }
+                }}>
+                {externalLoading ? "Searching…" : "Search External"}
+              </Button>
+            </Box>
+            <Box sx={{ p: 2.25 }}>
+              {externalError && <Alert severity="error" sx={{ mb: 1.5 }}>{externalError}</Alert>}
+              {!externalFetched && !externalLoading && (
+                <Typography sx={{ fontSize: 12.5, color: MUTED, textAlign: "center", py: 1.5 }}>
+                  Click "Search External" to check our cache first, then CoreSignal if needed — capped to 3 results to conserve credits.
+                </Typography>
+              )}
+              {externalFetched && !externalLoading && externalCandidates.length === 0 && !externalError && (
+                <Typography sx={{ fontSize: 12.5, color: MUTED, textAlign: "center", py: 1.5 }}>
+                  No external candidates found for this job's title, skills and location.
+                </Typography>
+              )}
+              {externalCandidates.length > 0 && (
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  {externalCandidates.map((c, i) => (
+                    <ExternalCandidateCard key={c.coresignalId ?? i} c={c} />
+                  ))}
+                </Box>
+              )}
+            </Box>
           </Paper>
         )}
 

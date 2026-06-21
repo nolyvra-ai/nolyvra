@@ -69,6 +69,23 @@ async function apiPost(path, body) {
   return res.json();
 }
 
+async function apiPut(path, body) {
+  const loginId = localStorage.getItem("loginId") || "";
+  const url = new URL(`${API_BASE}${path}`);
+  url.searchParams.set("loginId", loginId);
+  const res = await fetch(url.toString(), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    const error = parseApiError(res.status, res.statusText, text);
+    throw Object.assign(new Error(error.message), error);
+  }
+  return res.json();
+}
+
 // ─── Shared style tokens (matching wireframe) ────────────────────────────────
 const BORDER = "#E8ECF2";
 const MUTED = "#9AA3B4";
@@ -198,16 +215,49 @@ export default function AddCandidatePage() {
   const [form, setForm] = useState({
     name:           prefill?.name        ?? "",
     email:          prefill?.email       ?? "",
+    phone:          prefill?.phone       ?? "",
     linkedinUrl:    prefill?.linkedinUrl ?? "",
     cvText:         prefill?.cvText      ?? "",
+    skills:         [],
     recruiterNotes: "",
     jobId:          "",
+    currentTitle:        "",
+    location:            "",
+    state:               "",
+    yearsExperience:     "",
+    seniorityLevel:      "",
+    expectedSalaryMin:   "",
+    expectedSalaryMax:   "",
+    noticePeriodWeeks:   "",
+    workRights:          "",
+    remoteFlexible:      false,
   });
   const [jobs,          setJobs]          = useState([]);
   const [cvFile,        setCvFile]        = useState(null);
   const [cvUploading,   setCvUploading]   = useState(false);
   const [cvUploadError, setCvUploadError] = useState(null);
   const [validationErr, setValidationErr] = useState("");
+
+  // ── Edit Profile mode (entered via prefill.candidateId from CandidateWorkflowPage) ──
+  const isEditMode = !!prefill?.candidateId;
+  const editCandidateId = prefill?.candidateId ?? null;
+  const [editOriginalJobId, setEditOriginalJobId] = useState(null);
+  const [editOriginalJobStatus, setEditOriginalJobStatus] = useState(null);
+  const [editLoaded, setEditLoaded] = useState(!isEditMode);
+
+  // The job assignment is only "locked" (can't reassign this same candidate
+  // record) while their existing job is still open — Active or Fulfilling.
+  // Once a job is Filled/Closed/On Hold/etc., the dropdown unlocks naturally.
+  const isJobLocked = isEditMode && !!editOriginalJobId
+    && ["active", "fulfilling"].includes((editOriginalJobStatus || "").toLowerCase());
+
+  // A candidate can apply to more than one job — when the existing job is
+  // locked, "Add Candidate to Another Job" unlocks the dropdown to instead
+  // create a separate candidate record for a second job application.
+  const [duplicateForNewJob, setDuplicateForNewJob] = useState(false);
+  const [duplicateNoticeOpen, setDuplicateNoticeOpen] = useState(false);
+
+  const jobDropdownDisabled = isEditMode && (!editLoaded || (isJobLocked && !duplicateForNewJob));
 
   // Change 2: Bulk upload state
   const [bulkDialog,     setBulkDialog]     = useState(false);
@@ -221,6 +271,23 @@ export default function AddCandidatePage() {
 
   function setField(k, v) {
     setForm((p) => ({ ...p, [k]: v }));
+  }
+
+  // Smart Talent Lens search/match fields, shared by both submit paths below
+  function searchFieldsPayload() {
+    const num = (v) => (v === "" || v == null ? null : Number(v));
+    return {
+      currentTitle:      form.currentTitle || null,
+      location:          form.location || null,
+      state:             form.state || null,
+      yearsExperience:   num(form.yearsExperience),
+      seniorityLevel:    form.seniorityLevel || null,
+      expectedSalaryMin: num(form.expectedSalaryMin),
+      expectedSalaryMax: num(form.expectedSalaryMax),
+      noticePeriodWeeks: form.noticePeriodWeeks === "" ? null : Number(form.noticePeriodWeeks),
+      workRights:        form.workRights || null,
+      remoteFlexible:    form.remoteFlexible,
+    };
   }
 
   const bulkAnalysisBatchId = bulkAnalysisStatus?.batchId;
@@ -347,6 +414,7 @@ export default function AddCandidatePage() {
         name:        data.name        || prev.name,
         email:       data.email       || prev.email,
         linkedinUrl: data.linkedinUrl || prev.linkedinUrl,
+        skills:      Array.isArray(data.skills) && data.skills.length > 0 ? data.skills : prev.skills,
       }));
     } catch (e) {
       setCvUploadError("Failed to read the file: " + e.message);
@@ -369,24 +437,54 @@ export default function AddCandidatePage() {
     loadJobs();
   }, []);
 
-  // Fix 2: if prefill has a candidateId (internal candidate from talent search),
-  // fetch full candidate to get email which the search result doesn't include
+  // Edit Profile mode: fetch the full candidate record and prefill every field.
   useEffect(() => {
-    if (!prefill?.candidateId) return;
-    apiGet(`/api/candidates/${prefill.candidateId}`)
-      .then(candidate => {
-        if (candidate?.email) setField("email", candidate.email);
-        if (candidate?.linkedinUrl) setField("linkedinUrl", candidate.linkedinUrl);
+    if (!editCandidateId) return;
+    apiGet(`/api/candidates/${editCandidateId}`)
+      .then(async candidate => {
+        if (!candidate) return;
+        setEditOriginalJobId(candidate.jobId ?? null);
+        setForm(p => ({
+          ...p,
+          name:               candidate.name ?? "",
+          email:              candidate.email ?? "",
+          phone:              candidate.phone ?? "",
+          linkedinUrl:        candidate.linkedinUrl ?? "",
+          cvText:             candidate.cvText ?? "",
+          jobId:              candidate.jobId ?? "",
+          currentTitle:       candidate.currentTitle ?? "",
+          location:           candidate.location ?? "",
+          state:              candidate.state ?? "",
+          yearsExperience:    candidate.yearsExperience ?? "",
+          seniorityLevel:     candidate.seniorityLevel ?? "",
+          expectedSalaryMin:  candidate.expectedSalaryMin ?? "",
+          expectedSalaryMax:  candidate.expectedSalaryMax ?? "",
+          noticePeriodWeeks:  candidate.noticePeriodWeeks ?? "",
+          workRights:         candidate.workRights ?? "",
+          remoteFlexible:     candidate.remoteFlexible ?? false,
+        }));
+        // Job assignment is only "locked" while that job is still open —
+        // fetch its status to decide whether the dropdown should stay disabled.
+        if (candidate.jobId) {
+          try {
+            const job = await apiGet(`/api/jobs/${candidate.jobId}`);
+            setEditOriginalJobStatus(job?.status ?? null);
+          } catch (err) {
+            console.error("[AddCandidate] failed to load assigned job status:", err);
+            setEditOriginalJobStatus(null);
+          }
+        }
       })
-      .catch(err => console.error("[AddCandidate] prefill fetch failed:", err));
-  }, [prefill?.candidateId]);
+      .catch(err => console.error("[AddCandidate] edit prefill fetch failed:", err))
+      .finally(() => setEditLoaded(true));
+  }, [editCandidateId]);
 
   // ── Save candidate (no analysis) ──────────────────────────────────────────
 
   // Change 2: bulk upload handlers
   async function handleBulkFiles(files) {
     const arr = Array.from(files).map(f => ({
-      file: f, status: "pending", name: "", email: "", cvText: "", error: null
+      file: f, status: "pending", name: "", email: "", cvText: "", skills: [], error: null
     }));
     setBulkFiles(arr);
     setBulkDone(false);
@@ -407,6 +505,7 @@ export default function AddCandidatePage() {
             name:   data.name   || arr[i].file.name,
             email:  data.email  || "",
             cvText: data.text   || "",
+            skills: Array.isArray(data.skills) ? data.skills : [],
           } : b));
       } catch (e) {
         setBulkFiles(prev => prev.map((b, idx) =>
@@ -465,7 +564,7 @@ export default function AddCandidatePage() {
         const res = await fetch(url.toString(), {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
-          body: JSON.stringify({ name: b.name, email: b.email, cvText: b.cvText, linkedinUrl: "" }),
+          body: JSON.stringify({ name: b.name, email: b.email, cvText: b.cvText, linkedinUrl: "", skills: b.skills || [] }),
         });
         if (!res.ok) {
           const text = await res.text().catch(() => "");
@@ -532,24 +631,46 @@ export default function AddCandidatePage() {
 
   async function onSave(e) {
     e.preventDefault();
-    if (!checkCandidateLimit()) { setLimitDialog(true); return; }
+    // "Add Candidate to Another Job" creates a brand-new candidate record,
+    // even though we got here via Edit Profile — so it counts against the
+    // plan limit and goes through the create flow, not the update flow.
+    const isDuplicateCreate = isEditMode && duplicateForNewJob;
+    if ((!isEditMode || isDuplicateCreate) && !checkCandidateLimit()) { setLimitDialog(true); return; }
     if (!hasName)  { setValidationErr("Candidate name is required."); return; }
     if (!hasEmail) { setValidationErr("Email address is required."); return; }
     if (!hasCv)    { setValidationErr("CV text is required. Please paste or upload a CV."); return; }
+    if (isDuplicateCreate && !form.jobId) { setValidationErr("Please select a job for this second application."); return; }
     setValidationErr("");
     try {
-      // Change 3: use unassigned endpoint when no job selected
+      if (isEditMode && !duplicateForNewJob) {
+        await apiPut(`/api/candidates/${editCandidateId}`, {
+          name:        form.name,
+          email:       form.email,
+          phone:       form.phone,
+          linkedinUrl: form.linkedinUrl,
+          cvText:      form.cvText,
+          jobId:       jobDropdownDisabled ? editOriginalJobId : (form.jobId || null),
+          ...searchFieldsPayload(),
+        });
+        nav(`/candidates/${editCandidateId}/workflow`);
+        return;
+      }
+      // Change 3: use unassigned endpoint when no job selected (also used for
+      // "Add Candidate to Another Job", which always has a job selected)
       const apiPath = form.jobId
         ? `/api/jobs/${form.jobId}/candidates`
         : `/api/candidates`;
-      await apiPost(apiPath, {
+      const candidate = await apiPost(apiPath, {
         name:           form.name,
         email:          form.email,
+        phone:          form.phone,
         linkedinUrl:    form.linkedinUrl,
         cvText:         form.cvText,
+        skills:         form.skills,
         recruiterNotes: form.recruiterNotes,
+        ...searchFieldsPayload(),
       });
-      nav("/candidates");
+      nav(isDuplicateCreate ? `/candidates/${candidate.id}/workflow` : "/candidates");
     } catch (e) {
       setValidationErr(formatCandidateSaveError(e, form.name));
     }
@@ -557,26 +678,43 @@ export default function AddCandidatePage() {
 
   async function onSubmit(e) {
     e.preventDefault();
-    if (!checkCandidateLimit()) { setLimitDialog(true); return; }
+    const isDuplicateCreate = isEditMode && duplicateForNewJob;
+    if ((!isEditMode || isDuplicateCreate) && !checkCandidateLimit()) { setLimitDialog(true); return; }
     if (!hasName)  { setValidationErr("Candidate name is required."); return; }
     if (!hasEmail) { setValidationErr("Email address is required."); return; }
     if (!hasCv)    { setValidationErr("CV text is required. Please paste or upload a CV."); return; }
-    if (!form.jobId) { setValidationErr("Please assign the candidate to a job before running analysis."); return; }
+    const effectiveJobId = isDuplicateCreate
+      ? form.jobId
+      : (jobDropdownDisabled ? editOriginalJobId : form.jobId);
+    if (!effectiveJobId) { setValidationErr("Please assign the candidate to a job before running analysis."); return; }
     setValidationErr("");
     try {
-      // Change 3: use unassigned endpoint when no job selected
-      const apiPath = form.jobId
-        ? `/api/jobs/${form.jobId}/candidates`
-        : `/api/candidates`;
-      const candidate = await apiPost(apiPath, {
-        name:           form.name,
-        email:          form.email,
-        linkedinUrl:    form.linkedinUrl,
-        cvText:         form.cvText,
-        recruiterNotes: form.recruiterNotes,
-      });
-
-      const candidateId = candidate.id;
+      let candidateId;
+      if (isEditMode && !duplicateForNewJob) {
+        const candidate = await apiPut(`/api/candidates/${editCandidateId}`, {
+          name:        form.name,
+          email:       form.email,
+          phone:       form.phone,
+          linkedinUrl: form.linkedinUrl,
+          cvText:      form.cvText,
+          jobId:       effectiveJobId,
+          ...searchFieldsPayload(),
+        });
+        candidateId = candidate.id;
+      } else {
+        // Used both for brand-new candidates and "Add Candidate to Another Job"
+        const candidate = await apiPost(`/api/jobs/${effectiveJobId}/candidates`, {
+          name:           form.name,
+          email:          form.email,
+          phone:          form.phone,
+          linkedinUrl:    form.linkedinUrl,
+          cvText:         form.cvText,
+          skills:         form.skills,
+          recruiterNotes: form.recruiterNotes,
+          ...searchFieldsPayload(),
+        });
+        candidateId = candidate.id;
+      }
 
       const loginId = localStorage.getItem("loginId") || "";
       const analyzeUrl = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
@@ -648,30 +786,34 @@ export default function AddCandidatePage() {
       >
         <Box>
           <Typography sx={{ fontSize: 14, fontWeight: 700, color: TEXT, letterSpacing: "-0.2px" }}>
-            Add Candidate
+            {duplicateForNewJob ? "Add Candidate to Another Job" : isEditMode ? "Edit Candidate" : "Add Candidate"}
           </Typography>
           <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
-            Paste CV and LinkedIn for validation analysis
+            {duplicateForNewJob
+              ? "This creates a separate candidate profile for the new job — the existing one is untouched."
+              : isEditMode ? "Update this candidate's profile details" : "Paste CV and LinkedIn for validation analysis"}
           </Typography>
         </Box>
         <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+          {!isEditMode && (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => nav("/candidates/new-modern")}
+              sx={{
+                fontSize: 11, borderColor: "#C4B5FD", color: "#7C3AED",
+                borderRadius: "50px", textTransform: "none", px: 2,
+                bgcolor: "#F5F3FF",
+                "&:hover": { borderColor: "#7C3AED", bgcolor: "#EDE9FE" },
+              }}
+            >
+              ✦ Switch to New AI Add Candidate
+            </Button>
+          )}
           <Button
             size="small"
             variant="outlined"
-            onClick={() => nav("/candidates/new-modern")}
-            sx={{
-              fontSize: 11, borderColor: "#C4B5FD", color: "#7C3AED",
-              borderRadius: "50px", textTransform: "none", px: 2,
-              bgcolor: "#F5F3FF",
-              "&:hover": { borderColor: "#7C3AED", bgcolor: "#EDE9FE" },
-            }}
-          >
-            ✦ Switch to New AI Add Candidate
-          </Button>
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={() => nav("/candidates")}
+            onClick={() => nav(isEditMode ? `/candidates/${editCandidateId}/workflow` : "/candidates")}
             sx={{
               fontSize: 12, fontWeight: 500, borderColor: BORDER, color: TEXT,
               borderRadius: "6px", textTransform: "none",
@@ -681,18 +823,20 @@ export default function AddCandidatePage() {
             Cancel
           </Button>
           {/* Change 2: Bulk Upload button */}
-          <Button
-            size="small"
-            variant="outlined"
-            onClick={() => { setBulkFiles([]); setBulkDone(false); setBulkAnalyzing(false); setBulkAnalysisStatus(null); setBulkDialog(true); }}
-            sx={{
-              fontSize: 12, fontWeight: 500, borderColor: "#C4B5FD", color: "#7C3AED",
-              borderRadius: "6px", textTransform: "none",
-              "&:hover": { borderColor: "#7C3AED", bgcolor: "#F5F3FF" },
-            }}
-          >
-            📦 Bulk Upload CVs
-          </Button>
+          {!isEditMode && (
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => { setBulkFiles([]); setBulkDone(false); setBulkAnalyzing(false); setBulkAnalysisStatus(null); setBulkDialog(true); }}
+              sx={{
+                fontSize: 12, fontWeight: 500, borderColor: "#C4B5FD", color: "#7C3AED",
+                borderRadius: "6px", textTransform: "none",
+                "&:hover": { borderColor: "#7C3AED", bgcolor: "#F5F3FF" },
+              }}
+            >
+              📦 Bulk Upload CVs
+            </Button>
+          )}
           <Button
             size="small"
             variant="contained"
@@ -903,6 +1047,8 @@ export default function AddCandidatePage() {
                     label="Phone"
                     size="small"
                     placeholder="+44 7000 000000"
+                    value={form.phone}
+                    onChange={(e) => setField("phone", e.target.value)}
                     sx={fieldSx}
                   />
                 </Box>
@@ -913,20 +1059,39 @@ export default function AddCandidatePage() {
                   select
                   label="Assign to Job"
                   size="small"
+                  disabled={jobDropdownDisabled}
                   value={form.jobId}
                   onChange={(e) => setField("jobId", e.target.value)}
-                  sx={{ ...fieldSx, mb: 1.5 }}
+                  helperText={
+                    duplicateForNewJob
+                      ? "Pick a different job — this will create a separate candidate profile for it."
+                      : jobDropdownDisabled
+                        ? "This candidate is already assigned to an open job."
+                        : undefined
+                  }
+                  sx={{ ...fieldSx, mb: duplicateForNewJob || isJobLocked ? 0.5 : 1.5 }}
                 >
                   {/* Change 3: Not Assigned default option */}
                   <MenuItem value="" sx={{ fontSize: 13, color: MUTED }}>
                     — Not Assigned —
                   </MenuItem>
-                  {jobs.map((job) => (
-                    <MenuItem key={job.id} value={job.id} sx={{ fontSize: 13 }}>
-                      {job.title}{job.company ? ` — ${job.company}` : ""}
-                    </MenuItem>
-                  ))}
+                  {jobs
+                    .filter((job) => !(duplicateForNewJob && job.id === editOriginalJobId))
+                    .map((job) => (
+                      <MenuItem key={job.id} value={job.id} sx={{ fontSize: 13 }}>
+                        {job.title}{job.company ? ` — ${job.company}` : ""}
+                      </MenuItem>
+                    ))}
                 </TextField>
+
+                {isJobLocked && !duplicateForNewJob && (
+                  <Typography
+                    onClick={() => setDuplicateNoticeOpen(true)}
+                    sx={{ fontSize: 12, color: ACCENT, cursor: "pointer", mb: 1.5, "&:hover": { textDecoration: "underline" } }}
+                  >
+                    + Add Candidate to Another Job
+                  </Typography>
+                )}
 
                 {/* LinkedIn URL */}
                 <Box>
@@ -945,6 +1110,60 @@ export default function AddCandidatePage() {
                     onChange={(e) => setField("linkedinUrl", e.target.value)}
                     sx={fieldSx}
                   />
+                </Box>
+
+                {/* Smart Talent Lens search/match fields */}
+                <Divider sx={{ borderColor: BORDER, my: 2 }} />
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: 0.5, mb: 1.25 }}>
+                  Search &amp; Matching Details
+                </Typography>
+
+                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 1.5, mb: 1.5 }}>
+                  <TextField fullWidth label="Current Title" size="small"
+                    value={form.currentTitle} onChange={(e) => setField("currentTitle", e.target.value)} sx={fieldSx} />
+                  <TextField fullWidth label="Location" size="small" placeholder="City or suburb"
+                    value={form.location} onChange={(e) => setField("location", e.target.value)} sx={fieldSx} />
+                  <TextField fullWidth label="State" size="small" placeholder="e.g. VIC"
+                    value={form.state} onChange={(e) => setField("state", e.target.value)} sx={fieldSx} />
+                </Box>
+
+                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5, mb: 1.5 }}>
+                  <TextField fullWidth label="Years of Experience" size="small" type="number"
+                    value={form.yearsExperience} onChange={(e) => setField("yearsExperience", e.target.value)} sx={fieldSx} />
+                  <TextField fullWidth select label="Seniority Level" size="small"
+                    value={form.seniorityLevel} onChange={(e) => setField("seniorityLevel", e.target.value)} sx={fieldSx}>
+                    <MenuItem value="" sx={{ fontSize: 13, color: MUTED }}>— Not Set —</MenuItem>
+                    {["Junior", "Mid", "Mid-Senior", "Senior", "Lead/Principal"].map((s) => (
+                      <MenuItem key={s} value={s} sx={{ fontSize: 13 }}>{s}</MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
+
+                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5, mb: 1.5 }}>
+                  <TextField fullWidth label="Expected Salary Min" size="small" type="number"
+                    value={form.expectedSalaryMin} onChange={(e) => setField("expectedSalaryMin", e.target.value)} sx={fieldSx} />
+                  <TextField fullWidth label="Expected Salary Max" size="small" type="number"
+                    value={form.expectedSalaryMax} onChange={(e) => setField("expectedSalaryMax", e.target.value)} sx={fieldSx} />
+                </Box>
+
+                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5, mb: 1.5 }}>
+                  <TextField fullWidth label="Notice Period (weeks)" size="small" type="number"
+                    value={form.noticePeriodWeeks} onChange={(e) => setField("noticePeriodWeeks", e.target.value)} sx={fieldSx} />
+                  <TextField fullWidth select label="Work Rights" size="small"
+                    value={form.workRights} onChange={(e) => setField("workRights", e.target.value)} sx={fieldSx}>
+                    <MenuItem value="" sx={{ fontSize: 13, color: MUTED }}>— Not Set —</MenuItem>
+                    {["Citizen", "Permanent Resident", "Visa (sponsorship required)"].map((w) => (
+                      <MenuItem key={w} value={w} sx={{ fontSize: 13 }}>{w}</MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
+
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <input type="checkbox" id="remoteFlexible" checked={form.remoteFlexible}
+                    onChange={(e) => setField("remoteFlexible", e.target.checked)} />
+                  <label htmlFor="remoteFlexible" style={{ fontSize: 12, color: TEXT, cursor: "pointer" }}>
+                    Open to hybrid / remote work
+                  </label>
                 </Box>
               </Box>
             </Paper>
@@ -1261,7 +1480,7 @@ export default function AddCandidatePage() {
                 "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE },
               }}
             >
-              Save Without Analysis
+              {duplicateForNewJob ? "Create New Application" : isEditMode ? "Save Changes" : "Save Without Analysis"}
             </Button>
 
           </Box>
@@ -1316,6 +1535,36 @@ export default function AddCandidatePage() {
             sx={{ fontSize: 12, bgcolor: "#1D72E8", borderRadius: "6px", textTransform: "none",
               boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
             Upgrade Plan
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add Candidate to Another Job — confirmation notice */}
+      <Dialog open={duplicateNoticeOpen} onClose={() => setDuplicateNoticeOpen(false)} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { borderRadius: "12px" } }}>
+        <DialogTitle sx={{ fontSize: 14, fontWeight: 600, color: "#0F1623", pb: 1 }}>
+          Add Candidate to Another Job?
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: 13, color: "#9AA3B4", lineHeight: 1.6 }}>
+            This will create a new candidate profile for the new job, with a separate assessment
+            based on that job's requirements. The existing profile will not be impacted.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button variant="outlined" size="small" onClick={() => setDuplicateNoticeOpen(false)}
+            sx={{ fontSize: 12, borderColor: "#E8ECF2", color: "#0F1623", borderRadius: "6px", textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button variant="contained" size="small"
+            onClick={() => {
+              setField("jobId", "");
+              setDuplicateForNewJob(true);
+              setDuplicateNoticeOpen(false);
+            }}
+            sx={{ fontSize: 12, bgcolor: "#1D72E8", borderRadius: "6px", textTransform: "none",
+              boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
+            Continue
           </Button>
         </DialogActions>
       </Dialog>

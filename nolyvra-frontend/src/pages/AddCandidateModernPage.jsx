@@ -113,7 +113,10 @@ export default function AddCandidateModernPage() {
   const [savingCandidate, setSavingCandidate] = useState(false);
   const [candidateForm,   setCandidateForm]   = useState({
     name: "", email: "", phone: "", linkedinUrl: "",
-    currentTitle: "", location: "", cvText: "",
+    currentTitle: "", location: "", state: "", cvText: "", skills: [],
+    yearsExperience: "", seniorityLevel: "",
+    expectedSalaryMin: "", expectedSalaryMax: "",
+    noticePeriodWeeks: "", workRights: "", remoteFlexible: false,
   });
 
   // ── Bulk upload state ─────────────────────────────────────────────────────
@@ -179,6 +182,7 @@ export default function AddCandidateModernPage() {
         email:       data.email       || p.email,
         linkedinUrl: data.linkedinUrl || p.linkedinUrl,
         cvText:      data.text        || p.cvText,
+        skills:      Array.isArray(data.skills) && data.skills.length > 0 ? data.skills : p.skills,
       }));
       setCvParsed(true);
     } catch (e) {
@@ -190,7 +194,12 @@ export default function AddCandidateModernPage() {
   }
 
   function resetSingleForm() {
-    setCandidateForm({ name: "", email: "", phone: "", linkedinUrl: "", currentTitle: "", location: "", cvText: "" });
+    setCandidateForm({
+      name: "", email: "", phone: "", linkedinUrl: "", currentTitle: "", location: "", state: "", cvText: "", skills: [],
+      yearsExperience: "", seniorityLevel: "",
+      expectedSalaryMin: "", expectedSalaryMax: "",
+      noticePeriodWeeks: "", workRights: "", remoteFlexible: false,
+    });
     setCvFile(null);
     setCvParsed(false);
     setSingleError(null);
@@ -225,8 +234,20 @@ export default function AddCandidateModernPage() {
         body: JSON.stringify({
           name:        candidateForm.name,
           email:       candidateForm.email,
+          phone:       candidateForm.phone,
           linkedinUrl: candidateForm.linkedinUrl,
           cvText:      candidateForm.cvText,
+          skills:      candidateForm.skills,
+          currentTitle:       candidateForm.currentTitle || null,
+          location:           candidateForm.location || null,
+          state:              candidateForm.state || null,
+          yearsExperience:    candidateForm.yearsExperience === "" ? null : Number(candidateForm.yearsExperience),
+          seniorityLevel:     candidateForm.seniorityLevel || null,
+          expectedSalaryMin:  candidateForm.expectedSalaryMin === "" ? null : Number(candidateForm.expectedSalaryMin),
+          expectedSalaryMax:  candidateForm.expectedSalaryMax === "" ? null : Number(candidateForm.expectedSalaryMax),
+          noticePeriodWeeks:  candidateForm.noticePeriodWeeks === "" ? null : Number(candidateForm.noticePeriodWeeks),
+          workRights:         candidateForm.workRights || null,
+          remoteFlexible:     candidateForm.remoteFlexible,
         }),
       });
       if (res.status === 409) throw new Error("This candidate is already in the pipeline for this job.");
@@ -305,6 +326,7 @@ export default function AddCandidateModernPage() {
             email:       cv.email       || "",
             linkedinUrl: cv.linkedinUrl || "",
             cvText:      cv.text        || "",
+            skills:      Array.isArray(cv.skills) ? cv.skills : [],
           }),
         });
         if (sr.status === 409) throw new Error("Already in pipeline");
@@ -657,6 +679,61 @@ export default function AddCandidateModernPage() {
                   <FieldLabel>Location</FieldLabel>
                   <TextField fullWidth size="small" value={candidateForm.location}
                     onChange={e => setCandidateForm(p => ({ ...p, location: e.target.value }))} sx={fieldSx} />
+                </Box>
+                <Box>
+                  <FieldLabel>State</FieldLabel>
+                  <TextField fullWidth size="small" placeholder="e.g. VIC" value={candidateForm.state}
+                    onChange={e => setCandidateForm(p => ({ ...p, state: e.target.value }))} sx={fieldSx} />
+                </Box>
+                <Box>
+                  <FieldLabel>Years of Experience</FieldLabel>
+                  <TextField fullWidth size="small" type="number" value={candidateForm.yearsExperience}
+                    onChange={e => setCandidateForm(p => ({ ...p, yearsExperience: e.target.value }))} sx={fieldSx} />
+                </Box>
+                <Box>
+                  <FieldLabel>Seniority Level</FieldLabel>
+                  <TextField select fullWidth size="small" value={candidateForm.seniorityLevel}
+                    onChange={e => setCandidateForm(p => ({ ...p, seniorityLevel: e.target.value }))} sx={fieldSx}>
+                    <MenuItem value="" sx={{ fontSize: 13, color: MUTED }}>— Not Set —</MenuItem>
+                    {["Junior", "Mid", "Mid-Senior", "Senior", "Lead/Principal"].map(s => (
+                      <MenuItem key={s} value={s} sx={{ fontSize: 13 }}>{s}</MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
+                <Box>
+                  <FieldLabel>Expected Salary Min</FieldLabel>
+                  <TextField fullWidth size="small" type="number" value={candidateForm.expectedSalaryMin}
+                    onChange={e => setCandidateForm(p => ({ ...p, expectedSalaryMin: e.target.value }))} sx={fieldSx} />
+                </Box>
+                <Box>
+                  <FieldLabel>Expected Salary Max</FieldLabel>
+                  <TextField fullWidth size="small" type="number" value={candidateForm.expectedSalaryMax}
+                    onChange={e => setCandidateForm(p => ({ ...p, expectedSalaryMax: e.target.value }))} sx={fieldSx} />
+                </Box>
+                <Box>
+                  <FieldLabel>Notice Period (weeks)</FieldLabel>
+                  <TextField fullWidth size="small" type="number" value={candidateForm.noticePeriodWeeks}
+                    onChange={e => setCandidateForm(p => ({ ...p, noticePeriodWeeks: e.target.value }))} sx={fieldSx} />
+                </Box>
+                <Box>
+                  <FieldLabel>Work Rights</FieldLabel>
+                  <TextField select fullWidth size="small" value={candidateForm.workRights}
+                    onChange={e => setCandidateForm(p => ({ ...p, workRights: e.target.value }))} sx={fieldSx}>
+                    <MenuItem value="" sx={{ fontSize: 13, color: MUTED }}>— Not Set —</MenuItem>
+                    {["Citizen", "Permanent Resident", "Visa (sponsorship required)"].map(w => (
+                      <MenuItem key={w} value={w} sx={{ fontSize: 13 }}>{w}</MenuItem>
+                    ))}
+                  </TextField>
+                </Box>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <FieldLabel>Open to Hybrid / Remote</FieldLabel>
+                  <Switch checked={candidateForm.remoteFlexible}
+                    onChange={e => setCandidateForm(p => ({ ...p, remoteFlexible: e.target.checked }))}
+                    sx={{
+                      "& .MuiSwitch-switchBase.Mui-checked": { color: "#fff" },
+                      "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": { bgcolor: ACCENT, opacity: 1 },
+                      "& .MuiSwitch-track": { bgcolor: "#C8D0DE", opacity: "1 !important" },
+                    }} />
                 </Box>
               </Box>
               <Box>
