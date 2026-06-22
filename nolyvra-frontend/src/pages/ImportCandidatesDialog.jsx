@@ -10,10 +10,14 @@ const BORDER = "#E8ECF2", MUTED = "#9AA3B4", TEXT = "#0F1623", ACCENT = "#1D72E8
 const SUCCESS_BG = "#F0FDF4", SURFACE = "#FAFBFD";
 
 const TARGET_FIELDS = [
-  { key: "name",         label: "Name",         required: true  },
-  { key: "email",        label: "Email",        required: false },
-  { key: "phone_number", label: "Phone Number", required: false },
-  { key: "linkedin_url", label: "LinkedIn URL", required: false },
+  { key: "first_name",      label: "First Name",      required: true  },
+  { key: "last_name",       label: "Last Name",       required: false },
+  { key: "email",           label: "Email",           required: false },
+  { key: "phone_number",    label: "Phone Number",    required: false },
+  { key: "linkedin_url",    label: "LinkedIn URL",    required: false },
+  { key: "current_title",   label: "Job Title",       required: false },
+  { key: "current_company", label: "Employer",        required: false },
+  { key: "location",        label: "Location",        required: false },
 ];
 
 const NONE = "__none__";
@@ -50,6 +54,7 @@ export default function ImportCandidatesDialog({ open, onClose, onImported, onJo
           clearInterval(pollRef.current);
           setResult({
             importedCount:  data.importedCount  ?? 0,
+            updatedCount:   data.updatedCount   ?? 0,
             duplicateCount: data.duplicateCount ?? 0,
             invalidCount:   data.invalidCount   ?? 0,
             totalRows:      data.totalRows      ?? 0,
@@ -158,7 +163,7 @@ export default function ImportCandidatesDialog({ open, onClose, onImported, onJo
     handleClose();
   }
 
-  const canImport = mapping["name"] && mapping["name"] !== NONE;
+  const canImport = mapping["first_name"] && mapping["first_name"] !== NONE;
 
   const titles = {
     upload:    "Upload Candidates",
@@ -313,8 +318,10 @@ export default function ImportCandidatesDialog({ open, onClose, onImported, onJo
             <Typography sx={{ fontSize: 17, fontWeight: 700, color: TEXT, textAlign: "center" }}>
               {result.importedCount} candidate{result.importedCount !== 1 ? "s" : ""} imported successfully
             </Typography>
-            {(result.duplicateCount > 0 || result.invalidCount > 0) && (
+            {(result.updatedCount > 0 || result.duplicateCount > 0 || result.invalidCount > 0) && (
               <Typography sx={{ fontSize: 12.5, color: MUTED, textAlign: "center", lineHeight: 1.7 }}>
+                {result.updatedCount > 0 && `${result.updatedCount} existing candidate${result.updatedCount !== 1 ? "s" : ""} updated`}
+                {result.updatedCount > 0 && (result.duplicateCount > 0 || result.invalidCount > 0) && " · "}
                 {result.duplicateCount > 0 && `${result.duplicateCount} duplicate${result.duplicateCount !== 1 ? "s" : ""} skipped`}
                 {result.duplicateCount > 0 && result.invalidCount > 0 && " · "}
                 {result.invalidCount > 0 && `${result.invalidCount} row${result.invalidCount !== 1 ? "s" : ""} skipped (missing name or contact info)`}

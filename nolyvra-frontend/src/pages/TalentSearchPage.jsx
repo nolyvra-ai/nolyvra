@@ -138,6 +138,7 @@ export function TalentSearchPage() {
           if (data.status === "DONE") {
             setCompletionResult({
               importedCount:  data.importedCount  ?? 0,
+              updatedCount:   data.updatedCount   ?? 0,
               duplicateCount: data.duplicateCount ?? 0,
               invalidCount:   data.invalidCount   ?? 0,
             });
@@ -338,13 +339,13 @@ export function TalentSearchPage() {
           >
             Candidates Search
           </Button>
-          {/* Upload Excel — AI-assisted column mapping */}
+          {/* Upload Candidates — AI-assisted column mapping */}
           <Button
             onClick={() => setImportOpen(true)}
             size="small"
             sx={{ fontSize: 11, fontWeight: 600, px: "14px", bgcolor: "#F5F3FF", color: "#7C3AED", border: "1px solid #C4B5FD", borderRadius: "7px", textTransform: "none", "&:hover": { bgcolor: "#EDE9FE", borderColor: "#7C3AED" }, boxShadow: "none" }}
           >
-            📊 Upload Excel
+            Upload Candidates
           </Button>
         </Box>
       </Box>
@@ -663,8 +664,10 @@ export function TalentSearchPage() {
             <Typography sx={{ fontSize: 15, fontWeight: 700, color: TEXT, textAlign: "center" }}>
               {completionResult?.importedCount ?? 0} candidate{(completionResult?.importedCount ?? 0) !== 1 ? "s" : ""} imported successfully
             </Typography>
-            {((completionResult?.duplicateCount ?? 0) > 0 || (completionResult?.invalidCount ?? 0) > 0) && (
+            {((completionResult?.updatedCount ?? 0) > 0 || (completionResult?.duplicateCount ?? 0) > 0 || (completionResult?.invalidCount ?? 0) > 0) && (
               <Typography sx={{ fontSize: 12.5, color: MUTED, textAlign: "center", lineHeight: 1.7 }}>
+                {(completionResult.updatedCount > 0) && `${completionResult.updatedCount} existing candidate${completionResult.updatedCount !== 1 ? "s" : ""} updated`}
+                {(completionResult.updatedCount > 0 && (completionResult.duplicateCount > 0 || completionResult.invalidCount > 0)) && " · "}
                 {(completionResult.duplicateCount > 0) && `${completionResult.duplicateCount} duplicate${completionResult.duplicateCount !== 1 ? "s" : ""} skipped`}
                 {(completionResult.duplicateCount > 0 && completionResult.invalidCount > 0) && " · "}
                 {(completionResult.invalidCount > 0) && `${completionResult.invalidCount} row${completionResult.invalidCount !== 1 ? "s" : ""} skipped`}

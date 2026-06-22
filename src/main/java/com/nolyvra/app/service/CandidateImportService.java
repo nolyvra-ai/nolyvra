@@ -120,32 +120,47 @@ public class CandidateImportService {
         List<Map<String, String>> rows = cached.rows();
         IMPORT_CACHE.remove(importToken);
 
-        String nameHdr     = mapping.get("name");
-        String emailHdr    = mapping.get("email");
-        String phoneHdr    = mapping.get("phone_number");
-        String linkedinHdr = mapping.get("linkedin_url");
-        String titleHdr    = mapping.get("current_title");
-        String locationHdr = mapping.get("location");
-        String yearsHdr    = mapping.get("years_experience");
-        String seniorityHdr = mapping.get("seniority_level");
-        String salaryMinHdr = mapping.get("expected_salary_min");
-        String salaryMaxHdr = mapping.get("expected_salary_max");
-        String noticeHdr    = mapping.get("notice_period_weeks");
+        String firstNameHdr = mapping.get("first_name");
+        String lastNameHdr  = mapping.get("last_name");
+        String emailHdr     = mapping.get("email");
+        String phoneHdr     = mapping.get("phone_number");
+        String linkedinHdr  = mapping.get("linkedin_url");
+        String titleHdr     = mapping.get("current_title");
+        String companyHdr   = mapping.get("current_company");
+        String locationHdr  = mapping.get("location");
+        String yearsHdr      = mapping.get("years_experience");
+        String seniorityHdr  = mapping.get("seniority_level");
+        String salaryMinHdr  = mapping.get("expected_salary_min");
+        String salaryMaxHdr  = mapping.get("expected_salary_max");
+        String noticeHdr     = mapping.get("notice_period_weeks");
         String workRightsHdr = mapping.get("work_rights");
         String remoteHdr     = mapping.get("remote_flexible");
 
+        // Raw headers consumed by a known field — anything else on the row is
+        // preserved verbatim in other_fields so future columns aren't lost.
+        Set<String> mappedHeaders = new HashSet<>(mapping.values());
+
         int importedCount  = 0;
+        int updatedCount   = 0;
         int duplicateCount = 0;
         int invalidCount   = 0;
         int totalRows      = rows.size();
 
         for (Map<String, String> row : rows) {
-            String name     = nameHdr     != null ? trimToNull(row.get(nameHdr))     : null;
+            String firstName = firstNameHdr != null ? trimToNull(row.get(firstNameHdr)) : null;
+            String lastName  = lastNameHdr  != null ? trimToNull(row.get(lastNameHdr))  : null;
+            String name = trimToNull(((firstName != null ? firstName : "") + " " + (lastName != null ? lastName : "")).trim());
+
             String email    = emailHdr    != null ? trimToNull(row.get(emailHdr))    : null;
             String phone    = phoneHdr    != null ? trimToNull(row.get(phoneHdr))    : null;
             String linkedin = linkedinHdr != null ? trimToNull(row.get(linkedinHdr)) : null;
-            String currentTitle = titleHdr    != null ? trimToNull(row.get(titleHdr))    : null;
-            String location     = locationHdr != null ? trimToNull(row.get(locationHdr)) : null;
+            String currentTitle = titleHdr   != null ? trimToNull(row.get(titleHdr))   : null;
+            String currentCompany = companyHdr != null ? trimToNull(row.get(companyHdr)) : null;
+            String locationRaw  = locationHdr != null ? trimToNull(row.get(locationHdr)) : null;
+            LocationResolution loc = resolveLocation(locationRaw);
+            String location = loc.suburb();
+            String state    = loc.state();
+
             BigDecimal years    = yearsHdr     != null ? parseDecimal(row.get(yearsHdr))     : null;
             String seniority    = seniorityHdr != null ? trimToNull(row.get(seniorityHdr)) : null;
             BigDecimal salaryMin = salaryMinHdr != null ? parseDecimal(row.get(salaryMinHdr)) : null;
@@ -153,6 +168,7 @@ public class CandidateImportService {
             Integer notice       = noticeHdr    != null ? parseInt(row.get(noticeHdr))        : null;
             String workRights    = workRightsHdr != null ? trimToNull(row.get(workRightsHdr)) : null;
             Boolean remoteFlexible = remoteHdr != null ? parseBool(row.get(remoteHdr)) : null;
+            String otherFieldsJson = buildOtherFieldsJson(row, mappedHeaders);
 
             // Skip: name blank OR both email and phone blank
             if (name == null || (email == null && phone == null)) {
@@ -160,15 +176,32 @@ public class CandidateImportService {
                 continue;
             }
 
-            // Duplicate check by email
-            if (email != null) {
-                Integer count = jdbc.queryForObject(
-                        "select count(*) from candidates where login_id = ? and lower(email) = lower(?)",
-                        Integer.class, loginId, email);
-                if (count != null && count > 0) {
-                    duplicateCount++;
-                    continue;
-                }
+            String existingId = findExistingCandidateId(loginId, name, email, phone, currentCompany, state, currentTitle);
+            if (existingId != null) {
+                jdbc.update("""
+                        UPDATE candidates SET
+                            email                = COALESCE(email, ?),
+                            phone_number          = COALESCE(phone_number, ?),
+                            linkedin_url           = COALESCE(linkedin_url, ?),
+                            current_title          = COALESCE(current_title, ?),
+                            current_company        = COALESCE(current_company, ?),
+                            location               = COALESCE(location, ?),
+                            state                  = COALESCE(state, ?),
+                            years_experience       = COALESCE(years_experience, ?),
+                            seniority_level        = COALESCE(seniority_level, ?),
+                            expected_salary_min    = COALESCE(expected_salary_min, ?),
+                            expected_salary_max    = COALESCE(expected_salary_max, ?),
+                            notice_period_weeks    = COALESCE(notice_period_weeks, ?),
+                            work_rights            = COALESCE(work_rights, ?),
+                            remote_flexible        = COALESCE(remote_flexible, ?),
+                            other_fields           = COALESCE(other_fields, CAST(? AS jsonb)),
+                            updated_at             = now()
+                        WHERE id = ?
+                        """, email, phone, linkedin, currentTitle, currentCompany, location, state,
+                        years, seniority, salaryMin, salaryMax, notice, workRights, remoteFlexible,
+                        otherFieldsJson, existingId);
+                updatedCount++;
+                continue;
             }
 
             String id = "cand-" + UUID.randomUUID();
@@ -176,18 +209,95 @@ public class CandidateImportService {
             jdbc.update("""
                     INSERT INTO candidates
                         (id, login_id, name, email, phone_number, linkedin_url,
-                         current_title, location, years_experience, seniority_level,
+                         current_title, current_company, location, state, years_experience, seniority_level,
                          expected_salary_min, expected_salary_max, notice_period_weeks,
-                         work_rights, remote_flexible,
+                         work_rights, remote_flexible, other_fields,
                          stage, is_active, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Screening', true, now(), now())
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), 'Screening', true, now(), now())
                     """, id, loginId, name, email, phone, linkedin,
-                    currentTitle, location, years, seniority,
-                    salaryMin, salaryMax, notice, workRights, remoteFlexible);
+                    currentTitle, currentCompany, location, state, years, seniority,
+                    salaryMin, salaryMax, notice, workRights, remoteFlexible, otherFieldsJson);
             importedCount++;
         }
 
-        return new CandidateImportResultResponse(importedCount, duplicateCount, invalidCount, totalRows);
+        return new CandidateImportResultResponse(importedCount, updatedCount, duplicateCount, invalidCount, totalRows);
+    }
+
+    // ─── Dedup: find an existing candidate this row should merge into ─────────
+    // Primary key: name + (email or phone). Fallback (only when the row has
+    // neither email nor phone): name + current_company + state + current_title,
+    // and only when all three of those are present on the row.
+
+    private String findExistingCandidateId(String loginId, String name, String email, String phone,
+                                            String currentCompany, String state, String currentTitle) {
+        if (email != null) {
+            return jdbc.query(
+                    "select id from candidates where login_id = ? and lower(name) = lower(?) and lower(email) = lower(?) limit 1",
+                    (rs, n) -> rs.getString("id"), loginId, name, email)
+                    .stream().findFirst().orElse(null);
+        }
+        if (phone != null) {
+            return jdbc.query(
+                    "select id from candidates where login_id = ? and lower(name) = lower(?) and phone_number = ? limit 1",
+                    (rs, n) -> rs.getString("id"), loginId, name, phone)
+                    .stream().findFirst().orElse(null);
+        }
+        if (currentCompany != null && state != null && currentTitle != null) {
+            return jdbc.query("""
+                    select id from candidates
+                    where login_id = ? and lower(name) = lower(?)
+                      and lower(current_company) = lower(?) and lower(state) = lower(?) and lower(current_title) = lower(?)
+                    limit 1
+                    """,
+                    (rs, n) -> rs.getString("id"), loginId, name, currentCompany, state, currentTitle)
+                    .stream().findFirst().orElse(null);
+        }
+        return null;
+    }
+
+    // ─── Location resolution against the au_localities reference table ────────
+    // (same GeoNames-derived table TalentSearchService.resolveLocality uses for
+    // the radius-search feature — see TalentSearchService.java)
+
+    private record LocationResolution(String suburb, String state) {}
+
+    private LocationResolution resolveLocation(String raw) {
+        String input = trimToNull(raw);
+        if (input == null) return new LocationResolution(null, null);
+
+        List<String> stateMatch = jdbc.query(
+                "select distinct state_code from au_localities where lower(state_code) = lower(?) or lower(state_name) = lower(?) limit 1",
+                (rs, n) -> rs.getString("state_code"), input, input);
+        if (!stateMatch.isEmpty()) {
+            return new LocationResolution(null, stateMatch.get(0));
+        }
+
+        List<String> suburbStates = jdbc.query(
+                "select distinct state_code from au_localities where lower(suburb) = lower(?)",
+                (rs, n) -> rs.getString("state_code"), input);
+        if (suburbStates.size() == 1) {
+            return new LocationResolution(input, suburbStates.get(0));
+        }
+        // 0 matches, or a conflicting suburb name shared by multiple states — keep the
+        // suburb text but leave state blank since it can't be resolved unambiguously.
+        return new LocationResolution(input, null);
+    }
+
+    // ─── Catch-all for spreadsheet columns with no dedicated DB field ─────────
+
+    private String buildOtherFieldsJson(Map<String, String> row, Set<String> mappedHeaders) {
+        Map<String, String> other = new LinkedHashMap<>();
+        for (Map.Entry<String, String> e : row.entrySet()) {
+            if (mappedHeaders.contains(e.getKey())) continue;
+            String v = trimToNull(e.getValue());
+            if (v != null) other.put(e.getKey(), v);
+        }
+        if (other.isEmpty()) return null;
+        try {
+            return objectMapper.writeValueAsString(other);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // ─── Async job: start ────────────────────────────────────────────────────
@@ -228,6 +338,7 @@ public class CandidateImportService {
         resp.put("error",  job.error());
         if (job.result() != null) {
             resp.put("importedCount",  job.result().importedCount());
+            resp.put("updatedCount",   job.result().updatedCount());
             resp.put("duplicateCount", job.result().duplicateCount());
             resp.put("invalidCount",   job.result().invalidCount());
             resp.put("totalRows",      job.result().totalRows());
@@ -240,18 +351,22 @@ public class CandidateImportService {
     private Map<String, String> mapColumnsWithAI(List<String> headers) {
         String systemPrompt = """
                 You are mapping spreadsheet column headers to a fixed set of candidate database fields.
-                Target fields: name, email, phone_number, linkedin_url, current_title, location,
-                years_experience, seniority_level, expected_salary_min, expected_salary_max,
-                notice_period_weeks, work_rights, remote_flexible
+                Target fields: first_name, last_name, email, phone_number, linkedin_url, current_title,
+                current_company, location, years_experience, seniority_level, expected_salary_min,
+                expected_salary_max, notice_period_weeks, work_rights, remote_flexible
                 Given a list of raw column headers from an uploaded spreadsheet, return a JSON object
                 mapping each target field to the BEST matching raw header from the list, or null if no
-                reasonable match exists. Consider variations like "Full Name", "Candidate Name", "Email Address",
-                "Mobile", "Phone", "LinkedIn", "LinkedIn Profile", "LinkedIn URL", "Job Title", "Current Role",
-                "City", "Suburb", "Years of Experience", "YOE", "Seniority", "Level", "Min Salary", "Max Salary",
-                "Notice Period (weeks)", "Visa Status", "Work Rights", "Remote OK", "Hybrid/Remote" etc.
+                reasonable match exists. Consider variations like "First Name", "Given Name", "Last Name",
+                "Surname", "Family Name", "Email Address", "Mobile", "Phone", "LinkedIn", "LinkedIn Profile",
+                "LinkedIn URL", "Job Title", "Current Role", "Employer", "Company", "Current Company",
+                "City", "Suburb", "Location", "Years of Experience", "YOE", "Seniority", "Level", "Min Salary",
+                "Max Salary", "Notice Period (weeks)", "Visa Status", "Work Rights", "Remote OK", "Hybrid/Remote" etc.
+                If the spreadsheet has a single combined name column (e.g. "Name", "Full Name", "Candidate Name"),
+                map it to first_name and leave last_name null.
                 Return ONLY valid JSON, no markdown, in this exact format:
-                {"name": "raw_header_or_null", "email": "raw_header_or_null", "phone_number": "raw_header_or_null",
-                 "linkedin_url": "raw_header_or_null", "current_title": "raw_header_or_null", "location": "raw_header_or_null",
+                {"first_name": "raw_header_or_null", "last_name": "raw_header_or_null", "email": "raw_header_or_null",
+                 "phone_number": "raw_header_or_null", "linkedin_url": "raw_header_or_null", "current_title": "raw_header_or_null",
+                 "current_company": "raw_header_or_null", "location": "raw_header_or_null",
                  "years_experience": "raw_header_or_null", "seniority_level": "raw_header_or_null",
                  "expected_salary_min": "raw_header_or_null", "expected_salary_max": "raw_header_or_null",
                  "notice_period_weeks": "raw_header_or_null", "work_rights": "raw_header_or_null",
@@ -278,7 +393,8 @@ public class CandidateImportService {
         } catch (Exception e) {
             System.err.println("[CandidateImport] AI mapping failed: " + e.getMessage());
             Map<String, String> fallback = new HashMap<>();
-            fallback.put("name", null);
+            fallback.put("first_name", null);
+            fallback.put("last_name", null);
             fallback.put("email", null);
             fallback.put("phone_number", null);
             fallback.put("linkedin_url", null);
