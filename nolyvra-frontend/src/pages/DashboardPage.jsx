@@ -976,7 +976,7 @@ export default function DashboardPage() {
 
       {/* AI Prompt + Monthly Target row */}
       <Box sx={{ display: "flex", gap: 2, alignItems: "stretch" }}>
-        <Box sx={{ flex: "0 0 280px" }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <AiPromptCard />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
