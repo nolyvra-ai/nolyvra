@@ -74,6 +74,39 @@ public class LoginService {
         return rows.isEmpty() ? 0 : rows.get(0);
     }
 
+    public double getTotalFeesLast30Days(String loginId) {
+        List<Double> rows = jdbc.query("""
+                select coalesce(sum(total), 0) from xero_invoice
+                where login_id = ?
+                  and created_at >= now() - interval '30 days'
+                """,
+                (rs, r) -> rs.getDouble(1),
+                loginId);
+        return rows.isEmpty() ? 0 : rows.get(0);
+    }
+
+    public int getNewClientsLast30Days(String loginId) {
+        List<Integer> rows = jdbc.query("""
+                select count(*) from clients
+                where login_id = ?
+                  and created_at >= now() - interval '30 days'
+                """,
+                (rs, r) -> rs.getInt(1),
+                loginId);
+        return rows.isEmpty() ? 0 : rows.get(0);
+    }
+
+    public int getNewJobsLast30Days(String loginId) {
+        List<Integer> rows = jdbc.query("""
+                select count(*) from jobs
+                where login_id = ?
+                  and created_at >= now() - interval '30 days'
+                """,
+                (rs, r) -> rs.getInt(1),
+                loginId);
+        return rows.isEmpty() ? 0 : rows.get(0);
+    }
+
     // ── Dashboard Insights ────────────────────────────────────────────────────
 
     private static final List<String> SKILL_LIST = List.of(

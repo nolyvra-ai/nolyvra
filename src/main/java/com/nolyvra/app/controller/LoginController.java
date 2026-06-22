@@ -90,6 +90,9 @@ public class LoginController {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("fulfilledThisMonth", fulfilled);
         result.put("monthlyTarget", target);
+        result.put("totalFeesLast30Days", loginService.getTotalFeesLast30Days(loginId));
+        result.put("newClientsLast30Days", loginService.getNewClientsLast30Days(loginId));
+        result.put("newJobsLast30Days", loginService.getNewJobsLast30Days(loginId));
         return result;
     }
 }

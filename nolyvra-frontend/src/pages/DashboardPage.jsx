@@ -602,58 +602,57 @@ function GaugeArc({ fulfilled, target }) {
   );
 }
 
-function MonthlyTargetCard({ fulfilled, target }) {
+// Simple metric tile — label, big number, "Last 30 days" caption.
+function MetricTile({ label, value }) {
+  return (
+    <Box sx={{
+      bgcolor: "#FAFBFD", border: `1px solid ${BORDER}`, borderRadius: "10px",
+      p: "14px 16px", display: "flex", flexDirection: "column", gap: 0.75, justifyContent: "center",
+    }}>
+      <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: TEXT }}>{label}</Typography>
+      <Typography sx={{ fontSize: 22, fontWeight: 800, color: TEXT }}>{value}</Typography>
+      <Typography sx={{ fontSize: 10.5, color: MUTED }}>Last 30 days</Typography>
+    </Box>
+  );
+}
+
+function MonthlyTargetCard({ fulfilled, target, totalFees, newClients, newJobs }) {
   const remaining = Math.max(0, target - fulfilled);
   const pct       = target > 0 ? Math.min(100, Math.round((fulfilled / target) * 100)) : 0;
   const isComplete = fulfilled >= target;
   const monthLabel = new Date().toLocaleString("en-GB", { month: "long", year: "numeric" });
+  const feesLabel = `$${Math.round(totalFees ?? 0).toLocaleString("en-AU")}`;
 
   return (
     <Paper elevation={0} sx={{ ...CARD_BASE, display: "flex", flexDirection: "column", height: "100%" }}>
       <CardHead title="Monthly Target" />
-      <Box sx={{
-        p: 2, flex: 1,
-        display: "flex", flexDirection: "column", alignItems: "center",
-        justifyContent: "center", gap: 1.5,
-      }}>
-        {/* Gauge */}
-        <GaugeArc fulfilled={fulfilled} target={target} />
+      <Box sx={{ p: 2, flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
 
-        {/* Label */}
-        <Box sx={{ textAlign: "center" }}>
-          <Typography sx={{ fontSize: 12, fontWeight: 600, color: isComplete ? SUCCESS : TEXT }}>
-            {isComplete ? "Monthly target achieved!" : `${remaining} more to reach goal`}
-          </Typography>
-          <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
-            {pct}% complete · {monthLabel}
-          </Typography>
-        </Box>
-
-        {/* Stats row */}
+        {/* Tile 1: Monthly Target gauge — unchanged */}
         <Box sx={{
-          display: "flex", width: "100%",
-          bgcolor: "#FAFBFD", border: `1px solid ${BORDER}`,
-          borderRadius: "8px", p: "10px 0",
-          justifyContent: "space-evenly", alignItems: "center",
+          bgcolor: "#FAFBFD", border: `1px solid ${BORDER}`, borderRadius: "10px",
+          p: "14px 16px",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1,
         }}>
-          {[
-            { val: fulfilled, label: "Placed"   },
-            { val: target,    label: "Target"   },
-            { val: `${pct}%`, label: "Progress" },
-          ].map(({ val, label }, i, arr) => (
-            <React.Fragment key={label}>
-              <Box sx={{ textAlign: "center" }}>
-                <Typography sx={{ fontSize: 18, fontWeight: 800, color: TEXT }}>{val}</Typography>
-                <Typography sx={{ fontSize: 10, color: MUTED, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-                  {label}
-                </Typography>
-              </Box>
-              {i < arr.length - 1 && (
-                <Box sx={{ width: "1px", height: 30, bgcolor: BORDER }} />
-              )}
-            </React.Fragment>
-          ))}
+          <GaugeArc fulfilled={fulfilled} target={target} />
+          <Box sx={{ textAlign: "center" }}>
+            <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: isComplete ? SUCCESS : TEXT }}>
+              {isComplete ? "Monthly target achieved!" : `${remaining} more to reach goal`}
+            </Typography>
+            <Typography sx={{ fontSize: 10.5, color: MUTED, mt: 0.25 }}>
+              {pct}% complete · {monthLabel}
+            </Typography>
+          </Box>
         </Box>
+
+        {/* Tile 2: Total Fees */}
+        <MetricTile label="Total Fees" value={feesLabel} />
+
+        {/* Tile 3: New Clients */}
+        <MetricTile label="New Clients" value={newClients ?? 0} />
+
+        {/* Tile 4: New Jobs */}
+        <MetricTile label="New Jobs" value={newJobs ?? 0} />
       </Box>
     </Paper>
   );
@@ -817,7 +816,10 @@ export default function DashboardPage() {
   const [recentAnalyses,      setRecentAnalyses]      = useState([]);
   const [reminders,           setReminders]           = useState([]);
   const [candidateCountByJob, setCandidateCountByJob] = useState({});
-  const [monthlyStats,        setMonthlyStats]        = useState({ fulfilledThisMonth: 0, monthlyTarget: 35 });
+  const [monthlyStats,        setMonthlyStats]        = useState({
+    fulfilledThisMonth: 0, monthlyTarget: 35,
+    totalFeesLast30Days: 0, newClientsLast30Days: 0, newJobsLast30Days: 0,
+  });
   const [upcomingInterviews,     setUpcomingInterviews]     = useState([]);
   const [insights,               setInsights]               = useState(null);
   const [loading,             setLoading]             = useState(true);
@@ -833,7 +835,10 @@ export default function DashboardPage() {
           apiGet("/api/jobs"),
           apiGet("/api/analyses/recent"),
           apiGet("/api/reminders?filter=today"),
-          apiGet("/api/dashboard/monthly-stats").catch(() => ({ fulfilledThisMonth: 0, monthlyTarget: 35 })),
+          apiGet("/api/dashboard/monthly-stats").catch(() => ({
+            fulfilledThisMonth: 0, monthlyTarget: 35,
+            totalFeesLast30Days: 0, newClientsLast30Days: 0, newJobsLast30Days: 0,
+          })),
           apiGet("/api/interviews").catch(() => []),
           apiGet("/api/dashboard/insights").catch(() => null),
         ]);
@@ -971,13 +976,16 @@ export default function DashboardPage() {
 
       {/* AI Prompt + Monthly Target row */}
       <Box sx={{ display: "flex", gap: 2, alignItems: "stretch" }}>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Box sx={{ flex: "0 0 280px" }}>
           <AiPromptCard />
         </Box>
-        <Box sx={{ flex: "0 0 280px" }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <MonthlyTargetCard
             fulfilled={monthlyStats.fulfilledThisMonth}
             target={monthlyStats.monthlyTarget}
+            totalFees={monthlyStats.totalFeesLast30Days}
+            newClients={monthlyStats.newClientsLast30Days}
+            newJobs={monthlyStats.newJobsLast30Days}
           />
         </Box>
       </Box>
