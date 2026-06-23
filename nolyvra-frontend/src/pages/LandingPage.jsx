@@ -776,7 +776,7 @@ export default function LandingPage() {
               {name:"Seek",    bg:"#E60278",  el:<svg width="22" height="22" viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="#E60278"/><text x="24" y="32" textAnchor="middle" fill="#fff" fontSize="22" fontWeight="700" fontFamily="Arial">S</text></svg>},
               {name:"Indeed",  bg:"#003A9B",  el:<svg width="22" height="22" viewBox="0 0 48 48"><circle cx="24" cy="24" r="24" fill="#003A9B"/><text x="24" y="32" textAnchor="middle" fill="#fff" fontSize="20" fontWeight="700" fontFamily="Arial">i</text></svg>},
               {name:"AWS",     bg:"#fff",     el:<img src="/aws_logo.png" alt="AWS" style={{width:28,height:18,objectFit:"contain",display:"block"}} />},
-              {name:"Xero",    bg:"#fff",     el:<img src="/xero_logo.png" alt="Xero" style={{width:26,height:26,objectFit:"contain",display:"block"}} />},
+              {name:"Xero",    bg:"#fff",     el:<img src="/xero_logo.svg" alt="Xero" style={{width:26,height:26,objectFit:"contain",display:"block"}} />},
               {name:"Render",  bg:"#46E3B7",  el:<svg width="22" height="22" viewBox="0 0 48 48"><rect width="48" height="48" rx="6" fill="#46E3B7"/><text x="24" y="33" textAnchor="middle" fill="#0F1623" fontSize="24" fontWeight="800" fontFamily="Arial">R</text></svg>},
             ]).map(({name,bg,el},i)=>(
               <div key={i} className="nl-int-chip">
