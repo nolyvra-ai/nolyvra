@@ -26,7 +26,8 @@ public class WorkflowService {
     public WorkflowResponse getWorkflow(String candidateId, String loginId) {
 
         var rows = jdbc.query("""
-                select c.id, c.name, c.email, c.linkedin_url, c.job_id, c.stage,
+                select c.id, c.name, c.email, c.linkedin_url, c.phone_number, c.location, c.state,
+                       c.job_id, c.stage,
                        c.recruiter_notes, c.created_at, c.cv_text, c.interview_questions,
                        j.title as job_title, j.company,
                        a.consistency_score, a.capability_score, a.risk_level
@@ -49,6 +50,9 @@ public class WorkflowService {
                     m.put("name", rs.getString("name"));
                     m.put("email", rs.getString("email") != null ? rs.getString("email") : "");
                     m.put("linkedinUrl", rs.getString("linkedin_url") != null ? rs.getString("linkedin_url") : "");
+                    m.put("phone", rs.getString("phone_number") != null ? rs.getString("phone_number") : "");
+                    m.put("location", rs.getString("location") != null ? rs.getString("location") : "");
+                    m.put("state", rs.getString("state") != null ? rs.getString("state") : "");
                     m.put("jobId", rs.getString("job_id"));
                     m.put("jobTitle", rs.getString("job_title") != null ? rs.getString("job_title") : "");
                     m.put("company", rs.getString("company") != null ? rs.getString("company") : "");
@@ -76,6 +80,9 @@ public class WorkflowService {
                 (String) row.get("name"),
                 (String) row.get("email"),
                 (String) row.get("linkedinUrl"),
+                (String) row.get("phone"),
+                (String) row.get("location"),
+                (String) row.get("state"),
                 (String) row.get("jobId"),
                 (String) row.get("jobTitle"),
                 (String) row.get("company"),

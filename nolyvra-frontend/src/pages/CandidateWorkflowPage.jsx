@@ -353,7 +353,27 @@ export default function CandidateWorkflowPage() {
             {workflow.email && (
               <Box sx={{bgcolor:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.8)",
                 px:"10px",py:"3px",borderRadius:"20px",fontSize:11}}>
-                {workflow.email}
+                ✉ {workflow.email}
+              </Box>
+            )}
+            {workflow.phone && (
+              <Box sx={{bgcolor:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.8)",
+                px:"10px",py:"3px",borderRadius:"20px",fontSize:11}}>
+                ☎ {workflow.phone}
+              </Box>
+            )}
+            {(workflow.location || workflow.state) && (
+              <Box sx={{bgcolor:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.8)",
+                px:"10px",py:"3px",borderRadius:"20px",fontSize:11}}>
+                📍 {[workflow.location, workflow.state].filter(Boolean).join(", ")}
+              </Box>
+            )}
+            {workflow.linkedinUrl && (
+              <Box component="a" href={workflow.linkedinUrl} target="_blank" rel="noopener noreferrer"
+                sx={{bgcolor:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.8)",
+                px:"10px",py:"3px",borderRadius:"20px",fontSize:11,textDecoration:"none",
+                "&:hover":{bgcolor:"rgba(255,255,255,0.18)",color:"#fff"}}}>
+                🔗 LinkedIn
               </Box>
             )}
           </Box>
