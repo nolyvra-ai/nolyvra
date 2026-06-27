@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
@@ -26,6 +27,8 @@ public class CoWorkerService {
     private final TokenService tokenService;
     private final AnalysisService analysisService; // Change 1: added
     private final ExecutorService analysisPool;
+    private final JobService jobService;
+    private final PlanService planService;
 
     public CoWorkerService(
             OpenAIClient openAI,
@@ -34,6 +37,8 @@ public class CoWorkerService {
             TokenService tokenService,
             @Lazy AnalysisService analysisService, // Change 1: added (@Lazy avoids circular dependency)
             CoWorkerAnalysisExecutor analysisExecutor,
+            JobService jobService,
+            PlanService planService,
             @Value("${openai.model:gpt-4o-mini}") String model) {
         this.openAI = openAI;
         this.objectMapper = objectMapper;
@@ -41,6 +46,8 @@ public class CoWorkerService {
         this.tokenService = tokenService;
         this.analysisService = analysisService; // Change 1: added
         this.analysisPool = analysisExecutor.executorService();
+        this.jobService = jobService;
+        this.planService = planService;
         this.model = model;
     }
 
@@ -70,7 +77,7 @@ public class CoWorkerService {
                 {
                   "message": "<friendly conversational reply, briefly confirm what you found and what you plan to do>",
                   "pendingAction": {
-                    "type": "RUN_ANALYSIS|SCHEDULE_INTERVIEW|RESCHEDULE_AND_NOTIFY|MOVE_PIPELINE|EMAIL|CREATE_REMINDER|NONE",
+                    "type": "RUN_ANALYSIS|SCHEDULE_INTERVIEW|RESCHEDULE_AND_NOTIFY|MOVE_PIPELINE|EMAIL|CREATE_REMINDER|CREATE_JOB|NONE",
                     "description": "<1-sentence human-readable action description>",
                     "params": { <action-specific parameters — see below> }
                   }
@@ -99,6 +106,12 @@ public class CoWorkerService {
 
                 CREATE_REMINDER:
                   { "title": "...", "candidateId": "cand-xxx or null", "dueAt": "ISO datetime", "priority": "High|Normal|Low" }
+
+                CREATE_JOB:
+                  { "title": "...", "company": "...", "jobType": "Full-time|Part-time|Contract|Temporary|Remote|Hybrid|Onsite", "seniority": "...", "jdText": "...", "location": "...", "stackTags": ["skill", ...], "jobStatus": "Active", "salary": number or null, "currency": "AUD|USD|GBP|EUR|NZD|SGD", "feePercentage": number or null }
+                  Use this when the user asks you to create, open, add, or publish a new job/vacancy/role from a brief or JD.
+                  title and jdText are required. If the user gives only a rough brief, turn it into a professional job description.
+                  If company, location, seniority, salary, or fee are not mentioned, use null or "" rather than inventing them.
 
                 Rules:
                 - Always match candidate and job names to real IDs from the context above.
@@ -222,6 +235,7 @@ public class CoWorkerService {
             case "MOVE_PIPELINE" -> executeMovePipeline(loginId, params);
             case "EMAIL" -> buildEmailNavigation(params);
             case "CREATE_REMINDER" -> executeCreateReminder(loginId, params);
+            case "CREATE_JOB" -> executeCreateJob(loginId, params);
             default -> Map.of("message", "Unknown action type: " + type, "success", false);
         };
     }
@@ -502,6 +516,52 @@ public class CoWorkerService {
             System.err.println("[CoWorker] executeCreateReminder() failed: " + e.getMessage());
             e.printStackTrace();
             return Map.of("message", "Could not create the reminder. Please try again.", "success", false);
+        }
+    }
+
+    private Map<String, Object> executeCreateJob(String loginId, Map<String, Object> params) {
+        String title = textParam(params, "title", "");
+        String jdText = textParam(params, "jdText", "");
+
+        if (title.isBlank() || jdText.isBlank()) {
+            return Map.of(
+                    "message", "I need at least a job title and job description before creating the job.",
+                    "success", false);
+        }
+
+        try {
+            if (planService != null && planService.isJobLimitReached(loginId)) {
+                return Map.of(
+                        "message", "Your job limit has been reached. Please upgrade your plan before creating another job.",
+                        "success", false);
+            }
+
+            JobCreateRequest request = new JobCreateRequest(
+                    title,
+                    textParam(params, "company", ""),
+                    textParam(params, "jobType", "Full-time"),
+                    textParam(params, "seniority", null),
+                    jdText,
+                    textParam(params, "location", ""),
+                    listParam(params, "stackTags"),
+                    textParam(params, "jobStatus", "Active"),
+                    decimalParam(params, "salary"),
+                    textParam(params, "currency", "AUD"),
+                    decimalParam(params, "feePercentage"));
+
+            Long taskId = createTask(loginId, "CREATE_JOB", "Created job: " + title);
+            JobResponse job = jobService.createJob(request, loginId);
+            markTaskDone(taskId);
+
+            return Map.of(
+                    "message", "Job created: " + job.title() + ". Opening the candidate add page so you can start filling it.",
+                    "success", true,
+                    "jobId", job.id(),
+                    "navigateTo", "/jobs/" + job.id() + "/add-candidates-modern");
+        } catch (Exception e) {
+            System.err.println("[CoWorker] executeCreateJob() failed: " + e.getMessage());
+            e.printStackTrace();
+            return Map.of("message", "Could not create the job. Please try again.", "success", false);
         }
     }
 
@@ -812,5 +872,47 @@ public class CoWorkerService {
             t = t.replaceAll("(?s)^```[a-z]*\\n?", "").replaceAll("```$", "").strip();
         }
         return t;
+    }
+
+    private static String textParam(Map<String, Object> params, String key, String fallback) {
+        Object value = params.get(key);
+        if (value == null) return fallback;
+        String text = value.toString().trim();
+        return text.isEmpty() ? fallback : text;
+    }
+
+    private static BigDecimal decimalParam(Map<String, Object> params, String key) {
+        Object value = params.get(key);
+        if (value == null) return null;
+        if (value instanceof BigDecimal decimal) return decimal;
+        if (value instanceof Number number) return BigDecimal.valueOf(number.doubleValue());
+        String text = value.toString().trim();
+        if (text.isEmpty() || text.equalsIgnoreCase("null")) return null;
+        try {
+            return new BigDecimal(text.replace(",", ""));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static List<String> listParam(Map<String, Object> params, String key) {
+        Object value = params.get(key);
+        if (value instanceof Collection<?> collection) {
+            return collection.stream()
+                    .filter(Objects::nonNull)
+                    .map(Object::toString)
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .distinct()
+                    .toList();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            return Arrays.stream(text.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .distinct()
+                    .toList();
+        }
+        return List.of();
     }
 }

@@ -520,7 +520,6 @@ export default function CoWorkerPage() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Switch to a session ─────────────────────────────────────────────────────
@@ -580,7 +579,7 @@ export default function CoWorkerPage() {
       if (res.pendingAction && res.pendingAction.type !== "NONE") {
         setPendingAction(res.pendingAction);
       }
-    } catch (e) {
+    } catch {
       setMessages(prev => [...prev, {
         role: "assistant",
         content: "Sorry, I had trouble with that. Please try again.",
@@ -608,6 +607,16 @@ export default function CoWorkerPage() {
         setMessages(prev => [...prev, { role: "assistant", content: res.message, id: Date.now() }]);
         setLoading(false);
         nav("/email", { state: { prefill: res.emailParams } });
+        return;
+      }
+      if (res.navigateTo) {
+        setMessages(prev => [...prev, {
+          role: "assistant",
+          content: res.message || "Done!",
+          id: Date.now(),
+        }]);
+        setLoading(false);
+        nav(res.navigateTo);
         return;
       }
       setMessages(prev => [...prev, {

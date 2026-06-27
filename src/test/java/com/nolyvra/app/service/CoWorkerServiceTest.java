@@ -2,22 +2,30 @@ package com.nolyvra.app.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nolyvra.app.config.CoWorkerAnalysisExecutor;
+import com.nolyvra.app.model.CoWorkerConfirmRequest;
+import com.nolyvra.app.model.JobCreateRequest;
+import com.nolyvra.app.model.JobResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class CoWorkerServiceTest {
 
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
+    private final JobService jobService = mock(JobService.class);
+    private final PlanService planService = mock(PlanService.class);
     private ExecutorService analysisPool;
     private CoWorkerService service;
 
@@ -34,6 +42,8 @@ class CoWorkerServiceTest {
                 null,
                 null,
                 analysisExecutor,
+                jobService,
+                planService,
                 "gpt-4o-mini");
     }
 
@@ -83,6 +93,61 @@ class CoWorkerServiceTest {
                 argThat(sql -> sql.contains("where login_id = ?") && !sql.contains("status = ?")),
                 anyTaskMapper(),
                 eq("local@nolyvra.test"));
+    }
+
+    @Test
+    void confirmCreateJobDelegatesToJobServiceAndReturnsNavigation() {
+        when(planService.isJobLimitReached("local@nolyvra.test")).thenReturn(false);
+        when(jobService.createJob(any(JobCreateRequest.class), eq("local@nolyvra.test")))
+                .thenReturn(new JobResponse(
+                        "job-123",
+                        "Senior Backend Engineer",
+                        "Nolyvra",
+                        "Full-time",
+                        "Senior",
+                        "Build APIs",
+                        "Melbourne",
+                        List.of("Java", "Spring Boot"),
+                        Instant.now(),
+                        "Active",
+                        null,
+                        "AUD",
+                        null,
+                        null));
+
+        Map<String, Object> result = service.confirmAction(
+                "local@nolyvra.test",
+                new CoWorkerConfirmRequest("CREATE_JOB", Map.of(
+                        "title", "Senior Backend Engineer",
+                        "company", "Nolyvra",
+                        "jobType", "Full-time",
+                        "seniority", "Senior",
+                        "jdText", "Build APIs",
+                        "location", "Melbourne",
+                        "stackTags", List.of("Java", "Spring Boot"),
+                        "currency", "AUD")));
+
+        verify(jobService).createJob(argThat(req ->
+                        req.title().equals("Senior Backend Engineer")
+                                && req.jdText().equals("Build APIs")
+                                && req.stackTags().equals(List.of("Java", "Spring Boot"))),
+                eq("local@nolyvra.test"));
+        assertEquals(true, result.get("success"));
+        assertEquals("/jobs/job-123/add-candidates-modern", result.get("navigateTo"));
+    }
+
+    @Test
+    void confirmCreateJobRespectsJobLimit() {
+        when(planService.isJobLimitReached("local@nolyvra.test")).thenReturn(true);
+
+        Map<String, Object> result = service.confirmAction(
+                "local@nolyvra.test",
+                new CoWorkerConfirmRequest("CREATE_JOB", Map.of(
+                        "title", "Senior Backend Engineer",
+                        "jdText", "Build APIs")));
+
+        verify(jobService, never()).createJob(any(), anyString());
+        assertEquals(false, result.get("success"));
     }
 
     @SuppressWarnings("unchecked")
