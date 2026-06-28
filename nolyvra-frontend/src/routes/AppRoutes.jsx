@@ -23,6 +23,17 @@ import InterviewAnalysisPage  from "../pages/InterviewAnalysisPage";
 import ClientTrackerPage       from "../pages/ClientTrackerPage";
 import PrivacyPage             from "../pages/PrivacyPage";
 import TermsPage               from "../pages/TermsPage";
+import CrmEmployeesPage        from "../pages/CrmEmployeesPage";
+import CrmEmployeeDetailPage   from "../pages/CrmEmployeeDetailPage";
+import CrmDepartmentsPage      from "../pages/CrmDepartmentsPage";
+import CrmOnboardingPage          from "../pages/CrmOnboardingPage";
+import CrmOnboardingTemplatesPage from "../pages/CrmOnboardingTemplatesPage";
+import CrmLeavePage               from "../pages/CrmLeavePage";
+import CrmWorkflowsPage           from "../pages/CrmWorkflowsPage";
+import CrmExpensePage             from "../pages/CrmExpensePage";
+import CrmGrievancePage           from "../pages/CrmGrievancePage";
+import CrmDisciplinaryPage        from "../pages/CrmDisciplinaryPage";
+import CrmCoWorkerPage            from "../pages/CrmCoWorkerPage";
 
 export default function AppRoutes() {
   return (
@@ -56,6 +67,17 @@ export default function AppRoutes() {
       <Route path="/settings"                           element={<SettingsPage />} />
       <Route path="/coworker"                           element={<CoWorkerPage />} />
       <Route path="/clients"                            element={<ClientTrackerPage />} />
+      <Route path="/crm/employees"                      element={<CrmEmployeesPage />} />
+      <Route path="/crm/employees/:id"                  element={<CrmEmployeeDetailPage />} />
+      <Route path="/crm/departments"                    element={<CrmDepartmentsPage />} />
+      <Route path="/crm/onboarding"                     element={<CrmOnboardingPage />} />
+      <Route path="/crm/onboarding/templates"           element={<CrmOnboardingTemplatesPage />} />
+      <Route path="/crm/leave"                          element={<CrmLeavePage />} />
+      <Route path="/crm/workflows"                      element={<CrmWorkflowsPage />} />
+      <Route path="/crm/expenses"                       element={<CrmExpensePage />} />
+      <Route path="/crm/grievances"                     element={<CrmGrievancePage />} />
+      <Route path="/crm/disciplinary"                   element={<CrmDisciplinaryPage />} />
+      <Route path="/crm/coworker"                        element={<CrmCoWorkerPage />} />
       <Route path="*"                                   element={<Navigate to="/" replace />} />
     </Routes>
   );

@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAppMode } from "../context/AppModeContext";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const BG     = "#0F1623";
@@ -61,6 +62,7 @@ export default function TopBar() {
   const { pathname } = useLocation();
   const nav = useNavigate();
   const loginId = localStorage.getItem("name") || "";
+  const { mode } = useAppMode();
 
   const [tokens, setTokens] = useState(null);
 
@@ -117,16 +119,30 @@ export default function TopBar() {
       </Box> */} 
 
       <Box component="span" sx={{ fontSize: 14, color: "rgba(255,255,255,0.15)", mr: 0.5, userSelect: "none", flexShrink: 0 }}>│</Box>
-      <Box component="span" sx={{ fontSize: 10, color: "rgba(255,255,255,0.25)", mr: "4px", whiteSpace: "nowrap", userSelect: "none", flexShrink: 0 }}>
-        PAGES:
-      </Box>
 
-      {PILLS.map((pill, i) => (
-        <Box key={pill.label} sx={{ display: "flex", alignItems: "center", gap: "5px" }}>
-          <NavPill num={pill.num} label={pill.label} to={pill.to} active={isActive(pill)} isNew={pill.isNew} />
-          {i < PILLS.length - 1 && <Arrow />}
+      {mode === "crmx" ? (
+        <Box sx={{
+          px: "14px", py: "4px", borderRadius: "20px", flexShrink: 0,
+          background: "linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)",
+          color: "#fff", fontSize: 12, fontWeight: 700,
+          display: "flex", alignItems: "center", gap: "6px",
+          userSelect: "none",
+        }}>
+          ✦ CRMx
         </Box>
-      ))}
+      ) : (
+        <>
+          <Box component="span" sx={{ fontSize: 10, color: "rgba(255,255,255,0.25)", mr: "4px", whiteSpace: "nowrap", userSelect: "none", flexShrink: 0 }}>
+            PAGES:
+          </Box>
+          {PILLS.map((pill, i) => (
+            <Box key={pill.label} sx={{ display: "flex", alignItems: "center", gap: "5px" }}>
+              <NavPill num={pill.num} label={pill.label} to={pill.to} active={isActive(pill)} isNew={pill.isNew} />
+              {i < PILLS.length - 1 && <Arrow />}
+            </Box>
+          ))}
+        </>
+      )}
 
       {/* Token balance pill */}
       {tokens !== null && (

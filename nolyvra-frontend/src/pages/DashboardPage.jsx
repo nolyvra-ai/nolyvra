@@ -1,7 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useAppMode } from "../context/AppModeContext";
 import {
   Box, Paper, Typography, Table, TableHead, TableRow,
   TableCell, TableBody, Button, Alert,
+  Dialog, DialogTitle, DialogContent, DialogActions,
+  FormControl, InputLabel, Select, MenuItem, TextField,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
@@ -806,6 +809,446 @@ function ReminderRow({ reminder, isFirst }) {
   );
 }
 
+// ── Mode Toggle Bar ────────────────────────────────────────────────────────
+function ModeToggleBar({ mode, onToggle }) {
+  return (
+    <Box sx={{
+      display: "inline-flex", alignItems: "center",
+      bgcolor: "#0F1623", borderRadius: "7px", p: "3px",
+      border: `1px solid ${BORDER}`,
+    }}>
+      <Box onClick={() => onToggle("recruit")} sx={{
+        px: "10px", py: "3.5px", borderRadius: "5px",
+        cursor: "pointer", userSelect: "none",
+        bgcolor: mode === "recruit" ? ACCENT : "transparent",
+        color: mode === "recruit" ? "#fff" : "rgba(255,255,255,0.4)",
+        fontSize: 11, fontWeight: 600,
+        transition: "all .2s cubic-bezier(.4,0,.2,1)",
+        display: "flex", alignItems: "center", gap: "5px",
+        "&:hover": mode !== "recruit" ? { color: "rgba(255,255,255,0.7)" } : {},
+      }}>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+        </svg>
+        RecruitIQ
+      </Box>
+      <Box onClick={() => onToggle("crmx")} sx={{
+        px: "10px", py: "3.5px", borderRadius: "5px",
+        cursor: "pointer", userSelect: "none",
+        background: mode === "crmx" ? "linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)" : "transparent",
+        color: mode === "crmx" ? "#fff" : "rgba(200,180,255,0.5)",
+        fontSize: 11, fontWeight: 600,
+        transition: "all .2s cubic-bezier(.4,0,.2,1)",
+        display: "flex", alignItems: "center", gap: "5px",
+        "&:hover": mode !== "crmx" ? { color: "rgba(200,180,255,0.85)" } : {},
+      }}>
+        ✦ CRMx
+      </Box>
+    </Box>
+  );
+}
+
+// ── CRMx Dashboard ────────────────────────────────────────────────────────
+
+function CrmKpiCard({ label, value, sub, iconBg, iconEl, onClick }) {
+  return (
+    <Paper elevation={0} onClick={onClick}
+      sx={{ ...CARD_BASE, p: 2.25, display: "flex", alignItems: "flex-start", gap: 2,
+            cursor: onClick ? "pointer" : "default",
+            transition: "box-shadow .15s, border-color .15s",
+            "&:hover": onClick ? { boxShadow: "0 4px 14px rgba(15,22,35,0.09)", borderColor: "#C8D4E8" } : {} }}>
+      <Box sx={{ width: 46, height: 46, borderRadius: "11px", bgcolor: iconBg,
+        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        {iconEl}
+      </Box>
+      <Box sx={{ minWidth: 0 }}>
+        <Typography sx={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.55px" }}>
+          {label}
+        </Typography>
+        <Typography sx={{ fontSize: 30, fontWeight: 800, color: TEXT, lineHeight: 1.15, mt: 0.25 }}>
+          {value ?? 0}
+        </Typography>
+        {sub && <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.15 }}>{sub}</Typography>}
+      </Box>
+    </Paper>
+  );
+}
+
+function WorkflowHealthCard({ title, inProgress, resolvedLabel, resolvedCount, color, colorL, to, nav }) {
+  const total = inProgress + resolvedCount;
+  const pct   = total > 0 ? Math.round(inProgress / total * 100) : 0;
+  return (
+    <Paper elevation={0} sx={{ ...CARD_BASE, p: 2, display: "flex", flexDirection: "column", gap: 1.25 }}>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT }}>{title}</Typography>
+        <Box onClick={() => nav(to)} sx={{
+          fontSize: 11, color: ACCENT, cursor: "pointer", userSelect: "none",
+          "&:hover": { textDecoration: "underline" },
+        }}>View →</Box>
+      </Box>
+      <Box sx={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
+        <Typography sx={{ fontSize: 28, fontWeight: 800, color: inProgress > 0 ? color : MUTED, lineHeight: 1 }}>
+          {inProgress}
+        </Typography>
+        <Typography sx={{ fontSize: 10.5, color: MUTED, pb: "3px" }}>in progress</Typography>
+      </Box>
+      <Box sx={{ height: 5, bgcolor: "#F0F2F6", borderRadius: "3px", overflow: "hidden" }}>
+        <Box sx={{ width: `${pct}%`, height: "100%", bgcolor: color, borderRadius: "3px", transition: "width .4s" }} />
+      </Box>
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <Box sx={{
+          display: "inline-flex", alignItems: "center",
+          bgcolor: colorL, borderRadius: "20px", px: 1, py: "2px",
+          fontSize: 10.5, fontWeight: 600, color,
+        }}>
+          {resolvedCount} {resolvedLabel} this month
+        </Box>
+      </Box>
+    </Paper>
+  );
+}
+
+function DeptBar({ name, count, maxCount }) {
+  const pct = maxCount > 0 ? Math.round(count / maxCount * 100) : 0;
+  return (
+    <Box>
+      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.4 }}>
+        <Typography sx={{ fontSize: 11.5, color: TEXT, fontWeight: 500 }}>{name}</Typography>
+        <Typography sx={{ fontSize: 12, fontWeight: 700, color: PURPLE }}>{count}</Typography>
+      </Box>
+      <Box sx={{ height: 6, bgcolor: "#F0F2F6", borderRadius: "3px", overflow: "hidden" }}>
+        <Box sx={{ width: `${pct}%`, height: "100%",
+          background: "linear-gradient(90deg, #7C3AED 0%, #4F46E5 100%)",
+          borderRadius: "3px", transition: "width .5s ease" }} />
+      </Box>
+    </Box>
+  );
+}
+
+function CRMxDashboard({ loginId, nav }) {
+  const [summary,     setSummary]     = useState(null);
+  const [onboard,     setOnboard]     = useState([]);
+  const [depts,       setDepts]       = useState([]);
+  const [crmLoading,  setCrmLoading]  = useState(true);
+  const [crmError,    setCrmError]    = useState(null);
+
+  // convert dialog
+  const [convertOpen, setConvertOpen] = useState(false);
+  const [converting,  setConverting]  = useState(false);
+  const [convertErr,  setConvertErr]  = useState(null);
+  const [selCand,     setSelCand]     = useState(null);
+  const [convForm,    setConvForm]    = useState({
+    jobTitle: "", employmentType: "PERMANENT", startDate: "", departmentId: "",
+  });
+
+  const authH = () => ({ Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` });
+
+  async function loadCrm() {
+    setCrmLoading(true); setCrmError(null);
+    try {
+      const [sumRes, onbRes, deptRes] = await Promise.all([
+        fetch(`${API_BASE}/api/crm/dashboard/summary?loginId=${loginId}`, { headers: authH() }),
+        fetch(`${API_BASE}/api/crm/candidates/onboard?loginId=${loginId}`,  { headers: authH() }),
+        fetch(`${API_BASE}/api/crm/departments?loginId=${loginId}`,          { headers: authH() }),
+      ]);
+      if (sumRes.ok) setSummary(await sumRes.json());
+      setOnboard(onbRes.ok ? await onbRes.json() : []);
+      setDepts(deptRes.ok  ? await deptRes.json()  : []);
+    } catch (e) {
+      setCrmError(e.message);
+    } finally {
+      setCrmLoading(false);
+    }
+  }
+
+  useEffect(() => { loadCrm(); }, []); // eslint-disable-line
+
+  async function handleConvert() {
+    if (!selCand) return;
+    setConverting(true); setConvertErr(null);
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/crm/candidates/${selCand.id}/convert?loginId=${loginId}`,
+        { method: "POST", headers: { "Content-Type": "application/json", ...authH() },
+          body: JSON.stringify({ jobTitle: convForm.jobTitle || null,
+            employmentType: convForm.employmentType || "PERMANENT",
+            startDate: convForm.startDate || null, departmentId: convForm.departmentId || null, managerId: null }) },
+      );
+      if (!res.ok) { const t = await res.text().catch(() => ""); throw new Error(t || res.status); }
+      setConvertOpen(false); setSelCand(null);
+      setConvForm({ jobTitle: "", employmentType: "PERMANENT", startDate: "", departmentId: "" });
+      loadCrm();
+    } catch (e) { setConvertErr(e.message); }
+    finally { setConverting(false); }
+  }
+
+  if (crmLoading) return (
+    <Box sx={{ p: 4, display: "flex", justifyContent: "center" }}>
+      <Box sx={{ fontSize: 13, color: MUTED }}>Loading CRMx…</Box>
+    </Box>
+  );
+  if (crmError) return (
+    <Alert severity="error" sx={{ m: 2, fontSize: 12 }}>
+      {crmError.includes("403") ? "CRMx module not enabled for this account." : crmError}
+    </Alert>
+  );
+
+  const s = summary ?? {};
+  const cf = (k) => (v) => setConvForm(p => ({ ...p, [k]: v }));
+
+  const openCases = (s.promotionsInProgress ?? 0) + (s.salaryReviewsInProgress ?? 0)
+    + (s.expensesInProgress ?? 0) + (s.grievancesInProgress ?? 0) + (s.disciplinaryInProgress ?? 0);
+
+  const maxDeptCount = Math.max(1, ...(s.byDepartment ?? []).map(d => d.headcount));
+
+  const monthLabel = new Date().toLocaleString("en-GB", { month: "short" });
+
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+
+      {/* ── KPI row ── */}
+      <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2 }}>
+        <CrmKpiCard
+          label="Total Employees"
+          value={s.totalEmployees ?? 0}
+          sub={`${s.activeEmployees ?? 0} active · ${s.onboardingEmployees ?? 0} onboarding`}
+          iconBg={PURPLE_L}
+          iconEl={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={PURPLE} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>}
+          onClick={() => nav("/crm/employees")}
+        />
+        <CrmKpiCard
+          label="Open HR Cases"
+          value={openCases}
+          sub="Promotions · Salary · Expenses · Relations"
+          iconBg={WARN_L}
+          iconEl={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={WARN} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><line x1="7" y1="11.5" x2="17" y2="6.5"/><line x1="7" y1="12.5" x2="17" y2="17.5"/></svg>}
+          onClick={() => nav("/crm/workflows")}
+        />
+        <CrmKpiCard
+          label="Leave Pending Approval"
+          value={s.leavePending ?? 0}
+          sub={`${s.leaveApprovedThisMonth ?? 0} approved in ${monthLabel}`}
+          iconBg={ACCENT_L}
+          iconEl={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={ACCENT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>}
+          onClick={() => nav("/crm/leave")}
+        />
+        <CrmKpiCard
+          label="On Leave Today"
+          value={s.leaveActiveToday ?? 0}
+          sub={`${s.inactiveEmployees ?? 0} inactive employees`}
+          iconBg={DANGER_L}
+          iconEl={<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={DANGER} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>}
+          onClick={() => nav("/crm/leave")}
+        />
+      </Box>
+
+      {/* ── Department headcount + Onboarding snapshot ── */}
+      <Box sx={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 2, alignItems: "stretch" }}>
+
+        {/* Department headcount */}
+        <Paper elevation={0} sx={{ ...CARD_BASE }}>
+          <CardHead title="Headcount by Department"
+            action={<GhostBtn onClick={() => nav("/crm/departments")}>Manage →</GhostBtn>} />
+          <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 1.75 }}>
+            {(s.byDepartment ?? []).length === 0 ? (
+              <Typography sx={{ fontSize: 12, color: MUTED, py: 1 }}>
+                No active employees assigned to departments yet.
+              </Typography>
+            ) : (
+              (s.byDepartment ?? []).map(d => (
+                <DeptBar key={d.departmentName} name={d.departmentName} count={d.headcount} maxCount={maxDeptCount} />
+              ))
+            )}
+          </Box>
+        </Paper>
+
+        {/* Workforce snapshot */}
+        <Paper elevation={0} sx={{ ...CARD_BASE }}>
+          <CardHead title="Workforce Snapshot" />
+          <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 1.5 }}>
+            {[
+              { label: "Active",      value: s.activeEmployees ?? 0,     color: SUCCESS, bg: SUCCESS_L },
+              { label: "Onboarding",  value: s.onboardingEmployees ?? 0, color: WARN,    bg: WARN_L    },
+              { label: "Inactive",    value: s.inactiveEmployees ?? 0,   color: MUTED,   bg: "#F1F3F7" },
+              { label: "On Leave",    value: s.leaveActiveToday ?? 0,    color: ACCENT,  bg: ACCENT_L  },
+            ].map(({ label, value, color, bg }) => (
+              <Box key={label} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                p: "10px 14px", borderRadius: "10px", bgcolor: bg, border: `1px solid ${BORDER}` }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 500, color: TEXT }}>{label}</Typography>
+                <Typography sx={{ fontSize: 20, fontWeight: 800, color }}>{value}</Typography>
+              </Box>
+            ))}
+          </Box>
+        </Paper>
+      </Box>
+
+      {/* ── Workflow Health ── */}
+      <Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 1.5 }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>Workflow Health</Typography>
+          <Box sx={{ fontSize: 9, fontWeight: 700, color: PURPLE, bgcolor: PURPLE_L,
+            border: `1px solid ${PURPLE_BR}`, borderRadius: "4px", px: "6px", py: "2px" }}>LIVE</Box>
+        </Box>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 2 }}>
+          <WorkflowHealthCard title="Onboarding"        inProgress={s.onboardingInProgress ?? 0}    resolvedLabel="completed"  resolvedCount={s.onboardingCompleted ?? 0}        color={SUCCESS} colorL={SUCCESS_L} to="/crm/onboarding"   nav={nav} />
+          <WorkflowHealthCard title="Leave Requests"    inProgress={s.leavePending ?? 0}             resolvedLabel="approved"   resolvedCount={s.leaveApprovedThisMonth ?? 0}     color={ACCENT}  colorL={ACCENT_L}  to="/crm/leave"        nav={nav} />
+          <WorkflowHealthCard title="Promotions"        inProgress={s.promotionsInProgress ?? 0}     resolvedLabel="approved"   resolvedCount={s.promotionsApprovedThisMonth ?? 0} color={PURPLE}  colorL={PURPLE_L}  to="/crm/workflows"    nav={nav} />
+          <WorkflowHealthCard title="Salary Reviews"    inProgress={s.salaryReviewsInProgress ?? 0}  resolvedLabel="approved"   resolvedCount={s.salaryReviewsApprovedThisMonth ?? 0} color={PURPLE} colorL={PURPLE_L} to="/crm/workflows"   nav={nav} />
+          <WorkflowHealthCard title="Expense Claims"    inProgress={s.expensesInProgress ?? 0}       resolvedLabel="approved"   resolvedCount={s.expensesApprovedThisMonth ?? 0}  color={WARN}    colorL={WARN_L}    to="/crm/expenses"     nav={nav} />
+          <WorkflowHealthCard title="Employee Relations" inProgress={(s.grievancesInProgress ?? 0) + (s.disciplinaryInProgress ?? 0)} resolvedLabel="resolved/closed" resolvedCount={(s.grievancesResolvedThisMonth ?? 0) + (s.disciplinaryClosedThisMonth ?? 0)} color={DANGER} colorL={DANGER_L} to="/crm/grievances" nav={nav} />
+        </Box>
+      </Box>
+
+      {/* ── Expense Pending Amount ── */}
+      {(s.expensesInProgress ?? 0) > 0 && (
+        <Paper elevation={0} sx={{
+          ...CARD_BASE, p: 2, display: "flex", alignItems: "center", gap: 2,
+          background: "linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%)",
+          border: "1px solid #FDE68A",
+        }}>
+          <Box sx={{ width: 42, height: 42, borderRadius: "10px", bgcolor: WARN_L,
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            border: "1px solid #FDE68A" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={WARN} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+            </svg>
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT }}>
+              Expense Claims Awaiting Finance Review
+            </Typography>
+            <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.2 }}>
+              {s.expensesInProgress} claim{s.expensesInProgress !== 1 ? "s" : ""} pending · total value:{" "}
+              <strong style={{ color: WARN }}>
+                ${Number(s.expensesPendingAmount ?? 0).toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </strong>
+            </Typography>
+          </Box>
+          <Box onClick={() => nav("/crm/expenses")} sx={{
+            fontSize: 12, fontWeight: 600, color: WARN, cursor: "pointer",
+            "&:hover": { textDecoration: "underline" },
+          }}>Review →</Box>
+        </Paper>
+      )}
+
+      {/* ── Onboard Candidates ── */}
+      <Card>
+        <CardHead title="Onboard Candidates"
+          action={<GhostBtn onClick={() => nav("/crm/employees")}>View All Employees →</GhostBtn>} />
+        {onboard.length === 0 ? (
+          <Box sx={{ p: 3, textAlign: "center" }}>
+            <Typography sx={{ fontSize: 12.5, color: MUTED }}>
+              No candidates at Selected stage. Move a candidate to Selected in the ATS to see them here.
+            </Typography>
+          </Box>
+        ) : (
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={thSx}>Name</TableCell>
+                <TableCell sx={thSx}>Email</TableCell>
+                <TableCell sx={thSx}>Job Applied For</TableCell>
+                <TableCell sx={thSx}>Stage</TableCell>
+                <TableCell sx={{ ...thSx, textAlign: "right" }} />
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {onboard.map(c => (
+                <TableRow key={c.id} sx={{ "&:last-child td": { borderBottom: 0 } }}>
+                  <TableCell sx={{ py: 1.25, px: 2.5, fontSize: 13, fontWeight: 600, color: TEXT, borderBottom: `1px solid ${BORDER}` }}>
+                    {c.name}
+                  </TableCell>
+                  <TableCell sx={{ py: 1.25, px: 2.5, fontSize: 12, color: MUTED, borderBottom: `1px solid ${BORDER}` }}>
+                    {c.email}
+                  </TableCell>
+                  <TableCell sx={{ py: 1.25, px: 2.5, fontSize: 12, color: TEXT, borderBottom: `1px solid ${BORDER}` }}>
+                    {c.jobTitle || "—"}
+                  </TableCell>
+                  <TableCell sx={{ py: 1.25, px: 2.5, borderBottom: `1px solid ${BORDER}` }}>
+                    <Box sx={{ display: "inline-flex", alignItems: "center",
+                      bgcolor: SUCCESS_L, border: "1px solid #BBF7D0", borderRadius: "20px",
+                      px: 1.25, py: "2px", fontSize: 11, fontWeight: 600, color: SUCCESS }}>
+                      {c.stage}
+                    </Box>
+                  </TableCell>
+                  <TableCell sx={{ py: 1.25, px: 2.5, borderBottom: `1px solid ${BORDER}`, textAlign: "right" }}>
+                    {c.alreadyConverted ? (
+                      <Box sx={{ fontSize: 11, color: MUTED, fontWeight: 500 }}>Already added</Box>
+                    ) : (
+                      <Button size="small" onClick={() => {
+                        setSelCand(c);
+                        setConvForm({ jobTitle: c.jobTitle || "", employmentType: "PERMANENT", startDate: "", departmentId: "" });
+                        setConvertErr(null);
+                        setConvertOpen(true);
+                      }} sx={{ fontSize: 11, fontWeight: 600, textTransform: "none",
+                        color: PURPLE, border: `1px solid ${PURPLE_BR}`, bgcolor: PURPLE_L,
+                        borderRadius: "7px", px: "10px", py: "3px",
+                        "&:hover": { bgcolor: "#EDE9FE" } }}>
+                        Convert →
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
+
+      {/* Convert dialog */}
+      <Dialog open={convertOpen} onClose={() => !converting && setConvertOpen(false)} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { borderRadius: "14px" } }}>
+        <DialogTitle sx={{ fontSize: 15, fontWeight: 700, color: TEXT, pb: 0.5 }}>Convert to Employee</DialogTitle>
+        <DialogContent sx={{ pt: "12px !important" }}>
+          {selCand && (
+            <Typography sx={{ fontSize: 12.5, color: MUTED, mb: 2 }}>
+              Adding <strong style={{ color: TEXT }}>{selCand.name}</strong> as an employee.
+            </Typography>
+          )}
+          {convertErr && <Alert severity="error" sx={{ mb: 1.5, fontSize: 12 }}>{convertErr}</Alert>}
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1.75 }}>
+            <TextField label="Job title" value={convForm.jobTitle} onChange={e => cf("jobTitle")(e.target.value)}
+              fullWidth size="small" InputProps={{ sx: { fontSize: 13 } }} InputLabelProps={{ sx: { fontSize: 13 } }} />
+            <FormControl fullWidth size="small">
+              <InputLabel sx={{ fontSize: 13 }}>Employment type *</InputLabel>
+              <Select value={convForm.employmentType} label="Employment type *"
+                onChange={e => cf("employmentType")(e.target.value)} sx={{ fontSize: 13 }}>
+                <MenuItem value="PERMANENT" sx={{ fontSize: 13 }}>Permanent</MenuItem>
+                <MenuItem value="CONTRACT"  sx={{ fontSize: 13 }}>Contract</MenuItem>
+                <MenuItem value="PLACED"    sx={{ fontSize: 13 }}>Placed</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl fullWidth size="small">
+              <InputLabel sx={{ fontSize: 13 }}>Department</InputLabel>
+              <Select value={convForm.departmentId} label="Department"
+                onChange={e => cf("departmentId")(e.target.value)} sx={{ fontSize: 13 }}>
+                <MenuItem value="" sx={{ fontSize: 13 }}>None</MenuItem>
+                {depts.map(d => (
+                  <MenuItem key={d.id} value={d.id} sx={{ fontSize: 13 }}>{d.name}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <TextField label="Start date" type="date" value={convForm.startDate}
+              onChange={e => cf("startDate")(e.target.value)} size="small"
+              InputLabelProps={{ shrink: true, sx: { fontSize: 13 } }} InputProps={{ sx: { fontSize: 13 } }} />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={() => setConvertOpen(false)} disabled={converting}
+            sx={{ fontSize: 12, textTransform: "none", color: MUTED }}>Cancel</Button>
+          <Button onClick={handleConvert} disabled={converting} variant="contained" sx={{
+            fontSize: 12, fontWeight: 600, textTransform: "none", borderRadius: "8px",
+            background: "linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)", boxShadow: "none",
+            "&:hover": { background: "linear-gradient(135deg, #6D28D9 0%, #4338CA 100%)", boxShadow: "none" },
+          }}>
+            {converting ? "Converting…" : "Convert to Employee"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const nav     = useNavigate();
@@ -897,6 +1340,19 @@ export default function DashboardPage() {
   const firstName = name.split(" ")[0] || "there";
   const dateStr   = now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
+  const { mode, setMode } = useAppMode();
+  const [flipPhase, setFlipPhase] = useState(0); // 0=idle 1=out 2=snap-in
+
+  function handleToggle(newMode) {
+    if (newMode === mode || flipPhase !== 0) return;
+    setFlipPhase(1);
+    setTimeout(() => {
+      setMode(newMode);
+      setFlipPhase(2);
+      requestAnimationFrame(() => requestAnimationFrame(() => setFlipPhase(0)));
+    }, 220);
+  }
+
   function handleExportPdf() {
     const styleId = "dashboard-print-style";
     document.getElementById(styleId)?.remove();
@@ -919,46 +1375,67 @@ export default function DashboardPage() {
     });
   }
 
-  return (
-    <Box id="dashboard-print-root" sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
-      {error && <Alert severity="error" sx={{ mb: 0.5 }}>{error}</Alert>}
+  const flipStyles = flipPhase === 1
+    ? { transform: "perspective(1200px) rotateY(90deg)", opacity: 0, transition: "transform 0.22s ease, opacity 0.18s ease" }
+    : flipPhase === 2
+    ? { transform: "perspective(1200px) rotateY(-90deg)", opacity: 0, transition: "none" }
+    : { transform: "perspective(1200px) rotateY(0deg)", opacity: 1, transition: "transform 0.22s ease, opacity 0.22s ease" };
 
-      {/* Header */}
-      <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-        <Box>
-          <Typography sx={{ fontSize: 16, fontWeight: 700, color: TEXT, lineHeight: 1.3 }}>
-            {greeting}, {firstName}
-          </Typography>
-          <Typography sx={{ fontSize: 11.5, color: MUTED, mt: 0.3 }}>{dateStr}</Typography>
-        </Box>
-        <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-          <Button variant="outlined" size="small" onClick={() => nav("/reminders")}
-            sx={{ fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
-              borderRadius: "7px", textTransform: "none", gap: 0.5,
-              "&:hover": { borderColor: "#C0C8D8", bgcolor: "#F8F9FB" } }}>
-            <IcoBell />
-            Reminders
-            {todayTasks.length > 0 && (
-              <Box sx={{
-                bgcolor: DANGER, color: "#fff", borderRadius: "10px",
-                px: "5px", py: "1px", fontSize: 9, fontWeight: 700, lineHeight: 1.4,
-              }}>{todayTasks.length}</Box>
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+
+      {/* ── Animated Page Content ── */}
+      <Box id="dashboard-print-root" sx={{ display: "flex", flexDirection: "column", gap: 2.5, transformOrigin: "center top", ...flipStyles }}>
+
+        {/* Header — always visible so toggle shows in both modes */}
+        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+          <Box>
+            {mode === "recruit" && (
+              <>
+                <Typography sx={{ fontSize: 16, fontWeight: 700, color: TEXT, lineHeight: 1.3 }}>
+                  {greeting}, {firstName}
+                </Typography>
+                <Typography sx={{ fontSize: 11.5, color: MUTED, mt: 0.3 }}>{dateStr}</Typography>
+              </>
             )}
-          </Button>
-          <Button variant="outlined" size="small" onClick={handleExportPdf}
-            sx={{ fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
-              borderRadius: "7px", textTransform: "none",
-              "&:hover": { borderColor: "#C0C8D8", bgcolor: "#F8F9FB" } }}>
-            Export PDF
-          </Button>
-          <Button variant="contained" size="small" onClick={() => nav("/jobs/new")}
-            sx={{ fontSize: 11, fontWeight: 600, bgcolor: ACCENT, borderRadius: "7px",
-              textTransform: "none", boxShadow: "none",
-              "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
-            + New Job
-          </Button>
+          </Box>
+          <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
+            <ModeToggleBar mode={mode} onToggle={handleToggle} />
+            {mode === "recruit" && (
+              <>
+                <Button variant="outlined" size="small" onClick={() => nav("/reminders")}
+                  sx={{ fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
+                    borderRadius: "7px", textTransform: "none", gap: 0.5,
+                    "&:hover": { borderColor: "#C0C8D8", bgcolor: "#F8F9FB" } }}>
+                  <IcoBell />
+                  Reminders
+                  {todayTasks.length > 0 && (
+                    <Box sx={{
+                      bgcolor: DANGER, color: "#fff", borderRadius: "10px",
+                      px: "5px", py: "1px", fontSize: 9, fontWeight: 700, lineHeight: 1.4,
+                    }}>{todayTasks.length}</Box>
+                  )}
+                </Button>
+                <Button variant="outlined" size="small" onClick={handleExportPdf}
+                  sx={{ fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
+                    borderRadius: "7px", textTransform: "none",
+                    "&:hover": { borderColor: "#C0C8D8", bgcolor: "#F8F9FB" } }}>
+                  Export PDF
+                </Button>
+                <Button variant="contained" size="small" onClick={() => nav("/jobs/new")}
+                  sx={{ fontSize: 11, fontWeight: 600, bgcolor: ACCENT, borderRadius: "7px",
+                    textTransform: "none", boxShadow: "none",
+                    "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
+                  + New Job
+                </Button>
+              </>
+            )}
+          </Box>
         </Box>
-      </Box>
+
+        {mode === "crmx" ? <CRMxDashboard loginId={loginId} nav={nav} /> : (
+          <>
+            {error && <Alert severity="error" sx={{ mb: 0.5 }}>{error}</Alert>}
 
       {/* KPI row */}
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 2 }}>
@@ -1248,6 +1725,9 @@ export default function DashboardPage() {
             px: 1, py: "3px", fontSize: 10, fontWeight: 500, color: MUTED,
           }}>{label}</Box>
         ))}
+      </Box>
+          </>
+        )}
       </Box>
     </Box>
   );
