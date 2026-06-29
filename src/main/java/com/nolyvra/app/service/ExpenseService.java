@@ -67,7 +67,7 @@ public class ExpenseService {
                 req.title(),
                 req.amount(),
                 req.category(),
-                req.expenseDate() != null ? Date.valueOf(req.expenseDate()) : null,
+                Date.valueOf(req.expenseDate() != null ? req.expenseDate() : LocalDate.now()),
                 rName, data,
                 req.notes());
         return getById(id, loginId);
@@ -129,20 +129,20 @@ public class ExpenseService {
 
         BigDecimal expenseTotal = jdbc.queryForObject(
                 "SELECT COALESCE(SUM(amount), 0) FROM expense_submission " +
-                "WHERE login_id = ? AND is_active = true AND status = 'APPROVED' " +
+                "WHERE login_id = ? AND is_active = true AND status IN ('IN_PROGRESS', 'APPROVED') " +
                 "AND DATE_TRUNC('month', expense_date) = DATE_TRUNC('month', ?::DATE)",
                 BigDecimal.class, loginId, monthStart);
 
         int expenseCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM expense_submission " +
-                "WHERE login_id = ? AND is_active = true AND status = 'APPROVED' " +
+                "WHERE login_id = ? AND is_active = true AND status IN ('IN_PROGRESS', 'APPROVED') " +
                 "AND DATE_TRUNC('month', expense_date) = DATE_TRUNC('month', ?::DATE)",
                 Integer.class, loginId, monthStart);
 
         List<MonthlyExpenseSummaryResponse.CategoryBreakdown> byCategory = jdbc.queryForList(
                 "SELECT COALESCE(category, 'Uncategorised') AS cat, SUM(amount) AS total, COUNT(*) AS cnt " +
                 "FROM expense_submission " +
-                "WHERE login_id = ? AND is_active = true AND status = 'APPROVED' " +
+                "WHERE login_id = ? AND is_active = true AND status IN ('IN_PROGRESS', 'APPROVED') " +
                 "AND DATE_TRUNC('month', expense_date) = DATE_TRUNC('month', ?::DATE) " +
                 "GROUP BY category ORDER BY total DESC",
                 loginId, monthStart)

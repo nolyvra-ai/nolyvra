@@ -75,7 +75,11 @@ function NewRequestDialog({ open, onClose, loginId, employees, leaveTypes, onCre
   }
 
   useEffect(() => {
-    if (startDate && endDate && startDate <= endDate) {
+    if (startDate && endDate) {
+      if (endDate < startDate) {
+        setDaysRequested("");
+        return;
+      }
       const start = new Date(startDate);
       const end   = new Date(endDate);
       let days = 0;
@@ -92,6 +96,9 @@ function NewRequestDialog({ open, onClose, loginId, employees, leaveTypes, onCre
     if (!employeeId || !leaveTypeId || !startDate || !endDate || !daysRequested) {
       setErr("All fields except reason are required."); return;
     }
+    if (endDate < startDate) {
+      setErr("End date cannot be before start date."); return;
+    }
     setSaving(true);
     try {
       const res = await fetch(
@@ -104,7 +111,12 @@ function NewRequestDialog({ open, onClose, loginId, employees, leaveTypes, onCre
           }),
         }
       );
-      if (!res.ok) { setErr(await res.text()); return; }
+      if (!res.ok) {
+        const text = await res.text();
+        try { const j = JSON.parse(text); setErr(j.message || j.error || "Failed to submit leave request."); }
+        catch { setErr(text || "Failed to submit leave request."); }
+        return;
+      }
       onCreated(await res.json());
       reset(); onClose();
     } catch (e) { setErr(e.message); }

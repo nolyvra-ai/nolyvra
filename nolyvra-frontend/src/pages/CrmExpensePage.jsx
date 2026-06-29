@@ -163,7 +163,7 @@ function MonthlyExpenseSection({ loginId, authH }) {
                 {fmt(data?.expenseTotal)}
               </Typography>
               <Typography sx={{ fontSize: 11, color: WARN, opacity: 0.65, mt: 0.3 }}>
-                {data?.expenseCount ?? 0} approved claim{data?.expenseCount !== 1 ? "s" : ""} in {monthDisplay}
+                {data?.expenseCount ?? 0} submitted claim{data?.expenseCount !== 1 ? "s" : ""} in {monthDisplay}
               </Typography>
             </>
           )}
@@ -268,7 +268,8 @@ export default function CrmExpensePage() {
   const [resolving,  setResolving]  = useState(null);   // expense being actioned
 
   const [form, setForm] = useState({
-    employeeId: "", title: "", amount: "", category: "", expenseDate: "", notes: "",
+    employeeId: "", title: "", amount: "", category: "",
+    expenseDate: new Date().toISOString().split("T")[0], notes: "",
   });
   const [receipt,   setReceipt]   = useState(null);
   const [creating,  setCreating]  = useState(false);
@@ -308,7 +309,7 @@ export default function CrmExpensePage() {
       );
       if (!res.ok) { alert(await res.text()); return; }
       setNewDlg(false);
-      setForm({ employeeId: "", title: "", amount: "", category: "", expenseDate: "", notes: "" });
+      setForm({ employeeId: "", title: "", amount: "", category: "", expenseDate: new Date().toISOString().split("T")[0], notes: "" });
       setReceipt(null);
       load();
     } catch (e) { alert(e.message); }
