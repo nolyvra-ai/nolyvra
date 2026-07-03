@@ -21,7 +21,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/auth/login",
                         "/api/auth/register",
                         "/api/login",
-                        "/api/stripe/webhook"
+                        "/api/stripe/webhook",
+                        "/api/public/**"
                 );
     }
 }

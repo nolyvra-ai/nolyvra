@@ -403,6 +403,10 @@ export default function LandingPage() {
             style={{ background:"none",border:"none",cursor:"pointer",padding:0,fontFamily:"inherit",fontSize:13,fontWeight:500,lineHeight:"normal",display:"inline-flex",alignItems:"center" }}>
             AI in Recruitment
           </button>
+          <button onClick={()=>nav("/stack-audit")} className="lp-nav-link"
+            style={{ background:"none",border:"none",cursor:"pointer",padding:0,fontFamily:"inherit",fontSize:13,fontWeight:500,lineHeight:"normal",display:"inline-flex",alignItems:"center" }}>
+            Free Stack Audit
+          </button>
         </div>
         <div style={{ display:"flex",gap:10,alignItems:"center" }}>
           <button onClick={()=>nav("/login")} style={{ padding:"7px 16px",borderRadius:999,fontSize:13,fontWeight:500,border:"1px solid rgba(255,255,255,.18)",color:"rgba(255,255,255,.8)",background:"transparent",cursor:"pointer",fontFamily:"inherit",transition:"all .15s" }}>Login</button>

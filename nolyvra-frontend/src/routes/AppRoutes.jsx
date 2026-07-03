@@ -19,6 +19,7 @@ import RemindersPage          from "../pages/RemindersPage";
 import SettingsPage           from "../pages/SettingsPage";
 import CoWorkerPage           from "../pages/CoWorkerPage";
 import AgentEconomyPage       from "../pages/AgentEconomyPage";
+import StackAuditPage         from "../pages/StackAuditPage";
 import InterviewAnalysisPage  from "../pages/InterviewAnalysisPage";
 import ClientTrackerPage       from "../pages/ClientTrackerPage";
 import PrivacyPage             from "../pages/PrivacyPage";
@@ -43,6 +44,7 @@ export default function AppRoutes() {
       <Route path="/pricing"                            element={<PricingPage />} />
       <Route path="/login"                              element={<LoginPage />} />
       <Route path="/ai-in-recruitment"                  element={<AgentEconomyPage />} />
+      <Route path="/stack-audit"                        element={<StackAuditPage />} />
       <Route path="/privacy"                            element={<PrivacyPage />} />
       <Route path="/terms"                              element={<TermsPage />} />
 
