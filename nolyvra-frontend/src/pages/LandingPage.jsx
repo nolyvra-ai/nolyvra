@@ -847,6 +847,9 @@ export default function LandingPage() {
               { name:"Hyperon",     src:"/hyperon_logo.png" },
               { name:"Lúxi Living", src:"/luxi_logo.png" },
               { name:"ConnecTed",   src:"/connected_logo.png" },
+              { name:"Peppard",     src:"/peppard.png" },
+              { name:"Cornerstone", src:"/cornerstone.png" },
+              { name:"InTimeTec",   src:"/intimetec.png" },
             ]).map(({name,src},i)=>(
               <div key={i} className="nl-int-chip" style={{ padding:"10px 18px" }}>
                 <img src={src} alt={name} style={{ height:28,maxWidth:120,objectFit:"contain",display:"block" }} />

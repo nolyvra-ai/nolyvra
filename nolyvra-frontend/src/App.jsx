@@ -1,6 +1,7 @@
 import { BrowserRouter, useLocation, Navigate } from "react-router-dom";
 import AppShell from "./components/AppShell";
 import AppRoutes from "./routes/AppRoutes";
+import { AppModeProvider } from "./context/AppModeContext";
 
 // Routes that are fully public — no auth check, no AppShell
 const PUBLIC_ROUTES = ["/", "/pricing", "/login", "/ai-in-recruitment", "/privacy", "/terms"];
@@ -23,4 +24,10 @@ function Layout() {
   );
 }
 
-export default Layout;
+export default function App() {
+  return (
+    <AppModeProvider>
+      <Layout />
+    </AppModeProvider>
+  );
+}
