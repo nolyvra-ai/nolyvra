@@ -10,6 +10,7 @@ public record StackAuditLeadResponse(
         String email,
         String phone,
         OffsetDateTime createdAt,
+        boolean demoRequested,
         Report report
 ) {
     public record Report(

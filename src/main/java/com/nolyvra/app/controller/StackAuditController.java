@@ -32,6 +32,13 @@ public class StackAuditController {
         return ResponseEntity.ok(report);
     }
 
+    // Public — flags a submission as demo requested (excluded in WebMvcConfig via /api/public/**)
+    @PatchMapping("/public/stack-audit/{id}/demo")
+    public ResponseEntity<Void> requestDemo(@PathVariable long id) {
+        service.markDemoRequested(id);
+        return ResponseEntity.ok().build();
+    }
+
     // Authenticated — session token required (covered by SessionInterceptor)
     @GetMapping("/stack-audit/leads")
     public List<StackAuditLeadResponse> getLeads() {

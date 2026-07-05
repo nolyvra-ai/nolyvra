@@ -74,14 +74,18 @@ public class StackAuditService {
         Optional<StackAuditLeadResponse> previous = findRecentSubmission(req.email());
         if (previous.isPresent()) return previous.get();
         Report report = computeReport(req);
-        persist(req, report);
-        return buildResponse(-1, req.fullName(), req.companyName(), req.email(), req.phone(),
-                OffsetDateTime.now(), report, req);
+        long id = persist(req, report);
+        return buildResponse(id, req.fullName(), req.companyName(), req.email(), req.phone(),
+                OffsetDateTime.now(), false, report, req);
+    }
+
+    public void markDemoRequested(long id) {
+        jdbc.update("UPDATE stack_audit_submission SET demo_requested = TRUE WHERE id = ?", id);
     }
 
     private Optional<StackAuditLeadResponse> findRecentSubmission(String email) {
         List<StackAuditLeadResponse> rows = jdbc.query("""
-                SELECT id, full_name, company_name, email, phone, created_at, computed_report
+                SELECT id, full_name, company_name, email, phone, created_at, demo_requested, computed_report
                 FROM stack_audit_submission
                 WHERE email = ? AND created_at > NOW() - INTERVAL '24 hours'
                 ORDER BY created_at DESC LIMIT 1
@@ -93,6 +97,7 @@ public class StackAuditService {
                         rs.getString("email"),
                         rs.getString("phone"),
                         rs.getObject("created_at", OffsetDateTime.class),
+                        rs.getBoolean("demo_requested"),
                         parseReport(rs.getString("computed_report")),
                         null
                 ),
@@ -245,9 +250,9 @@ public class StackAuditService {
 
     // ── Persistence ──────────────────────────────────────────────────────────
 
-    private void persist(StackAuditRequest req, Report report) {
+    private long persist(StackAuditRequest req, Report report) {
         try {
-            jdbc.update("""
+            Long id = jdbc.queryForObject("""
                     INSERT INTO stack_audit_submission
                         (full_name, company_name, email, phone,
                          candidate_tools, ats_tool, ats_expense, ats_features,
@@ -259,16 +264,19 @@ public class StackAuditService {
                             ?,?,CAST(? AS jsonb),
                             CAST(? AS jsonb),?,?,
                             ?,CAST(? AS jsonb))
+                    RETURNING id
                     """,
+                    Long.class,
                     req.fullName(), req.companyName(), req.email(), req.phone(),
                     toJson(req.candidateTools()), req.atsTool(), req.atsExpense(), toJson(req.atsFeatures()),
                     req.crmTool(), req.crmExpense(), toJson(req.crmFeatures()),
                     toJson(req.aiTools()), req.usesAiAgent(), req.aiAgentExpense(),
                     req.consent(), toJson(report)
             );
+            return id != null ? id : -1L;
         } catch (Exception e) {
             log.error("Failed to persist stack audit submission", e);
-            // Do not surface DB errors to the caller — report is already computed
+            return -1L;
         }
     }
 
@@ -276,24 +284,22 @@ public class StackAuditService {
 
     public List<StackAuditLeadResponse> getLeads() {
         return jdbc.query("""
-                SELECT id, full_name, company_name, email, phone, created_at, computed_report
+                SELECT id, full_name, company_name, email, phone, created_at, demo_requested, computed_report
                 FROM stack_audit_submission
                 ORDER BY created_at DESC
                 LIMIT 200
                 """,
-                (rs, rowNum) -> {
-                    Report report = parseReport(rs.getString("computed_report"));
-                    return buildResponse(
-                            rs.getLong("id"),
-                            rs.getString("full_name"),
-                            rs.getString("company_name"),
-                            rs.getString("email"),
-                            rs.getString("phone"),
-                            rs.getObject("created_at", OffsetDateTime.class),
-                            report,
-                            null
-                    );
-                }
+                (rs, rowNum) -> buildResponse(
+                        rs.getLong("id"),
+                        rs.getString("full_name"),
+                        rs.getString("company_name"),
+                        rs.getString("email"),
+                        rs.getString("phone"),
+                        rs.getObject("created_at", OffsetDateTime.class),
+                        rs.getBoolean("demo_requested"),
+                        parseReport(rs.getString("computed_report")),
+                        null
+                )
         );
     }
 
@@ -321,9 +327,10 @@ public class StackAuditService {
             long id,
             String fullName, String companyName, String email, String phone,
             OffsetDateTime createdAt,
+            boolean demoRequested,
             Report report,
             StackAuditRequest req
     ) {
-        return new StackAuditLeadResponse(id, fullName, companyName, email, phone, createdAt, report);
+        return new StackAuditLeadResponse(id, fullName, companyName, email, phone, createdAt, demoRequested, report);
     }
 }

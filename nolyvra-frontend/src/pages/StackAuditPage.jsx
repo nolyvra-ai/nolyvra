@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   TextField, Slider, Checkbox, FormControlLabel,
   Autocomplete, Chip, Alert,
+  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button,
 } from "@mui/material";
 import { BarChart } from "@mui/x-charts/BarChart";
 import { PieChart } from "@mui/x-charts/PieChart";
@@ -81,8 +82,11 @@ export default function StackAuditPage() {
   const [errors, setErrors]         = useState({});
   const [loading, setLoading]       = useState(false);
   const [submitError, setSubmitError] = useState(null);
-  const [report, setReport]         = useState(null);
-  const [pdfLoading, setPdfLoading] = useState(false);
+  const [report, setReport]               = useState(null);
+  const [submissionId, setSubmissionId]   = useState(null);
+  const [demoRequested, setDemoRequested] = useState(false);
+  const [demoDialogOpen, setDemoDialogOpen] = useState(false);
+  const [pdfLoading, setPdfLoading]       = useState(false);
   const resultsRef = useRef(null);
 
   function setF(key, val) {
@@ -146,6 +150,8 @@ export default function StackAuditPage() {
       }
       const data = await res.json();
       setReport(data.report);
+      setSubmissionId(data.id);
+      setDemoRequested(data.demoRequested || false);
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior:"smooth" }), 100);
     } catch (err) {
       setSubmitError(err.message || "Submission failed. Please try again.");
@@ -176,6 +182,15 @@ export default function StackAuditPage() {
     } finally {
       setPdfLoading(false);
     }
+  }
+
+  async function handleDemoRequest() {
+    if (!submissionId || submissionId < 0) { setDemoDialogOpen(true); return; }
+    try {
+      await fetch(`${API_BASE}/api/public/stack-audit/${submissionId}/demo`, { method:"PATCH" });
+      setDemoRequested(true);
+    } catch (_) { /* non-critical — still show the thank-you */ }
+    setDemoDialogOpen(true);
   }
 
   const r = report;
@@ -684,7 +699,9 @@ export default function StackAuditPage() {
                   <button className="sa-pdf" onClick={handleDownloadPdf} disabled={pdfLoading}>
                     {pdfLoading ? "Generating…" : "⬇ Download PDF"}
                   </button>
-                  <button className="sa-cta">Book Your Live Demo →</button>
+                  <button className="sa-cta" onClick={handleDemoRequest} disabled={demoRequested}>
+                    {demoRequested ? "✓ Demo Requested" : "Book Your Live Demo →"}
+                  </button>
                 </div>
               </div>
             </div>
@@ -692,6 +709,32 @@ export default function StackAuditPage() {
         )}
       </div>
     </div>
+
+    {/* Demo request thank-you dialog */}
+    <Dialog
+      open={demoDialogOpen}
+      onClose={() => setDemoDialogOpen(false)}
+      PaperProps={{ sx:{ borderRadius:"14px", background:"#0d1230", border:"1px solid rgba(255,255,255,.1)", px:1 } }}
+    >
+      <DialogTitle sx={{ color:"#fff", fontWeight:700, fontSize:17, pt:3 }}>
+        Thanks for your request!
+      </DialogTitle>
+      <DialogContent>
+        <DialogContentText sx={{ color:"rgba(255,255,255,.6)", fontSize:14, lineHeight:1.7 }}>
+          Our team will reach out to you shortly to arrange your live demo.
+        </DialogContentText>
+      </DialogContent>
+      <DialogActions sx={{ pb:2.5, px:3 }}>
+        <Button
+          onClick={() => setDemoDialogOpen(false)}
+          variant="contained"
+          sx={{ background:"#4a90d9", borderRadius:"8px", textTransform:"none", fontWeight:600, fontSize:13,
+            "&:hover":{ background:"#3a7bc8" } }}
+        >
+          Close
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
 

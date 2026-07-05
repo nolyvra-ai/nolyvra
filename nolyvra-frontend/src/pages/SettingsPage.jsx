@@ -1552,7 +1552,7 @@ export default function SettingsPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
                 <thead>
                   <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
-                    {["Name","Company","Email","Phone","Submitted","Est. monthly saving","% saving",""].map(h => (
+                    {["Name","Company","Email","Phone","Submitted","Est. monthly saving","% saving","Demo",""].map(h => (
                       <th key={h} style={{ padding: "7px 8px", color: MUTED, fontWeight: 600, textAlign: h === "" ? "center" : "left", whiteSpace: "nowrap", fontSize: 11 }}>{h}</th>
                     ))}
                   </tr>
@@ -1576,11 +1576,16 @@ export default function SettingsPage() {
                           <td style={{ padding:"9px 8px", color: MUTED, whiteSpace:"nowrap" }}>{fmtDate(lead.createdAt)}</td>
                           <td style={{ padding:"9px 8px", color: SUCCESS, fontWeight: 600 }}>{fmtAUD(saving)}/mo</td>
                           <td style={{ padding:"9px 8px", color: SUCCESS }}>{pct !== "—" ? `~${pct}%` : "—"}</td>
+                          <td style={{ padding:"9px 8px", textAlign:"center" }}>
+                            {lead.demoRequested
+                              ? <span style={{ fontSize:10, fontWeight:700, color:"#16a34a", background:"#dcfce7", border:"1px solid #bbf7d0", borderRadius:6, padding:"2px 8px", whiteSpace:"nowrap" }}>Requested</span>
+                              : <span style={{ fontSize:10, color:MUTED }}>—</span>}
+                          </td>
                           <td style={{ padding:"9px 8px", textAlign:"center", color: ACCENT, fontSize: 11, fontWeight: 600 }}>{isOpen ? "▲ Hide" : "▼ View"}</td>
                         </tr>
                         {isOpen && rep && (
                           <tr>
-                            <td colSpan={8} style={{ padding:"16px 12px", background: ACCENT_BG, borderBottom: `1px solid ${BORDER}` }}>
+                            <td colSpan={9} style={{ padding:"16px 12px", background: ACCENT_BG, borderBottom: `1px solid ${BORDER}` }}>
                               <Typography sx={{ fontSize: 11, fontWeight: 700, color: ACCENT, letterSpacing: "1.5px", textTransform: "uppercase", mb: 1 }}>Breakdown</Typography>
                               {[rep.candidateSearch, rep.ats, rep.crm, rep.aiAndAgent].map(cat => cat && (
                                 <Box key={cat.label} sx={{ display:"flex", justifyContent:"space-between", py:0.5, borderBottom:`1px solid ${BORDER}` }}>
