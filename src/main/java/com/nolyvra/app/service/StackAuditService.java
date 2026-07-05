@@ -71,10 +71,33 @@ public class StackAuditService {
     // ── Submit + compute ─────────────────────────────────────────────────────
 
     public StackAuditLeadResponse submit(StackAuditRequest req) {
+        Optional<StackAuditLeadResponse> previous = findRecentSubmission(req.email());
+        if (previous.isPresent()) return previous.get();
         Report report = computeReport(req);
         persist(req, report);
         return buildResponse(-1, req.fullName(), req.companyName(), req.email(), req.phone(),
                 OffsetDateTime.now(), report, req);
+    }
+
+    private Optional<StackAuditLeadResponse> findRecentSubmission(String email) {
+        List<StackAuditLeadResponse> rows = jdbc.query("""
+                SELECT id, full_name, company_name, email, phone, created_at, computed_report
+                FROM stack_audit_submission
+                WHERE email = ? AND created_at > NOW() - INTERVAL '24 hours'
+                ORDER BY created_at DESC LIMIT 1
+                """,
+                (rs, rowNum) -> buildResponse(
+                        rs.getLong("id"),
+                        rs.getString("full_name"),
+                        rs.getString("company_name"),
+                        rs.getString("email"),
+                        rs.getString("phone"),
+                        rs.getObject("created_at", OffsetDateTime.class),
+                        parseReport(rs.getString("computed_report")),
+                        null
+                ),
+                email);
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.getFirst());
     }
 
     // ── Deterministic savings calc ───────────────────────────────────────────
