@@ -205,6 +205,7 @@ export default function StackAuditPage() {
   ].filter(d => d.value > 0) : [];
 
   return (
+    <>
     <div style={{ fontFamily:"'DM Sans',sans-serif", background:"#06091e", minHeight:"100vh", display:"flex", flexDirection:"column" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
@@ -735,6 +736,7 @@ export default function StackAuditPage() {
         </Button>
       </DialogActions>
     </Dialog>
+    </>
   );
 }
 
