@@ -3,9 +3,6 @@ package com.nolyvra.app.service;
 import com.nolyvra.app.model.*;
 import com.nolyvra.app.config.CoWorkerAnalysisExecutor;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openai.client.OpenAIClient;
-import com.openai.models.chat.completions.ChatCompletionCreateParams;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -20,41 +17,32 @@ import java.util.concurrent.ExecutorService;
 @Service
 public class CoWorkerService {
 
-    private final OpenAIClient openAI;
     private final ObjectMapper objectMapper;
     private final JdbcTemplate jdbc;
-    private final String model;
-    private final TokenService tokenService;
+    private final CoWorkerAiClient aiClient;
     private final AnalysisService analysisService; // Change 1: added
     private final ExecutorService analysisPool;
     private final JobService jobService;
     private final CandidateService candidateService;
     private final PlanService planService;
-    private final boolean mockAi;
 
     public CoWorkerService(
-            OpenAIClient openAI,
             ObjectMapper objectMapper,
             JdbcTemplate jdbc,
-            TokenService tokenService,
+            CoWorkerAiClient aiClient,
             @Lazy AnalysisService analysisService, // Change 1: added (@Lazy avoids circular dependency)
             CoWorkerAnalysisExecutor analysisExecutor,
             JobService jobService,
             CandidateService candidateService,
-            PlanService planService,
-            @Value("${openai.model:gpt-4o-mini}") String model,
-            @Value("${nolyvra.mock-ai:false}") boolean mockAi) {
-        this.openAI = openAI;
+            PlanService planService) {
         this.objectMapper = objectMapper;
         this.jdbc = jdbc;
-        this.tokenService = tokenService;
+        this.aiClient = aiClient;
         this.analysisService = analysisService; // Change 1: added
         this.analysisPool = analysisExecutor.executorService();
         this.jobService = jobService;
         this.candidateService = candidateService;
         this.planService = planService;
-        this.model = model;
-        this.mockAi = mockAi;
     }
 
     // ─── Main chat endpoint ───────────────────────────────────────────────────
@@ -73,250 +61,22 @@ public class CoWorkerService {
 
         persistMessage(loginId, sessionId, "user", request.message());
 
-        if (mockAi) {
-            return mockChatResponse(loginId, sessionId, request.message());
-        }
-
-        String systemPrompt = """
-                You are nolyvra Co-worker AI — a helpful recruitment assistant that takes actions inside the app.
-
-                You have access to the following recruitment data for this recruiter:
-                %s
-
-                When the user asks you to do something, you MUST return EXACTLY ONE JSON object:
-                {
-                  "message": "<friendly conversational reply, briefly confirm what you found and what you plan to do>",
-                  "pendingAction": {
-                    "type": "RUN_ANALYSIS|SCHEDULE_INTERVIEW|RESCHEDULE_AND_NOTIFY|MOVE_PIPELINE|EMAIL|CREATE_REMINDER|CREATE_JOB|ADD_CANDIDATES|NONE",
-                    "description": "<1-sentence human-readable action description>",
-                    "params": { <action-specific parameters — see below> }
-                  }
-                }
-
-                Set pendingAction.type to "NONE" and params to {} if the message is just a question or greeting.
-
-                Parameter schemas per action type:
-
-                RUN_ANALYSIS:
-                  { "candidateIds": ["cand-xxx", ...], "candidateNames": ["Name", ...], "jobTitle": "..." }
-
-                SCHEDULE_INTERVIEW:
-                  { "candidateId": "cand-xxx", "candidateName": "...", "interviewType": "Phone Screen|Video Interview|In-Person", "scheduledAt": "ISO datetime or null if not specified", "notes": "..." }
-
-                RESCHEDULE_AND_NOTIFY:
-                  { "interviewId": "int-xxx or null", "candidateId": "cand-xxx", "candidateName": "...", "interviewType": "...", "newScheduledAt": "ISO datetime or null", "notes": "..." }
-                  Use this for any reschedule request, or multi-step (reschedule + notify candidate + next available slots).
-
-                MOVE_PIPELINE:
-                  { "candidateIds": ["cand-xxx", ...], "candidateNames": ["Name", ...], "toStage": "Screening|Interview|Assessment|Offer|Selected|Rejected", "jobTitle": "..." }
-
-                EMAIL:
-                  { "candidateId": "cand-xxx", "candidateName": "...", "emailType": "FOLLOW_UP|INTERVIEW_INVITE|REJECTION|OFFER", "subject": "suggested subject", "body": "suggested email body" }
-                  NOTE: For email actions, the app will navigate to the email centre page with fields pre-populated. No email is sent automatically.
-
-                CREATE_REMINDER:
-                  { "title": "...", "candidateId": "cand-xxx or null", "dueAt": "ISO datetime", "priority": "High|Normal|Low" }
-
-                CREATE_JOB:
-                  { "title": "...", "company": "...", "jobType": "Full-time|Part-time|Contract|Temporary|Remote|Hybrid|Onsite", "seniority": "...", "jdText": "...", "location": "...", "stackTags": ["skill", ...], "jobStatus": "Active", "salary": number or null, "currency": "AUD|USD|GBP|EUR|NZD|SGD", "feePercentage": number or null }
-                  Use this when the user asks you to create, open, add, or publish a new job/vacancy/role from a brief or JD.
-                  title and jdText are required. If the user gives only a rough brief, turn it into a professional job description.
-                  If company, location, seniority, salary, or fee are not mentioned, use null or "" rather than inventing them.
-
-                ADD_CANDIDATES:
-                  { "jobId": "job-xxx or null", "jobTitle": "... or null", "candidates": [{ "name": "...", "email": "...", "phone": "...", "linkedinUrl": "...", "cvText": "...", "skills": ["skill", ...], "currentTitle": "...", "location": "...", "state": "...", "yearsExperience": number or null, "seniorityLevel": "...", "expectedSalaryMin": number or null, "expectedSalaryMax": number or null, "salaryCurrency": "AUD|USD|GBP|EUR|NZD|SGD or null", "noticePeriodWeeks": number or null, "workRights": "...", "remoteFlexible": true|false|null }] }
-                  Use this when the user attaches, uploads, imports, or adds one or more CVs/resumes as candidates.
-                  Match the requested job to a real jobId from the JOBS context. If the user does not specify a job, use null and add the candidates as unassigned.
-                  name and cvText are required. Use extracted attachment fields when present; do not invent email or phone.
-                  If the user message includes an "Attached CVs:" section, preserve each attachment's cvText exactly in the matching candidate object.
-
-                Rules:
-                - Always match candidate and job names to real IDs from the context above.
-                - If you cannot find a match, say so in the message and set pendingAction type to NONE.
-                - For EMAIL actions, always mention in your message that you will take the user to the email page.
-                - For questions about upcoming meetings or free time, answer directly from UPCOMING INTERVIEWS data above — set pendingAction to NONE.
-                - For reschedule + notify + next slots requests, always use RESCHEDULE_AND_NOTIFY (not SCHEDULE_INTERVIEW).
-                - Keep your message friendly, concise and specific (mention names and counts).
-                - No markdown. No extra keys.
-                - CRITICAL: You MUST respond with ONLY a valid JSON object. Never respond with plain text. Even for greetings or questions, wrap your reply in the JSON structure above with pendingAction type NONE.
-                - CRITICAL: params must ALWAYS be a JSON object {}, never a JSON array []. If scheduling multiple candidates, pick the first one and mention you will handle others separately.
-                """
-                .formatted(context);
-
-        List<CoWorkerChatRequest.ChatMessage> history = request.history() != null
-                ? request.history()
-                : List.of();
-        int start = Math.max(0, history.size() - 10);
-        StringBuilder contextHistory = new StringBuilder();
-        for (int i = start; i < history.size(); i++) {
-            var h = history.get(i);
-            contextHistory.append(h.role().toUpperCase())
-                    .append(": ")
-                    .append(h.content())
-                    .append("\n");
-        }
-
-        String fullSystemPrompt = systemPrompt
-                + (contextHistory.length() > 0
-                        ? "\n\nCONVERSATION SO FAR:\n" + contextHistory
-                        : "");
-
-        var params = ChatCompletionCreateParams.builder()
-                .model(model)
-                .addSystemMessage(fullSystemPrompt)
-                .addUserMessage(request.message())
-                .temperature(0.3)
-                .build();
-
         try {
-            if (!tokenService.deductToken(loginId)) {
-                return new CoWorkerChatResponse(
-                        sessionId,
-                        "You have run out of tokens. Please upgrade your plan to continue.",
-                        null);
-            }
-
-            var completion = openAI.chat().completions().create(params);
-            String content = completion.choices().getFirst().message().content()
-                    .orElse("{\"message\":\"I'm here to help! What would you like me to do?\",\"pendingAction\":{\"type\":\"NONE\",\"description\":\"\",\"params\":{}}}");
-
-            String clean = cleanJson(content);
-
-            // Fix 2: If OpenAI returned plain text instead of JSON, wrap it gracefully
-            if (!clean.startsWith("{")) {
-                persistMessage(loginId, sessionId, "assistant", clean);
-                updateSessionLastMessage(sessionId);
-                return new CoWorkerChatResponse(sessionId, clean, null);
-            }
-
-            var root = objectMapper.readTree(clean);
-
-            String message = root.path("message").asText("How can I help?");
-            persistMessage(loginId, sessionId, "assistant", message);
+            CoWorkerChatResponse response = aiClient.chat(
+                    loginId,
+                    sessionId,
+                    request.message(),
+                    context,
+                    request.history() != null ? request.history() : List.of());
+            persistMessage(loginId, sessionId, "assistant", response.message());
             updateSessionLastMessage(sessionId);
-
-            var pa = root.path("pendingAction");
-            CoWorkerChatResponse.PendingAction pendingAction = null;
-            if (pa != null && !pa.isMissingNode() && !"NONE".equals(pa.path("type").asText("NONE"))) {
-                var paramsNode = pa.path("params");
-                Map<String, Object> actionParams;
-                if (paramsNode.isArray()) {
-                    // AI returned params as array (e.g. multiple candidates) — wrap it
-                    @SuppressWarnings("unchecked")
-                    List<Object> list = objectMapper.convertValue(paramsNode, List.class);
-                    actionParams = new java.util.LinkedHashMap<>();
-                    actionParams.put("items", list);
-                    // Also extract candidateIds/candidateNames for convenience
-                    List<String> ids = new ArrayList<>();
-                    List<String> names = new ArrayList<>();
-                    for (Object item : list) {
-                        if (item instanceof Map<?,?> m) {
-                            if (m.get("candidateId") != null) ids.add(m.get("candidateId").toString());
-                            if (m.get("candidateName") != null) names.add(m.get("candidateName").toString());
-                        }
-                    }
-                    if (!ids.isEmpty()) actionParams.put("candidateIds", ids);
-                    if (!names.isEmpty()) actionParams.put("candidateNames", names);
-                } else {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> m = objectMapper.convertValue(paramsNode, Map.class);
-                    actionParams = m != null ? m : new java.util.LinkedHashMap<>();
-                }
-                pendingAction = new CoWorkerChatResponse.PendingAction(
-                        pa.path("type").asText(),
-                        pa.path("description").asText(),
-                        actionParams);
-            }
-
-            return new CoWorkerChatResponse(sessionId, message, pendingAction);
-
+            return response;
         } catch (Exception e) {
-            // Fix 1: log full error to backend, return generic message to UI
             System.err.println("[CoWorker] chat() failed: " + e.getMessage());
             e.printStackTrace();
             return new CoWorkerChatResponse(
                     sessionId, "Something went wrong on our end. Please try again.", null);
         }
-    }
-
-    private CoWorkerChatResponse mockChatResponse(String loginId, Long sessionId, String message) {
-        String lower = message == null ? "" : message.toLowerCase(Locale.ROOT);
-        if (lower.contains("create") && (lower.contains("job") || lower.contains("role") || lower.contains("vacancy"))) {
-            Map<String, Object> actionParams = new LinkedHashMap<>();
-            actionParams.put("title", "Senior Backend Engineer");
-            actionParams.put("company", "Acme FinTech");
-            actionParams.put("jobType", "Full-time");
-            actionParams.put("seniority", "Senior · 5+ yrs");
-            actionParams.put("jdText", """
-                    We are hiring a Senior Backend Engineer to design, build, and operate reliable backend services for a growing fintech platform.
-
-                    Responsibilities:
-                    - Build scalable Java and Spring Boot services.
-                    - Design REST APIs, data models, and distributed system components.
-                    - Collaborate with product, frontend, and platform teams.
-                    - Improve reliability, observability, and deployment practices.
-
-                    Requirements:
-                    - 5+ years of backend engineering experience.
-                    - Strong Java, Spring Boot, PostgreSQL, AWS, and microservices experience.
-                    - Comfortable with Docker, Kubernetes, system design, and production operations.
-                    - Clear communication and strong ownership.
-                    """);
-            actionParams.put("location", "Melbourne");
-            actionParams.put("stackTags", List.of(
-                    "Java", "Spring Boot", "PostgreSQL", "AWS", "Microservices", "REST APIs", "Docker", "Kubernetes"));
-            actionParams.put("jobStatus", "Active");
-            actionParams.put("salary", 160000);
-            actionParams.put("currency", "AUD");
-            actionParams.put("feePercentage", 18);
-
-            String reply = "I found a create-job request. I can create a Senior Backend Engineer job for Acme FinTech with the key skills and fee details.";
-            persistMessage(loginId, sessionId, "assistant", reply);
-            updateSessionLastMessage(sessionId);
-            return new CoWorkerChatResponse(
-                    sessionId,
-                    reply,
-                    new CoWorkerChatResponse.PendingAction(
-                            "CREATE_JOB",
-                            "Create Senior Backend Engineer at Acme FinTech.",
-                            actionParams));
-        }
-
-        if (lower.contains("attached cvs:") || lower.contains("attached cv:")) {
-            Map<String, Object> candidate = new LinkedHashMap<>();
-            candidate.put("name", extractAttachedField(message, "name", "Attached Candidate"));
-            candidate.put("email", extractAttachedField(message, "email", ""));
-            candidate.put("phone", extractAttachedField(message, "phone", ""));
-            candidate.put("linkedinUrl", extractAttachedField(message, "linkedinUrl", ""));
-            candidate.put("skills", listFromCommaText(extractAttachedField(message, "skills", "")));
-            candidate.put("cvText", extractAttachedField(message, "cvText", message));
-
-            Map<String, String> job = latestJob(loginId);
-            Map<String, Object> actionParams = new LinkedHashMap<>();
-            actionParams.put("jobId", job.get("id"));
-            actionParams.put("jobTitle", job.get("title"));
-            actionParams.put("candidates", List.of(candidate));
-
-            String reply = "I found 1 attached CV. I can add it"
-                    + (job.get("title") != null ? " to " + job.get("title") : " as an unassigned candidate")
-                    + ".";
-            persistMessage(loginId, sessionId, "assistant", reply);
-            updateSessionLastMessage(sessionId);
-            return new CoWorkerChatResponse(
-                    sessionId,
-                    reply,
-                    new CoWorkerChatResponse.PendingAction(
-                            "ADD_CANDIDATES",
-                            job.get("title") != null
-                                    ? "Add attached CV to " + job.get("title") + "."
-                                    : "Add attached CV as a candidate.",
-                            actionParams));
-        }
-
-        String reply = "Mock Co-worker is running locally. Ask me to create a job to test the new action.";
-        persistMessage(loginId, sessionId, "assistant", reply);
-        updateSessionLastMessage(sessionId);
-        return new CoWorkerChatResponse(sessionId, reply, null);
     }
 
     // ─── Confirm + execute action ─────────────────────────────────────────────
@@ -1071,69 +831,11 @@ public class CoWorkerService {
         }
     }
 
-    private static String cleanJson(String s) {
-        String t = s.strip();
-        if (t.startsWith("```")) {
-            t = t.replaceAll("(?s)^```[a-z]*\\n?", "").replaceAll("```$", "").strip();
-        }
-        return t;
-    }
-
     private static String textParam(Map<String, Object> params, String key, String fallback) {
         Object value = params.get(key);
         if (value == null) return fallback;
         String text = value.toString().trim();
         return text.isEmpty() ? fallback : text;
-    }
-
-    private static String extractAttachedField(String text, String field, String fallback) {
-        if (text == null || text.isBlank()) return fallback;
-        String marker = field + ":";
-        int start = text.indexOf(marker);
-        if (start < 0) return fallback;
-        start += marker.length();
-        int next = text.length();
-        for (String candidateMarker : List.of(
-                "\nfileName:", "\nname:", "\nemail:", "\nphone:", "\nlinkedinUrl:", "\nskills:", "\ncvText:", "\n\nCV ")) {
-            int idx = text.indexOf(candidateMarker, start);
-            if (idx >= 0 && idx < next) next = idx;
-        }
-        String value = text.substring(start, next).trim();
-        return value.isBlank() ? fallback : value;
-    }
-
-    private Map<String, String> latestJob(String loginId) {
-        try {
-            return jdbc.query("""
-                    select id, title from jobs
-                    where login_id = ? and is_active = true
-                    order by created_at desc limit 1
-                    """, (rs, r) -> {
-                Map<String, String> job = new LinkedHashMap<>();
-                job.put("id", rs.getString("id"));
-                job.put("title", rs.getString("title"));
-                return job;
-            }, loginId).stream().findFirst().orElseGet(() -> {
-                Map<String, String> empty = new LinkedHashMap<>();
-                empty.put("id", null);
-                empty.put("title", null);
-                return empty;
-            });
-        } catch (Exception e) {
-            Map<String, String> empty = new LinkedHashMap<>();
-            empty.put("id", null);
-            empty.put("title", null);
-            return empty;
-        }
-    }
-
-    private static List<String> listFromCommaText(String text) {
-        if (text == null || text.isBlank()) return List.of();
-        return Arrays.stream(text.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isBlank())
-                .distinct()
-                .toList();
     }
 
     private static BigDecimal decimalParam(Map<String, Object> params, String key) {

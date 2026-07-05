@@ -28,6 +28,7 @@ import static org.mockito.Mockito.*;
 class CoWorkerServiceTest {
 
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
+    private final CoWorkerAiClient aiClient = mock(CoWorkerAiClient.class);
     private final JobService jobService = mock(JobService.class);
     private final CandidateService candidateService = mock(CandidateService.class);
     private final PlanService planService = mock(PlanService.class);
@@ -41,17 +42,14 @@ class CoWorkerServiceTest {
         when(analysisExecutor.executorService()).thenReturn(analysisPool);
 
         service = new CoWorkerService(
-                null,
                 new ObjectMapper(),
                 jdbc,
-                null,
+                aiClient,
                 null,
                 analysisExecutor,
                 jobService,
                 candidateService,
-                planService,
-                "gpt-4o-mini",
-                false);
+                planService);
     }
 
     @AfterEach
@@ -159,27 +157,14 @@ class CoWorkerServiceTest {
 
     @Test
     void mockChatCanReturnCreateJobAction() {
-        CoWorkerAnalysisExecutor analysisExecutor = mock(CoWorkerAnalysisExecutor.class);
-        when(analysisExecutor.executorService()).thenReturn(analysisPool);
-        CoWorkerService mockService = new CoWorkerService(
-                null,
-                new ObjectMapper(),
-                jdbc,
-                null,
-                null,
-                analysisExecutor,
-                jobService,
-                candidateService,
-                planService,
-                "gpt-4o-mini",
-                true);
+        MockCoWorkerAiClient mockClient = new MockCoWorkerAiClient(jdbc);
 
-        CoWorkerChatResponse response = mockService.chat(
+        CoWorkerChatResponse response = mockClient.chat(
                 "local@nolyvra.test",
-                new CoWorkerChatRequest(
-                        42L,
-                        "Create a job for Senior Backend Engineer",
-                        List.of()));
+                42L,
+                "Create a job for Senior Backend Engineer",
+                "",
+                List.of());
 
         assertEquals("CREATE_JOB", response.pendingAction().type());
         assertEquals("Senior Backend Engineer", response.pendingAction().params().get("title"));
