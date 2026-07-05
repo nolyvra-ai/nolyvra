@@ -61,6 +61,13 @@ public class CoWorkerService {
 
         persistMessage(loginId, sessionId, "user", request.message());
 
+        if (isPipelineSummaryRequest(request.message())) {
+            CoWorkerChatResponse response = buildPipelineSummary(loginId, sessionId);
+            persistMessage(loginId, sessionId, "assistant", response.message());
+            updateSessionLastMessage(sessionId);
+            return response;
+        }
+
         try {
             CoWorkerChatResponse response = aiClient.chat(
                     loginId,
@@ -77,6 +84,163 @@ public class CoWorkerService {
             return new CoWorkerChatResponse(
                     sessionId, "Something went wrong on our end. Please try again.", null);
         }
+    }
+
+    private boolean isPipelineSummaryRequest(String message) {
+        if (message == null || message.isBlank()) return false;
+        String lower = message.toLowerCase(Locale.ROOT);
+        return (lower.contains("pipeline") && (lower.contains("movement") || lower.contains("summary") || lower.contains("summarise") || lower.contains("summarize")))
+                || (lower.contains("stalled") && lower.contains("candidate"));
+    }
+
+    private CoWorkerChatResponse buildPipelineSummary(String loginId, Long sessionId) {
+        try {
+            Integer stageMoves = jdbc.queryForObject("""
+                    select count(*)
+                    from activity_timeline
+                    where login_id = ?
+                      and event_type = 'STAGE_CHANGED'
+                      and created_at >= date_trunc('week', now())
+                    """, Integer.class, loginId);
+            Integer added = jdbc.queryForObject("""
+                    select count(*)
+                    from activity_timeline
+                    where login_id = ?
+                      and event_type = 'CANDIDATE_ADDED'
+                      and created_at >= date_trunc('week', now())
+                    """, Integer.class, loginId);
+
+            List<Map<String, Object>> stageBreakdown = jdbc.query("""
+                    select coalesce(nullif(trim(replace(note, 'Stage updated to:', '')), ''), 'Unknown') as stage,
+                           count(*) as count
+                    from activity_timeline
+                    where login_id = ?
+                      and event_type = 'STAGE_CHANGED'
+                      and created_at >= date_trunc('week', now())
+                    group by stage
+                    order by count desc, stage asc
+                    """, (rs, r) -> {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("stage", rs.getString("stage"));
+                row.put("count", rs.getInt("count"));
+                return row;
+            }, loginId);
+
+            List<Map<String, Object>> recentMoves = jdbc.query("""
+                    select c.name, coalesce(j.title, 'Unassigned') as job_title,
+                           c.stage, a.note, a.created_at
+                    from activity_timeline a
+                    join candidates c on c.id = a.candidate_id
+                    left join jobs j on j.id = c.job_id
+                    where a.login_id = ?
+                      and a.event_type = 'STAGE_CHANGED'
+                      and a.created_at >= date_trunc('week', now())
+                      and c.is_active = true
+                    order by a.created_at desc
+                    limit 8
+                    """, (rs, r) -> {
+                OffsetDateTime movedAt = rs.getObject("created_at", OffsetDateTime.class);
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("name", rs.getString("name"));
+                row.put("jobTitle", rs.getString("job_title"));
+                row.put("stage", rs.getString("stage"));
+                row.put("note", rs.getString("note"));
+                row.put("movedAt", movedAt);
+                return row;
+            }, loginId);
+
+            List<Map<String, Object>> stalled = jdbc.query("""
+                    select c.id, c.name, c.stage, coalesce(j.title, 'Unassigned') as job_title,
+                           greatest(c.updated_at, coalesce(max(a.created_at), c.created_at)) as last_activity,
+                           extract(day from now() - greatest(c.updated_at, coalesce(max(a.created_at), c.created_at)))::int as days_stalled
+                    from candidates c
+                    left join jobs j on j.id = c.job_id
+                    left join activity_timeline a on a.candidate_id = c.id and a.login_id = c.login_id
+                    where c.login_id = ?
+                      and c.is_active = true
+                      and c.stage not in ('Selected', 'Rejected')
+                    group by c.id, c.name, c.stage, j.title, c.updated_at, c.created_at
+                    having greatest(c.updated_at, coalesce(max(a.created_at), c.created_at)) < now() - interval '5 days'
+                    order by days_stalled desc, c.name asc
+                    limit 10
+                    """, (rs, r) -> {
+                OffsetDateTime lastActivity = rs.getObject("last_activity", OffsetDateTime.class);
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("id", rs.getString("id"));
+                row.put("name", rs.getString("name"));
+                row.put("stage", rs.getString("stage"));
+                row.put("jobTitle", rs.getString("job_title"));
+                row.put("lastActivity", lastActivity);
+                row.put("daysStalled", rs.getInt("days_stalled"));
+                return row;
+            }, loginId);
+
+            String message = formatPipelineSummary(
+                    stageMoves != null ? stageMoves : 0,
+                    added != null ? added : 0,
+                    stageBreakdown,
+                    recentMoves,
+                    stalled);
+            return new CoWorkerChatResponse(sessionId, message, null);
+        } catch (Exception e) {
+            System.err.println("[CoWorker] buildPipelineSummary() failed: " + e.getMessage());
+            e.printStackTrace();
+            return new CoWorkerChatResponse(
+                    sessionId,
+                    "I could not summarise pipeline movement right now. Please try again.",
+                    null);
+        }
+    }
+
+    private String formatPipelineSummary(
+            int stageMoves,
+            int added,
+            List<Map<String, Object>> stageBreakdown,
+            List<Map<String, Object>> recentMoves,
+            List<Map<String, Object>> stalled) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("This week's pipeline movement: ")
+                .append(stageMoves).append(" stage change(s) and ")
+                .append(added).append(" new candidate(s) added.");
+
+        if (!stageBreakdown.isEmpty()) {
+            sb.append("\n\nStage movement breakdown:");
+            for (Map<String, Object> row : stageBreakdown) {
+                sb.append("\n- ").append(row.get("stage")).append(": ").append(row.get("count"));
+            }
+        }
+
+        if (!recentMoves.isEmpty()) {
+            sb.append("\n\nRecent movements:");
+            for (Map<String, Object> row : recentMoves) {
+                sb.append("\n- ")
+                        .append(row.get("name"))
+                        .append(" → ")
+                        .append(row.get("stage"))
+                        .append(" (")
+                        .append(row.get("jobTitle"))
+                        .append(")");
+            }
+        }
+
+        if (stalled.isEmpty()) {
+            sb.append("\n\nNo stalled active candidates found using the 5-day inactivity threshold.");
+        } else {
+            sb.append("\n\nStalled candidates to review:");
+            for (Map<String, Object> row : stalled) {
+                sb.append("\n- ")
+                        .append(row.get("name"))
+                        .append(" has been in ")
+                        .append(row.get("stage"))
+                        .append(" for ")
+                        .append(row.get("daysStalled"))
+                        .append(" day(s) without activity (")
+                        .append(row.get("jobTitle"))
+                        .append(")");
+            }
+        }
+
+        return sb.toString();
     }
 
     // ─── Confirm + execute action ─────────────────────────────────────────────

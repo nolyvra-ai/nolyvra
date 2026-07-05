@@ -16,6 +16,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -217,8 +220,68 @@ class CoWorkerServiceTest {
         assertEquals(1, result.get("created"));
     }
 
+    @Test
+    void chatSummarisesPipelineMovementWithoutCallingAi() {
+        when(jdbc.query(contains("select id, title, company from jobs"), anyStringMapper(), eq("local@nolyvra.test")))
+                .thenReturn(List.of());
+        when(jdbc.query(contains("from candidates c\njoin jobs j"), anyStringMapper(), eq("local@nolyvra.test")))
+                .thenReturn(List.of());
+        when(jdbc.query(contains("from interviews i"), anyStringMapper(), eq("local@nolyvra.test")))
+                .thenReturn(List.of());
+        when(jdbc.queryForObject(contains("event_type = 'STAGE_CHANGED'"), eq(Integer.class), eq("local@nolyvra.test")))
+                .thenReturn(3);
+        when(jdbc.queryForObject(contains("event_type = 'CANDIDATE_ADDED'"), eq(Integer.class), eq("local@nolyvra.test")))
+                .thenReturn(2);
+
+        Map<String, Object> stage = new LinkedHashMap<>();
+        stage.put("stage", "Interview");
+        stage.put("count", 2);
+        doReturn(List.of(stage)).when(jdbc)
+                .query(contains("group by stage"), anyMapMapper(), eq("local@nolyvra.test"));
+
+        Map<String, Object> movement = new LinkedHashMap<>();
+        movement.put("name", "Ava Smith");
+        movement.put("jobTitle", "Backend Engineer");
+        movement.put("stage", "Interview");
+        movement.put("note", "Stage updated to: Interview");
+        movement.put("movedAt", OffsetDateTime.now(ZoneOffset.UTC));
+        doReturn(List.of(movement)).when(jdbc)
+                .query(contains("order by a.created_at desc"), anyMapMapper(), eq("local@nolyvra.test"));
+
+        Map<String, Object> stalled = new LinkedHashMap<>();
+        stalled.put("id", "cand-1");
+        stalled.put("name", "Ben Lee");
+        stalled.put("stage", "Screening");
+        stalled.put("jobTitle", "Backend Engineer");
+        stalled.put("lastActivity", OffsetDateTime.now(ZoneOffset.UTC).minusDays(8));
+        stalled.put("daysStalled", 8);
+        doReturn(List.of(stalled)).when(jdbc)
+                .query(contains("days_stalled"), anyMapMapper(), eq("local@nolyvra.test"));
+
+        CoWorkerChatResponse response = service.chat(
+                "local@nolyvra.test",
+                new CoWorkerChatRequest(
+                        42L,
+                        "Summarise this week's pipeline movement and flag stalled candidates",
+                        List.of()));
+
+        assertEquals(true, response.message().contains("3 stage change(s)"));
+        assertEquals(true, response.message().contains("Ben Lee"));
+        verify(aiClient, never()).chat(anyString(), any(), anyString(), anyString(), anyList());
+    }
+
     @SuppressWarnings("unchecked")
     private static RowMapper<Object> anyTaskMapper() {
+        return any(RowMapper.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static RowMapper<String> anyStringMapper() {
+        return any(RowMapper.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static RowMapper<Map<String, Object>> anyMapMapper() {
         return any(RowMapper.class);
     }
 }
