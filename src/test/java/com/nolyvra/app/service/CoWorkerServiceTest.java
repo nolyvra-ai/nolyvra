@@ -2,9 +2,13 @@ package com.nolyvra.app.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nolyvra.app.config.CoWorkerAnalysisExecutor;
+import com.nolyvra.app.model.CoWorkerChatRequest;
+import com.nolyvra.app.model.CoWorkerChatResponse;
 import com.nolyvra.app.model.CoWorkerConfirmRequest;
 import com.nolyvra.app.model.JobCreateRequest;
 import com.nolyvra.app.model.JobResponse;
+import com.nolyvra.app.model.CandidateCreateRequest;
+import com.nolyvra.app.model.CandidateResponse;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +29,7 @@ class CoWorkerServiceTest {
 
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
     private final JobService jobService = mock(JobService.class);
+    private final CandidateService candidateService = mock(CandidateService.class);
     private final PlanService planService = mock(PlanService.class);
     private ExecutorService analysisPool;
     private CoWorkerService service;
@@ -43,8 +48,10 @@ class CoWorkerServiceTest {
                 null,
                 analysisExecutor,
                 jobService,
+                candidateService,
                 planService,
-                "gpt-4o-mini");
+                "gpt-4o-mini",
+                false);
     }
 
     @AfterEach
@@ -148,6 +155,81 @@ class CoWorkerServiceTest {
 
         verify(jobService, never()).createJob(any(), anyString());
         assertEquals(false, result.get("success"));
+    }
+
+    @Test
+    void mockChatCanReturnCreateJobAction() {
+        CoWorkerAnalysisExecutor analysisExecutor = mock(CoWorkerAnalysisExecutor.class);
+        when(analysisExecutor.executorService()).thenReturn(analysisPool);
+        CoWorkerService mockService = new CoWorkerService(
+                null,
+                new ObjectMapper(),
+                jdbc,
+                null,
+                null,
+                analysisExecutor,
+                jobService,
+                candidateService,
+                planService,
+                "gpt-4o-mini",
+                true);
+
+        CoWorkerChatResponse response = mockService.chat(
+                "local@nolyvra.test",
+                new CoWorkerChatRequest(
+                        42L,
+                        "Create a job for Senior Backend Engineer",
+                        List.of()));
+
+        assertEquals("CREATE_JOB", response.pendingAction().type());
+        assertEquals("Senior Backend Engineer", response.pendingAction().params().get("title"));
+    }
+
+    @Test
+    void confirmAddCandidatesCreatesCandidateForJob() {
+        when(planService.isCandidateLimitReached("local@nolyvra.test")).thenReturn(false);
+        when(candidateService.addCandidate(eq("job-123"), any(CandidateCreateRequest.class), eq("local@nolyvra.test")))
+                .thenReturn(new CandidateResponse(
+                        "cand-123",
+                        "job-123",
+                        "Ava Smith",
+                        "ava@example.com",
+                        "",
+                        "",
+                        Instant.now(),
+                        "Screening",
+                        "Professional experience with Java and Spring Boot. Education Bachelor degree. Skills Java SQL AWS.",
+                        List.of("Java", "Spring Boot"),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null));
+
+        Map<String, Object> result = service.confirmAction(
+                "local@nolyvra.test",
+                new CoWorkerConfirmRequest("ADD_CANDIDATES", Map.of(
+                        "jobId", "job-123",
+                        "jobTitle", "Backend Engineer",
+                        "candidates", List.of(Map.of(
+                                "name", "Ava Smith",
+                                "email", "ava@example.com",
+                                "cvText", "Professional experience with Java and Spring Boot. Education Bachelor degree. Skills Java SQL AWS.",
+                                "skills", List.of("Java", "Spring Boot"))))));
+
+        verify(candidateService).addCandidate(eq("job-123"), argThat(req ->
+                        req.name().equals("Ava Smith")
+                                && req.email().equals("ava@example.com")
+                                && req.skills().equals(List.of("Java", "Spring Boot"))),
+                eq("local@nolyvra.test"));
+        assertEquals(true, result.get("success"));
+        assertEquals(1, result.get("created"));
     }
 
     @SuppressWarnings("unchecked")

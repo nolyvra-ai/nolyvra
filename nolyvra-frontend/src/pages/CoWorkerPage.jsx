@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Box, CircularProgress, LinearProgress, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import { isSupportedCvFile, validateCvContent } from "../utils/cvValidation";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -51,6 +52,30 @@ async function apiGet(path, loginId, extra = {}) {
   const res = await fetch(url.toString(), { headers: authHeader() });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
+}
+
+async function apiUploadCv(file, loginId) {
+  const url = new URL(`${API_BASE}/api/cv/extract`);
+  url.searchParams.set("loginId", loginId);
+  const body = new FormData();
+  body.append("file", file);
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers: authHeader(),
+    body,
+  });
+  const raw = await res.text();
+  if (!res.ok) {
+    let message = "Could not read the file. Please try a different document.";
+    try {
+      const parsed = JSON.parse(raw);
+      message = parsed.error || parsed.message || message;
+    } catch {
+      if (raw) message = raw;
+    }
+    throw new Error(message);
+  }
+  return JSON.parse(raw);
 }
 
 // ── Welcome screen (shown when stream is empty) ───────────────────────────────
@@ -472,9 +497,13 @@ export default function CoWorkerPage() {
   const [input,         setInput]         = useState("");
   const [loading,       setLoading]       = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
+  const [cvAttachments, setCvAttachments] = useState([]);
+  const [cvAttachError, setCvAttachError] = useState(null);
+  const [cvUploading,   setCvUploading]   = useState(false);
 
   const streamEndRef = useRef(null);
   const textareaRef  = useRef(null);
+  const fileInputRef = useRef(null);
 
   // ── Load session list ───────────────────────────────────────────────────────
   const loadSessions = useCallback(async () => {
@@ -541,17 +570,81 @@ export default function CoWorkerPage() {
     setPendingAction(null);
     setMessages([]);
     setInput("");
+    setCvAttachments([]);
+    setCvAttachError(null);
     textareaRef.current?.focus();
+  }
+
+  async function handleAttachCvs(files) {
+    const selected = Array.from(files || []);
+    if (!selected.length || cvUploading) return;
+    setCvAttachError(null);
+    setCvUploading(true);
+    try {
+      const parsed = [];
+      for (const file of selected) {
+        if (!isSupportedCvFile(file)) {
+          throw new Error("Only PDF and Word (.docx / .doc) files are supported.");
+        }
+        const data = await apiUploadCv(file, loginId);
+        const extractedText = data.text || "";
+        const validationError = validateCvContent(extractedText);
+        if (validationError) {
+          throw new Error(`${file.name}: ${validationError}`);
+        }
+        parsed.push({
+          id: `${file.name}-${file.size}-${Date.now()}-${parsed.length}`,
+          fileName: file.name,
+          name: data.name || file.name.replace(/\.[^.]+$/, ""),
+          email: data.email || "",
+          phone: data.phone || "",
+          linkedinUrl: data.linkedinUrl || "",
+          skills: Array.isArray(data.skills) ? data.skills : [],
+          cvText: extractedText,
+        });
+      }
+      setCvAttachments(prev => [...prev, ...parsed]);
+      if (!input.trim()) {
+        setInput("Attach the uploaded CVs to the right job and create candidates.");
+      }
+    } catch (e) {
+      setCvAttachError(e.message || "Failed to attach CV.");
+    } finally {
+      setCvUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      textareaRef.current?.focus();
+    }
+  }
+
+  function removeAttachment(id) {
+    setCvAttachments(prev => prev.filter(a => a.id !== id));
+  }
+
+  function buildMessageWithAttachments(message, attachments) {
+    if (!attachments.length) return message;
+    const attachmentText = attachments.map((cv, idx) => [
+      `CV ${idx + 1}:`,
+      `fileName: ${cv.fileName}`,
+      `name: ${cv.name}`,
+      `email: ${cv.email}`,
+      `phone: ${cv.phone}`,
+      `linkedinUrl: ${cv.linkedinUrl}`,
+      `skills: ${cv.skills.join(", ")}`,
+      `cvText: ${cv.cvText}`,
+    ].join("\n")).join("\n\n");
+    return `${message}\n\nAttached CVs:\n${attachmentText}`;
   }
 
   // ── Send message ────────────────────────────────────────────────────────────
   async function sendMessage(text) {
     const msg = text ?? input.trim();
-    if (!msg || loading) return;
+    if ((!msg && !cvAttachments.length) || loading || cvUploading) return;
+    const attachmentsToSend = cvAttachments;
+    const messageToSend = buildMessageWithAttachments(msg || "Please review the attached CVs.", attachmentsToSend);
     setInput("");
     setPendingAction(null);
 
-    const userMsg = { role: "user", content: msg, id: Date.now() };
+    const userMsg = { role: "user", content: msg || `Attached ${attachmentsToSend.length} CV(s).`, id: Date.now() };
     setMessages(prev => [...prev, userMsg]);
     setLoading(true);
 
@@ -560,13 +653,13 @@ export default function CoWorkerPage() {
     try {
       const res = await apiPost("/api/coworker/chat", loginId, {
         sessionId: activeSession?.id ?? null,
-        message: msg,
+        message: messageToSend,
         history,
       });
 
       // First message in a session — set active session from the returned ID
       if (!activeSession && res.sessionId) {
-        const newSession = { id: res.sessionId, title: msg.slice(0, 60) };
+        const newSession = { id: res.sessionId, title: (msg || "Attached CVs").slice(0, 60) };
         setActiveSession(newSession);
         loadSessions();
       } else if (activeSession) {
@@ -579,6 +672,8 @@ export default function CoWorkerPage() {
       if (res.pendingAction && res.pendingAction.type !== "NONE") {
         setPendingAction(res.pendingAction);
       }
+      setCvAttachments([]);
+      setCvAttachError(null);
     } catch {
       setMessages(prev => [...prev, {
         role: "assistant",
@@ -808,7 +903,58 @@ export default function CoWorkerPage() {
 
         {/* Composer */}
         <Box sx={{ borderTop: `1px solid ${C.border}`, bgcolor: C.white, flexShrink: 0 }}>
+          {(cvAttachments.length > 0 || cvAttachError) && (
+            <Box sx={{ px: 2, pt: "10px", display: "flex", flexDirection: "column", gap: 0.75 }}>
+              {cvAttachments.length > 0 && (
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+                  {cvAttachments.map(cv => (
+                    <Box key={cv.id} sx={{
+                      display: "flex", alignItems: "center", gap: 0.75,
+                      maxWidth: 260, px: "9px", py: "5px",
+                      borderRadius: "7px", border: `1px solid ${C.accentBr}`,
+                      bgcolor: C.accentBg, color: C.text, fontSize: 11.5,
+                    }}>
+                      <Box sx={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {cv.name || cv.fileName}
+                      </Box>
+                      <Box component="button" onClick={() => removeAttachment(cv.id)} sx={{
+                        border: "none", bgcolor: "transparent", cursor: "pointer",
+                        color: C.textMuted, fontSize: 14, lineHeight: 1, p: 0,
+                      }} title="Remove CV">x</Box>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+              {cvAttachError && (
+                <Typography sx={{ fontSize: 11.5, color: C.danger }}>{cvAttachError}</Typography>
+              )}
+            </Box>
+          )}
           <Box sx={{ display: "flex", alignItems: "flex-end", gap: 1, px: 2, pt: "12px", pb: "10px" }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              style={{ display: "none" }}
+              onChange={e => handleAttachCvs(e.target.files)}
+            />
+            <Box
+              component="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading || cvUploading}
+              sx={{
+                width: 36, height: 36, borderRadius: "8px", flexShrink: 0,
+                bgcolor: cvUploading ? C.bg : C.white,
+                border: `1px solid ${C.border}`, cursor: loading || cvUploading ? "default" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: C.textSec, fontSize: 17,
+                "&:hover": { borderColor: loading || cvUploading ? C.border : C.accent, color: C.accent, bgcolor: C.accentBg },
+              }}
+              title="Attach CVs"
+            >
+              {cvUploading ? <CircularProgress size={16} /> : "CV"}
+            </Box>
             <Box
               component="textarea"
               ref={textareaRef}
@@ -833,14 +979,14 @@ export default function CoWorkerPage() {
             <Box
               component="button"
               onClick={() => sendMessage()}
-              disabled={loading || !input.trim()}
+              disabled={loading || cvUploading || (!input.trim() && cvAttachments.length === 0)}
               sx={{
                 width: 36, height: 36, borderRadius: "8px", flexShrink: 0,
-                bgcolor: input.trim() && !loading ? C.purple : C.border,
-                border: "none", cursor: input.trim() && !loading ? "pointer" : "default",
+                bgcolor: (input.trim() || cvAttachments.length > 0) && !loading && !cvUploading ? C.purple : C.border,
+                border: "none", cursor: (input.trim() || cvAttachments.length > 0) && !loading && !cvUploading ? "pointer" : "default",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 color: "#fff", fontSize: 16, transition: "background .15s",
-                "&:hover": { bgcolor: input.trim() && !loading ? "#6D28D9" : C.border },
+                "&:hover": { bgcolor: (input.trim() || cvAttachments.length > 0) && !loading && !cvUploading ? "#6D28D9" : C.border },
               }}
             >↑</Box>
           </Box>

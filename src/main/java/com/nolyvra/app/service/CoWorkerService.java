@@ -28,7 +28,9 @@ public class CoWorkerService {
     private final AnalysisService analysisService; // Change 1: added
     private final ExecutorService analysisPool;
     private final JobService jobService;
+    private final CandidateService candidateService;
     private final PlanService planService;
+    private final boolean mockAi;
 
     public CoWorkerService(
             OpenAIClient openAI,
@@ -38,8 +40,10 @@ public class CoWorkerService {
             @Lazy AnalysisService analysisService, // Change 1: added (@Lazy avoids circular dependency)
             CoWorkerAnalysisExecutor analysisExecutor,
             JobService jobService,
+            CandidateService candidateService,
             PlanService planService,
-            @Value("${openai.model:gpt-4o-mini}") String model) {
+            @Value("${openai.model:gpt-4o-mini}") String model,
+            @Value("${nolyvra.mock-ai:false}") boolean mockAi) {
         this.openAI = openAI;
         this.objectMapper = objectMapper;
         this.jdbc = jdbc;
@@ -47,8 +51,10 @@ public class CoWorkerService {
         this.analysisService = analysisService; // Change 1: added
         this.analysisPool = analysisExecutor.executorService();
         this.jobService = jobService;
+        this.candidateService = candidateService;
         this.planService = planService;
         this.model = model;
+        this.mockAi = mockAi;
     }
 
     // ─── Main chat endpoint ───────────────────────────────────────────────────
@@ -67,6 +73,10 @@ public class CoWorkerService {
 
         persistMessage(loginId, sessionId, "user", request.message());
 
+        if (mockAi) {
+            return mockChatResponse(loginId, sessionId, request.message());
+        }
+
         String systemPrompt = """
                 You are nolyvra Co-worker AI — a helpful recruitment assistant that takes actions inside the app.
 
@@ -77,7 +87,7 @@ public class CoWorkerService {
                 {
                   "message": "<friendly conversational reply, briefly confirm what you found and what you plan to do>",
                   "pendingAction": {
-                    "type": "RUN_ANALYSIS|SCHEDULE_INTERVIEW|RESCHEDULE_AND_NOTIFY|MOVE_PIPELINE|EMAIL|CREATE_REMINDER|CREATE_JOB|NONE",
+                    "type": "RUN_ANALYSIS|SCHEDULE_INTERVIEW|RESCHEDULE_AND_NOTIFY|MOVE_PIPELINE|EMAIL|CREATE_REMINDER|CREATE_JOB|ADD_CANDIDATES|NONE",
                     "description": "<1-sentence human-readable action description>",
                     "params": { <action-specific parameters — see below> }
                   }
@@ -112,6 +122,13 @@ public class CoWorkerService {
                   Use this when the user asks you to create, open, add, or publish a new job/vacancy/role from a brief or JD.
                   title and jdText are required. If the user gives only a rough brief, turn it into a professional job description.
                   If company, location, seniority, salary, or fee are not mentioned, use null or "" rather than inventing them.
+
+                ADD_CANDIDATES:
+                  { "jobId": "job-xxx or null", "jobTitle": "... or null", "candidates": [{ "name": "...", "email": "...", "phone": "...", "linkedinUrl": "...", "cvText": "...", "skills": ["skill", ...], "currentTitle": "...", "location": "...", "state": "...", "yearsExperience": number or null, "seniorityLevel": "...", "expectedSalaryMin": number or null, "expectedSalaryMax": number or null, "salaryCurrency": "AUD|USD|GBP|EUR|NZD|SGD or null", "noticePeriodWeeks": number or null, "workRights": "...", "remoteFlexible": true|false|null }] }
+                  Use this when the user attaches, uploads, imports, or adds one or more CVs/resumes as candidates.
+                  Match the requested job to a real jobId from the JOBS context. If the user does not specify a job, use null and add the candidates as unassigned.
+                  name and cvText are required. Use extracted attachment fields when present; do not invent email or phone.
+                  If the user message includes an "Attached CVs:" section, preserve each attachment's cvText exactly in the matching candidate object.
 
                 Rules:
                 - Always match candidate and job names to real IDs from the context above.
@@ -222,7 +239,88 @@ public class CoWorkerService {
         }
     }
 
+    private CoWorkerChatResponse mockChatResponse(String loginId, Long sessionId, String message) {
+        String lower = message == null ? "" : message.toLowerCase(Locale.ROOT);
+        if (lower.contains("create") && (lower.contains("job") || lower.contains("role") || lower.contains("vacancy"))) {
+            Map<String, Object> actionParams = new LinkedHashMap<>();
+            actionParams.put("title", "Senior Backend Engineer");
+            actionParams.put("company", "Acme FinTech");
+            actionParams.put("jobType", "Full-time");
+            actionParams.put("seniority", "Senior · 5+ yrs");
+            actionParams.put("jdText", """
+                    We are hiring a Senior Backend Engineer to design, build, and operate reliable backend services for a growing fintech platform.
+
+                    Responsibilities:
+                    - Build scalable Java and Spring Boot services.
+                    - Design REST APIs, data models, and distributed system components.
+                    - Collaborate with product, frontend, and platform teams.
+                    - Improve reliability, observability, and deployment practices.
+
+                    Requirements:
+                    - 5+ years of backend engineering experience.
+                    - Strong Java, Spring Boot, PostgreSQL, AWS, and microservices experience.
+                    - Comfortable with Docker, Kubernetes, system design, and production operations.
+                    - Clear communication and strong ownership.
+                    """);
+            actionParams.put("location", "Melbourne");
+            actionParams.put("stackTags", List.of(
+                    "Java", "Spring Boot", "PostgreSQL", "AWS", "Microservices", "REST APIs", "Docker", "Kubernetes"));
+            actionParams.put("jobStatus", "Active");
+            actionParams.put("salary", 160000);
+            actionParams.put("currency", "AUD");
+            actionParams.put("feePercentage", 18);
+
+            String reply = "I found a create-job request. I can create a Senior Backend Engineer job for Acme FinTech with the key skills and fee details.";
+            persistMessage(loginId, sessionId, "assistant", reply);
+            updateSessionLastMessage(sessionId);
+            return new CoWorkerChatResponse(
+                    sessionId,
+                    reply,
+                    new CoWorkerChatResponse.PendingAction(
+                            "CREATE_JOB",
+                            "Create Senior Backend Engineer at Acme FinTech.",
+                            actionParams));
+        }
+
+        if (lower.contains("attached cvs:") || lower.contains("attached cv:")) {
+            Map<String, Object> candidate = new LinkedHashMap<>();
+            candidate.put("name", extractAttachedField(message, "name", "Attached Candidate"));
+            candidate.put("email", extractAttachedField(message, "email", ""));
+            candidate.put("phone", extractAttachedField(message, "phone", ""));
+            candidate.put("linkedinUrl", extractAttachedField(message, "linkedinUrl", ""));
+            candidate.put("skills", listFromCommaText(extractAttachedField(message, "skills", "")));
+            candidate.put("cvText", extractAttachedField(message, "cvText", message));
+
+            Map<String, String> job = latestJob(loginId);
+            Map<String, Object> actionParams = new LinkedHashMap<>();
+            actionParams.put("jobId", job.get("id"));
+            actionParams.put("jobTitle", job.get("title"));
+            actionParams.put("candidates", List.of(candidate));
+
+            String reply = "I found 1 attached CV. I can add it"
+                    + (job.get("title") != null ? " to " + job.get("title") : " as an unassigned candidate")
+                    + ".";
+            persistMessage(loginId, sessionId, "assistant", reply);
+            updateSessionLastMessage(sessionId);
+            return new CoWorkerChatResponse(
+                    sessionId,
+                    reply,
+                    new CoWorkerChatResponse.PendingAction(
+                            "ADD_CANDIDATES",
+                            job.get("title") != null
+                                    ? "Add attached CV to " + job.get("title") + "."
+                                    : "Add attached CV as a candidate.",
+                            actionParams));
+        }
+
+        String reply = "Mock Co-worker is running locally. Ask me to create a job to test the new action.";
+        persistMessage(loginId, sessionId, "assistant", reply);
+        updateSessionLastMessage(sessionId);
+        return new CoWorkerChatResponse(sessionId, reply, null);
+    }
+
     // ─── Confirm + execute action ─────────────────────────────────────────────
+
 
     public Map<String, Object> confirmAction(String loginId, CoWorkerConfirmRequest req) {
         String type = req.actionType();
@@ -236,6 +334,7 @@ public class CoWorkerService {
             case "EMAIL" -> buildEmailNavigation(params);
             case "CREATE_REMINDER" -> executeCreateReminder(loginId, params);
             case "CREATE_JOB" -> executeCreateJob(loginId, params);
+            case "ADD_CANDIDATES" -> executeAddCandidates(loginId, params);
             default -> Map.of("message", "Unknown action type: " + type, "success", false);
         };
     }
@@ -565,6 +664,112 @@ public class CoWorkerService {
         }
     }
 
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> executeAddCandidates(String loginId, Map<String, Object> params) {
+        Object rawCandidates = params.get("candidates");
+        List<Map<String, Object>> candidates = new ArrayList<>();
+        if (rawCandidates instanceof Collection<?> collection) {
+            for (Object item : collection) {
+                if (item instanceof Map<?, ?> map) {
+                    Map<String, Object> normalized = new LinkedHashMap<>();
+                    map.forEach((k, v) -> {
+                        if (k != null) normalized.put(k.toString(), v);
+                    });
+                    candidates.add(normalized);
+                }
+            }
+        } else if (params.get("name") != null || params.get("cvText") != null) {
+            candidates.add(params);
+        }
+
+        if (candidates.isEmpty()) {
+            return Map.of("message", "No CV candidates were provided.", "success", false);
+        }
+
+        String jobId = textParam(params, "jobId", null);
+        if (jobId != null && jobId.equalsIgnoreCase("null")) jobId = null;
+        String jobTitle = textParam(params, "jobTitle", null);
+
+        Long taskId = createTask(loginId, "ADD_CANDIDATES",
+                "Attached " + candidates.size() + " CV candidate(s)"
+                        + (jobTitle != null ? " to " + jobTitle : ""));
+
+        int created = 0;
+        int skipped = 0;
+        List<String> createdNames = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+
+        for (Map<String, Object> candidate : candidates) {
+            String name = textParam(candidate, "name", "");
+            String cvText = textParam(candidate, "cvText", "");
+
+            if (name.isBlank() || cvText.isBlank()) {
+                skipped++;
+                errors.add((name.isBlank() ? "Unnamed candidate" : name) + ": missing name or CV text");
+                continue;
+            }
+
+            try {
+                if (planService != null && planService.isCandidateLimitReached(loginId)) {
+                    skipped++;
+                    errors.add(name + ": candidate limit reached");
+                    continue;
+                }
+
+                CandidateCreateRequest request = CandidateCreateRequest.builder()
+                        .name(name)
+                        .email(textParam(candidate, "email", null))
+                        .phone(textParam(candidate, "phone", null))
+                        .linkedinUrl(textParam(candidate, "linkedinUrl", null))
+                        .cvText(cvText)
+                        .skills(listParam(candidate, "skills"))
+                        .currentTitle(textParam(candidate, "currentTitle", null))
+                        .location(textParam(candidate, "location", null))
+                        .state(textParam(candidate, "state", null))
+                        .yearsExperience(decimalParam(candidate, "yearsExperience"))
+                        .seniorityLevel(textParam(candidate, "seniorityLevel", null))
+                        .expectedSalaryMin(decimalParam(candidate, "expectedSalaryMin"))
+                        .expectedSalaryMax(decimalParam(candidate, "expectedSalaryMax"))
+                        .salaryCurrency(textParam(candidate, "salaryCurrency", null))
+                        .noticePeriodWeeks(integerParam(candidate, "noticePeriodWeeks"))
+                        .workRights(textParam(candidate, "workRights", null))
+                        .remoteFlexible(booleanParam(candidate, "remoteFlexible"))
+                        .build();
+
+                CandidateResponse createdCandidate = jobId != null && !jobId.isBlank()
+                        ? candidateService.addCandidate(jobId, request, loginId)
+                        : candidateService.addCandidateUnassigned(request, loginId);
+                created++;
+                createdNames.add(createdCandidate.name());
+            } catch (IllegalStateException e) {
+                skipped++;
+                errors.add(name + ": " + e.getMessage());
+            } catch (Exception e) {
+                skipped++;
+                errors.add(name + ": could not be added");
+                System.err.println("[CoWorker] executeAddCandidates() failed for " + name + ": " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        markTaskDone(taskId);
+
+        String target = jobTitle != null && !jobTitle.isBlank()
+                ? " to " + jobTitle
+                : (jobId != null && !jobId.isBlank() ? " to " + jobId : " as unassigned");
+        String message = created + " candidate(s) added" + target
+                + (createdNames.isEmpty() ? "." : ": " + String.join(", ", createdNames) + ".")
+                + (skipped > 0 ? " " + skipped + " skipped. " + String.join("; ", errors) : "");
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", message);
+        result.put("success", created > 0);
+        result.put("created", created);
+        result.put("skipped", skipped);
+        if (taskId != null) result.put("taskId", taskId);
+        return result;
+    }
+
     // ─── Reschedule + notify + next slots (multi-step) ───────────────────────
 
     @SuppressWarnings("unchecked")
@@ -881,6 +1086,56 @@ public class CoWorkerService {
         return text.isEmpty() ? fallback : text;
     }
 
+    private static String extractAttachedField(String text, String field, String fallback) {
+        if (text == null || text.isBlank()) return fallback;
+        String marker = field + ":";
+        int start = text.indexOf(marker);
+        if (start < 0) return fallback;
+        start += marker.length();
+        int next = text.length();
+        for (String candidateMarker : List.of(
+                "\nfileName:", "\nname:", "\nemail:", "\nphone:", "\nlinkedinUrl:", "\nskills:", "\ncvText:", "\n\nCV ")) {
+            int idx = text.indexOf(candidateMarker, start);
+            if (idx >= 0 && idx < next) next = idx;
+        }
+        String value = text.substring(start, next).trim();
+        return value.isBlank() ? fallback : value;
+    }
+
+    private Map<String, String> latestJob(String loginId) {
+        try {
+            return jdbc.query("""
+                    select id, title from jobs
+                    where login_id = ? and is_active = true
+                    order by created_at desc limit 1
+                    """, (rs, r) -> {
+                Map<String, String> job = new LinkedHashMap<>();
+                job.put("id", rs.getString("id"));
+                job.put("title", rs.getString("title"));
+                return job;
+            }, loginId).stream().findFirst().orElseGet(() -> {
+                Map<String, String> empty = new LinkedHashMap<>();
+                empty.put("id", null);
+                empty.put("title", null);
+                return empty;
+            });
+        } catch (Exception e) {
+            Map<String, String> empty = new LinkedHashMap<>();
+            empty.put("id", null);
+            empty.put("title", null);
+            return empty;
+        }
+    }
+
+    private static List<String> listFromCommaText(String text) {
+        if (text == null || text.isBlank()) return List.of();
+        return Arrays.stream(text.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .distinct()
+                .toList();
+    }
+
     private static BigDecimal decimalParam(Map<String, Object> params, String key) {
         Object value = params.get(key);
         if (value == null) return null;
@@ -893,6 +1148,28 @@ public class CoWorkerService {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    private static Integer integerParam(Map<String, Object> params, String key) {
+        Object value = params.get(key);
+        if (value == null) return null;
+        if (value instanceof Number number) return number.intValue();
+        String text = value.toString().trim();
+        if (text.isEmpty() || text.equalsIgnoreCase("null")) return null;
+        try {
+            return Integer.parseInt(text.replace(",", ""));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static Boolean booleanParam(Map<String, Object> params, String key) {
+        Object value = params.get(key);
+        if (value == null) return null;
+        if (value instanceof Boolean bool) return bool;
+        String text = value.toString().trim();
+        if (text.isEmpty() || text.equalsIgnoreCase("null")) return null;
+        return Boolean.parseBoolean(text);
     }
 
     private static List<String> listParam(Map<String, Object> params, String key) {
