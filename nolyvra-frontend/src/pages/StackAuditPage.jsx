@@ -21,6 +21,9 @@ const CRM_SEEDS = [
   "Payroll integration","Document management",
 ];
 
+const ATS_TOOLS = ["Jobadder","Bullhorn","Corecruit","Atlus","Juicebox","Other"];
+const CRM_TOOLS = ["Jobadder","Bullhorn","Vincere","Zoho","Other"];
+
 // Industry-average time estimates used in the time analysis chart (hrs/week)
 const TIME_TASKS = [
   { task: "Analysing CVs",        current: 6,   ideal: 1.0 },
@@ -319,10 +322,17 @@ export default function StackAuditPage() {
             {/* § 3 — ATS */}
             <div style={SECTION}>
               <div style={SEC_TITLE}>③ Applicant Tracking System (ATS)</div>
-              <TextField label="Current ATS tool" size="small" fullWidth value={form.atsTool}
-                onChange={e => setF("atsTool", e.target.value)}
-                error={!!errors.atsTool} helperText={errors.atsTool}
-                sx={{ ...DARK_FIELD, mb:2.5 }} FormHelperTextProps={{ sx:{ color:"#f87171" } }}
+              <Autocomplete
+                options={ATS_TOOLS}
+                value={form.atsTool || null}
+                onChange={(_, v) => setF("atsTool", v || "")}
+                renderInput={params => (
+                  <TextField {...params} label="Current ATS tool" size="small"
+                    error={!!errors.atsTool} helperText={errors.atsTool}
+                    FormHelperTextProps={{ sx:{ color:"#f87171" } }}
+                  />
+                )}
+                sx={{ ...DARK_AC, mb:2.5 }} ListboxProps={{ sx:LISTBOX_SX }}
               />
               <SliderRow label="ATS — monthly spend" value={form.atsExpense} onChange={v => setF("atsExpense",v)} />
               <div style={{ marginTop:20 }}>
@@ -346,10 +356,17 @@ export default function StackAuditPage() {
             {/* § 4 — CRM */}
             <div style={SECTION}>
               <div style={SEC_TITLE}>④ Internal HR / CRM</div>
-              <TextField label="CRM / HRM tool name" size="small" fullWidth value={form.crmTool}
-                onChange={e => setF("crmTool", e.target.value)}
-                error={!!errors.crmTool} helperText={errors.crmTool}
-                sx={{ ...DARK_FIELD, mb:2.5 }} FormHelperTextProps={{ sx:{ color:"#f87171" } }}
+              <Autocomplete
+                options={CRM_TOOLS}
+                value={form.crmTool || null}
+                onChange={(_, v) => setF("crmTool", v || "")}
+                renderInput={params => (
+                  <TextField {...params} label="CRM / HRM tool name" size="small"
+                    error={!!errors.crmTool} helperText={errors.crmTool}
+                    FormHelperTextProps={{ sx:{ color:"#f87171" } }}
+                  />
+                )}
+                sx={{ ...DARK_AC, mb:2.5 }} ListboxProps={{ sx:LISTBOX_SX }}
               />
               <SliderRow label="CRM — monthly spend" value={form.crmExpense} onChange={v => setF("crmExpense",v)} />
               <div style={{ marginTop:20 }}>
@@ -374,7 +391,7 @@ export default function StackAuditPage() {
             <div style={SECTION}>
               <div style={SEC_TITLE}>⑤ AI Tools</div>
               <p style={{ fontSize:13, color:"rgba(255,255,255,.38)", marginTop:-12, marginBottom:20 }}>
-                Add any standalone AI tools your team pays for (e.g. ChatGPT Plus, Jasper, Otter.ai). Leave empty if none.
+                Add any standalone AI tools your team pays for (e.g. ChatGPT Plus, Jasper, Otter.ai, Roi.ai, sapia.ai). Leave empty if none.
               </p>
               {form.aiTools.map((tool,i) => (
                 <div key={i} style={{ display:"flex", gap:12, alignItems:"flex-start", marginBottom:20 }}>
