@@ -1,11 +1,15 @@
 package com.nolyvra.app.controller;
 
 import com.nolyvra.app.model.CoreSignalProfileResponse;
+import com.nolyvra.app.model.ExternalLoadMoreRequest;
 import com.nolyvra.app.model.TalentSearchRequest;
 import com.nolyvra.app.model.TalentSearchResponse;
+import com.nolyvra.app.model.TalentSearchResult;
 import com.nolyvra.app.service.TalentSearchService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/talent-search")
@@ -26,8 +30,16 @@ public class TalentSearchController {
 
     @GetMapping("/coresignal/{coresignalId}")
     public CoreSignalProfileResponse getCoreSignalProfile(
-            @PathVariable Long coresignalId,
+            @PathVariable String coresignalId,
             @RequestParam String loginId) {
         return talentSearchService.getCoreSignalProfile(coresignalId);
+    }
+
+    // ── "Load more external candidates" (Talent Search page) ─────────────────
+    @PostMapping("/external/load-more")
+    public List<TalentSearchResult> loadMoreExternal(
+            @Valid @RequestBody ExternalLoadMoreRequest req,
+            @RequestParam String loginId) {
+        return talentSearchService.loadMoreExternal(req.query(), loginId);
     }
 }

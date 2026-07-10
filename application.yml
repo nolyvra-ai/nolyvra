@@ -41,6 +41,12 @@ coresignal:
   api-key: ${CORESIGNAL_API_KEY:wPRJhUvgk9HT5tVOGHJDkLrcVuonFR9r}
   base-url: ${CORESIGNAL_BASE_URL:https://api.coresignal.com/cdapi/v2}
 
+brightdata:
+  api-key: ${BRIGHTDATA_API_KEY:e8d99be7-be6d-44ee-9625-691b7f7d4cb9}
+  dataset-id: ${BRIGHTDATA_DATASET_ID:gd_l1viktl72bvl7bjuj0}
+  company-dataset-id: ${BRIGHTDATA_COMPANY_DATASET_ID:gd_l1vikfnt1wgvvqz95w}
+  base-url: ${BRIGHTDATA_BASE_URL:https://api.brightdata.com}
+
 microsoft:
   client-id: ${MICROSOFT_CLIENT_ID:}
   client-secret: ${MICROSOFT_CLIENT_SECRET:}

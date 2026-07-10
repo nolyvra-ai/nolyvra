@@ -48,6 +48,8 @@ public class CoWorkerService {
 
     public CoWorkerChatResponse chat(String loginId, CoWorkerChatRequest request) {
         String context = buildContext(loginId);
+        String nowLine = OffsetDateTime.now(ZoneOffset.UTC)
+                .format(java.time.format.DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy 'at' HH:mm 'UTC'"));
 
         // Resolve or create session
         Long sessionId = request.sessionId();
@@ -62,6 +64,10 @@ public class CoWorkerService {
 
         String systemPrompt = """
                 You are nolyvra Co-worker AI — a helpful recruitment assistant that takes actions inside the app.
+
+                Current date and time: %s
+                Always use this as "now" when resolving relative dates/times (e.g. "tomorrow", "next Monday",
+                "in 2 weeks") into ISO datetimes. Never use any other year unless the user explicitly states one.
 
                 You have access to the following recruitment data for this recruiter:
                 %s
@@ -111,7 +117,7 @@ public class CoWorkerService {
                 - CRITICAL: You MUST respond with ONLY a valid JSON object. Never respond with plain text. Even for greetings or questions, wrap your reply in the JSON structure above with pendingAction type NONE.
                 - CRITICAL: params must ALWAYS be a JSON object {}, never a JSON array []. If scheduling multiple candidates, pick the first one and mention you will handle others separately.
                 """
-                .formatted(context);
+                .formatted(nowLine, context);
 
         List<CoWorkerChatRequest.ChatMessage> history = request.history() != null
                 ? request.history()

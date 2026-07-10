@@ -1,7 +1,7 @@
 import {
   Box, Paper, Typography, Table, TableHead, TableRow,
   TableCell, TableBody, Button, TextField, InputAdornment,
-  Alert, LinearProgress, Dialog, DialogTitle, DialogContent, DialogActions,
+  Alert, LinearProgress, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
@@ -226,7 +226,7 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
 }
 
 // ─── Suitable Candidate card (internal DB match) ───────────────────────────────
-function SuitableCandidateCard({ c, onView }) {
+function SuitableCandidateCard({ c, onView, onAdd, adding, added, alreadyOnJob }) {
   const tierColor = c.matchTier === "Strong Match" ? SUCCESS
     : c.matchTier === "Hidden Gem" ? PURPLE
     : c.matchTier === "Needs Review" ? WARN : DANGER;
@@ -252,20 +252,39 @@ function SuitableCandidateCard({ c, onView }) {
         <Typography sx={{ fontSize: 13, fontWeight: 700, color: tierColor }}>{c.matchScore}%</Typography>
         <Typography sx={{ fontSize: 9.5, color: MUTED }}>{c.matchTier}</Typography>
       </Box>
+      {alreadyOnJob ? (
+        <Badge label="On This Job" variant="neutral" />
+      ) : (
+        <Button size="small" variant={added ? "outlined" : "contained"}
+          onClick={e => { e.stopPropagation(); if (!adding && !added) onAdd(); }}
+          disabled={adding || added}
+          sx={{
+            fontSize: 10.5, fontWeight: 500, ml: 0.5, flexShrink: 0, borderRadius: "6px",
+            textTransform: "none", whiteSpace: "nowrap",
+            ...(added
+              ? { borderColor: SUCCESS_BR, color: SUCCESS }
+              : { bgcolor: ACCENT, boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } })
+          }}>
+          {adding ? <CircularProgress size={12} sx={{ color: added ? SUCCESS : "#fff" }} /> : added ? "Added ✓" : "Add to Job"}
+        </Button>
+      )}
     </Box>
   );
 }
 
-// ─── External Candidate card (CoreSignal match) ────────────────────────────────
-function ExternalCandidateCard({ c }) {
+// ─── External Candidate card (Bright Data / LinkedIn match) ────────────────────
+function ExternalCandidateCard({ c, onAdd, adding, added }) {
+  const hasPhoto = !!c.avatarUrl && c.defaultAvatar !== true;
   return (
     <Box sx={{
       display: "flex", alignItems: "center", gap: 1.25, p: "10px 14px",
       border: `1px solid ${PURPLE_BR}`, borderLeft: `3px solid ${PURPLE}`, borderRadius: "8px", bgcolor: "#fff",
     }}>
-      <Box sx={{ width: 30, height: 30, borderRadius: "50%", bgcolor: PURPLE, color: "#fff", display: "flex",
+      <Box sx={{ width: 30, height: 30, borderRadius: "50%", overflow: "hidden", bgcolor: hasPhoto ? "transparent" : PURPLE, color: "#fff", display: "flex",
         alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
-        {(c.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
+        {hasPhoto
+          ? <Box component="img" src={c.avatarUrl} alt={c.name || ""} sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          : (c.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
       </Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: TEXT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -288,6 +307,17 @@ function ExternalCandidateCard({ c }) {
             LinkedIn ↗
           </Typography>
         )}
+        <Button size="small" variant={added ? "outlined" : "contained"}
+          onClick={() => { if (!adding && !added) onAdd(); }}
+          disabled={adding || added}
+          sx={{
+            fontSize: 10.5, fontWeight: 500, borderRadius: "6px", textTransform: "none", whiteSpace: "nowrap",
+            ...(added
+              ? { borderColor: SUCCESS_BR, color: SUCCESS }
+              : { bgcolor: PURPLE, boxShadow: "none", "&:hover": { bgcolor: "#6D28D9", boxShadow: "none" } })
+          }}>
+          {adding ? <CircularProgress size={12} sx={{ color: added ? SUCCESS : "#fff" }} /> : added ? "Added ✓" : "Add to Job"}
+        </Button>
       </Box>
     </Box>
   );
@@ -315,13 +345,19 @@ export default function JobsPage() {
 
   const [externalCandidates, setExternalCandidates] = useState([]);
   const [externalLoading, setExternalLoading]       = useState(false);
+  const [externalLoadingMore, setExternalLoadingMore] = useState(false);
   const [externalError, setExternalError]           = useState("");
   const [externalFetched, setExternalFetched]       = useState(false);
+
+  // ── Add to Job (Suitable / External candidate cards) ─────────────────────
+  const [addingKeys, setAddingKeys] = useState(new Set());
+  const [addedKeys, setAddedKeys]   = useState(new Set());
 
   useEffect(() => {
     // Switching jobs invalidates any previous find/search results
     setSuitableCandidates([]); setSuitableFetched(false); setSuitableError("");
     setExternalCandidates([]); setExternalFetched(false); setExternalError("");
+    setAddingKeys(new Set()); setAddedKeys(new Set());
   }, [selectedJobId]);
 
   async function handleFindSuitableCandidates() {
@@ -349,6 +385,91 @@ export default function JobsPage() {
       setExternalError(e?.message || "Failed to search external candidates");
     } finally {
       setExternalLoading(false);
+    }
+  }
+
+  async function handleLoadMoreExternalCandidates() {
+    if (!selectedJobId) return;
+    setExternalLoadingMore(true); setExternalError("");
+    try {
+      const fresh = await apiGet(`/api/jobs/${selectedJobId}/external-candidates/load-more`);
+      const existingIds = new Set(externalCandidates.filter(c => c.coresignalId).map(c => c.coresignalId));
+      const deduped = (fresh ?? []).filter(c => c.coresignalId && !existingIds.has(c.coresignalId));
+      setExternalCandidates(prev => [...prev, ...deduped]);
+    } catch (e) {
+      setExternalError(e?.message || "Failed to load more external candidates");
+    } finally {
+      setExternalLoadingMore(false);
+    }
+  }
+
+  function suitableCandidatePayload(c) {
+    return {
+      name: c.name ?? "",
+      email: c.email ?? "",
+      phone: c.phone ?? "",
+      linkedinUrl: c.linkedinUrl ?? "",
+      cvText: "",
+      skills: c.skills ?? [],
+      currentTitle: c.currentTitle ?? "",
+      location: c.location ?? "",
+      state: c.state ?? "",
+      yearsExperience: c.yearsExperience ?? null,
+      seniorityLevel: c.seniorityLevel ?? "",
+      expectedSalaryMin: c.expectedSalaryMin ?? null,
+      expectedSalaryMax: c.expectedSalaryMax ?? null,
+      salaryCurrency: c.salaryCurrency ?? "",
+      noticePeriodWeeks: c.noticePeriodWeeks ?? null,
+      workRights: c.workRights ?? "",
+      remoteFlexible: c.remoteFlexible ?? null,
+    };
+  }
+
+  function externalCandidatePayload(c) {
+    return {
+      name: c.name ?? "",
+      email: c.email ?? "",
+      phone: c.phone ?? "",
+      linkedinUrl: c.linkedinUrl ?? "",
+      cvText: "",
+      skills: c.matchedSkills ?? [],
+      currentTitle: c.currentTitle ?? "",
+      yearsExperience: c.yearsExperience ?? null,
+    };
+  }
+
+  async function handleAddToJob(key, payload) {
+    if (!selectedJobId || addingKeys.has(key) || addedKeys.has(key)) return;
+    setAddingKeys(prev => new Set(prev).add(key));
+    try {
+      const loginId = localStorage.getItem("loginId") || "";
+      const url = new URL(`${API_BASE}/api/jobs/${selectedJobId}/candidates`);
+      url.searchParams.set("loginId", loginId);
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+        body: JSON.stringify(payload),
+      });
+      if (res.status === 409) {
+        setAddedKeys(prev => new Set(prev).add(key));
+        return;
+      }
+      if (!res.ok) { const t = await res.text().catch(() => ""); throw new Error(`${res.status} - ${t}`); }
+      const created = await res.json();
+      setAddedKeys(prev => new Set(prev).add(key));
+      setCandidatesByJob(prev => {
+        const next = new Map(prev);
+        const existing = next.get(selectedJobId) ?? [];
+        next.set(selectedJobId, [
+          ...existing,
+          { ...created, consistencyScore: null, capabilityScore: null, risk: null, status: "Pending" }
+        ]);
+        return next;
+      });
+    } catch (e) {
+      setErr(e?.message || "Failed to add candidate to job");
+    } finally {
+      setAddingKeys(prev => { const next = new Set(prev); next.delete(key); return next; });
     }
   }
 
@@ -775,17 +896,24 @@ export default function JobsPage() {
               )}
               {suitableCandidates.length > 0 && (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                  {suitableCandidates.map(c => (
-                    <SuitableCandidateCard key={c.candidateId} c={c}
-                      onView={() => nav(`/candidates/${c.candidateId}/workflow`)} />
-                  ))}
+                  {suitableCandidates.map(c => {
+                    const key = `suitable-${c.candidateId}`;
+                    return (
+                      <SuitableCandidateCard key={c.candidateId} c={c}
+                        onView={() => nav(`/candidates/${c.candidateId}/workflow`)}
+                        onAdd={() => handleAddToJob(key, suitableCandidatePayload(c))}
+                        adding={addingKeys.has(key)}
+                        added={addedKeys.has(key)}
+                        alreadyOnJob={c.jobId === selectedJobId} />
+                    );
+                  })}
                 </Box>
               )}
             </Box>
           </Paper>
         )}
 
-        {/* Search External Candidates (CoreSignal) */}
+        {/* Search External Candidates (Bright Data / LinkedIn) */}
         {selectedJob && (
           <Paper elevation={0} sx={{
             border: `1px solid ${BORDER}`, borderRadius: "10px",
@@ -800,9 +928,9 @@ export default function JobsPage() {
                 <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
                   Search External Candidates
                 </Typography>
-                <Typography sx={{ fontSize: 10.5, color: MUTED }}>via CoreSignal · up to 3 results</Typography>
               </Box>
               <Button size="small" variant="contained" onClick={handleSearchExternalCandidates} disabled={externalLoading}
+                startIcon={externalLoading ? <CircularProgress size={13} sx={{ color: "#fff" }} /> : null}
                 sx={{
                   fontSize: 11, fontWeight: 500, bgcolor: PURPLE, borderRadius: "6px",
                   textTransform: "none", boxShadow: "none",
@@ -815,8 +943,16 @@ export default function JobsPage() {
               {externalError && <Alert severity="error" sx={{ mb: 1.5 }}>{externalError}</Alert>}
               {!externalFetched && !externalLoading && (
                 <Typography sx={{ fontSize: 12.5, color: MUTED, textAlign: "center", py: 1.5 }}>
-                  Click "Search External" to check our cache first, then CoreSignal if needed — capped to 3 results to conserve credits.
+                  Click "Search External" to blend cached matches with fresh LinkedIn candidates for this job.
                 </Typography>
+              )}
+              {externalLoading && (
+                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.75, py: 2 }}>
+                  <CircularProgress size={20} sx={{ color: PURPLE }} />
+                  <Typography sx={{ fontSize: 11.5, color: MUTED }}>
+                    Live LinkedIn lookups can take up to 1 minute — hang tight.
+                  </Typography>
+                </Box>
               )}
               {externalFetched && !externalLoading && externalCandidates.length === 0 && !externalError && (
                 <Typography sx={{ fontSize: 12.5, color: MUTED, textAlign: "center", py: 1.5 }}>
@@ -825,9 +961,29 @@ export default function JobsPage() {
               )}
               {externalCandidates.length > 0 && (
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                  {externalCandidates.map((c, i) => (
-                    <ExternalCandidateCard key={c.coresignalId ?? i} c={c} />
-                  ))}
+                  {externalCandidates.map((c, i) => {
+                    const key = `external-${c.coresignalId ?? i}`;
+                    return (
+                      <ExternalCandidateCard key={c.coresignalId ?? i} c={c}
+                        onAdd={() => handleAddToJob(key, externalCandidatePayload(c))}
+                        adding={addingKeys.has(key)}
+                        added={addedKeys.has(key)} />
+                    );
+                  })}
+                </Box>
+              )}
+              {externalFetched && !externalLoading && (
+                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.75, mt: 1.5 }}>
+                  <Button size="small" variant="outlined" onClick={handleLoadMoreExternalCandidates} disabled={externalLoadingMore}
+                    startIcon={externalLoadingMore ? <CircularProgress size={13} sx={{ color: PURPLE }} /> : null}
+                    sx={{ fontSize: 11, borderColor: PURPLE_BR, color: PURPLE, borderRadius: "6px", textTransform: "none", "&:hover": { borderColor: PURPLE, bgcolor: PURPLE_BG } }}>
+                    {externalLoadingMore ? "Fetching from LinkedIn…" : "Load More External Candidates"}
+                  </Button>
+                  {externalLoadingMore && (
+                    <Typography sx={{ fontSize: 11.5, color: "#B4BCC9" }}>
+                      This can take up to 1 minute while we pull fresh LinkedIn profiles.
+                    </Typography>
+                  )}
                 </Box>
               )}
             </Box>

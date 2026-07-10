@@ -87,7 +87,7 @@ public class JobsController {
         return talentSearchService.suitableInternalCandidatesForJob(job, loginId);
     }
 
-    // ── External Candidates: top 3 CoreSignal matches, cache-checked first ───
+    // ── External Candidates: 5 cached + 5 fresh from Bright Data, every call ──
     @GetMapping("/{jobId}/external-candidates")
     public List<TalentSearchResult> getExternalCandidates(
             @PathVariable String jobId,
@@ -95,6 +95,17 @@ public class JobsController {
         JobResponse job = jobService.getJob(jobId, loginId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found: " + jobId));
         return talentSearchService.searchCoreSignalForJob(
+                job.stackTags(), job.location(), job.title(), job.seniority());
+    }
+
+    // ── "Load more external candidates" (Jobs page) ──────────────────────────
+    @GetMapping("/{jobId}/external-candidates/load-more")
+    public List<TalentSearchResult> loadMoreExternalCandidates(
+            @PathVariable String jobId,
+            @RequestParam String loginId) {
+        JobResponse job = jobService.getJob(jobId, loginId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found: " + jobId));
+        return talentSearchService.loadMoreExternalForJob(
                 job.stackTags(), job.location(), job.title(), job.seniority());
     }
 }

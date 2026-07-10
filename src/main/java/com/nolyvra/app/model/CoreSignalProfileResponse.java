@@ -3,7 +3,7 @@ package com.nolyvra.app.model;
 import java.util.List;
 
 public record CoreSignalProfileResponse(
-    Long    coresignalId,
+    String  coresignalId,       // Bright Data record id — string slug, not numeric
     String  fullName,
     String  jobTitle,
     String  currentCompany,
@@ -14,5 +14,7 @@ public record CoreSignalProfileResponse(
     String  managementLevel,
     String  description,
     List<String> skills,
+    String  avatarUrl,
+    Boolean defaultAvatar,
     String  rawJson             // full raw_json from cache; frontend parses experience/education/etc.
 ) {}
