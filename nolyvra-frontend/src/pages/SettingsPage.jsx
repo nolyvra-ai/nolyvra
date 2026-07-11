@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import {
   Box, Paper, Typography, Button, TextField, MenuItem,
   Alert, CircularProgress, LinearProgress, Slider
@@ -296,6 +296,18 @@ export default function SettingsPage() {
       .finally(() => setOnboardingRecipientsLoading(false));
   }, [loginId, isAdmin]);
 
+  useEffect(() => {
+    if (!loginId || !isAdmin) return;
+    setLeadsLoading(true);
+    fetch(`${API_BASE}/api/stack-audit/leads`, {
+      headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+    })
+      .then(r => r.ok ? r.json() : [])
+      .then(setStackLeads)
+      .catch(() => {})
+      .finally(() => setLeadsLoading(false));
+  }, [loginId, isAdmin]);
+
   async function handleOnboard(targetId) {
     setOnboarding(targetId);
     try {
@@ -512,6 +524,11 @@ export default function SettingsPage() {
       setBuyLoading(false);
     }
   }
+
+  // ── Form Leads (Stack Audit) ──────────────────────────────────────────────
+  const [stackLeads,        setStackLeads]        = useState([]);
+  const [leadsLoading,      setLeadsLoading]      = useState(false);
+  const [selectedLeadId,    setSelectedLeadId]    = useState(null);
 
   // ── Manage Subscription (Stripe Portal) ──────────────────────────────────
   const [portalLoading, setPortalLoading] = useState(false);
@@ -1515,6 +1532,92 @@ export default function SettingsPage() {
           </Box>
         </Box>
       </Paper>
+
+      {/* ── Form Leads (Stack Audit submissions) — admin only ────────────── */}
+      {isAdmin && <Paper elevation={0} sx={{ border: `1px solid ${BORDER}`, borderRadius: "10px", overflow: "hidden", bgcolor: "#fff" }}>
+        <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Box>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>Form Leads</Typography>
+            <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>Stack Audit submissions from the public page</Typography>
+          </Box>
+          <Typography sx={{ fontSize: 11, color: MUTED }}>{stackLeads.length} lead{stackLeads.length !== 1 ? "s" : ""}</Typography>
+        </Box>
+        <Box sx={{ p: 2.25 }}>
+          {leadsLoading ? (
+            <LinearProgress sx={{ borderRadius: "4px" }} />
+          ) : stackLeads.length === 0 ? (
+            <Typography sx={{ fontSize: 12, color: MUTED, textAlign: "center", py: 2 }}>No submissions yet.</Typography>
+          ) : (
+            <Box sx={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                <thead>
+                  <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
+                    {["Name","Company","Email","Phone","Submitted","Est. monthly saving","% saving","Demo",""].map(h => (
+                      <th key={h} style={{ padding: "7px 8px", color: MUTED, fontWeight: 600, textAlign: h === "" ? "center" : "left", whiteSpace: "nowrap", fontSize: 11 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {stackLeads.map(lead => {
+                    const rep     = lead.report;
+                    const isOpen  = selectedLeadId === lead.id;
+                    const saving  = rep?.totalMonthlySaving ?? "—";
+                    const pct     = rep?.savingPercent ?? "—";
+                    const fmtAUD  = n => n != null ? `$${Number(n).toLocaleString("en-AU")}` : "—";
+                    const fmtDate = s => s ? new Date(s).toLocaleDateString("en-AU", { day:"2-digit", month:"short", year:"numeric" }) : "—";
+                    return (
+                      <Fragment key={lead.id}>
+                        <tr style={{ borderBottom: `1px solid ${BORDER}`, cursor: "pointer", background: isOpen ? ACCENT_BG : "transparent" }}
+                          onClick={() => setSelectedLeadId(isOpen ? null : lead.id)}>
+                          <td style={{ padding:"9px 8px", color: TEXT, fontWeight: 500 }}>{lead.fullName}</td>
+                          <td style={{ padding:"9px 8px", color: TEXT }}>{lead.companyName}</td>
+                          <td style={{ padding:"9px 8px", color: MUTED }}>{lead.email}</td>
+                          <td style={{ padding:"9px 8px", color: MUTED }}>{lead.phone}</td>
+                          <td style={{ padding:"9px 8px", color: MUTED, whiteSpace:"nowrap" }}>{fmtDate(lead.createdAt)}</td>
+                          <td style={{ padding:"9px 8px", color: SUCCESS, fontWeight: 600 }}>{fmtAUD(saving)}/mo</td>
+                          <td style={{ padding:"9px 8px", color: SUCCESS }}>{pct !== "—" ? `~${pct}%` : "—"}</td>
+                          <td style={{ padding:"9px 8px", textAlign:"center" }}>
+                            {lead.demoRequested
+                              ? <span style={{ fontSize:10, fontWeight:700, color:"#16a34a", background:"#dcfce7", border:"1px solid #bbf7d0", borderRadius:6, padding:"2px 8px", whiteSpace:"nowrap" }}>Requested</span>
+                              : <span style={{ fontSize:10, color:MUTED }}>—</span>}
+                          </td>
+                          <td style={{ padding:"9px 8px", textAlign:"center", color: ACCENT, fontSize: 11, fontWeight: 600 }}>{isOpen ? "▲ Hide" : "▼ View"}</td>
+                        </tr>
+                        {isOpen && rep && (
+                          <tr>
+                            <td colSpan={9} style={{ padding:"16px 12px", background: ACCENT_BG, borderBottom: `1px solid ${BORDER}` }}>
+                              <Typography sx={{ fontSize: 11, fontWeight: 700, color: ACCENT, letterSpacing: "1.5px", textTransform: "uppercase", mb: 1 }}>Breakdown</Typography>
+                              {[rep.candidateSearch, rep.ats, rep.crm, rep.aiAndAgent].map(cat => cat && (
+                                <Box key={cat.label} sx={{ display:"flex", justifyContent:"space-between", py:0.5, borderBottom:`1px solid ${BORDER}` }}>
+                                  <Typography sx={{ fontSize:12, color: TEXT }}>{cat.label}</Typography>
+                                  <Typography sx={{ fontSize:12, color: MUTED }}>
+                                    {`$${(cat.currentMonthly||0).toLocaleString("en-AU")} → $${(cat.nolyvraMonthly||0).toLocaleString("en-AU")} `}
+                                    <span style={{ color: SUCCESS }}>({`+$${(cat.saving||0).toLocaleString("en-AU")}`})</span>
+                                  </Typography>
+                                </Box>
+                              ))}
+                              <Box sx={{ display:"flex", justifyContent:"space-between", pt:1, mb: rep.narrative ? 1.5 : 0 }}>
+                                <Typography sx={{ fontSize:12, fontWeight:600, color: TEXT }}>Annual saving est.</Typography>
+                                <Typography sx={{ fontSize:12, fontWeight:700, color: SUCCESS }}>${(rep.totalAnnualisedSaving||0).toLocaleString("en-AU")}/yr</Typography>
+                              </Box>
+                              {rep.narrative && (
+                                <Box sx={{ mt:1.5, p:1.5, bgcolor:"#fff", border:`1px solid ${BORDER}`, borderRadius:"8px" }}>
+                                  <Typography sx={{ fontSize:11, fontWeight:700, color: MUTED, mb:0.5, textTransform:"uppercase", letterSpacing:"1px" }}>AI Narrative</Typography>
+                                  <Typography sx={{ fontSize:12, color: TEXT, lineHeight:1.7 }}>{rep.narrative}</Typography>
+                                </Box>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </Box>
+          )}
+        </Box>
+      </Paper>}
 
       {/* ── Session / Logout ──────────────────────────────────────────────── */}
       <Paper elevation={0} sx={{

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Box, Paper, Typography, Button, TextField, MenuItem, Alert, CircularProgress,
-  Dialog, DialogTitle, DialogContent, DialogActions, IconButton } from "@mui/material";
+  Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Checkbox, FormControlLabel } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -112,6 +112,21 @@ export default function CandidateWorkflowPage() {
   const [analysisRunning,  setAnalysisRunning]  = useState(false); // Change 1
   const [analysisError,    setAnalysisError]    = useState(null);  // Change 1
 
+  // Format CV dialog state
+  const [formatCvOpen,            setFormatCvOpen]            = useState(false);
+  const [formatCvTemplates,       setFormatCvTemplates]       = useState([]);
+  const [formatCvTemplatesLoading, setFormatCvTemplatesLoading] = useState(false);
+  const [formatCvTemplateId,      setFormatCvTemplateId]      = useState("");
+  const [formatCvAttachScore,     setFormatCvAttachScore]     = useState(false);
+  const [formatCvLoading,         setFormatCvLoading]         = useState(false);
+  const [formatCvError,           setFormatCvError]           = useState("");
+
+  // Add-new-template sub-state (within the Format CV dialog)
+  const [newTemplateName,       setNewTemplateName]       = useState("");
+  const [newTemplateFile,       setNewTemplateFile]       = useState(null);
+  const [newTemplateUploading,  setNewTemplateUploading]  = useState(false);
+  const [newTemplateError,      setNewTemplateError]      = useState("");
+
   // Suggestive Questions dialog state
   const [questionsOpen,       setQuestionsOpen]       = useState(false);
   const [questionsData,       setQuestionsData]       = useState(null);   // parsed JSON
@@ -201,6 +216,101 @@ export default function CandidateWorkflowPage() {
       nav(`/analysis/${candidateId}`);
     } catch(e) { setAnalysisError(e.message); }
     finally { setAnalysisRunning(false); }
+  }
+
+  async function loadCvTemplates() {
+    setFormatCvTemplatesLoading(true);
+    try {
+      const data = await apiGet(`/api/cv-templates`);
+      setFormatCvTemplates(data ?? []);
+      if ((data ?? []).length > 0) setFormatCvTemplateId(prev => prev || data[0].id);
+    } catch (e) {
+      setFormatCvError(e.message || "Failed to load CV templates");
+    } finally {
+      setFormatCvTemplatesLoading(false);
+    }
+  }
+
+  function openFormatCvDialog() {
+    setFormatCvError("");
+    setFormatCvOpen(true);
+    loadCvTemplates();
+  }
+
+  async function handleUploadNewTemplate() {
+    if (!newTemplateFile || !newTemplateName.trim()) {
+      setNewTemplateError("Please provide a name and a .docx file.");
+      return;
+    }
+    setNewTemplateUploading(true); setNewTemplateError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", newTemplateFile);
+      const url = new URL(`${API_BASE}/api/cv-templates`);
+      url.searchParams.set("loginId", loginId);
+      url.searchParams.set("name", newTemplateName.trim());
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+        body: fd,
+      });
+      if (!res.ok) throw new Error((await res.text().catch(() => "")) || "Failed to upload template");
+      const created = await res.json();
+      setFormatCvTemplates(prev => [created, ...prev]);
+      setFormatCvTemplateId(created.id);
+      setNewTemplateName(""); setNewTemplateFile(null);
+    } catch (e) {
+      setNewTemplateError(e.message || "Failed to upload template");
+    } finally {
+      setNewTemplateUploading(false);
+    }
+  }
+
+  async function handleDeleteTemplate(templateId) {
+    if (!window.confirm("Delete this CV template?")) return;
+    try {
+      const url = new URL(`${API_BASE}/api/cv-templates/${templateId}`);
+      url.searchParams.set("loginId", loginId);
+      const res = await fetch(url.toString(), {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+      });
+      if (!res.ok) throw new Error((await res.text().catch(() => "")) || "Failed to delete template");
+      setFormatCvTemplates(prev => prev.filter(t => t.id !== templateId));
+      if (formatCvTemplateId === templateId) setFormatCvTemplateId("");
+    } catch (e) {
+      setFormatCvError(e.message || "Failed to delete template");
+    }
+  }
+
+  async function handleFormatCv() {
+    if (!formatCvTemplateId) { setFormatCvError("Please select a CV template."); return; }
+    setFormatCvLoading(true); setFormatCvError("");
+    try {
+      const url = new URL(`${API_BASE}/api/candidates/${candidateId}/format-cv`);
+      url.searchParams.set("loginId", loginId);
+      url.searchParams.set("templateId", formatCvTemplateId);
+      url.searchParams.set("attachScore", formatCvAttachScore ? "true" : "false");
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+      });
+      if (!res.ok) throw new Error((await res.text().catch(() => "")) || "Failed to format CV");
+      const blob = await res.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = `${(workflow.candidateName || "candidate").replace(/\s+/g, "_")}_formatted_cv.docx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(downloadUrl);
+      setFormatCvOpen(false);
+    } catch (e) {
+      setFormatCvError(e.message || "Failed to format CV");
+    } finally {
+      setFormatCvLoading(false);
+    }
   }
 
   function parseQuestionsJson(raw) {
@@ -300,6 +410,14 @@ export default function CandidateWorkflowPage() {
             sx={{fontSize:11,borderColor:PURPLE_BR,color:PURPLE,borderRadius:"6px",
               textTransform:"none","&:hover":{bgcolor:PURPLE_BG}}}>
             🎤 Interview Analysis
+          </Button>
+          <Button variant="outlined" size="small"
+            disabled={!workflow.cvText?.trim()}
+            onClick={openFormatCvDialog}
+            sx={{fontSize:11,borderColor:ACCENT_BR,color:ACCENT,borderRadius:"6px",
+              textTransform:"none","&:hover":{bgcolor:ACCENT_BG},
+              "&.Mui-disabled":{borderColor:BORDER,color:MUTED}}}>
+            📄 Format CV
           </Button>
           {!workflow.cvText?.trim() && (
             <Button variant="outlined" size="small"
@@ -856,6 +974,145 @@ export default function CandidateWorkflowPage() {
                 : questionsSaved ? "✓ Saved!" : "Save Questions"}
             </Button>
           </Box>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Format CV Dialog ─────────────────────────────────────────────── */}
+      <Dialog open={formatCvOpen} onClose={() => !formatCvLoading && setFormatCvOpen(false)}
+        maxWidth="xs" fullWidth
+        slotProps={{ paper: { sx: { borderRadius: "12px", border: `1px solid ${BORDER}` } } }}>
+        <DialogTitle sx={{ px: 2.5, py: 2, borderBottom: `1px solid ${BORDER}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Typography sx={{ fontSize: 14, fontWeight: 700, color: TEXT }}>📄 Format CV</Typography>
+          <IconButton size="small" disabled={formatCvLoading}
+            onClick={() => setFormatCvOpen(false)} sx={{ color: MUTED }}>✕</IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ p: 2.5 }}>
+          <Typography sx={{ fontSize: 12, color: MUTED, mb: 1.75, lineHeight: 1.6 }}>
+            Pick a saved CV template — the candidate's details will be stamped into it,
+            preserving its exact formatting, and downloaded as a .docx file.
+          </Typography>
+
+          {formatCvTemplatesLoading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
+              <CircularProgress size={20} />
+            </Box>
+          ) : formatCvTemplates.length === 0 ? (
+            <Typography sx={{ fontSize: 12, color: MUTED, mb: 1.5 }}>
+              No CV templates saved yet. Upload one below to get started.
+            </Typography>
+          ) : (
+            <>
+              <TextField select fullWidth size="small" label="CV Template" value={formatCvTemplateId}
+                disabled={formatCvLoading}
+                onChange={e => setFormatCvTemplateId(e.target.value)}
+                sx={{ mb: 0.75, "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}>
+                {formatCvTemplates.map(t => (
+                  <MenuItem key={t.id} value={t.id} sx={{ fontSize: 13 }}>{t.name}</MenuItem>
+                ))}
+              </TextField>
+              {formatCvTemplateId && (
+                <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1.5 }}>
+                  <Box onClick={() => handleDeleteTemplate(formatCvTemplateId)}
+                    sx={{ fontSize: 11, color: DANGER, cursor: "pointer", "&:hover": { textDecoration: "underline" } }}>
+                    Delete selected template
+                  </Box>
+                </Box>
+              )}
+            </>
+          )}
+
+          <FormControlLabel
+            sx={{ mt: 0.5, ml: 0 }}
+            control={
+              <Checkbox size="small" checked={formatCvAttachScore} disabled={formatCvLoading}
+                onChange={e => setFormatCvAttachScore(e.target.checked)} />
+            }
+            label={<Typography sx={{ fontSize: 12.5, color: TEXT }}>Attach candidate analysis score with the CV</Typography>}
+          />
+
+          {formatCvError && (
+            <Typography sx={{ fontSize: 12, color: DANGER, mt: 1.25, fontWeight: 500 }}>⚠ {formatCvError}</Typography>
+          )}
+
+          {/* Add a new template */}
+          <Box sx={{ mt: 2, pt: 2, borderTop: `1px solid ${BORDER}` }}>
+            <Typography sx={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: 0.5, mb: 1 }}>
+              Add a New Template
+            </Typography>
+            <TextField fullWidth size="small" placeholder="Template name (e.g. Nolyvra Standard CV)"
+              value={newTemplateName} onChange={e => setNewTemplateName(e.target.value)}
+              disabled={newTemplateUploading}
+              sx={{ mb: 1, "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }} />
+            <Box
+              component="label"
+              htmlFor="cv-template-file-input"
+              sx={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                flexDirection: "column", gap: 0.5,
+                border: `2px dashed ${newTemplateFile ? SUCCESS_BR : BORDER}`,
+                borderRadius: "8px", p: "14px 12px",
+                bgcolor: newTemplateFile ? SUCCESS_BG : SURFACE,
+                cursor: newTemplateUploading ? "default" : "pointer", transition: "all .15s",
+                "&:hover": newTemplateUploading ? {} : { borderColor: ACCENT, bgcolor: ACCENT_BG },
+              }}>
+              <Typography sx={{ fontSize: 18 }}>{newTemplateFile ? "✅" : "📎"}</Typography>
+              <Typography sx={{ fontSize: 11.5, fontWeight: 500,
+                color: newTemplateFile ? SUCCESS : TEXT, textAlign: "center" }}>
+                {newTemplateFile ? newTemplateFile.name : "Click to upload a .docx template"}
+              </Typography>
+              <Box
+                id="cv-template-file-input"
+                component="input"
+                type="file"
+                disabled={newTemplateUploading}
+                accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f) {
+                    setNewTemplateFile(f);
+                    setNewTemplateName(prev => prev.trim() ? prev : f.name.replace(/\.docx$/i, ""));
+                  }
+                  e.target.value = "";
+                }}
+                sx={{ display: "none" }}
+              />
+            </Box>
+            {newTemplateError && (
+              <Typography sx={{ fontSize: 11.5, color: DANGER, mt: 0.75 }}>⚠ {newTemplateError}</Typography>
+            )}
+            <Button size="small" variant="outlined" fullWidth onClick={handleUploadNewTemplate}
+              disabled={newTemplateUploading || !newTemplateFile || !newTemplateName.trim()}
+              sx={{ mt: 1, fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "7px", textTransform: "none" }}>
+              {newTemplateUploading
+                ? <><CircularProgress size={12} sx={{ mr: 0.75 }} /> Uploading…</>
+                : "Save Template"}
+            </Button>
+            {!newTemplateUploading && (!newTemplateFile || !newTemplateName.trim()) && (
+              <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.5 }}>
+                {!newTemplateFile && !newTemplateName.trim()
+                  ? "Enter a name and choose a .docx file to enable Save."
+                  : !newTemplateFile
+                    ? "Choose a .docx file to enable Save."
+                    : "Enter a template name to enable Save."}
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 2.5, pb: 2.25, gap: 1 }}>
+          <Button variant="outlined" size="small" disabled={formatCvLoading}
+            onClick={() => setFormatCvOpen(false)}
+            sx={{ fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none" }}>
+            Cancel
+          </Button>
+          <Button variant="contained" size="small" onClick={handleFormatCv}
+            disabled={formatCvLoading || !formatCvTemplateId}
+            sx={{ fontSize: 12, bgcolor: ACCENT, borderRadius: "6px", textTransform: "none",
+              boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
+            {formatCvLoading
+              ? <><CircularProgress size={12} sx={{ color: "#fff", mr: 0.75 }} /> Building…</>
+              : "Format & Download"}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

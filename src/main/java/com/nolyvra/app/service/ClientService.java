@@ -2,6 +2,8 @@ package com.nolyvra.app.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.nolyvra.app.model.ClientRequest;
 import com.nolyvra.app.model.ClientResponse;
 import com.nolyvra.app.model.OutreachRequest;
@@ -21,6 +23,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class ClientService {
@@ -33,8 +36,9 @@ public class ClientService {
     private final TokenService tokenService;
     private final RestTemplate restTemplate;
     private final String model;
-    private final String coreSignalApiKey;
-    private final String coreSignalBaseUrl;
+    private final String brightDataApiKey;
+    private final String brightDataCompanyDatasetId;
+    private final String brightDataBaseUrl;
 
     public ClientService(
             JdbcTemplate jdbc,
@@ -42,15 +46,17 @@ public class ClientService {
             ObjectMapper objectMapper,
             TokenService tokenService,
             @Value("${openai.model:gpt-4o-mini}") String model,
-            @Value("${coresignal.api-key:}") String coreSignalApiKey,
-            @Value("${coresignal.base-url:https://api.coresignal.com/cdapi/v2}") String coreSignalBaseUrl) {
+            @Value("${brightdata.api-key:}") String brightDataApiKey,
+            @Value("${brightdata.company-dataset-id:gd_l1vijqt9jfj7olije}") String brightDataCompanyDatasetId,
+            @Value("${brightdata.base-url:https://api.brightdata.com}") String brightDataBaseUrl) {
         this.jdbc = jdbc;
         this.openAI = openAIClient;
         this.objectMapper = objectMapper;
         this.tokenService = tokenService;
         this.model = model;
-        this.coreSignalApiKey = coreSignalApiKey;
-        this.coreSignalBaseUrl = coreSignalBaseUrl;
+        this.brightDataApiKey = brightDataApiKey;
+        this.brightDataCompanyDatasetId = brightDataCompanyDatasetId;
+        this.brightDataBaseUrl = brightDataBaseUrl;
         this.restTemplate = new RestTemplate();
     }
 
@@ -247,227 +253,499 @@ public class ClientService {
         return getAllClientJobs(companyName, loginId);
     }
 
+    private static final int LEAD_BATCH_SIZE = 5;
+    private static final long POLL_DELAY_MS = 180_000;
+    private static final int POLL_MAX_ATTEMPTS = 5;
+
     // ─── GET /api/clients/potential ───────────────────────────────────────────
 
     public List<PotentialClientResponse> getPotentialClients(
-            String loginId, String industry, String country,
+            String loginId, String industry, String place,
             String companySize, String keyword) {
-        if (coreSignalApiKey == null || coreSignalApiKey.isBlank()) {
-            log.warn("[ClientSearch] CoreSignal API key is not configured — returning empty");
-            return List.of();
-        }
-        log.info("[ClientSearch] Params — industry='{}' country='{}' companySize='{}' keyword='{}'",
-                industry, country, companySize, keyword);
+        log.info("[ClientSearch] Params — industry='{}' place='{}' companySize='{}' keyword='{}'",
+                industry, place, companySize, keyword);
         try {
-            return fetchFromCoreSignal(loginId, industry, country, companySize, keyword);
+            return fetchLeadCompanies(industry, place, companySize, keyword);
         } catch (Exception e) {
-            log.error("[ClientSearch] Unhandled exception in fetchFromCoreSignal: {}", e.getMessage(), e);
+            log.error("[ClientSearch] Unhandled exception in fetchLeadCompanies: {}", e.getMessage(), e);
             return List.of();
         }
     }
 
-    // ─── CoreSignal: search + collect company profiles ────────────────────────
+    // ─── GET /api/clients/potential/load-more ──────────────────────────────────
+    // Stateless — identical operation to getPotentialClients, repeated on each click.
 
-    private List<PotentialClientResponse> fetchFromCoreSignal(
-            String loginId, String industry, String country,
-            String companySize, String keyword) throws Exception {
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("apikey", coreSignalApiKey);
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        // Build ES DSL query with filters applied at source — never fetch more than 4 IDs
-        List<Map<String, Object>> mustClauses = new ArrayList<>();
-        if (isPresent(country))     mustClauses.add(Map.of("match", Map.of("location_hq_country", country)));
-        if (isPresent(industry))    mustClauses.add(Map.of("match", Map.of("industry", industry)));
-        if (isPresent(companySize)) {
-            List<String> ranges = mapSizeToRanges(companySize);
-            if (!ranges.isEmpty()) mustClauses.add(Map.of("terms", Map.of("size_range", ranges)));
-        }
-        if (isPresent(keyword))     mustClauses.add(Map.of("match", Map.of("name", keyword)));
-
-        Map<String, Object> queryBody = mustClauses.isEmpty()
-            ? Map.of("query", Map.of("match_all", Map.of()))
-            : Map.of("query", Map.of("bool", Map.of("must", mustClauses)));
-
-        String searchUrl = coreSignalBaseUrl + "/company_clean/search/es_dsl";
-        log.info("[ClientSearch] POST {} body={}", searchUrl, objectMapper.writeValueAsString(queryBody));
-
-        HttpEntity<Map<String, Object>> searchEntity = new HttpEntity<>(queryBody, headers);
-        ResponseEntity<String> searchResp = restTemplate.exchange(
-            searchUrl, HttpMethod.POST, searchEntity, String.class);
-
-        String rawBody = searchResp.getBody();
-        log.info("[ClientSearch] Search status={} bodyLength={}",
-                searchResp.getStatusCode(), rawBody != null ? rawBody.length() : 0);
-
-        if (!searchResp.getStatusCode().is2xxSuccessful() || rawBody == null) {
-            log.warn("[ClientSearch] Non-2xx or empty body — aborting");
+    public List<PotentialClientResponse> loadMoreClients(
+            String loginId, String industry, String place,
+            String companySize, String keyword) {
+        try {
+            return fetchLeadCompanies(industry, place, companySize, keyword);
+        } catch (Exception e) {
+            log.error("[ClientSearch] Unhandled exception in loadMoreClients: {}", e.getMessage(), e);
             return List.of();
         }
+    }
 
-        JsonNode idsNode = objectMapper.readTree(rawBody);
-        int count = idsNode.isArray() ? Math.min(idsNode.size(), 4) : 0;
-        log.info("[ClientSearch] IDs returned: {} (collecting {})", idsNode.isArray() ? idsNode.size() : 0, count);
-        if (count == 0) return List.of();
+    // ─── Shared 5-cached + 5-fresh core ────────────────────────────────────────
 
-        List<Integer> ids = new ArrayList<>();
-        for (int i = 0; i < count; i++) ids.add(idsNode.get(i).asInt());
-        log.info("[ClientSearch] Collecting IDs: {}", ids);
+    private List<PotentialClientResponse> fetchLeadCompanies(
+            String industry, String place, String companySize, String keyword) {
+        List<PotentialClientResponse> cached =
+                randomCachedCompanies(industry, place, companySize, keyword, LEAD_BATCH_SIZE);
+        // Dedupe fresh Bright Data hits only against the specific records just
+        // picked for the cached half of THIS response — not the entire history
+        // of everything ever cached for this term. Bright Data's Search isn't
+        // randomized/paginated, so it returns the same deterministic top-N
+        // matches every call; deduping against the full historical cache meant
+        // the fresh half silently returned 0 results as soon as those matches
+        // had been cached once, on any prior search.
+        Set<String> justShownFromCache = cached.stream()
+                .map(PotentialClientResponse::externalId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        List<PotentialClientResponse> combined = new ArrayList<>(cached);
+        combined.addAll(fetchBrightDataCompaniesLive(industry, place, LEAD_BATCH_SIZE, justShownFromCache));
+        return combined;
+    }
 
-        List<PotentialClientResponse> results = new ArrayList<>();
-        for (int id : ids) {
-            PotentialClientResponse pc = collectCompany(id, headers);
-            if (pc != null) results.add(pc);
+    private void appendLeadCompanyWhereClause(
+            String industry, String place, String companySize, String keyword,
+            StringBuilder sql, List<Object> args) {
+        sql.append(" where sector = 'real_estate' and is_active = true");
+        if (isPresent(industry)) {
+            sql.append(" and data->>'industry' ilike ?");
+            args.add("%" + industry + "%");
         }
+        if (isPresent(place)) {
+            sql.append(" and (data->>'location_hq_city' ilike ? or data->>'location_hq_country' ilike ? or region ilike ?)");
+            args.add("%" + place + "%");
+            args.add("%" + place + "%");
+            args.add("%" + place + "%");
+        }
+        if (isPresent(companySize)) {
+            List<String> ranges = mapSizeToRanges(companySize);
+            if (!ranges.isEmpty()) {
+                List<String> clauses = new ArrayList<>();
+                for (String r : ranges) {
+                    clauses.add("data->>'size_range' = ?");
+                    args.add(r);
+                }
+                sql.append(" and (").append(String.join(" or ", clauses)).append(")");
+            }
+        }
+        if (isPresent(keyword)) {
+            sql.append(" and data->>'name' ilike ?");
+            args.add("%" + keyword + "%");
+        }
+    }
 
-        results.sort(Comparator.comparingInt(PotentialClientResponse::matchScore).reversed());
+    private List<PotentialClientResponse> randomCachedCompanies(
+            String industry, String place, String companySize, String keyword, int limit) {
+        StringBuilder sql = new StringBuilder("select external_id, data from lead_companies");
+        List<Object> args = new ArrayList<>();
+        appendLeadCompanyWhereClause(industry, place, companySize, keyword, sql, args);
+        sql.append(" order by random() limit ").append(limit);
+
+        List<PotentialClientResponse> results = jdbc.query(sql.toString(), (rs, i) -> {
+            String externalId = rs.getString("external_id");
+            try {
+                JsonNode data = objectMapper.readTree(rs.getString("data"));
+                jdbc.update("update lead_companies set fetch_count = fetch_count + 1, last_fetched_at = now() where external_id = ?",
+                        externalId);
+                return mapStoredDataToPotentialClient(data, externalId);
+            } catch (Exception e) {
+                log.error("[ClientSearch] failed to parse cached row {}: {}", externalId, e.getMessage());
+                return null;
+            }
+        }, args.toArray());
+        results.removeIf(Objects::isNull);
         return results;
     }
 
     private List<String> mapSizeToRanges(String size) {
         return switch (size.toLowerCase()) {
-            case "small"      -> List.of("1-10 employees", "11-50 employees");
-            case "medium"     -> List.of("51-200 employees", "201-500 employees");
-            case "large"      -> List.of("501-1000 employees", "1001-5000 employees");
-            case "enterprise" -> List.of("5001-10000 employees", "10001+ employees");
+            case "small"      -> List.of("1-10", "11-50");
+            case "medium"     -> List.of("51-100", "51-200", "201-500");
+            case "large"      -> List.of("501-1000", "1001-5000");
+            case "enterprise" -> List.of("5001-10000", "10001+");
             default           -> List.of();
         };
+    }
+
+    // Confirmed-real num_employees bucket values for this Bright Data dataset,
+    // ascending (from the user's working curl example — these are NOT the same
+    // strings mapSizeToRanges above uses for the DB cache side, which reflects
+    // whatever is actually stored in lead_companies.data).
+    private static final List<String> BRIGHTDATA_SIZE_BUCKETS = List.of(
+            "11-50", "51-100", "101-250", "251-500", "501-1000", "1001-5000", "5001-10000", "10001+");
+
+    // Each dropdown option maps to "this bucket and everything larger" via the
+    // "in" operator (confirmed working — "!=" against a single bucket failed
+    // the snapshot job outright).
+    private List<String> mapSizeToBrightDataBuckets(String size) {
+        int fromIndex = switch (size.toLowerCase()) {
+            case "small"      -> 0; // 11-50 and up — excludes only the 1-10 micro bucket
+            case "medium"     -> 1; // 51-100 and up
+            case "large"      -> 3; // 251-500 and up
+            case "enterprise" -> 5; // 1001-5000 and up
+            default           -> -1;
+        };
+        return fromIndex < 0 ? List.of() : BRIGHTDATA_SIZE_BUCKETS.subList(fromIndex, BRIGHTDATA_SIZE_BUCKETS.size());
     }
 
     private boolean isPresent(String val) {
         return val != null && !val.isBlank();
     }
 
-    // ─── Collect a single company profile by ID ───────────────────────────────
+    // ─── Bright Data live call: Search API ────────────────────────────────────
+    // gd_l1vikfnt1wgvvqz95w is one of the three dataset IDs Bright Data itself
+    // confirmed as Search-enabled on this account (from the earlier "dataset_id
+    // must be one of [...]" 400) — same fast, synchronous, no-snapshot pattern
+    // as candidates. Field mapping (mapBrightDataCompanyToStoredShape) still
+    // reflects the old Crunchbase dataset's schema and needs rebuilding once a
+    // real response is captured — logging the full raw response here for that.
 
-    private PotentialClientResponse collectCompany(int id, HttpHeaders headers) {
+    private List<PotentialClientResponse> fetchBrightDataCompaniesLive(
+            String industry, String place, int limit, Set<String> excludeIds) {
+        if (brightDataApiKey == null || brightDataApiKey.isBlank()) return List.of();
         try {
-            String collectUrl = coreSignalBaseUrl + "/company_clean/collect/" + id;
-            log.info("[ClientSearch] GET {}", collectUrl);
-            HttpEntity<Void> entity = new HttpEntity<>(headers);
-            ResponseEntity<String> resp = restTemplate.exchange(
-                collectUrl, HttpMethod.GET, entity, String.class);
+            JsonNode records = searchBrightDataCompanies(buildCompanySearchBody(industry, place, limit));
+            if (records == null || !records.isArray() || records.isEmpty()) return List.of();
 
-            log.info("[ClientSearch] Collect id={} status={}", id, resp.getStatusCode());
-            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
-                log.warn("[ClientSearch] Collect id={} failed or empty body", id);
-                return null;
+            List<PotentialClientResponse> fresh = new ArrayList<>();
+            for (JsonNode record : records) {
+                if (fresh.size() >= limit) break;
+                String rawId = textField(record, "id");
+                if (rawId == null || rawId.isBlank()) continue;
+                String externalId = "BD-" + rawId;
+                if (externalId.length() > 50) externalId = externalId.substring(0, 50);
+                if (excludeIds.contains(externalId)) continue;
+
+                ObjectNode mapped = mapBrightDataCompanyToStoredShape(record);
+                upsertLeadCompany(externalId, mapped);
+                fresh.add(mapStoredDataToPotentialClient(mapped, externalId));
             }
-
-            JsonNode c = objectMapper.readTree(resp.getBody());
-
-            String companyName   = c.path("name").asText("Unknown");
-            String industry      = c.path("industry").asText("");
-            String sizeRange     = c.path("size_range").asText("");
-            String city          = c.path("location_hq_city").asText("");
-            String country       = c.path("location_hq_country").asText("");
-            String location      = city.isBlank() ? country : city + ", " + country;
-
-            log.info("[ClientSearch] Parsed id={} name='{}' industry='{}' size_range='{}' country='{}' city='{}'",
-                    id, companyName, industry, sizeRange, country, city);
-            int openRoles        = c.path("active_job_postings_count").asInt(0);
-            int totalEmployees   = c.path("size_employees_count").asInt(0);
-            String description   = c.path("description").asText("");
-            String websiteUrl    = c.path("websites_main").asText("");
-            String linkedinUrl   = c.path("websites_linkedin").asText("");
-            String foundedYear   = c.path("founded").asText("");
-            String companyType   = c.path("type").asText("");
-
-            double growthPct         = c.path("employees_count_change")
-                .path("change_yearly_percentage").asDouble(0);
-            double postingsGrowthPct = c.path("active_job_postings_count_change")
-                .path("change_monthly_percentage").asDouble(0);
-
-            JsonNode funding = c.path("last_funding_round");
-            String fundingEvent = null;
-            if (!funding.isMissingNode() && !funding.isNull()) {
-                String type     = funding.path("type").asText("");
-                long amount     = funding.path("amount_raised").asLong(0);
-                String currency = funding.path("amount_raised_currency").asText("USD");
-                String date     = funding.path("announced_date").asText("");
-                if (amount > 0) {
-                    long amountM = amount / 1_000_000;
-                    fundingEvent = type + " — " + currency + " " +
-                        (amountM > 0 ? amountM + "M" : amount) + " raised" +
-                        (date.isBlank() ? "" : " (" + date.substring(0, 7) + ")");
-                }
-            }
-
-            List<String> signals = new ArrayList<>();
-            if (fundingEvent != null) signals.add("💰 " + fundingEvent);
-            if (postingsGrowthPct > 30)
-                signals.add("📋 +" + Math.round(postingsGrowthPct) + "% job postings this month");
-            else if (openRoles > 0)
-                signals.add("📋 " + openRoles + " active job posting" + (openRoles > 1 ? "s" : ""));
-            if (growthPct > 15)
-                signals.add("↗ +" + Math.round(growthPct) + "% team growth");
-
-            JsonNode news = c.path("news_articles");
-            if (news.isArray() && news.size() > 0) {
-                String headline = news.get(0).path("headline").asText("");
-                if (!headline.isBlank()) signals.add("📰 " + headline);
-            }
-
-            if (signals.isEmpty()) signals.add("📋 " + openRoles + " open roles");
-
-            String hiringSignal;
-            if (fundingEvent != null && postingsGrowthPct > 50) hiringSignal = "Very High";
-            else if (fundingEvent != null || postingsGrowthPct > 50 || growthPct > 30) hiringSignal = "High";
-            else hiringSignal = "Medium";
-
-            int matchScore = 50;
-            if (fundingEvent != null) matchScore += 20;
-            if (postingsGrowthPct > 50) matchScore += 15;
-            if (growthPct > 20) matchScore += 10;
-            matchScore += Math.min(openRoles * 2, 15);
-            matchScore = Math.min(matchScore, 98);
-
-            List<PotentialClientResponse.DecisionMaker> decisionMakers = new ArrayList<>();
-            JsonNode executives = c.path("key_executives");
-            if (executives.isArray()) {
-                for (int i = 0; i < executives.size(); i++) {
-                    JsonNode exec = executives.get(i);
-                    String name  = exec.path("member_full_name").asText("");
-                    String title = exec.path("member_position_title").asText("");
-                    if (!name.isBlank()) {
-                        decisionMakers.add(new PotentialClientResponse.DecisionMaker(name, title));
-                    }
-                }
-            }
-
-            List<String> specialties = new ArrayList<>();
-            JsonNode specs = c.path("specialities");
-            if (specs.isArray()) {
-                for (JsonNode s : specs) {
-                    String spec = s.asText("");
-                    if (!spec.isBlank()) specialties.add(spec);
-                }
-            }
-
-            List<PotentialClientResponse.NewsArticle> newsArticles = new ArrayList<>();
-            if (news.isArray()) {
-                for (JsonNode article : news) {
-                    String headline = article.path("headline").asText("");
-                    String date     = article.path("date").asText("");
-                    if (!headline.isBlank())
-                        newsArticles.add(new PotentialClientResponse.NewsArticle(headline, date));
-                }
-            }
-
-            return new PotentialClientResponse(
-                companyName, industry, sizeRange, location,
-                fundingEvent != null ? fundingEvent : hiringSignal + " hiring signal",
-                signals, openRoles, matchScore, (int) Math.round(growthPct),
-                decisionMakers,
-                description, websiteUrl, linkedinUrl, foundedYear, companyType,
-                specialties, newsArticles, totalEmployees, postingsGrowthPct,
-                city, country);
-
+            log.info("[ClientSearch] kept {} of {} raw hit(s) after cap/dedup (limit={})",
+                    fresh.size(), records.size(), limit);
+            return fresh;
         } catch (Exception e) {
-            log.error("[ClientSearch] collectCompany id={} threw: {}", id, e.getMessage(), e);
-            return null;
+            log.error("[ClientSearch] live fetch failed: {}", e.getMessage(), e);
+            return List.of();
         }
+    }
+
+    // Clause rules per the user's confirmed dashboard-generated filter for this
+    // dataset: industries includes <industry>, place matched with an OR across
+    // three possible location field names (locations / formatted_locations /
+    // headquarters — hedging since it's unconfirmed which one this dataset
+    // actually populates). companySize and keyword's buying-signal clause are
+    // deliberately NOT sent yet — "num_employees" and "leadership_hire" were
+    // Crunchbase-specific field names with no confirmed equivalent here; adding
+    // them back is a follow-up once we see a real response.
+    private Map<String, Object> buildCompanySearchBody(String industry, String place, int size) {
+        List<Map<String, Object>> clauses = new ArrayList<>();
+        if (isPresent(industry)) clauses.add(Map.of("name", "industries", "operator", "includes", "value", industry));
+        if (isPresent(place)) {
+            clauses.add(Map.of("operator", "or", "filters", List.of(
+                    Map.of("name", "locations", "operator", "includes", "value", place),
+                    Map.of("name", "formatted_locations", "operator", "includes", "value", place),
+                    Map.of("name", "headquarters", "operator", "includes", "value", place))));
+        }
+
+        // "records_limit" is rejected outright on this endpoint ("records_limit"
+        // is not allowed") — confirmed Filter-API-only. "size" is the correct
+        // (and only) param name for Search.
+        return Map.of(
+                "filter", Map.of("operator", "and", "filters", clauses),
+                "size", size);
+    }
+
+    private JsonNode searchBrightDataCompanies(Map<String, Object> searchBody) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(brightDataApiKey);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(searchBody, headers);
+
+        try {
+            log.info("[ClientSearch] POST {}/datasets/search/{} body={}",
+                    brightDataBaseUrl, brightDataCompanyDatasetId, objectMapper.writeValueAsString(searchBody));
+        } catch (Exception ignored) {}
+
+        for (int attempt = 1; attempt <= POLL_MAX_ATTEMPTS; attempt++) {
+            try {
+                ResponseEntity<String> resp = restTemplate.exchange(
+                        brightDataBaseUrl + "/datasets/search/" + brightDataCompanyDatasetId,
+                        HttpMethod.POST, entity, String.class);
+                if (resp.getStatusCode().is2xxSuccessful() && resp.getBody() != null) {
+                    JsonNode hits = objectMapper.readTree(resp.getBody()).path("hits");
+                    log.info("[ClientSearch] search succeeded (attempt {}/{}) — {} raw hit(s) returned by Bright Data",
+                            attempt, POLL_MAX_ATTEMPTS, hits.isArray() ? hits.size() : -1);
+                    return hits;
+                }
+                log.warn("[ClientSearch] Bright Data search returned HTTP {} (attempt {}/{})",
+                        resp.getStatusCode(), attempt, POLL_MAX_ATTEMPTS);
+            } catch (Exception e) {
+                log.warn("[ClientSearch] Bright Data search failed (attempt {}/{}): {}",
+                        attempt, POLL_MAX_ATTEMPTS, e.getMessage());
+            }
+            if (attempt < POLL_MAX_ATTEMPTS) {
+                try {
+                    Thread.sleep(POLL_DELAY_MS);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return null;
+                }
+            }
+        }
+        return null;
+    }
+
+    // ─── Reshape a Bright Data LinkedIn Company record into the CoreSignal- ───
+    // shaped structure lead_companies.data already documents. Field names
+    // confirmed against a real captured response for gd_l1vikfnt1wgvvqz95w
+    // (e.g. "MY AUSTRALIAN PROPERTY" — id, name, industries, company_size,
+    // headquarters, country_code, unformatted_about, organization_type,
+    // website, url, employees[], updates[]). This dataset has no Crunchbase-
+    // style funding/job-postings data — those stay null, which the schema
+    // already treats as independently nullable.
+
+    private ObjectNode mapBrightDataCompanyToStoredShape(JsonNode record) {
+        ObjectNode out = objectMapper.createObjectNode();
+        String companyName = textField(record, "name");
+        out.put("name", companyName);
+
+        // "industries" is a plain string on this dataset (unlike Crunchbase's
+        // array of {id, value} objects).
+        String industry = textField(record, "industries");
+        if (industry != null) out.put("industry", industry); else out.putNull("industry");
+
+        // e.g. "2-10 employees" — kept as-is, no bucket normalisation since the
+        // full vocabulary isn't confirmed.
+        String sizeRange = textField(record, "company_size");
+        if (sizeRange != null) out.put("size_range", sizeRange); else out.putNull("size_range");
+        if (record.hasNonNull("employees_in_linkedin")) {
+            out.put("size_employees_count", record.path("employees_in_linkedin").asInt());
+        } else {
+            out.putNull("size_employees_count");
+        }
+
+        // "headquarters" is already a formatted "City, State" string; no separate
+        // city/country split is offered beyond the ISO country_code.
+        String headquarters = textField(record, "headquarters");
+        String countryCode = textField(record, "country_code");
+        if (headquarters != null) out.put("location_hq_city", headquarters); else out.putNull("location_hq_city");
+        if (countryCode != null) out.put("location_hq_country", countryCode); else out.putNull("location_hq_country");
+
+        String description = textField(record, "unformatted_about", "about", "description");
+        if (description != null) out.put("description", description.strip()); else out.putNull("description");
+
+        // Not present in this dataset's schema.
+        out.putNull("founded");
+
+        String orgType = textField(record, "organization_type");
+        out.put("type", orgType != null ? orgType : "Privately Held");
+
+        String website = textField(record, "website");
+        if (website != null) out.put("websites_main", website); else out.putNull("websites_main");
+
+        // "url" is the LinkedIn company page itself on this dataset (no separate
+        // social_media_links array like Crunchbase).
+        String linkedinUrl = textField(record, "url");
+        if (linkedinUrl != null) out.put("websites_linkedin", linkedinUrl); else out.putNull("websites_linkedin");
+
+        // Not present in this dataset.
+        out.putNull("active_job_postings_count");
+        out.set("employees_count_change", objectMapper.createObjectNode().putNull("change_yearly_percentage"));
+        out.set("active_job_postings_count_change", objectMapper.createObjectNode().putNull("change_monthly_percentage"));
+        out.putNull("last_funding_round");
+
+        // "employees[]" only exposes {img, link, title} for a handful of profiles
+        // shown on the company page — "title" is often the person's name, but can
+        // also be a private-profile placeholder ("LinkedIn Member") or just repeat
+        // the company name; skip both. No separate job-title field is available.
+        ArrayNode executives = objectMapper.createArrayNode();
+        JsonNode employees = record.path("employees");
+        if (employees.isArray()) {
+            int count = 0;
+            for (JsonNode emp : employees) {
+                if (count >= 5) break;
+                String label = emp.path("title").asText("");
+                if (!label.isBlank() && !label.equalsIgnoreCase("LinkedIn Member")
+                        && (companyName == null || !label.equalsIgnoreCase(companyName))) {
+                    ObjectNode exec = objectMapper.createObjectNode();
+                    exec.put("member_full_name", label);
+                    exec.putNull("member_position_title");
+                    executives.add(exec);
+                    count++;
+                }
+            }
+        }
+        out.set("key_executives", executives);
+
+        // No specialities-style field on this dataset.
+        out.set("specialities", objectMapper.createArrayNode());
+
+        // "updates[]" is this company's recent LinkedIn post feed — closest
+        // analog to Crunchbase's news_articles[]. "title" in each entry just
+        // repeats the company name, so the headline is derived from the post
+        // body ("text") instead, truncated for display.
+        ArrayNode newsArticles = objectMapper.createArrayNode();
+        JsonNode updates = record.path("updates");
+        if (updates.isArray()) {
+            for (JsonNode u : updates) {
+                String text = u.path("text").asText("");
+                if (!text.isBlank()) {
+                    String headline = text.length() > 120 ? text.substring(0, 120).strip() + "…" : text.strip();
+                    ObjectNode article = objectMapper.createObjectNode();
+                    article.put("headline", headline);
+                    article.put("date", u.path("date").asText(null));
+                    newsArticles.add(article);
+                }
+            }
+        }
+        out.set("news_articles", newsArticles);
+
+        return out;
+    }
+
+    private String textField(JsonNode node, String... keys) {
+        for (String key : keys) {
+            JsonNode v = node.path(key);
+            if (!v.isMissingNode() && !v.isNull() && !v.asText().isBlank()) return v.asText();
+        }
+        return null;
+    }
+
+    private void upsertLeadCompany(String externalId, ObjectNode data) {
+        try {
+            String city = data.path("location_hq_city").asText(null);
+            String country = data.path("location_hq_country").asText(null);
+            String region = isPresent(city)
+                    ? (isPresent(country) ? city + ", " + country : city)
+                    : country;
+            jdbc.update("""
+                insert into lead_companies (external_id, sector, region, data, source)
+                values (?, 'real_estate', ?, CAST(? AS jsonb), 'brightdata')
+                on conflict (external_id) do update set
+                    region     = excluded.region,
+                    data       = excluded.data,
+                    updated_at = now()
+                """,
+                externalId, region, objectMapper.writeValueAsString(data));
+        } catch (Exception e) {
+            log.error("[ClientSearch] upsert failed for {}: {}", externalId, e.getMessage());
+        }
+    }
+
+    // ─── Map stored/mapped CoreSignal-shaped JSON -> PotentialClientResponse ──
+    // Reused for both cached rows (read from lead_companies.data) and freshly-
+    // mapped Bright Data records — same scoring/signal logic either way.
+
+    private PotentialClientResponse mapStoredDataToPotentialClient(JsonNode c, String externalId) {
+        String companyName   = c.path("name").asText("Unknown");
+        String industry      = c.path("industry").asText("");
+        String sizeRange     = c.path("size_range").asText("");
+        String city          = c.path("location_hq_city").asText("");
+        String country       = c.path("location_hq_country").asText("");
+        String location      = city.isBlank() ? country : city + ", " + country;
+
+        int openRoles        = c.path("active_job_postings_count").asInt(0);
+        int totalEmployees   = c.path("size_employees_count").asInt(0);
+        String description   = c.path("description").asText("");
+        String websiteUrl    = c.path("websites_main").asText("");
+        String linkedinUrl   = c.path("websites_linkedin").asText("");
+        String foundedYear   = c.path("founded").asText("");
+        String companyType   = c.path("type").asText("");
+
+        double growthPct         = c.path("employees_count_change")
+            .path("change_yearly_percentage").asDouble(0);
+        double postingsGrowthPct = c.path("active_job_postings_count_change")
+            .path("change_monthly_percentage").asDouble(0);
+
+        JsonNode funding = c.path("last_funding_round");
+        String fundingEvent = null;
+        if (!funding.isMissingNode() && !funding.isNull()) {
+            String type     = funding.path("type").asText("");
+            long amount     = funding.path("amount_raised").asLong(0);
+            String currency = funding.path("amount_raised_currency").asText("USD");
+            String date     = funding.path("announced_date").asText("");
+            if (amount > 0) {
+                long amountM = amount / 1_000_000;
+                fundingEvent = type + " — " + currency + " " +
+                    (amountM > 0 ? amountM + "M" : amount) + " raised" +
+                    (date.isBlank() ? "" : " (" + date.substring(0, 7) + ")");
+            }
+        }
+
+        List<String> signals = new ArrayList<>();
+        if (fundingEvent != null) signals.add("💰 " + fundingEvent);
+        if (postingsGrowthPct > 30)
+            signals.add("📋 +" + Math.round(postingsGrowthPct) + "% job postings this month");
+        else if (openRoles > 0)
+            signals.add("📋 " + openRoles + " active job posting" + (openRoles > 1 ? "s" : ""));
+        if (growthPct > 15)
+            signals.add("↗ +" + Math.round(growthPct) + "% team growth");
+
+        JsonNode news = c.path("news_articles");
+        if (news.isArray() && news.size() > 0) {
+            String headline = news.get(0).path("headline").asText("");
+            if (!headline.isBlank()) signals.add("📰 " + headline);
+        }
+
+        if (signals.isEmpty()) signals.add("📋 " + openRoles + " open roles");
+
+        String hiringSignal;
+        if (fundingEvent != null && postingsGrowthPct > 50) hiringSignal = "Very High";
+        else if (fundingEvent != null || postingsGrowthPct > 50 || growthPct > 30) hiringSignal = "High";
+        else hiringSignal = "Medium";
+
+        int matchScore = 50;
+        if (fundingEvent != null) matchScore += 20;
+        if (postingsGrowthPct > 50) matchScore += 15;
+        if (growthPct > 20) matchScore += 10;
+        matchScore += Math.min(openRoles * 2, 15);
+        matchScore = Math.min(matchScore, 98);
+
+        List<PotentialClientResponse.DecisionMaker> decisionMakers = new ArrayList<>();
+        JsonNode executives = c.path("key_executives");
+        if (executives.isArray()) {
+            for (int i = 0; i < executives.size(); i++) {
+                JsonNode exec = executives.get(i);
+                String name  = exec.path("member_full_name").asText("");
+                String title = exec.path("member_position_title").asText("");
+                if (!name.isBlank()) {
+                    decisionMakers.add(new PotentialClientResponse.DecisionMaker(name, title));
+                }
+            }
+        }
+
+        List<String> specialties = new ArrayList<>();
+        JsonNode specs = c.path("specialities");
+        if (specs.isArray()) {
+            for (JsonNode s : specs) {
+                String spec = s.asText("");
+                if (!spec.isBlank()) specialties.add(spec);
+            }
+        }
+
+        List<PotentialClientResponse.NewsArticle> newsArticles = new ArrayList<>();
+        if (news.isArray()) {
+            for (JsonNode article : news) {
+                String headline = article.path("headline").asText("");
+                String date     = article.path("date").asText("");
+                if (!headline.isBlank())
+                    newsArticles.add(new PotentialClientResponse.NewsArticle(headline, date));
+            }
+        }
+
+        return new PotentialClientResponse(
+            externalId, companyName, industry, sizeRange, location,
+            fundingEvent != null ? fundingEvent : hiringSignal + " hiring signal",
+            signals, openRoles, matchScore, (int) Math.round(growthPct),
+            decisionMakers,
+            description, websiteUrl, linkedinUrl, foundedYear, companyType,
+            specialties, newsArticles, totalEmployees, postingsGrowthPct,
+            city, country);
     }
 
     // ─── POST /api/clients/outreach ───────────────────────────────────────────

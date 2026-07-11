@@ -64,6 +64,22 @@ function ContactBlock({ email, phone, linkedin }) {
   );
 }
 
+function CandidateAvatar({ name, avatarUrl, defaultAvatar, size = 38, fontSize = 14, bg = ACCENT }) {
+  const initials = (name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const hasPhoto = !!avatarUrl && defaultAvatar !== true;
+  return (
+    <Box sx={{
+      width: size, height: size, borderRadius: "50%", flexShrink: 0, overflow: "hidden",
+      bgcolor: hasPhoto ? "transparent" : bg, color: "#fff", display: "flex",
+      alignItems: "center", justifyContent: "center", fontSize, fontWeight: 700,
+    }}>
+      {hasPhoto
+        ? <Box component="img" src={avatarUrl} alt={name || ""} sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        : initials}
+    </Box>
+  );
+}
+
 function SourceBadge({ source }) {
   if (source !== "CORESIGNAL") return null;
   return (
@@ -96,6 +112,7 @@ export function TalentSearchPage() {
   const [page, setPage]                 = useState(0);
   const [allResults, setAllResults]     = useState([]);
   const [noCvError, setNoCvError]       = useState(false);
+  const [externalLoadingMore, setExternalLoadingMore] = useState(false);
 
   // ── Pipeline dialog state (unchanged) ────────────────────────────────────
   const [pipelineDialog,    setPipelineDialog]    = useState(false);
@@ -158,6 +175,9 @@ export function TalentSearchPage() {
   const [csProfile,        setCsProfile]        = useState(null);
   const [csProfileLoading, setCsProfileLoading] = useState(false);
 
+  // ── Selected candidate (right-side detail panel) ─────────────────────────
+  const [selected, setSelected] = useState(null);
+
   useEffect(() => {
     if (!loginId) return;
     const url = new URL(`${API_BASE}/api/jobs`);
@@ -192,6 +212,7 @@ export function TalentSearchPage() {
     const searchQuery = q || query;
     if (!searchQuery.trim()) return;
     setDbMode(false);
+    setSelected(null);
     setLoading(true); setError(null);
     setSearchedQuery(searchQuery); setPage(0);
     try {
@@ -216,8 +237,36 @@ export function TalentSearchPage() {
     finally { setLoading(false); }
   }
 
+  async function handleLoadMoreExternal() {
+    setExternalLoadingMore(true); setError(null);
+    try {
+      const url = new URL(`${API_BASE}/api/talent-search/external/load-more`);
+      url.searchParams.set("loginId", loginId);
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+        body: JSON.stringify({ query: searchedQuery }),
+      });
+      if (res.status === 402) throw new Error("You have run out of tokens. Please upgrade your plan to continue searching.");
+      if (!res.ok) throw new Error(await res.text());
+      const fresh = await res.json();
+      const existingIds = new Set(allResults.filter(c => c.coresignalId).map(c => c.coresignalId));
+      const deduped = (fresh ?? []).filter(c => c.coresignalId && !existingIds.has(c.coresignalId));
+      const combined = [...allResults, ...deduped];
+      setAllResults(combined);
+      setResult(prev => prev && ({
+        ...prev,
+        results: combined,
+        coreSignalCount: (prev.coreSignalCount ?? 0) + deduped.length,
+        totalFound: (prev.totalFound ?? 0) + deduped.length,
+      }));
+    } catch (e) { setError(e.message); }
+    finally { setExternalLoadingMore(false); }
+  }
+
   async function handleCandidatesSearch() {
-    setDbMode(true); setDbLoading(true); setError(null);
+    setDbMode(true); setSelected(null);
+    setDbLoading(true); setError(null);
     try {
       const url = new URL(`${API_BASE}/api/candidates`);
       url.searchParams.set("loginId", loginId);
@@ -270,6 +319,18 @@ export function TalentSearchPage() {
     } finally {
       setCsProfileLoading(false);
     }
+  }
+
+  function handleViewFullProfile(c) {
+    if ((c.isDB || c.source === "INTERNAL") && c.candidateId) {
+      nav(`/candidates/${c.candidateId}/workflow`);
+    } else if (c.source === "CORESIGNAL" && c.coresignalId) {
+      openCoreSignalProfile(c.coresignalId);
+    }
+  }
+
+  function handleAssignToJob(c) {
+    setPipelineCandidate(c); setPipelineJobId(""); setPipelineError(""); setPipelineDialog(true);
   }
 
   // ── Derived display data ──────────────────────────────────────────────────
@@ -410,10 +471,21 @@ export function TalentSearchPage() {
             </Box>
           </Box>
 
+          {/* ── Results + detail panel ───────────────────────────────────── */}
+          <Box sx={{ display: "flex", gap: 2, alignItems: "flex-start" }}>
+          <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+
           {/* Loading spinner */}
           {isLoading && (
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, justifyContent: "center", py: 6, color: MUTED, fontSize: 13 }}>
-              <CircularProgress size={18} sx={{ color: ACCENT }} /> {dbMode ? "Loading candidates…" : "Searching talent…"}
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.75, justifyContent: "center", py: 6 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, color: MUTED, fontSize: 13 }}>
+                <CircularProgress size={18} sx={{ color: ACCENT }} /> {dbMode ? "Loading candidates…" : "Searching talent…"}
+              </Box>
+              {!dbMode && (
+                <Typography sx={{ fontSize: 11.5, color: "#B4BCC9" }}>
+                  Live LinkedIn lookups can take up to 1 minute — hang tight.
+                </Typography>
+              )}
             </Box>
           )}
 
@@ -426,32 +498,29 @@ export function TalentSearchPage() {
 
           {/* ── Card grid ─────────────────────────────────────────────────── */}
           {!isLoading && viewMode === "cards" && (
-            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 1.5 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 1.5 }}>
               {displayResults.map((c, i) => {
                 const scoreColor = c.matchScore >= 80 ? SUCCESS : c.matchScore >= 60 ? WARN : DANGER;
                 const isCS = c.source === "CORESIGNAL";
                 return (
                   <Paper key={i} elevation={0}
-                    onClick={() => {
-                      if (c.isDB && c.candidateId) nav(`/candidates/${c.candidateId}/workflow`);
-                      else if (c.source === "CORESIGNAL" && c.coresignalId) openCoreSignalProfile(c.coresignalId);
-                    }}
+                    onClick={() => setSelected(c)}
                     sx={{
+                      minWidth: 0,
                       border: `1px solid ${isCS ? PURPLE_BR : ACCENT_BR}`,
                       borderLeft: `3px solid ${isCS ? PURPLE : ACCENT}`,
                       borderRadius: "10px", p: 2, bgcolor: "#fff",
                       boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
-                      cursor: (c.isDB || (c.source === "CORESIGNAL" && c.coresignalId)) ? "pointer" : "default",
-                      "&:hover": (c.isDB || (c.source === "CORESIGNAL" && c.coresignalId)) ? { boxShadow: "0 4px 12px rgba(0,0,0,0.10)" } : {},
+                      cursor: "pointer",
+                      "&:hover": { boxShadow: "0 4px 12px rgba(0,0,0,0.10)" },
                       transition: "box-shadow .15s",
                     }}>
 
                     {/* Top row */}
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1.25, gap: 1 }}>
                       <Box sx={{ display: "flex", gap: 1.25, alignItems: "center", minWidth: 0 }}>
-                        <Box sx={{ width: 38, height: 38, borderRadius: "50%", bgcolor: isCS ? PURPLE : ACCENT, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, flexShrink: 0 }}>
-                          {c.name?.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
-                        </Box>
+                        <CandidateAvatar name={c.name} avatarUrl={c.avatarUrl} defaultAvatar={c.defaultAvatar}
+                          size={38} fontSize={14} bg={isCS ? PURPLE : ACCENT} />
                         <Box sx={{ minWidth: 0 }}>
                           <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</Typography>
                           <Typography sx={{ fontSize: 11, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.currentTitle}</Typography>
@@ -554,13 +623,12 @@ export function TalentSearchPage() {
                     const valSx = v => v ? { fontSize: 12, fontWeight: 500, color: TEXT } : { fontSize: 12, ...emptyStyle };
                     return (
                       <TableRow key={i}
-                        onClick={() => { if (isCS && c.coresignalId) openCoreSignalProfile(c.coresignalId); }}
-                        sx={{ "&:hover": { bgcolor: "#FAFBFD" }, borderTop: `1px solid #EEF1F6`, cursor: isCS && c.coresignalId ? "pointer" : "default" }}>
+                        onClick={() => setSelected(c)}
+                        sx={{ "&:hover": { bgcolor: "#FAFBFD" }, borderTop: `1px solid #EEF1F6`, cursor: "pointer" }}>
                         <TableCell sx={{ py: 1.25 }}>
                           <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
-                            <Box sx={{ width: 30, height: 30, borderRadius: "50%", bgcolor: isCS ? PURPLE : ACCENT, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
-                              {c.name?.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
-                            </Box>
+                            <CandidateAvatar name={c.name} avatarUrl={c.avatarUrl} defaultAvatar={c.defaultAvatar}
+                              size={30} fontSize={12} bg={isCS ? PURPLE : ACCENT} />
                             <Box sx={{ minWidth: 0 }}>
                               <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: TEXT, whiteSpace: "nowrap" }}>{c.name}</Typography>
                               <Typography sx={{ fontSize: 10.5, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 160 }}>{c.currentTitle}</Typography>
@@ -570,7 +638,11 @@ export function TalentSearchPage() {
                         <TableCell sx={{ fontSize: 12, color: MUTED, whiteSpace: "nowrap", py: 1.25 }}>{c.currentCompany || "—"}</TableCell>
                         <TableCell sx={{ py: 1.25 }}><Typography sx={valSx(c.email)}>{val(c.email)}</Typography></TableCell>
                         <TableCell sx={{ py: 1.25 }}><Typography sx={valSx(c.phone)}>{val(c.phone)}</Typography></TableCell>
-                        <TableCell sx={{ py: 1.25 }}><Typography sx={{ ...valSx(c.linkedinUrl), color: c.linkedinUrl ? ACCENT : "#C2C8D4" }}>{val(c.linkedinUrl)}</Typography></TableCell>
+                        <TableCell sx={{ py: 1.25, maxWidth: 180 }}>
+                          <Typography sx={{ ...valSx(c.linkedinUrl), color: c.linkedinUrl ? ACCENT : "#C2C8D4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {val(c.linkedinUrl)}
+                          </Typography>
+                        </TableCell>
                         <TableCell sx={{ py: 1.25 }}>
                           {c.isDB ? (
                             <Box sx={{ display: "inline-flex", px: "9px", py: "3px", bgcolor: c.statusBg, border: `1px solid ${c.statusBorder}`, borderRadius: "20px", fontSize: 10.5, fontWeight: 600, color: c.statusColor, whiteSpace: "nowrap" }}>
@@ -601,14 +673,102 @@ export function TalentSearchPage() {
           )}
 
           {/* Load More (AI mode only) */}
-          {!dbMode && result && result.totalFound > result.results.length && (
-            <Box sx={{ textAlign: "center" }}>
-              <Button variant="outlined" onClick={handleLoadMore} disabled={loading}
-                sx={{ fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "8px", textTransform: "none" }}>
-                {loading ? "Loading…" : `Load More Results (${result.totalFound - result.results.length} remaining)`}
-              </Button>
+          {!dbMode && result && (
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.75 }}>
+              <Box sx={{ display: "flex", gap: 1, justifyContent: "center", flexWrap: "wrap" }}>
+                {result.totalFound > result.results.length && (
+                  <Button variant="outlined" onClick={handleLoadMore} disabled={loading}
+                    sx={{ fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "8px", textTransform: "none" }}>
+                    {loading ? "Loading…" : `Load More Results (${result.totalFound - result.results.length} remaining)`}
+                  </Button>
+                )}
+                <Button variant="outlined" onClick={handleLoadMoreExternal} disabled={externalLoadingMore}
+                  startIcon={externalLoadingMore ? <CircularProgress size={14} sx={{ color: PURPLE }} /> : null}
+                  sx={{ fontSize: 12, borderColor: PURPLE_BR, color: PURPLE, borderRadius: "8px", textTransform: "none", "&:hover": { borderColor: PURPLE, bgcolor: PURPLE_BG } }}>
+                  {externalLoadingMore ? "Fetching from LinkedIn…" : "Load More External Candidates"}
+                </Button>
+              </Box>
+              {externalLoadingMore && (
+                <Typography sx={{ fontSize: 11.5, color: "#B4BCC9" }}>
+                  This can take up to 1 minute while we pull fresh LinkedIn profiles.
+                </Typography>
+              )}
             </Box>
           )}
+
+          </Box>
+
+          {/* ── Right-side detail panel ──────────────────────────────────── */}
+          {selected && (
+            <Paper elevation={0} sx={{ width: 340, flexShrink: 0, border: `1px solid ${BORDER}`, borderRadius: "10px", p: 2.5, boxShadow: "0 1px 3px rgba(0,0,0,0.05)", position: "sticky", top: 12 }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1.5 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT }}>Candidate Details</Typography>
+                <Box component="button" onClick={() => setSelected(null)} sx={{ border: "none", bgcolor: "transparent", cursor: "pointer", color: MUTED, display: "inline-flex", alignItems: "center", fontSize: 16 }}>
+                  ✕
+                </Box>
+              </Box>
+
+              <Box sx={{ display: "flex", gap: 1.25, alignItems: "center", mb: 1.5 }}>
+                <CandidateAvatar name={selected.name} avatarUrl={selected.avatarUrl} defaultAvatar={selected.defaultAvatar}
+                  size={44} fontSize={16} bg={selected.source === "CORESIGNAL" ? PURPLE : ACCENT} />
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography sx={{ fontSize: 14, fontWeight: 700, color: TEXT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{selected.name}</Typography>
+                  <Typography sx={{ fontSize: 12, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{selected.currentTitle}</Typography>
+                </Box>
+              </Box>
+
+              {selected.isAI && <SourceBadge source={selected.source} />}
+
+              {(selected.currentCompany || selected.yearsExperience) && (
+                <Typography sx={{ fontSize: 12, color: MUTED, mb: 1.5 }}>
+                  {selected.currentCompany}{selected.yearsExperience ? ` · ${selected.yearsExperience} yrs exp` : ""}
+                </Typography>
+              )}
+
+              {selected.isAI && (
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5, pb: 1.5, borderBottom: `1px solid ${BORDER}` }}>
+                  <Typography sx={{ fontSize: 12, color: MUTED }}>Match Score</Typography>
+                  <Typography sx={{ fontSize: 16, fontWeight: 700, color: selected.matchScore >= 80 ? SUCCESS : selected.matchScore >= 60 ? WARN : DANGER }}>
+                    {selected.matchScore}%
+                  </Typography>
+                </Box>
+              )}
+
+              <ContactBlock email={selected.email} phone={selected.phone} linkedin={selected.linkedinUrl} />
+
+              {(selected.matchedSkills?.length > 0 || selected.gapSkills?.length > 0) && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: 0.5, mb: 0.75 }}>Skills</Typography>
+                  <Box>
+                    {selected.matchedSkills?.map(s => <Tag key={s} label={s} variant="match" />)}
+                    {selected.gapSkills?.map(s => <Tag key={`gap-${s}`} label={`No ${s}`} variant="gap" />)}
+                  </Box>
+                </Box>
+              )}
+
+              {selected.alreadyInPipeline && (
+                <Box sx={{ mb: 2 }}>
+                  <Badge label="Already in Pipeline" variant="accent" />
+                </Box>
+              )}
+
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                <Button variant="contained" fullWidth onClick={() => handleViewFullProfile(selected)}
+                  sx={{
+                    fontSize: 12, borderRadius: "7px", textTransform: "none", boxShadow: "none",
+                    bgcolor: selected.source === "CORESIGNAL" ? PURPLE : ACCENT,
+                    "&:hover": { bgcolor: selected.source === "CORESIGNAL" ? "#6D28D9" : "#1660CC", boxShadow: "none" },
+                  }}>
+                  View Full Profile
+                </Button>
+                <Button variant="outlined" fullWidth onClick={() => handleAssignToJob(selected)}
+                  sx={{ fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "7px", textTransform: "none", "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
+                  Assign to Job
+                </Button>
+              </Box>
+            </Paper>
+          )}
+          </Box>
         </>
       )}
 
@@ -710,9 +870,8 @@ export function TalentSearchPage() {
               <Box>
                 {/* ── Header ──────────────────────────────────────────────── */}
                 <Box sx={{ p: 3, display: "flex", gap: 2.5, alignItems: "flex-start", borderBottom: `1px solid ${BORDER}` }}>
-                  <Box sx={{ width: 64, height: 64, borderRadius: "50%", bgcolor: PURPLE, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, fontWeight: 700, flexShrink: 0 }}>
-                    {(csProfile.fullName || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
-                  </Box>
+                  <CandidateAvatar name={csProfile.fullName} avatarUrl={csProfile.avatarUrl} defaultAvatar={csProfile.defaultAvatar}
+                    size={64} fontSize={22} bg={PURPLE} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography sx={{ fontSize: 18, fontWeight: 700, color: TEXT }}>{csProfile.fullName}</Typography>
                     {(csProfile.jobTitle || csProfile.currentCompany) && (
@@ -736,11 +895,11 @@ export function TalentSearchPage() {
                           {csProfile.managementLevel}
                         </Box>
                       )}
-                      {raw.follower_count > 0 && (
-                        <Typography sx={{ fontSize: 11.5, color: MUTED }}>{Number(raw.follower_count).toLocaleString()} followers</Typography>
+                      {(raw.followers ?? raw.follower_count) > 0 && (
+                        <Typography sx={{ fontSize: 11.5, color: MUTED }}>{Number(raw.followers ?? raw.follower_count).toLocaleString()} followers</Typography>
                       )}
-                      {raw.connections_count > 0 && (
-                        <Typography sx={{ fontSize: 11.5, color: MUTED }}>{Number(raw.connections_count).toLocaleString()} connections</Typography>
+                      {(raw.connections ?? raw.connections_count) > 0 && (
+                        <Typography sx={{ fontSize: 11.5, color: MUTED }}>{Number(raw.connections ?? raw.connections_count).toLocaleString()} connections</Typography>
                       )}
                       {csProfile.linkedinUrl && (
                         <Typography component="a" href={csProfile.linkedinUrl} target="_blank" rel="noreferrer"
@@ -791,15 +950,15 @@ export function TalentSearchPage() {
                               <Box sx={{ flex: 1, minWidth: 0, pb: ei < exp.length - 1 ? 2 : 0 }}>
                                 <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{ex.title}</Typography>
                                 <Typography sx={{ fontSize: 12, color: MUTED, mt: 0.2 }}>
-                                  {ex.company_name}{ex.location ? ` · ${ex.location}` : ""}
+                                  {ex.company ?? ex.company_name}{ex.location ? ` · ${ex.location}` : ""}
                                 </Typography>
-                                {(ex.date_from_year || ex.date_to_year) && (
+                                {(ex.start_date || ex.end_date || ex.date_from_year || ex.date_to_year) && (
                                   <Typography sx={{ fontSize: 11.5, color: MUTED, mt: 0.15 }}>
-                                    {ex.date_from_year || "?"} – {ex.date_to_year || "Present"}
+                                    {ex.start_date ?? ex.date_from_year ?? "?"} – {ex.end_date ?? ex.date_to_year ?? "Present"}
                                   </Typography>
                                 )}
-                                {ex.description && (
-                                  <Typography sx={{ fontSize: 12, color: TEXT, mt: 0.6, lineHeight: 1.6, opacity: 0.78 }}>{ex.description}</Typography>
+                                {(ex.description ?? ex.description_html) && (
+                                  <Typography sx={{ fontSize: 12, color: TEXT, mt: 0.6, lineHeight: 1.6, opacity: 0.78 }}>{ex.description ?? ex.description_html}</Typography>
                                 )}
                               </Box>
                             </Box>
@@ -818,11 +977,11 @@ export function TalentSearchPage() {
                           <Box key={edi} sx={{ display: "flex", gap: 1.5 }}>
                             <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: PURPLE, mt: 0.5, flexShrink: 0 }} />
                             <Box>
-                              <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{ed.major || ed.title}</Typography>
-                              {ed.major && ed.title && <Typography sx={{ fontSize: 12, color: MUTED, mt: 0.15 }}>{ed.title}</Typography>}
-                              {(ed.date_from || ed.date_to) && (
+                              <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{ed.institution ?? ed.major ?? ed.title}</Typography>
+                              {ed.title && (ed.institution ?? ed.major) && <Typography sx={{ fontSize: 12, color: MUTED, mt: 0.15 }}>{ed.title}</Typography>}
+                              {(ed.start_year || ed.end_year || ed.date_from || ed.date_to) && (
                                 <Typography sx={{ fontSize: 11.5, color: MUTED, mt: 0.15 }}>
-                                  {ed.date_from || "?"} – {ed.date_to || "Present"}
+                                  {ed.start_year ?? ed.date_from ?? "?"} – {ed.end_year ?? ed.date_to ?? "Present"}
                                 </Typography>
                               )}
                             </Box>
@@ -858,8 +1017,8 @@ export function TalentSearchPage() {
                       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
                         {langs.map((lg, lgi) => (
                           <Box key={lgi} sx={{ px: 1.75, py: 0.85, bgcolor: "#F8FAFB", border: `1px solid ${BORDER}`, borderRadius: "8px" }}>
-                            <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: TEXT }}>{lg.language}</Typography>
-                            {lg.proficiency && <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.1 }}>{lg.proficiency}</Typography>}
+                            <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: TEXT }}>{lg.title ?? lg.language}</Typography>
+                            {(lg.subtitle ?? lg.proficiency) && <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.1 }}>{lg.subtitle ?? lg.proficiency}</Typography>}
                           </Box>
                         ))}
                       </Box>

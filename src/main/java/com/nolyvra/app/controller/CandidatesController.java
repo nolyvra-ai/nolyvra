@@ -10,11 +10,15 @@ import com.nolyvra.app.model.CandidateSearchResult;
 import com.nolyvra.app.model.CandidateUpdateRequest;
 import com.nolyvra.app.model.StageUpdateRequest;
 import com.nolyvra.app.service.CandidateService;
+import com.nolyvra.app.service.CvFormatService;
 import com.nolyvra.app.service.InterviewQuestionsService;
 import com.nolyvra.app.service.TalentSearchService;
 import com.nolyvra.app.service.WorkflowService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -33,17 +37,20 @@ public class CandidatesController {
     private final WorkflowService workflowService;
     private final InterviewQuestionsService interviewQuestionsService;
     private final TalentSearchService talentSearchService;
+    private final CvFormatService cvFormatService;
     private final ObjectMapper objectMapper;
 
     public CandidatesController(CandidateService candidateService,
                                 WorkflowService workflowService,
                                 InterviewQuestionsService interviewQuestionsService,
                                 TalentSearchService talentSearchService,
+                                CvFormatService cvFormatService,
                                 ObjectMapper objectMapper) {
         this.candidateService          = candidateService;
         this.workflowService           = workflowService;
         this.interviewQuestionsService = interviewQuestionsService;
         this.talentSearchService       = talentSearchService;
+        this.cvFormatService           = cvFormatService;
         this.objectMapper              = objectMapper;
     }
 
@@ -104,6 +111,21 @@ public class CandidatesController {
         return candidateService.getCandidate(candidateId, loginId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Candidate not found: " + candidateId));
+    }
+
+    // ── Format CV: stamp candidate data into a recruiter's stored .docx
+    // template (merge fields), optionally including the analysis score ───────
+    @PostMapping("/candidates/{candidateId}/format-cv")
+    public ResponseEntity<byte[]> formatCv(
+            @PathVariable String candidateId,
+            @RequestParam String loginId,
+            @RequestParam String templateId,
+            @RequestParam(defaultValue = "false") boolean attachScore) {
+        byte[] docx = cvFormatService.formatCv(candidateId, loginId, templateId, attachScore);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"formatted-cv-" + candidateId + ".docx\"")
+                .body(docx);
     }
 
     @GetMapping("/jobs/{jobId}/candidates")

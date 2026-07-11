@@ -1069,10 +1069,11 @@ export default function ClientTrackerPage() {
   const [showAdd,           setShowAdd]           = useState(false);
   const [editingClient,     setEditingClient]     = useState(null);
   const [potentialLoading,  setPotentialLoading]  = useState(false);
+  const [potentialLoadingMore, setPotentialLoadingMore] = useState(false);
   const [potentialSearched, setPotentialSearched] = useState(false);
   const [potentialError,    setPotentialError]    = useState("");
   const [searchIndustry,    setSearchIndustry]    = useState("");
-  const [searchCountry,     setSearchCountry]     = useState("");
+  const [searchPlace,     setSearchPlace]     = useState("");
   const [searchSize,        setSearchSize]        = useState("");
   const [searchKeyword,     setSearchKeyword]     = useState("");
   const [detailCard,        setDetailCard]        = useState(null);
@@ -1096,23 +1097,43 @@ export default function ClientTrackerPage() {
     loadClients();
   }, []);
 
+  function buildPotentialParams() {
+    const params = new URLSearchParams();
+    if (searchIndustry.trim()) params.set("industry",    searchIndustry.trim());
+    if (searchPlace.trim())   params.set("place",       searchPlace.trim());
+    if (searchSize)            params.set("companySize", searchSize);
+    if (searchKeyword.trim())  params.set("keyword",     searchKeyword.trim());
+    return params.toString();
+  }
+
   async function handleFindPotential() {
     setPotentialLoading(true);
     setPotentialError("");
     setPotentialSearched(true);
     try {
-      const params = new URLSearchParams();
-      if (searchIndustry.trim()) params.set("industry",    searchIndustry.trim());
-      if (searchCountry.trim())  params.set("country",     searchCountry.trim());
-      if (searchSize)            params.set("companySize", searchSize);
-      if (searchKeyword.trim())  params.set("keyword",     searchKeyword.trim());
-      const qs = params.toString();
+      const qs = buildPotentialParams();
       const p = await apiGet(`/api/clients/potential${qs ? "?" + qs : ""}`);
       setPotential(p);
     } catch (e) {
       setPotentialError(e.message || "Failed to fetch potential clients.");
     } finally {
       setPotentialLoading(false);
+    }
+  }
+
+  async function handleLoadMorePotential() {
+    setPotentialLoadingMore(true);
+    setPotentialError("");
+    try {
+      const qs = buildPotentialParams();
+      const fresh = await apiGet(`/api/clients/potential/load-more${qs ? "?" + qs : ""}`);
+      const existingIds = new Set(potential.filter(pc => pc.externalId).map(pc => pc.externalId));
+      const deduped = (fresh ?? []).filter(pc => pc.externalId && !existingIds.has(pc.externalId));
+      setPotential(prev => [...prev, ...deduped]);
+    } catch (e) {
+      setPotentialError(e.message || "Failed to load more potential clients.");
+    } finally {
+      setPotentialLoadingMore(false);
     }
   }
 
@@ -1140,7 +1161,7 @@ export default function ClientTrackerPage() {
 
   const totalActive = clients.reduce((s, c) => s + c.activeJobCount, 0);
   const totalFilled = clients.reduce((s, c) => s + c.filledJobCount, 0);
-  const hasFilters  = searchIndustry || searchCountry || searchSize || searchKeyword;
+  const hasFilters  = searchIndustry || searchPlace || searchSize || searchKeyword;
 
   // Total fee across all clients (Active/Fulfilling jobs only), grouped by currency —
   // amounts in different currencies cannot be added together meaningfully.
@@ -1309,9 +1330,9 @@ export default function ClientTrackerPage() {
                 </Box>
                 <Box>
                   <Box sx={{ fontSize: 11, fontWeight: 600, color: MUTED, textTransform: "uppercase",
-                    letterSpacing: ".4px", mb: "5px" }}>Country</Box>
-                  <input value={searchCountry} onChange={e => setSearchCountry(e.target.value)}
-                    placeholder="e.g. United Kingdom" style={inputStyle} />
+                    letterSpacing: ".4px", mb: "5px" }}>Place</Box>
+                  <input value={searchPlace} onChange={e => setSearchPlace(e.target.value)}
+                    placeholder="e.g. Sydney" style={inputStyle} />
                 </Box>
                 <Box>
                   <Box sx={{ fontSize: 11, fontWeight: 600, color: MUTED, textTransform: "uppercase",
@@ -1333,7 +1354,7 @@ export default function ClientTrackerPage() {
               </Box>
               <Box sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "10px" }}>
                 {hasFilters && (
-                  <Box onClick={() => { setSearchIndustry(""); setSearchCountry(""); setSearchSize(""); setSearchKeyword(""); }}
+                  <Box onClick={() => { setSearchIndustry(""); setSearchPlace(""); setSearchSize(""); setSearchKeyword(""); }}
                     sx={{ fontSize: 12, color: MUTED, cursor: "pointer",
                       "&:hover": { color: TEXT }, transition: "color .12s" }}>
                     Clear filters
@@ -1363,7 +1384,7 @@ export default function ClientTrackerPage() {
                   Discover companies actively hiring
                 </Box>
                 <Box sx={{ fontSize: 12, color: MUTED, maxWidth: 420, mx: "auto" }}>
-                  Filter by industry, country, size, or keyword — then click <strong>Find Potential Clients</strong> to surface companies showing live hiring signals.
+                  Filter by industry, place, size, or keyword — then click <strong>Find Potential Clients</strong> to surface companies showing live hiring signals.
                 </Box>
               </Box>
             )}
@@ -1384,11 +1405,24 @@ export default function ClientTrackerPage() {
             )}
 
             {potential.length > 0 && (
-              <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                {potential.map((pc, i) => (
-                  <PotentialCard key={i} pc={pc} onViewDetail={() => setDetailCard(pc)} />
-                ))}
-              </Box>
+              <>
+                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  {potential.map((pc, i) => (
+                    <PotentialCard key={pc.externalId ?? i} pc={pc} onViewDetail={() => setDetailCard(pc)} />
+                  ))}
+                </Box>
+                <Box sx={{ textAlign: "center", mt: "16px" }}>
+                  <Box onClick={potentialLoadingMore ? undefined : handleLoadMorePotential} sx={{
+                    display: "inline-flex", alignItems: "center", gap: "8px", px: "18px", py: "9px",
+                    bgcolor: potentialLoadingMore ? WARN_L : "#fff", color: WARN,
+                    border: `1px solid ${WARN}`, borderRadius: "8px", fontSize: 13, fontWeight: 600,
+                    cursor: potentialLoadingMore ? "default" : "pointer",
+                    "&:hover": potentialLoadingMore ? {} : { bgcolor: WARN_L },
+                  }}>
+                    {potentialLoadingMore ? "Loading…" : "Load More"}
+                  </Box>
+                </Box>
+              </>
             )}
           </Box>
         </>

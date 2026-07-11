@@ -3,6 +3,7 @@ package com.nolyvra.app.model;
 import java.util.List;
 
 public record PotentialClientResponse(
+    String externalId,
     String companyName,
     String industry,
     String size,

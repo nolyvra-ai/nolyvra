@@ -16,5 +16,7 @@ public record TalentSearchResult(
     int yearsExperience,
     String source,              // INTERNAL | CORESIGNAL
     boolean alreadyInPipeline,
-    Long coresignalId           // set for CORESIGNAL results; null for INTERNAL
+    String coresignalId,        // set for CORESIGNAL results (Bright Data string id); null for INTERNAL
+    String avatarUrl,
+    Boolean defaultAvatar
 ) {}
