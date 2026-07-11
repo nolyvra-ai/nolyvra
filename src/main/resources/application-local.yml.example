@@ -27,3 +27,9 @@ google:
   client-secret: your-google-client-secret
   redirect-uri: http://localhost:8080/auth/google/callback
   frontend-url: http://localhost:5173
+
+hubspot:
+  client-id: your-hubspot-client-id
+  client-secret: your-hubspot-client-secret
+  redirect-uri: http://localhost:8080/auth/hubspot/callback
+  frontend-url: http://localhost:5173
