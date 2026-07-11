@@ -93,6 +93,9 @@ public class HubSpotOAuthService {
         String accessToken = json.path("access_token").asText();
         String refreshToken = json.path("refresh_token").asText(null);
         Instant expiresAt = Instant.now().plusSeconds(json.path("expires_in").asLong(1800));
+        if (accessToken == null || accessToken.isBlank()) {
+            throw new IllegalStateException("HubSpot did not return an access token");
+        }
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new IllegalStateException("HubSpot did not return a refresh token");
         }
@@ -154,6 +157,9 @@ public class HubSpotOAuthService {
 
         String newAccess = json.path("access_token").asText();
         String newRefresh = json.path("refresh_token").asText(null);
+        if (newAccess == null || newAccess.isBlank()) {
+            throw new HubSpotReconnectRequiredException(connection.loginId(), null);
+        }
         if (newRefresh == null || newRefresh.isBlank()) {
             newRefresh = connection.refreshToken();
         }
