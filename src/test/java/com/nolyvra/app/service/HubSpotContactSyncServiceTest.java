@@ -66,6 +66,27 @@ class HubSpotContactSyncServiceTest {
     }
 
     @Test
+    void unlinkedContactCreatesWhenEmailSearchHasNoMatch() throws Exception {
+        ClientResponse client = client("ada@example.com");
+        Map<String, String> properties = Map.of("email", "ada@example.com");
+        ExternalCrmLink saved = link("contact-1");
+        when(mapper.fromClient(client)).thenReturn(properties);
+        when(crmService.findContactByEmail("login-1", "ada@example.com")).thenReturn(null);
+        when(crmService.createContact("login-1", properties))
+                .thenReturn(new HubSpotCrmService.CrmObject("contact-1", saved.externalUrl()));
+        when(linkService.recordSuccess(
+                "login-1", "hubspot", "client_contact", "42",
+                "contact-1", saved.externalUrl())).thenReturn(saved);
+
+        HubSpotContactSyncService.ContactSyncResult result =
+                service.upsertContact(client, "login-1", "portal-1");
+
+        assertThat(result.externalId()).isEqualTo("contact-1");
+        verify(crmService).createContact("login-1", properties);
+        verify(crmService, never()).updateContact("login-1", "contact-1", properties);
+    }
+
+    @Test
     void missingEmailSkipsContactSync() throws Exception {
         ClientResponse client = client(null);
         when(mapper.fromClient(client)).thenReturn(Map.of("firstname", "Ada"));
