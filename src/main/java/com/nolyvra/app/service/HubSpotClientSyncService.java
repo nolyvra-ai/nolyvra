@@ -21,18 +21,21 @@ public class HubSpotClientSyncService {
     private final HubSpotCrmService crmService;
     private final ExternalCrmLinkService linkService;
     private final HubSpotCompanyMapper companyMapper;
+    private final HubSpotContactSyncService contactSyncService;
 
     public HubSpotClientSyncService(
             ClientService clientService,
             HubSpotOAuthService oauthService,
             HubSpotCrmService crmService,
             ExternalCrmLinkService linkService,
-            HubSpotCompanyMapper companyMapper) {
+            HubSpotCompanyMapper companyMapper,
+            HubSpotContactSyncService contactSyncService) {
         this.clientService = clientService;
         this.oauthService = oauthService;
         this.crmService = crmService;
         this.linkService = linkService;
         this.companyMapper = companyMapper;
+        this.contactSyncService = contactSyncService;
     }
 
     public HubSpotSyncStatusResponse pushClient(Long clientId, String loginId) {
@@ -58,7 +61,21 @@ public class HubSpotClientSyncService {
             ExternalCrmLink saved = linkService.recordSuccess(
                     loginId, PROVIDER, LOCAL_TYPE, localId,
                     company.id(), externalUrl);
-            return HubSpotSyncStatusResponse.fromLink(saved);
+            HubSpotSyncStatusResponse companyStatus = HubSpotSyncStatusResponse.fromLink(saved);
+            try {
+                HubSpotContactSyncService.ContactSyncResult contact =
+                        contactSyncService.syncAndAssociate(
+                                client, loginId, connection.hubspotPortalId(), company.id());
+                return companyStatus.withContact(
+                        contact.state(), contact.externalUrl(), contact.error());
+            } catch (Exception contactError) {
+                ExternalCrmLink contactLink = linkService.findByLocalRecord(
+                        loginId, PROVIDER, HubSpotContactSyncService.LOCAL_TYPE, localId);
+                return companyStatus.withContact(
+                        "failed",
+                        contactLink == null ? null : contactLink.externalUrl(),
+                        safeMessage(contactError));
+            }
         } catch (Exception e) {
             linkService.recordFailure(loginId, PROVIDER, LOCAL_TYPE, localId, safeMessage(e));
             throw new ResponseStatusException(
@@ -67,14 +84,26 @@ public class HubSpotClientSyncService {
     }
 
     public HubSpotSyncStatusResponse getStatus(Long clientId, String loginId) {
-        clientService.getClientForHubSpot(clientId, loginId);
+        ClientResponse client = clientService.getClientForHubSpot(clientId, loginId);
         if (oauthService.getConnection(loginId) == null) {
             return HubSpotSyncStatusResponse.disconnected();
         }
         ExternalCrmLink link = linkService.findByLocalRecord(
                 loginId, PROVIDER, LOCAL_TYPE, clientId.toString());
-        return link == null ? HubSpotSyncStatusResponse.notLinked()
+        HubSpotSyncStatusResponse companyStatus = link == null
+                ? HubSpotSyncStatusResponse.notLinked()
                 : HubSpotSyncStatusResponse.fromLink(link);
+        if (client.contactEmail() == null || client.contactEmail().isBlank()) {
+            return companyStatus.withContact("skipped", null, "Contact email is required");
+        }
+        ExternalCrmLink contactLink = linkService.findByLocalRecord(
+                loginId, PROVIDER, HubSpotContactSyncService.LOCAL_TYPE, clientId.toString());
+        if (contactLink == null) {
+            return companyStatus.withContact("not_linked", null, null);
+        }
+        String contactState = "failed".equals(contactLink.lastSyncStatus()) ? "failed" : "success";
+        return companyStatus.withContact(
+                contactState, contactLink.externalUrl(), contactLink.lastSyncError());
     }
 
     private String companyUrl(String portalId, String companyId) {

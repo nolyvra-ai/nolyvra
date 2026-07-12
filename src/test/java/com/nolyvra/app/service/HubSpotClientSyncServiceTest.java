@@ -5,6 +5,7 @@ import com.nolyvra.app.model.ExternalCrmLink;
 import com.nolyvra.app.model.HubSpotConnection;
 import com.nolyvra.app.model.HubSpotSyncStatusResponse;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 
 import java.time.Instant;
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -27,8 +29,17 @@ class HubSpotClientSyncServiceTest {
     private final HubSpotCrmService crmService = mock(HubSpotCrmService.class);
     private final ExternalCrmLinkService linkService = mock(ExternalCrmLinkService.class);
     private final HubSpotCompanyMapper mapper = mock(HubSpotCompanyMapper.class);
+    private final HubSpotContactSyncService contactSyncService = mock(HubSpotContactSyncService.class);
     private final HubSpotClientSyncService service = new HubSpotClientSyncService(
-            clientService, oauthService, crmService, linkService, mapper);
+            clientService, oauthService, crmService, linkService, mapper, contactSyncService);
+
+    @BeforeEach
+    void skipContactByDefault() throws Exception {
+        when(contactSyncService.syncAndAssociate(
+                any(ClientResponse.class), anyString(), anyString(), anyString()))
+                .thenReturn(HubSpotContactSyncService.ContactSyncResult.skipped(
+                        "Contact email is required"));
+    }
 
     @Test
     void unlinkedClientCreatesCompanyAndStoresLink() throws Exception {
@@ -137,10 +148,39 @@ class HubSpotClientSyncServiceTest {
         assertThat(response.lastSyncError()).isEqualTo("Rate limited");
     }
 
+    @Test
+    void contactFailureReturnsPartialSuccessForCompany() throws Exception {
+        ClientResponse client = clientWithContact();
+        ExternalCrmLink company = link("company-1", "success", null);
+        when(clientService.getClientForHubSpot(42L, "login-1")).thenReturn(client);
+        when(oauthService.getConnection("login-1")).thenReturn(connection());
+        when(mapper.fromClient(client)).thenReturn(Map.of("name", "Nolyvra"));
+        when(crmService.createCompany("login-1", Map.of("name", "Nolyvra")))
+                .thenReturn(new HubSpotCrmService.CrmObject("company-1", company.externalUrl()));
+        when(linkService.recordSuccess(
+                "login-1", "hubspot", "client", "42", "company-1", company.externalUrl()))
+                .thenReturn(company);
+        when(contactSyncService.syncAndAssociate(client, "login-1", "portal-1", "company-1"))
+                .thenThrow(new HubSpotCrmService.HubSpotApiException(400, "Invalid contact"));
+
+        HubSpotSyncStatusResponse response = service.pushClient(42L, "login-1");
+
+        assertThat(response.state()).isEqualTo("linked");
+        assertThat(response.contactState()).isEqualTo("failed");
+        assertThat(response.contactSyncError()).isEqualTo("Invalid contact");
+    }
+
     private ClientResponse client() {
         return new ClientResponse(
                 42L, "login-1", "Nolyvra", null, null, null,
                 null, null, null, null, null, null, null,
+                Instant.now(), 0, 0, 0, List.of(), List.of());
+    }
+
+    private ClientResponse clientWithContact() {
+        return new ClientResponse(
+                42L, "login-1", "Nolyvra", null, null, null,
+                "Ada Lovelace", "ada@example.com", "CTO", null, null, null, null,
                 Instant.now(), 0, 0, 0, List.of(), List.of());
     }
 

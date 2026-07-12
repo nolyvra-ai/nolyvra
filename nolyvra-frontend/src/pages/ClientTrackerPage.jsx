@@ -265,6 +265,19 @@ function ClientRow({ client, onEdit, onSelect, onInvoice, hubSpotStatus, hubSpot
           ? <Box sx={{ fontSize: 13, color: TEXT }}>{client.contactPerson}</Box>
           : <Box sx={{ fontSize: 12, color: MUTED }}>—</Box>}
         {client.contactEmail && <Box sx={{ fontSize: 11, color: MUTED, mt: "1px" }}>{client.contactEmail}</Box>}
+        {hubSpotStatus?.contactState === "success" && (
+          <Box sx={{ fontSize: 10, color: HUBSPOT, fontWeight: 600, mt: "2px" }}>Contact synced</Box>
+        )}
+        {hubSpotStatus?.contactState === "failed" && (
+          <Tooltip title={hubSpotStatus.contactSyncError || "Contact sync failed"}>
+            <Box sx={{ fontSize: 10, color: "#DC2626", fontWeight: 600, mt: "2px", width: "fit-content" }}>
+              Contact failed
+            </Box>
+          </Tooltip>
+        )}
+        {hubSpotStatus?.contactState === "skipped" && (
+          <Box sx={{ fontSize: 10, color: MUTED, mt: "2px" }}>Contact skipped: no email</Box>
+        )}
       </Box>
       <Box>
         <Box sx={{ fontSize: 13, fontWeight: 600, color: client.activeJobCount > 0 ? SUCCESS : MUTED }}>
