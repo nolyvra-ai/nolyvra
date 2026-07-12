@@ -4,6 +4,8 @@ import com.nolyvra.app.model.ExternalCrmLink;
 import com.nolyvra.app.model.HubSpotConnection;
 import com.nolyvra.app.model.HubSpotSyncStatusResponse;
 import com.nolyvra.app.model.JobResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -13,6 +15,8 @@ import java.util.Map;
 
 @Service
 public class HubSpotJobSyncService {
+
+    private static final Logger log = LoggerFactory.getLogger(HubSpotJobSyncService.class);
 
     private static final String PROVIDER = "hubspot";
     private static final String LOCAL_TYPE = "job";
@@ -53,6 +57,8 @@ public class HubSpotJobSyncService {
                 loginId, PROVIDER, LOCAL_TYPE, jobId);
         Map<String, String> properties = dealMapper.fromJob(job);
 
+        log.info("[HubSpotSync] action=push localType=job localId={} loginId={} operation=start linked={}",
+                jobId, loginId, existing != null && existing.externalId() != null);
         try {
             HubSpotCrmService.CrmObject deal = existing != null
                     && existing.externalId() != null && !existing.externalId().isBlank()
@@ -64,11 +70,16 @@ public class HubSpotJobSyncService {
             ExternalCrmLink saved = linkService.recordSuccess(
                     loginId, PROVIDER, LOCAL_TYPE, jobId, deal.id(), externalUrl);
             associateDeal(loginId, deal.id(), companyLink, clientId);
+            log.info("[HubSpotSync] action=push localType=job localId={} loginId={} operation=success externalId={}",
+                    jobId, loginId, deal.id());
             return HubSpotSyncStatusResponse.fromLink(saved);
         } catch (Exception e) {
-            linkService.recordFailure(loginId, PROVIDER, LOCAL_TYPE, jobId, safeMessage(e));
+            String message = HubSpotErrorSupport.userMessage(e);
+            linkService.recordFailure(loginId, PROVIDER, LOCAL_TYPE, jobId, message);
+            log.warn("[HubSpotSync] action=push localType=job localId={} loginId={} operation=failed status={} message={}",
+                    jobId, loginId, HubSpotErrorSupport.responseStatus(e).value(), message);
             throw new ResponseStatusException(
-                    HttpStatus.BAD_GATEWAY, "HubSpot job sync failed: " + safeMessage(e), e);
+                    HubSpotErrorSupport.responseStatus(e), message, e);
         }
     }
 
@@ -135,11 +146,5 @@ public class HubSpotJobSyncService {
     private String dealUrl(String portalId, String dealId) {
         if (portalId == null || portalId.isBlank()) return null;
         return "https://app.hubspot.com/contacts/" + portalId + "/deal/" + dealId;
-    }
-
-    private String safeMessage(Exception error) {
-        String message = error.getMessage();
-        if (message == null || message.isBlank()) return "HubSpot job sync failed";
-        return message.length() > 500 ? message.substring(0, 500) : message;
     }
 }

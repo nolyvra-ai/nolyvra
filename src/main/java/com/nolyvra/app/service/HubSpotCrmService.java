@@ -3,10 +3,13 @@ package com.nolyvra.app.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Map;
@@ -14,6 +17,8 @@ import java.util.List;
 
 @Service
 public class HubSpotCrmService {
+
+    private static final Logger log = LoggerFactory.getLogger(HubSpotCrmService.class);
 
     private static final String OBJECTS_URL = "https://api.hubapi.com/crm/objects/2026-03";
 
@@ -131,11 +136,32 @@ public class HubSpotCrmService {
         JsonNode json = response.body() == null || response.body().isBlank()
                 ? objectMapper.createObjectNode()
                 : objectMapper.readTree(response.body());
+        String category = json.path("category").asText(null);
+        String correlationId = json.path("correlationId").asText(null);
+        HttpHeaders headers = response.headers();
+        String retryAfter = headers == null ? null : headers.firstValue("Retry-After").orElse(null);
+        log.info("[HubSpotCRM] method={} path={} objectType={} status={} category={} correlationId={} retryAfter={}",
+                method, path, objectType(path), response.statusCode(), category, correlationId, retryAfter);
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             String message = json.path("message").asText("HubSpot API request failed");
-            throw new HubSpotApiException(response.statusCode(), message);
+            log.warn("[HubSpotCRM] request failed method={} path={} status={} category={} correlationId={} retryAfter={}",
+                    method, path, response.statusCode(), category, correlationId, retryAfter);
+            throw new HubSpotApiException(
+                    response.statusCode(), message, category, correlationId, retryAfter);
         }
         return json;
+    }
+
+    private String objectType(String path) {
+        if (path == null || path.isBlank()) return "unknown";
+        String normalized = path.startsWith("/") ? path.substring(1) : path;
+        String first = normalized.split("/", 2)[0];
+        return switch (first) {
+            case "company", "companies" -> "company";
+            case "contact", "contacts" -> "contact";
+            case "deal", "deals" -> "deal";
+            default -> first == null || first.isBlank() ? "unknown" : first;
+        };
     }
 
     private CrmObject mapObject(JsonNode response) {
@@ -156,14 +182,41 @@ public class HubSpotCrmService {
 
     public static class HubSpotApiException extends RuntimeException {
         private final int statusCode;
+        private final String category;
+        private final String correlationId;
+        private final String retryAfter;
 
         public HubSpotApiException(int statusCode, String message) {
+            this(statusCode, message, null, null, null);
+        }
+
+        public HubSpotApiException(
+                int statusCode,
+                String message,
+                String category,
+                String correlationId,
+                String retryAfter) {
             super(message);
             this.statusCode = statusCode;
+            this.category = category;
+            this.correlationId = correlationId;
+            this.retryAfter = retryAfter;
         }
 
         public int getStatusCode() {
             return statusCode;
+        }
+
+        public String getCategory() {
+            return category;
+        }
+
+        public String getCorrelationId() {
+            return correlationId;
+        }
+
+        public String getRetryAfter() {
+            return retryAfter;
         }
     }
 }

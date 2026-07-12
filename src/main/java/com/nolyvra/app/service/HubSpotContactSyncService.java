@@ -2,12 +2,16 @@ package com.nolyvra.app.service;
 
 import com.nolyvra.app.model.ClientResponse;
 import com.nolyvra.app.model.ExternalCrmLink;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
 
 @Service
 public class HubSpotContactSyncService {
+
+    private static final Logger log = LoggerFactory.getLogger(HubSpotContactSyncService.class);
 
     static final String LOCAL_TYPE = "client_contact";
     private static final String PROVIDER = "hubspot";
@@ -36,6 +40,8 @@ public class HubSpotContactSyncService {
         String localId = Long.toString(client.id());
         ExternalCrmLink existing = linkService.findByLocalRecord(
                 loginId, PROVIDER, LOCAL_TYPE, localId);
+        log.info("[HubSpotSync] action=push localType=client_contact localId={} loginId={} operation=start linked={}",
+                localId, loginId, existing != null && existing.externalId() != null);
         try {
             HubSpotCrmService.CrmObject contact;
             if (existing != null && existing.externalId() != null
@@ -53,10 +59,15 @@ public class HubSpotContactSyncService {
             ExternalCrmLink saved = linkService.recordSuccess(
                     loginId, PROVIDER, LOCAL_TYPE, localId,
                     contact.id(), externalUrl);
+            log.info("[HubSpotSync] action=push localType=client_contact localId={} loginId={} operation=success externalId={}",
+                    localId, loginId, contact.id());
             return ContactSyncResult.success(saved.externalId(), saved.externalUrl());
         } catch (Exception e) {
+            String message = HubSpotErrorSupport.userMessage(e);
             linkService.recordFailure(
-                    loginId, PROVIDER, LOCAL_TYPE, localId, safeMessage(e));
+                    loginId, PROVIDER, LOCAL_TYPE, localId, message);
+            log.warn("[HubSpotSync] action=push localType=client_contact localId={} loginId={} operation=failed status={} message={}",
+                    localId, loginId, HubSpotErrorSupport.responseStatus(e).value(), message);
             throw e;
         }
     }
@@ -70,8 +81,11 @@ public class HubSpotContactSyncService {
             crmService.associateContactToCompany(loginId, contact.externalId(), companyId);
             return contact;
         } catch (Exception e) {
+            String message = HubSpotErrorSupport.userMessage(e);
             linkService.recordFailure(
-                    loginId, PROVIDER, LOCAL_TYPE, Long.toString(client.id()), safeMessage(e));
+                    loginId, PROVIDER, LOCAL_TYPE, Long.toString(client.id()), message);
+            log.warn("[HubSpotSync] action=associate localType=client_contact localId={} loginId={} operation=failed status={} message={}",
+                    client.id(), loginId, HubSpotErrorSupport.responseStatus(e).value(), message);
             throw e;
         }
     }
@@ -80,13 +94,6 @@ public class HubSpotContactSyncService {
         if (portalId == null || portalId.isBlank()) return null;
         return "https://app.hubspot.com/contacts/" + portalId + "/contact/" + contactId;
     }
-
-    private String safeMessage(Exception error) {
-        String message = error.getMessage();
-        if (message == null || message.isBlank()) return "HubSpot contact sync failed";
-        return message.length() > 500 ? message.substring(0, 500) : message;
-    }
-
     public record ContactSyncResult(
             String state, String externalId, String externalUrl, String error) {
         static ContactSyncResult success(String externalId, String externalUrl) {
