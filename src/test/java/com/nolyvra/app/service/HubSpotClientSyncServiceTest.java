@@ -16,6 +16,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -70,6 +71,31 @@ class HubSpotClientSyncServiceTest {
 
         verify(crmService).updateCompany("login-1", "company-1", Map.of("name", "Nolyvra"));
         verify(crmService, never()).createCompany(eq("login-1"), eq(Map.of("name", "Nolyvra")));
+    }
+
+    @Test
+    void repeatPushCreatesOnceThenUpdatesSameCompany() throws Exception {
+        ClientResponse client = client();
+        ExternalCrmLink linked = link("company-1", "success", null);
+        Map<String, String> properties = Map.of("name", "Nolyvra");
+        when(clientService.getClientForHubSpot(42L, "login-1")).thenReturn(client);
+        when(oauthService.getConnection("login-1")).thenReturn(connection());
+        when(linkService.findByLocalRecord("login-1", "hubspot", "client", "42"))
+                .thenReturn(null, linked);
+        when(mapper.fromClient(client)).thenReturn(properties);
+        when(crmService.createCompany("login-1", properties))
+                .thenReturn(new HubSpotCrmService.CrmObject("company-1", linked.externalUrl()));
+        when(crmService.updateCompany("login-1", "company-1", properties))
+                .thenReturn(new HubSpotCrmService.CrmObject("company-1", linked.externalUrl()));
+        when(linkService.recordSuccess(
+                "login-1", "hubspot", "client", "42", "company-1", linked.externalUrl()))
+                .thenReturn(linked);
+
+        service.pushClient(42L, "login-1");
+        service.pushClient(42L, "login-1");
+
+        verify(crmService, times(1)).createCompany("login-1", properties);
+        verify(crmService, times(1)).updateCompany("login-1", "company-1", properties);
     }
 
     @Test
