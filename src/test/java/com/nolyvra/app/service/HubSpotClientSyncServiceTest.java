@@ -125,6 +125,24 @@ class HubSpotClientSyncServiceTest {
     }
 
     @Test
+    void rateLimitPushRecordsFriendlyFailureAndReturnsTooManyRequests() throws Exception {
+        ClientResponse client = client();
+        when(clientService.getClientForHubSpot(42L, "login-1")).thenReturn(client);
+        when(oauthService.getConnection("login-1")).thenReturn(connection());
+        when(mapper.fromClient(client)).thenReturn(Map.of("name", "Nolyvra"));
+        when(crmService.createCompany("login-1", Map.of("name", "Nolyvra")))
+                .thenThrow(new HubSpotCrmService.HubSpotApiException(
+                        429, "Limit reached", "RATE_LIMIT", "corr-1", "1000"));
+
+        assertThatThrownBy(() -> service.pushClient(42L, "login-1"))
+                .hasMessageContaining("429 TOO_MANY_REQUESTS")
+                .hasMessageContaining("HubSpot rate limit reached");
+        verify(linkService).recordFailure(
+                "login-1", "hubspot", "client", "42",
+                "HubSpot rate limit reached. Retry after 1000ms.");
+    }
+
+    @Test
     void statusDistinguishesDisconnectedAndConnectedNotLinked() {
         when(clientService.getClientForHubSpot(42L, "login-1")).thenReturn(client());
 

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.net.http.HttpClient;
+import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Map;
@@ -53,6 +54,24 @@ class HubSpotCrmServiceTest {
                 "login-1", "company-123", Map.of("name", "Nolyvra")))
                 .isInstanceOf(HubSpotCrmService.HubSpotApiException.class)
                 .hasMessage("Invalid property");
+    }
+
+    @Test
+    void capturesHubSpotRateLimitMetadata() throws Exception {
+        HttpResponse<String> response = response(
+                429,
+                "{\"message\":\"You have reached your secondly limit.\",\"category\":\"RATE_LIMIT\",\"correlationId\":\"corr-1\"}",
+                Map.of("Retry-After", "1000"));
+        when(oauthService.getValidAccessToken("login-1")).thenReturn("access-token");
+        when(httpClient.send(any(), anyStringBodyHandler())).thenReturn(response);
+
+        assertThatThrownBy(() -> service.createCompany("login-1", Map.of("name", "Nolyvra")))
+                .isInstanceOfSatisfying(HubSpotCrmService.HubSpotApiException.class, e -> {
+                    assertThat(e.getStatusCode()).isEqualTo(429);
+                    assertThat(e.getCategory()).isEqualTo("RATE_LIMIT");
+                    assertThat(e.getCorrelationId()).isEqualTo("corr-1");
+                    assertThat(e.getRetryAfter()).isEqualTo("1000");
+                });
     }
 
     @Test
@@ -125,9 +144,19 @@ class HubSpotCrmServiceTest {
 
     @SuppressWarnings("unchecked")
     private static HttpResponse<String> response(int status, String body) {
+        return response(status, body, Map.of());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static HttpResponse<String> response(int status, String body, Map<String, String> headers) {
         HttpResponse<String> response = mock(HttpResponse.class);
         when(response.statusCode()).thenReturn(status);
         when(response.body()).thenReturn(body);
+        when(response.headers()).thenReturn(HttpHeaders.of(
+                headers.entrySet().stream()
+                        .collect(java.util.stream.Collectors.toMap(
+                                Map.Entry::getKey, e -> java.util.List.of(e.getValue()))),
+                (name, value) -> true));
         return response;
     }
 }
