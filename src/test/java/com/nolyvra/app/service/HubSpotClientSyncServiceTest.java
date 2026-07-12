@@ -143,6 +143,23 @@ class HubSpotClientSyncServiceTest {
     }
 
     @Test
+    void reconnectRequiredPushReturnsConflict() throws Exception {
+        ClientResponse client = client();
+        when(clientService.getClientForHubSpot(42L, "login-1")).thenReturn(client);
+        when(oauthService.getConnection("login-1")).thenReturn(connection());
+        when(mapper.fromClient(client)).thenReturn(Map.of("name", "Nolyvra"));
+        when(crmService.createCompany("login-1", Map.of("name", "Nolyvra")))
+                .thenThrow(new HubSpotOAuthService.HubSpotReconnectRequiredException("login-1", null));
+
+        assertThatThrownBy(() -> service.pushClient(42L, "login-1"))
+                .hasMessageContaining("409 CONFLICT")
+                .hasMessageContaining("HubSpot reconnect required");
+        verify(linkService).recordFailure(
+                "login-1", "hubspot", "client", "42",
+                "HubSpot reconnect required. Reconnect HubSpot in Settings and try again.");
+    }
+
+    @Test
     void statusDistinguishesDisconnectedAndConnectedNotLinked() {
         when(clientService.getClientForHubSpot(42L, "login-1")).thenReturn(client());
 

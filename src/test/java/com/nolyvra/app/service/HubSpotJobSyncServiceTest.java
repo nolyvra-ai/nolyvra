@@ -120,6 +120,26 @@ class HubSpotJobSyncServiceTest {
         verify(crmService, never()).createDeal(anyString(), any());
     }
 
+    @Test
+    void reconnectRequiredPushReturnsConflict() throws Exception {
+        JobResponse job = job();
+        when(jobService.getJob("job-1", "login-1")).thenReturn(Optional.of(job));
+        when(oauthService.getConnection("login-1")).thenReturn(connection());
+        whenClientLookupReturns(42L);
+        when(linkService.findByLocalRecord("login-1", "hubspot", "client", "42"))
+                .thenReturn(companyLink());
+        when(mapper.fromJob(job)).thenReturn(Map.of("dealname", "Senior Engineer"));
+        when(crmService.createDeal("login-1", Map.of("dealname", "Senior Engineer")))
+                .thenThrow(new HubSpotOAuthService.HubSpotReconnectRequiredException("login-1", null));
+
+        assertThatThrownBy(() -> service.pushJob("job-1", "login-1"))
+                .hasMessageContaining("409 CONFLICT")
+                .hasMessageContaining("HubSpot reconnect required");
+        verify(linkService).recordFailure(
+                "login-1", "hubspot", "job", "job-1",
+                "HubSpot reconnect required. Reconnect HubSpot in Settings and try again.");
+    }
+
     private void whenClientLookupReturns(Long clientId) {
         when(jdbc.query(anyString(), any(ResultSetExtractor.class), eq("login-1"), eq("Nolyvra")))
                 .thenReturn(clientId);
