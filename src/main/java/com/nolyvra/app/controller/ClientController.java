@@ -72,6 +72,13 @@ public class ClientController {
         return ResponseEntity.ok(hubSpotClientSyncService.pushClient(id, loginId));
     }
 
+    @GetMapping("/{id}/hubspot/status")
+    public ResponseEntity<HubSpotSyncStatusResponse> getClientHubSpotStatus(
+            @PathVariable Long id,
+            @RequestParam String loginId) {
+        return ResponseEntity.ok(hubSpotClientSyncService.getStatus(id, loginId));
+    }
+
     @GetMapping("/potential")
     public ResponseEntity<List<PotentialClientResponse>> getPotentialClients(
             @RequestParam String loginId,

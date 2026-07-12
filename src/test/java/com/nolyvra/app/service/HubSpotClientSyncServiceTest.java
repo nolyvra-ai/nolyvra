@@ -87,6 +87,30 @@ class HubSpotClientSyncServiceTest {
                 "login-1", "hubspot", "client", "42", "Invalid property");
     }
 
+    @Test
+    void statusDistinguishesDisconnectedAndConnectedNotLinked() {
+        when(clientService.getClientForHubSpot(42L, "login-1")).thenReturn(client());
+
+        assertThat(service.getStatus(42L, "login-1").state()).isEqualTo("disconnected");
+
+        when(oauthService.getConnection("login-1")).thenReturn(connection());
+        assertThat(service.getStatus(42L, "login-1").state()).isEqualTo("not_linked");
+    }
+
+    @Test
+    void statusReturnsStoredFailureWithoutLosingLink() {
+        when(clientService.getClientForHubSpot(42L, "login-1")).thenReturn(client());
+        when(oauthService.getConnection("login-1")).thenReturn(connection());
+        when(linkService.findByLocalRecord("login-1", "hubspot", "client", "42"))
+                .thenReturn(link("company-1", "failed", "Rate limited"));
+
+        HubSpotSyncStatusResponse response = service.getStatus(42L, "login-1");
+
+        assertThat(response.state()).isEqualTo("sync_failed");
+        assertThat(response.linked()).isTrue();
+        assertThat(response.lastSyncError()).isEqualTo("Rate limited");
+    }
+
     private ClientResponse client() {
         return new ClientResponse(
                 42L, "login-1", "Nolyvra", null, null, null,
