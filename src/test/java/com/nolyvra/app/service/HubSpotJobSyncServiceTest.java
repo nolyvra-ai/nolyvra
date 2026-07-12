@@ -86,6 +86,30 @@ class HubSpotJobSyncServiceTest {
     }
 
     @Test
+    void associatesDealToContactWhenClientContactIsLinked() throws Exception {
+        JobResponse job = job();
+        ExternalCrmLink deal = dealLink("deal-1", "success", null);
+        when(jobService.getJob("job-1", "login-1")).thenReturn(Optional.of(job));
+        when(oauthService.getConnection("login-1")).thenReturn(connection());
+        whenClientLookupReturns(42L);
+        when(linkService.findByLocalRecord("login-1", "hubspot", "client", "42"))
+                .thenReturn(companyLink());
+        when(linkService.findByLocalRecord("login-1", "hubspot", "client_contact", "42"))
+                .thenReturn(contactLink());
+        when(mapper.fromJob(job)).thenReturn(Map.of("dealname", "Senior Engineer"));
+        when(crmService.createDeal("login-1", Map.of("dealname", "Senior Engineer")))
+                .thenReturn(new HubSpotCrmService.CrmObject("deal-1", deal.externalUrl()));
+        when(linkService.recordSuccess(
+                "login-1", "hubspot", "job", "job-1", "deal-1", deal.externalUrl()))
+                .thenReturn(deal);
+
+        service.pushJob("job-1", "login-1");
+
+        verify(crmService).associateDealToCompany("login-1", "deal-1", "company-1");
+        verify(crmService).associateDealToContact("login-1", "deal-1", "contact-1");
+    }
+
+    @Test
     void missingCompanyLinkAsksUserToPushClientFirst() throws Exception {
         when(jobService.getJob("job-1", "login-1")).thenReturn(Optional.of(job()));
         when(oauthService.getConnection("login-1")).thenReturn(connection());
@@ -127,5 +151,12 @@ class HubSpotJobSyncServiceTest {
                 2L, "login-1", "hubspot", "job", "job-1", externalId,
                 "https://app.hubspot.com/contacts/portal-1/deal/" + externalId,
                 Instant.now(), status, error);
+    }
+
+    private ExternalCrmLink contactLink() {
+        return new ExternalCrmLink(
+                3L, "login-1", "hubspot", "client_contact", "42", "contact-1",
+                "https://app.hubspot.com/contacts/portal-1/contact/contact-1",
+                Instant.now(), "success", null);
     }
 }
