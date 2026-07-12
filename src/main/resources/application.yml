@@ -74,6 +74,8 @@ hubspot:
   client-secret: ${HUBSPOT_CLIENT_SECRET:}
   redirect-uri: ${HUBSPOT_REDIRECT_URI:http://localhost:8080/auth/hubspot/callback}
   frontend-url: ${HUBSPOT_FRONTEND_URL:http://localhost:5173}
+  deal-pipeline: ${HUBSPOT_DEAL_PIPELINE:default}
+  deal-stage: ${HUBSPOT_DEAL_STAGE:appointmentscheduled}
 
 resend:
   api-key: ${RESEND_API_KEY:}

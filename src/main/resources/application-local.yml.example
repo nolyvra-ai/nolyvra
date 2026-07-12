@@ -33,3 +33,5 @@ hubspot:
   client-secret: your-hubspot-client-secret
   redirect-uri: http://localhost:8080/auth/hubspot/callback
   frontend-url: http://localhost:5173
+  deal-pipeline: default
+  deal-stage: appointmentscheduled
