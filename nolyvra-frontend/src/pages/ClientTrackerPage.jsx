@@ -235,7 +235,7 @@ function ClientRow({ client, onEdit, onSelect, onInvoice, hubSpotStatus, hubSpot
   return (
     <Box onClick={() => onSelect(client)} sx={{
       display: "grid",
-      gridTemplateColumns: "2fr 1.5fr 1fr 1.2fr 2fr 1fr",
+      gridTemplateColumns: "2fr 1.5fr 1fr 1.2fr 2fr 2fr",
       alignItems: "center",
       px: "16px", py: "12px",
       borderBottom: `1px solid ${BORDER}`,
@@ -312,18 +312,23 @@ function ClientRow({ client, onEdit, onSelect, onInvoice, hubSpotStatus, hubSpot
         )}
         <Tooltip title={hubSpotDisconnected ? "Connect HubSpot in Settings" : hubSpotLinked ? "Sync to HubSpot" : "Push to HubSpot"}>
           <span>
-            <IconButton
+            <Button
               onClick={e => { e.stopPropagation(); onHubSpotPush(client); }}
               disabled={!hubSpotStatus || hubSpotDisconnected || hubSpotBusy}
               size="small"
+              variant="outlined"
+              startIcon={hubSpotBusy
+                ? <CircularProgress size={12} sx={{ color: "inherit" }} />
+                : hubSpotLinked ? <SyncIcon /> : <HubOutlinedIcon />}
               aria-label={`${hubSpotLinked ? "Sync" : "Push"} ${client.companyName} to HubSpot`}
-              sx={{ width: 28, height: 28, border: `1px solid ${BORDER}`, borderRadius: "6px",
-                color: HUBSPOT, bgcolor: SURFACE, "&:hover": { borderColor: HUBSPOT, bgcolor: HUBSPOT_L } }}
+              sx={{ height: 28, minWidth: 116, px: "8px", borderRadius: "6px",
+                borderColor: BORDER, color: HUBSPOT, bgcolor: SURFACE,
+                fontSize: 10, fontWeight: 700, textTransform: "none", whiteSpace: "nowrap",
+                "& .MuiButton-startIcon": { mr: "4px", "& svg": { fontSize: 14 } },
+                "&:hover": { borderColor: HUBSPOT, bgcolor: HUBSPOT_L } }}
             >
-              {hubSpotBusy
-                ? <CircularProgress size={13} sx={{ color: HUBSPOT }} />
-                : hubSpotLinked ? <SyncIcon sx={{ fontSize: 15 }} /> : <HubOutlinedIcon sx={{ fontSize: 15 }} />}
-            </IconButton>
+              {hubSpotBusy ? "Syncing..." : hubSpotLinked ? "Sync HubSpot" : "Push to HubSpot"}
+            </Button>
           </span>
         </Tooltip>
         <Box onClick={e => { e.stopPropagation(); onInvoice(client); }} sx={{
@@ -1387,10 +1392,10 @@ export default function ClientTrackerPage() {
             </Box>
 
             <Box sx={{
-              display: "grid", gridTemplateColumns: "2fr 1.5fr 1fr 1.2fr 2fr 1fr",
+              display: "grid", gridTemplateColumns: "2fr 1.5fr 1fr 1.2fr 2fr 2fr",
               px: "16px", py: "8px", borderBottom: `1px solid ${BORDER}`, bgcolor: "#F8FAFC",
             }}>
-              {["Client", "Contact", "Active Jobs", "Total Fee", "Job Details", ""].map((h, i) => (
+              {["Client", "Contact", "Active Jobs", "Total Fee", "Job Details", "Actions"].map((h, i) => (
                 <Box key={i} sx={{ fontSize: 11, fontWeight: 600, color: MUTED,
                   textTransform: "uppercase", letterSpacing: ".5px",
                   textAlign: i === 5 ? "right" : "left" }}>
