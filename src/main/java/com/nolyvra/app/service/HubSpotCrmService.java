@@ -10,6 +10,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.Map;
+import java.util.List;
 
 @Service
 public class HubSpotCrmService {
@@ -47,6 +48,29 @@ public class HubSpotCrmService {
 
     public JsonNode getCompany(String loginId, String companyId) throws Exception {
         return sendJson(loginId, "GET", "/companies/" + companyId, null);
+    }
+
+    public CrmObject createContact(String loginId, Map<String, String> properties) throws Exception {
+        return mapObject(sendJson(
+                loginId, "POST", "/contacts", Map.of("properties", properties)));
+    }
+
+    public CrmObject updateContact(
+            String loginId, String contactId, Map<String, String> properties) throws Exception {
+        return mapObject(sendJson(
+                loginId, "PATCH", "/contacts/" + contactId, Map.of("properties", properties)));
+    }
+
+    public CrmObject findContactByEmail(String loginId, String email) throws Exception {
+        Map<String, Object> filter = Map.of(
+                "propertyName", "email", "operator", "EQ", "value", email);
+        Map<String, Object> body = Map.of(
+                "filterGroups", List.of(Map.of("filters", List.of(filter))),
+                "properties", List.of("email"),
+                "limit", 1);
+        JsonNode response = sendJson(loginId, "POST", "/contacts/search", body);
+        JsonNode results = response.path("results");
+        return results.isArray() && !results.isEmpty() ? mapObject(results.get(0)) : null;
     }
 
     private JsonNode sendJson(String loginId, String method, String path, Object body) throws Exception {
