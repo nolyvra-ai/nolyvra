@@ -61,6 +61,21 @@ public class HubSpotContactSyncService {
         }
     }
 
+    public ContactSyncResult syncAndAssociate(
+            ClientResponse client, String loginId, String portalId, String companyId) throws Exception {
+        ContactSyncResult contact = upsertContact(client, loginId, portalId);
+        if (!"success".equals(contact.state())) return contact;
+
+        try {
+            crmService.associateContactToCompany(loginId, contact.externalId(), companyId);
+            return contact;
+        } catch (Exception e) {
+            linkService.recordFailure(
+                    loginId, PROVIDER, LOCAL_TYPE, Long.toString(client.id()), safeMessage(e));
+            throw e;
+        }
+    }
+
     private String contactUrl(String portalId, String contactId) {
         if (portalId == null || portalId.isBlank()) return null;
         return "https://app.hubspot.com/contacts/" + portalId + "/contact/" + contactId;

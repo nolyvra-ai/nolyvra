@@ -55,6 +55,22 @@ class HubSpotCrmServiceTest {
                 .hasMessage("Invalid property");
     }
 
+    @Test
+    void associatesContactToCompanyUsingDefaultAssociationEndpoint() throws Exception {
+        HttpResponse<String> response = response(200, "{}");
+        when(oauthService.getValidAccessToken("login-1")).thenReturn("access-token");
+        when(httpClient.send(any(), anyStringBodyHandler())).thenReturn(response);
+
+        service.associateContactToCompany("login-1", "contact-1", "company-1");
+
+        ArgumentCaptor<HttpRequest> request = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient).send(request.capture(), anyStringBodyHandler());
+        assertThat(request.getValue().method()).isEqualTo("PUT");
+        assertThat(request.getValue().uri().toString()).isEqualTo(
+                "https://api.hubapi.com/crm/objects/2026-03/contact/contact-1"
+                        + "/associations/default/company/company-1");
+    }
+
     @SuppressWarnings("unchecked")
     private static HttpResponse.BodyHandler<String> anyStringBodyHandler() {
         return any(HttpResponse.BodyHandler.class);

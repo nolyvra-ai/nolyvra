@@ -78,6 +78,27 @@ class HubSpotContactSyncServiceTest {
         verify(crmService, never()).createContact("login-1", Map.of("firstname", "Ada"));
     }
 
+    @Test
+    void associatesSyncedContactWithCompany() throws Exception {
+        ClientResponse client = client("ada@example.com");
+        Map<String, String> properties = Map.of("email", "ada@example.com");
+        ExternalCrmLink link = link("contact-1");
+        when(mapper.fromClient(client)).thenReturn(properties);
+        when(linkService.findByLocalRecord("login-1", "hubspot", "client_contact", "42"))
+                .thenReturn(link);
+        when(crmService.updateContact("login-1", "contact-1", properties))
+                .thenReturn(new HubSpotCrmService.CrmObject("contact-1", link.externalUrl()));
+        when(linkService.recordSuccess(
+                "login-1", "hubspot", "client_contact", "42", "contact-1", link.externalUrl()))
+                .thenReturn(link);
+
+        HubSpotContactSyncService.ContactSyncResult result = service.syncAndAssociate(
+                client, "login-1", "portal-1", "company-1");
+
+        assertThat(result.state()).isEqualTo("success");
+        verify(crmService).associateContactToCompany("login-1", "contact-1", "company-1");
+    }
+
     private ClientResponse client(String email) {
         return new ClientResponse(
                 42L, "login-1", "Nolyvra", null, null, null,

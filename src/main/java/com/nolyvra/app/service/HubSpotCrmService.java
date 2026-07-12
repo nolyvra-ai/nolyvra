@@ -73,6 +73,13 @@ public class HubSpotCrmService {
         return results.isArray() && !results.isEmpty() ? mapObject(results.get(0)) : null;
     }
 
+    public void associateContactToCompany(
+            String loginId, String contactId, String companyId) throws Exception {
+        sendJson(loginId, "PUT",
+                "/contact/" + contactId + "/associations/default/company/" + companyId,
+                null);
+    }
+
     private JsonNode sendJson(String loginId, String method, String path, Object body) throws Exception {
         String accessToken = oauthService.getValidAccessToken(loginId);
         if (accessToken == null || accessToken.isBlank()) {
