@@ -2,6 +2,7 @@ package com.nolyvra.app.service;
 
 import com.nolyvra.app.model.ExternalCrmLink;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.ResultSetExtractor;
 import org.springframework.stereotype.Service;
 
 import java.sql.ResultSet;
@@ -26,6 +27,14 @@ public class ExternalCrmLinkService {
                 where login_id = ? and provider = ? and local_type = ? and local_id = ?
                 """, rs -> rs.next() ? mapRow(rs) : null,
                 loginId, provider, localType, localId);
+    }
+
+    public void acquireLocalRecordLock(
+            String loginId, String provider, String localType, String localId) {
+        String lockKey = String.join(":", loginId, provider, localType, localId);
+        jdbc.query("select pg_advisory_xact_lock(hashtext(?))",
+                (ResultSetExtractor<Void>) rs -> null,
+                lockKey);
     }
 
     public ExternalCrmLink recordSuccess(

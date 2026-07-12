@@ -5,6 +5,7 @@ import com.nolyvra.app.model.ExternalCrmLink;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 
@@ -29,6 +30,7 @@ public class HubSpotContactSyncService {
         this.contactMapper = contactMapper;
     }
 
+    @Transactional
     public ContactSyncResult upsertContact(
             ClientResponse client, String loginId, String portalId) throws Exception {
         Map<String, String> properties = contactMapper.fromClient(client);
@@ -38,6 +40,7 @@ public class HubSpotContactSyncService {
         }
 
         String localId = Long.toString(client.id());
+        linkService.acquireLocalRecordLock(loginId, PROVIDER, LOCAL_TYPE, localId);
         ExternalCrmLink existing = linkService.findByLocalRecord(
                 loginId, PROVIDER, LOCAL_TYPE, localId);
         log.info("[HubSpotSync] action=push localType=client_contact localId={} loginId={} operation=start linked={}",

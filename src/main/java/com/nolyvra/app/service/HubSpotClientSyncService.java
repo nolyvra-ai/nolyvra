@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
@@ -42,6 +43,7 @@ public class HubSpotClientSyncService {
         this.contactSyncService = contactSyncService;
     }
 
+    @Transactional
     public HubSpotSyncStatusResponse pushClient(Long clientId, String loginId) {
         ClientResponse client = clientService.getClientForHubSpot(clientId, loginId);
         HubSpotConnection connection = oauthService.getConnection(loginId);
@@ -50,6 +52,7 @@ public class HubSpotClientSyncService {
         }
 
         String localId = clientId.toString();
+        linkService.acquireLocalRecordLock(loginId, PROVIDER, LOCAL_TYPE, localId);
         ExternalCrmLink existing = linkService.findByLocalRecord(
                 loginId, PROVIDER, LOCAL_TYPE, localId);
         Map<String, String> properties = companyMapper.fromClient(client);

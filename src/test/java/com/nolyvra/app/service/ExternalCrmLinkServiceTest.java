@@ -2,8 +2,10 @@ package com.nolyvra.app.service;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.ResultSetExtractor;
 
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -38,5 +40,15 @@ class ExternalCrmLinkServiceTest {
                         && !sql.contains("external_url = excluded.external_url")),
                 eq("local@nolyvra.test"), eq("hubspot"), eq("client"), eq("42"),
                 eq("HubSpot unavailable"));
+    }
+
+    @Test
+    void acquireLocalRecordLockUsesStableProviderScopedKey() {
+        service.acquireLocalRecordLock("local@nolyvra.test", "hubspot", "job", "job-1");
+
+        verify(jdbc).query(
+                eq("select pg_advisory_xact_lock(hashtext(?))"),
+                any(ResultSetExtractor.class),
+                eq("local@nolyvra.test:hubspot:job:job-1"));
     }
 }
