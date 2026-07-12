@@ -2,6 +2,7 @@ package com.nolyvra.app.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -19,6 +20,7 @@ public class HubSpotCrmService {
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
 
+    @Autowired
     public HubSpotCrmService(HubSpotOAuthService oauthService, ObjectMapper objectMapper) {
         this(oauthService, objectMapper, HttpClient.newHttpClient());
     }
