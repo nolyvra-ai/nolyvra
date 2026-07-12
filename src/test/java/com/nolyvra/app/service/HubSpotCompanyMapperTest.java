@@ -23,10 +23,9 @@ class HubSpotCompanyMapperTest {
         Map<String, String> properties = mapper.fromClient(client);
 
         assertThat(properties).containsEntry("name", "Nolyvra")
-                .containsEntry("industry", "Software")
                 .containsEntry("description", "Recruitment platform")
                 .containsEntry("linkedin_company_page", "https://linkedin.com/company/nolyvra")
-                .doesNotContainKeys("location", "company_size", "numberofemployees");
+                .doesNotContainKeys("industry", "location", "company_size", "numberofemployees");
     }
 
     @Test
