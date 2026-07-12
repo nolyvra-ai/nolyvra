@@ -65,10 +65,20 @@ const hdrs    = () => ({
   "Content-Type": "application/json",
 });
 
+async function apiError(response) {
+  const text = await response.text();
+  try {
+    const json = JSON.parse(text);
+    return new Error(json.message || json.error || "Request failed");
+  } catch {
+    return new Error(text || "Request failed");
+  }
+}
+
 async function apiGet(path) {
   const sep = path.includes("?") ? "&" : "?";
   const r = await fetch(`${API}${path}${sep}loginId=${encodeURIComponent(loginId())}`, { headers: hdrs() });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await apiError(r);
   return r.json();
 }
 
@@ -77,7 +87,7 @@ async function apiPost(path, body) {
   const r = await fetch(`${API}${path}${sep}loginId=${encodeURIComponent(loginId())}`, {
     method: "POST", headers: hdrs(), body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await apiError(r);
   return r.text();
 }
 
@@ -86,7 +96,7 @@ async function apiPostJson(path, body) {
   const r = await fetch(`${API}${path}${sep}loginId=${encodeURIComponent(loginId())}`, {
     method: "POST", headers: hdrs(), body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await apiError(r);
   return r.json();
 }
 
