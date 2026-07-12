@@ -61,6 +61,21 @@ public class HubSpotCrmService {
                 loginId, "PATCH", "/contacts/" + contactId, Map.of("properties", properties)));
     }
 
+    public CrmObject createDeal(String loginId, Map<String, String> properties) throws Exception {
+        return mapObject(sendJson(
+                loginId, "POST", "/deals", Map.of("properties", properties)));
+    }
+
+    public CrmObject updateDeal(
+            String loginId, String dealId, Map<String, String> properties) throws Exception {
+        return mapObject(sendJson(
+                loginId, "PATCH", "/deals/" + dealId, Map.of("properties", properties)));
+    }
+
+    public JsonNode getDeal(String loginId, String dealId) throws Exception {
+        return sendJson(loginId, "GET", "/deals/" + dealId, null);
+    }
+
     public CrmObject findContactByEmail(String loginId, String email) throws Exception {
         Map<String, Object> filter = Map.of(
                 "propertyName", "email", "operator", "EQ", "value", email);
@@ -77,6 +92,20 @@ public class HubSpotCrmService {
             String loginId, String contactId, String companyId) throws Exception {
         sendJson(loginId, "PUT",
                 "/contact/" + contactId + "/associations/default/company/" + companyId,
+                null);
+    }
+
+    public void associateDealToCompany(
+            String loginId, String dealId, String companyId) throws Exception {
+        sendJson(loginId, "PUT",
+                "/deal/" + dealId + "/associations/default/company/" + companyId,
+                null);
+    }
+
+    public void associateDealToContact(
+            String loginId, String dealId, String contactId) throws Exception {
+        sendJson(loginId, "PUT",
+                "/deal/" + dealId + "/associations/default/contact/" + contactId,
                 null);
     }
 

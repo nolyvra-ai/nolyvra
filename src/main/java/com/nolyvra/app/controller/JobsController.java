@@ -5,6 +5,8 @@ import com.nolyvra.app.model.ClientBriefRequest;
 import com.nolyvra.app.model.ClientBriefResponse;
 import com.nolyvra.app.model.JobCreateRequest;
 import com.nolyvra.app.model.JobResponse;
+import com.nolyvra.app.model.HubSpotSyncStatusResponse;
+import com.nolyvra.app.service.HubSpotJobSyncService;
 import com.nolyvra.app.model.TalentSearchResult;
 import com.nolyvra.app.service.JobService;
 import com.nolyvra.app.service.TalentSearchService;
@@ -21,10 +23,15 @@ public class JobsController {
 
     private final JobService jobService;
     private final TalentSearchService talentSearchService;
+    private final HubSpotJobSyncService hubSpotJobSyncService;
 
-    public JobsController(JobService jobService, TalentSearchService talentSearchService) {
+    public JobsController(
+            JobService jobService,
+            TalentSearchService talentSearchService,
+            HubSpotJobSyncService hubSpotJobSyncService) {
         this.jobService = jobService;
         this.talentSearchService = talentSearchService;
+        this.hubSpotJobSyncService = hubSpotJobSyncService;
     }
 
     @PostMapping
@@ -45,6 +52,20 @@ public class JobsController {
             @RequestParam String loginId) {
         return jobService.getJob(jobId, loginId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found: " + jobId));
+    }
+
+    @PostMapping("/{jobId}/hubspot/push")
+    public HubSpotSyncStatusResponse pushJobToHubSpot(
+            @PathVariable String jobId,
+            @RequestParam String loginId) {
+        return hubSpotJobSyncService.pushJob(jobId, loginId);
+    }
+
+    @GetMapping("/{jobId}/hubspot/status")
+    public HubSpotSyncStatusResponse getJobHubSpotStatus(
+            @PathVariable String jobId,
+            @RequestParam String loginId) {
+        return hubSpotJobSyncService.getStatus(jobId, loginId);
     }
 
     // ── MVP2: Update job ─────────────────────────────────────────────────────
