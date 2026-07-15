@@ -754,25 +754,61 @@ public class ClientService {
         if (!tokenService.deductToken(loginId))
             throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
 
-        String systemPrompt = """
-                You are an expert B2B sales copywriter specialising in recruitment agency outreach.
-                Write a concise, personalised cold outreach email (150–200 words) to a hiring decision-maker.
-                Tone: professional, warm, consultative — never salesy.
-                Structure: 1 opening hook tied to their recent signal, 2 lines on how the agency can help, 1 clear CTA.
-                Return only the email body — no subject line, no markdown, no sign-off.
-                """;
+        String industry = isPresent(req.industry()) ? req.industry() : "their industry";
+        String place = isPresent(req.place()) ? req.place() : "their region";
+        String keyword = isPresent(req.keyword()) ? req.keyword() : "hiring";
+        String signals = isPresent(req.recentSignals()) ? req.recentSignals() : "recent growth and expansion";
+        String agencyName = getAgencyName(loginId);
 
-        String userPrompt = String.format("""
-                Client company: %s
-                Contact name: %s
-                Industry: %s
-                Recent hiring signals: %s
-                Agency name: Nolyvra
-                """,
-                req.clientName(),
-                req.contactName() != null && !req.contactName().isBlank() ? req.contactName() : "Hiring Manager",
-                req.industry() != null && !req.industry().isBlank() ? req.industry() : "Technology",
-                req.recentSignals() != null && !req.recentSignals().isBlank() ? req.recentSignals() : "recent growth and expansion");
+        String systemPrompt = req.bulk()
+                ? """
+                  You are an expert B2B sales copywriter specialising in recruitment agency outreach.
+                  Write a single concise cold outreach email (150–200 words) that will be sent, unchanged, to
+                  MULTIPLE different hiring decision-makers across similar companies — it must NOT name any
+                  specific company, since the exact same body is reused for every recipient.
+                  Tone: professional, warm, consultative — never salesy.
+                  Structure: 1 opening hook relevant to the shared industry/location/hiring context given below,
+                  2 lines on how the sending agency (name given below) can help teams like theirs specifically
+                  (grounded in that industry, location and hiring context — never generic boilerplate), 1 clear CTA.
+                  Always refer to the sender by the exact agency name given below — never invent or substitute a
+                  different agency name.
+                  Start the email with the literal greeting "Hi {}," using the literal characters { and } exactly
+                  as shown — this is a merge-field placeholder for each recipient's name and must not be replaced,
+                  translated, described, or removed.
+                  Return only the email body — no subject line, no markdown, no sign-off.
+                  """
+                : """
+                  You are an expert B2B sales copywriter specialising in recruitment agency outreach.
+                  Write a concise, personalised cold outreach email (150–200 words) to a hiring decision-maker.
+                  Tone: professional, warm, consultative — never salesy.
+                  Structure: 1 opening hook tied to their recent signal, 2 lines on how the sending agency (name
+                  given below) can help THIS company specifically — grounded in their industry, location and
+                  hiring context given below (never generic boilerplate), 1 clear CTA.
+                  Always refer to the sender by the exact agency name given below — never invent or substitute a
+                  different agency name.
+                  Return only the email body — no subject line, no markdown, no sign-off.
+                  """;
+
+        String userPrompt = req.bulk()
+                ? String.format("""
+                        Shared industry: %s
+                        Shared location: %s
+                        Search context / hiring keyword: %s
+                        Sender agency name: %s
+                        """,
+                        industry, place, keyword, agencyName)
+                : String.format("""
+                        Client company: %s
+                        Contact name: %s
+                        Industry: %s
+                        Location: %s
+                        Search context / hiring keyword: %s
+                        Recent hiring signals: %s
+                        Sender agency name: %s
+                        """,
+                        req.clientName(),
+                        isPresent(req.contactName()) ? req.contactName() : "Hiring Manager",
+                        industry, place, keyword, signals, agencyName);
 
         var params = ChatCompletionCreateParams.builder()
                 .model(model)
@@ -789,5 +825,14 @@ public class ClientService {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                     "Failed to generate outreach message: " + e.getMessage());
         }
+    }
+
+    private String getAgencyName(String loginId) {
+        List<String> rows = jdbc.query(
+                "SELECT company FROM login WHERE id = ?",
+                (rs, rowNum) -> rs.getString("company"),
+                loginId);
+        String company = rows.isEmpty() ? null : rows.get(0);
+        return isPresent(company) ? company : "Nolyvra";
     }
 }

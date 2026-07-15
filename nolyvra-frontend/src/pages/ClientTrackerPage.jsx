@@ -694,7 +694,12 @@ function InvoiceDialog({ client, onClose, onInvoiced }) {
 }
 
 // ─── Potential client card ─────────────────────────────────────────────────────
-function PotentialCard({ pc, onViewDetail }) {
+function outreachSubject(companyName) {
+  return `Partnering to support hiring at ${companyName}`;
+}
+
+function PotentialCard({ pc, onViewDetail, selected, onToggleSelect, searchPlace, searchKeyword }) {
+  const nav = useNavigate();
   const [outreachMsg, setMsg]   = useState("");
   const [generating, setGen]    = useState(false);
   const [genError, setGenError] = useState("");
@@ -711,7 +716,10 @@ function PotentialCard({ pc, onViewDetail }) {
         clientName: pc.companyName,
         contactName: pc.decisionMakers?.[0]?.name || "",
         industry: pc.industry,
+        place: pc.location || searchPlace || "",
+        keyword: searchKeyword || "",
         recentSignals: pc.signalReasons?.join("; ") || pc.hiringSignal,
+        bulk: false,
       });
       setMsg(msg);
     } catch (e) {
@@ -721,12 +729,24 @@ function PotentialCard({ pc, onViewDetail }) {
     }
   }
 
+  function sendEmail() {
+    nav("/email", { state: {
+      toAddress: "",
+      subject: outreachSubject(pc.companyName),
+      body: outreachMsg,
+    } });
+  }
+
   return (
     <Box sx={{ ...CARD_BASE, p: "18px 20px", display: "flex", flexDirection: "column", gap: "12px" }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <Box>
-          <Box sx={{ fontSize: 14, fontWeight: 700, color: TEXT }}>{pc.companyName}</Box>
-          <Box sx={{ fontSize: 12, color: MUTED, mt: "2px" }}>{pc.size} · {pc.location}</Box>
+        <Box sx={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+          <Checkbox size="small" checked={!!selected} onChange={onToggleSelect}
+            sx={{ p: 0, mt: "1px" }} />
+          <Box>
+            <Box sx={{ fontSize: 14, fontWeight: 700, color: TEXT }}>{pc.companyName}</Box>
+            <Box sx={{ fontSize: 12, color: MUTED, mt: "2px" }}>{pc.size} · {pc.location}</Box>
+          </Box>
         </Box>
         <Box sx={{ px: "10px", py: "4px", borderRadius: "20px", fontSize: 12, fontWeight: 700,
           color: scoreColor, bgcolor: scoreBg, flexShrink: 0 }}>
@@ -800,11 +820,17 @@ function PotentialCard({ pc, onViewDetail }) {
             : <><SparkIcon /> {outreachMsg ? "Regenerate" : "Generate Outreach"}</>}
         </Box>
         {outreachMsg && (
-          <Box component="span"
-            onClick={() => navigator.clipboard?.writeText(outreachMsg)}
-            sx={{ fontSize: 11, color: ACCENT, cursor: "pointer", "&:hover": { textDecoration: "underline" } }}>
-            Copy
-          </Box>
+          <>
+            <Box component="span"
+              onClick={() => navigator.clipboard?.writeText(outreachMsg)}
+              sx={{ fontSize: 11, color: ACCENT, cursor: "pointer", "&:hover": { textDecoration: "underline" } }}>
+              Copy
+            </Box>
+            <Box component="span" onClick={sendEmail}
+              sx={{ fontSize: 11, color: ACCENT, cursor: "pointer", "&:hover": { textDecoration: "underline" } }}>
+              Send Email
+            </Box>
+          </>
         )}
         <Box sx={{ flex: 1 }} />
         <Box onClick={onViewDetail} sx={{
@@ -820,7 +846,8 @@ function PotentialCard({ pc, onViewDetail }) {
 }
 
 // ─── Potential client detail modal ────────────────────────────────────────────
-function PotentialDetailModal({ pc, onClose, onAddToClients }) {
+function PotentialDetailModal({ pc, onClose, onAddToClients, searchPlace, searchKeyword }) {
+  const nav = useNavigate();
   const [outreachMsg, setMsg]   = useState("");
   const [generating, setGen]    = useState(false);
   const [genError, setGenError] = useState("");
@@ -837,7 +864,10 @@ function PotentialDetailModal({ pc, onClose, onAddToClients }) {
         clientName: pc.companyName,
         contactName: pc.decisionMakers?.[0]?.name || "",
         industry: pc.industry,
+        place: pc.location || searchPlace || "",
+        keyword: searchKeyword || "",
         recentSignals: pc.signalReasons?.join("; ") || pc.hiringSignal,
+        bulk: false,
       });
       setMsg(msg);
     } catch (e) {
@@ -845,6 +875,14 @@ function PotentialDetailModal({ pc, onClose, onAddToClients }) {
     } finally {
       setGen(false);
     }
+  }
+
+  function sendEmail() {
+    nav("/email", { state: {
+      toAddress: "",
+      subject: outreachSubject(pc.companyName),
+      body: outreachMsg,
+    } });
   }
 
   return (
@@ -1027,11 +1065,18 @@ function PotentialDetailModal({ pc, onClose, onAddToClients }) {
               : <><SparkIcon /> {outreachMsg ? "Regenerate Outreach" : "Generate Outreach"}</>}
           </Box>
           {outreachMsg && (
-            <Box component="span" onClick={() => navigator.clipboard?.writeText(outreachMsg)}
-              sx={{ fontSize: 11, color: ACCENT, cursor: "pointer",
-                "&:hover": { textDecoration: "underline" } }}>
-              Copy
-            </Box>
+            <>
+              <Box component="span" onClick={() => navigator.clipboard?.writeText(outreachMsg)}
+                sx={{ fontSize: 11, color: ACCENT, cursor: "pointer",
+                  "&:hover": { textDecoration: "underline" } }}>
+                Copy
+              </Box>
+              <Box component="span" onClick={sendEmail}
+                sx={{ fontSize: 11, color: ACCENT, cursor: "pointer",
+                  "&:hover": { textDecoration: "underline" } }}>
+                Send Email
+              </Box>
+            </>
           )}
           <Box sx={{ flex: 1 }} />
           <Box onClick={() => onAddToClients(pc)} sx={{
@@ -1081,6 +1126,54 @@ export default function ClientTrackerPage() {
   const [selectedClient,    setSelectedClient]    = useState(null);
   const [invoicingClient,   setInvoicingClient]   = useState(null);
 
+  // ── Bulk outreach (Potential Clients multi-select) ─────────────────────────
+  const [selectedIds,       setSelectedIds]       = useState(new Set());
+  const [bulkMsg,           setBulkMsg]           = useState("");
+  const [bulkGenerating,    setBulkGenerating]    = useState(false);
+  const [bulkGenError,      setBulkGenError]      = useState("");
+
+  function toggleSelect(externalId) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(externalId)) next.delete(externalId); else next.add(externalId);
+      return next;
+    });
+  }
+
+  async function generateBulkOutreach() {
+    setBulkGenerating(true); setBulkGenError("");
+    try {
+      const msg = await apiPost("/api/clients/outreach", {
+        clientId: "",
+        clientName: "",
+        contactName: "{}",
+        industry: searchIndustry,
+        place: searchPlace,
+        keyword: searchKeyword,
+        recentSignals: "",
+        bulk: true,
+      });
+      setBulkMsg(msg);
+    } catch (e) {
+      setBulkGenError(e.message || "Generation failed.");
+    } finally {
+      setBulkGenerating(false);
+    }
+  }
+
+  function sendBulkEmail() {
+    const selectedCards = potential.filter(pc => selectedIds.has(pc.externalId));
+    const recipients = selectedCards.map(pc => ({
+      name: pc.decisionMakers?.[0]?.name || "there",
+      email: "",
+    }));
+    nav("/email", { state: {
+      bulkRecipients: recipients,
+      bulkSubject: `Partnering to support your hiring${searchIndustry ? ` in ${searchIndustry}` : ""}${searchPlace ? ` — ${searchPlace}` : ""}`,
+      bulkBodyTemplate: bulkMsg,
+    } });
+  }
+
   async function loadClients() {
     setLoading(true);
     try {
@@ -1110,6 +1203,8 @@ export default function ClientTrackerPage() {
     setPotentialLoading(true);
     setPotentialError("");
     setPotentialSearched(true);
+    setSelectedIds(new Set());
+    setBulkMsg(""); setBulkGenError("");
     try {
       const qs = buildPotentialParams();
       const p = await apiGet(`/api/clients/potential${qs ? "?" + qs : ""}`);
@@ -1404,11 +1499,64 @@ export default function ClientTrackerPage() {
               </Box>
             )}
 
+            {selectedIds.size > 0 && (
+              <Box sx={{ ...CARD_BASE, p: "14px 18px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <Box sx={{ fontSize: 12.5, fontWeight: 600, color: TEXT }}>
+                    {selectedIds.size} selected
+                  </Box>
+                  <Box onClick={bulkGenerating ? undefined : generateBulkOutreach} sx={{
+                    display: "inline-flex", alignItems: "center", gap: "6px",
+                    px: "14px", py: "7px", borderRadius: "8px",
+                    bgcolor: bulkGenerating ? ACCENT_L : ACCENT, color: bulkGenerating ? ACCENT : "#fff",
+                    fontSize: 12, fontWeight: 600, cursor: bulkGenerating ? "default" : "pointer",
+                    transition: "all .15s", "&:hover": bulkGenerating ? {} : { bgcolor: "#1558C0" },
+                  }}>
+                    {bulkGenerating
+                      ? <><CircularProgress size={12} sx={{ color: ACCENT }} /> Generating…</>
+                      : <><SparkIcon /> {bulkMsg ? "Regenerate Bulk Outreach" : "Generate Bulk Outreach"}</>}
+                  </Box>
+                  {bulkMsg && (
+                    <>
+                      <Box component="span" onClick={() => navigator.clipboard?.writeText(bulkMsg)}
+                        sx={{ fontSize: 11, color: ACCENT, cursor: "pointer", "&:hover": { textDecoration: "underline" } }}>
+                        Copy
+                      </Box>
+                      <Box component="span" onClick={sendBulkEmail}
+                        sx={{ fontSize: 11, color: ACCENT, cursor: "pointer", "&:hover": { textDecoration: "underline" } }}>
+                        Send Email
+                      </Box>
+                    </>
+                  )}
+                  <Box sx={{ flex: 1 }} />
+                  <Box onClick={() => setSelectedIds(new Set())} sx={{
+                    fontSize: 11, color: MUTED, cursor: "pointer", "&:hover": { color: TEXT } }}>
+                    Clear selection
+                  </Box>
+                </Box>
+                {bulkGenError && (
+                  <Box sx={{ p: "8px 10px", borderRadius: "6px", bgcolor: "rgba(220,38,38,0.06)",
+                    border: "1px solid rgba(220,38,38,0.15)", color: "#DC2626", fontSize: 11 }}>
+                    {bulkGenError}
+                  </Box>
+                )}
+                {bulkMsg && (
+                  <Box sx={{ p: "12px", bgcolor: "#F8FAFC", border: `1px solid ${BORDER}`, borderRadius: "8px",
+                    fontSize: 12, color: TEXT, lineHeight: 1.7, whiteSpace: "pre-wrap", maxHeight: 180, overflowY: "auto" }}>
+                    {bulkMsg}
+                  </Box>
+                )}
+              </Box>
+            )}
+
             {potential.length > 0 && (
               <>
                 <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                   {potential.map((pc, i) => (
-                    <PotentialCard key={pc.externalId ?? i} pc={pc} onViewDetail={() => setDetailCard(pc)} />
+                    <PotentialCard key={pc.externalId ?? i} pc={pc} onViewDetail={() => setDetailCard(pc)}
+                      selected={selectedIds.has(pc.externalId)}
+                      onToggleSelect={() => toggleSelect(pc.externalId)}
+                      searchPlace={searchPlace} searchKeyword={searchKeyword} />
                   ))}
                 </Box>
                 <Box sx={{ textAlign: "center", mt: "16px" }}>
@@ -1434,6 +1582,8 @@ export default function ClientTrackerPage() {
           pc={detailCard}
           onClose={() => setDetailCard(null)}
           onAddToClients={handleAddFromPotential}
+          searchPlace={searchPlace}
+          searchKeyword={searchKeyword}
         />
       )}
 
