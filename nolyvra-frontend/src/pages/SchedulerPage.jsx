@@ -135,6 +135,156 @@ function StatCard({ label, value, sub, icon, primary = false }) {
   );
 }
 
+// ── Calendly-style Date & Time picker ─────────────────────────────────────
+const TIME_STEP_MINUTES  = 15;
+const BUSINESS_START_HOUR = 9;
+const BUSINESS_END_HOUR   = 18; // exclusive — last slot is 17:45
+
+function buildTimeSlots() {
+  const slots = [];
+  for (let h = BUSINESS_START_HOUR; h < BUSINESS_END_HOUR; h++) {
+    for (let m = 0; m < 60; m += TIME_STEP_MINUTES) slots.push({ h, m });
+  }
+  return slots;
+}
+const TIME_SLOTS = buildTimeSlots();
+
+function pad2(n) { return String(n).padStart(2, "0"); }
+
+function formatTimeLabel(h, m) {
+  const period = h >= 12 ? "PM" : "AM";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:${pad2(m)} ${period}`;
+}
+
+function toLocalInputValue(date, h, m) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(h)}:${pad2(m)}`;
+}
+
+function DateTimePicker({ value, onChange, error }) {
+  const initial = value ? new Date(value) : null;
+  const [month, setMonth]               = useState(() => initial ? new Date(initial.getFullYear(), initial.getMonth(), 1) : new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [selectedDate, setSelectedDate] = useState(initial);
+
+  // Keep in sync if the parent sets scheduledAt externally (reschedule, reset on close)
+  useEffect(() => {
+    if (value) {
+      const d = new Date(value);
+      setSelectedDate(d);
+      setMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+    } else {
+      setSelectedDate(null);
+    }
+  }, [value]);
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const year = month.getFullYear(), mo = month.getMonth();
+  const firstDayWeekday = new Date(year, mo, 1).getDay();
+  const daysInMonth = new Date(year, mo + 1, 0).getDate();
+  const isCurrentOrPastMonth = year < today.getFullYear() || (year === today.getFullYear() && mo <= today.getMonth());
+
+  const cells = [];
+  for (let i = 0; i < firstDayWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  function isPast(d) {
+    const dt = new Date(year, mo, d); dt.setHours(0, 0, 0, 0);
+    return dt < today;
+  }
+  function isSelected(d) {
+    return !!selectedDate && selectedDate.getFullYear() === year && selectedDate.getMonth() === mo && selectedDate.getDate() === d;
+  }
+
+  function pickDay(d) {
+    if (isPast(d)) return;
+    const dt = new Date(year, mo, d);
+    const hadTime = !!selectedDate;
+    if (hadTime) dt.setHours(selectedDate.getHours(), selectedDate.getMinutes());
+    setSelectedDate(dt);
+    if (hadTime) onChange(toLocalInputValue(dt, dt.getHours(), dt.getMinutes()));
+  }
+
+  function pickTime(h, m) {
+    if (!selectedDate) return;
+    const dt = new Date(selectedDate);
+    dt.setHours(h, m, 0, 0);
+    setSelectedDate(dt);
+    onChange(toLocalInputValue(dt, h, m));
+  }
+
+  const selectedHour = selectedDate ? selectedDate.getHours() : null;
+  const selectedMinute = selectedDate ? selectedDate.getMinutes() : null;
+
+  return (
+    <Box sx={{ display: "flex", gap: 2, border: `1px solid ${error ? DANGER : BORDER}`, borderRadius: "10px", p: 2, bgcolor: "#fff" }}>
+      {/* Calendar pane */}
+      <Box sx={{ flex: 1.1, minWidth: 0 }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1.5 }}>
+          <Box onClick={() => { if (!isCurrentOrPastMonth) setMonth(new Date(year, mo - 1, 1)); }}
+            sx={{ cursor: isCurrentOrPastMonth ? "default" : "pointer", opacity: isCurrentOrPastMonth ? 0.3 : 1,
+              width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+              "&:hover": isCurrentOrPastMonth ? {} : { bgcolor: "#F1F3F7" } }}>‹</Box>
+          <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT }}>
+            {month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+          </Typography>
+          <Box onClick={() => setMonth(new Date(year, mo + 1, 1))}
+            sx={{ cursor: "pointer", width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+              "&:hover": { bgcolor: "#F1F3F7" } }}>›</Box>
+        </Box>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: "4px", mb: 0.5 }}>
+          {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+            <Typography key={i} sx={{ fontSize: 10, fontWeight: 600, color: MUTED, textAlign: "center" }}>{d}</Typography>
+          ))}
+        </Box>
+        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: "4px" }}>
+          {cells.map((d, i) => d === null ? <Box key={i} /> : (
+            <Box key={i} onClick={() => pickDay(d)}
+              sx={{
+                width: 30, height: 30, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 12.5, fontWeight: 600, mx: "auto",
+                cursor: isPast(d) ? "default" : "pointer",
+                color: isPast(d) ? "#C2C8D4" : isSelected(d) ? "#fff" : TEXT,
+                bgcolor: isSelected(d) ? ACCENT : "transparent",
+                "&:hover": isPast(d) ? {} : { bgcolor: isSelected(d) ? ACCENT : ACCENT_L },
+              }}>
+              {d}
+            </Box>
+          ))}
+        </Box>
+      </Box>
+
+      {/* Time slots pane */}
+      <Box sx={{ flex: 0.9, minWidth: 0, borderLeft: `1px solid ${BORDER}`, pl: 2 }}>
+        {!selectedDate ? (
+          <Typography sx={{ fontSize: 12, color: MUTED, textAlign: "center", mt: 4 }}>Select a date first</Typography>
+        ) : (
+          <>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: TEXT, mb: 1 }}>
+              {selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+            </Typography>
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, maxHeight: 220, overflowY: "auto", pr: 0.5 }}>
+              {TIME_SLOTS.map(({ h, m }) => {
+                const active = selectedHour === h && selectedMinute === m;
+                return (
+                  <Box key={`${h}:${m}`} onClick={() => pickTime(h, m)}
+                    sx={{
+                      textAlign: "center", py: 0.85, borderRadius: "8px", fontSize: 12.5, fontWeight: 600,
+                      cursor: "pointer", border: `1px solid ${active ? ACCENT : BORDER}`,
+                      color: active ? "#fff" : TEXT, bgcolor: active ? ACCENT : "#fff",
+                      "&:hover": { borderColor: ACCENT, bgcolor: active ? ACCENT : ACCENT_L },
+                    }}>
+                    {formatTimeLabel(h, m)}
+                  </Box>
+                );
+              })}
+            </Box>
+          </>
+        )}
+      </Box>
+    </Box>
+  );
+}
+
 // ── Schedule Modal ─────────────────────────────────────────────────────────
 function ScheduleModal({ form, updateForm, handleCandidateChange, candidates, saving, error, conflictWarning, conflictChecking, onSchedule, onClose }) {
   return (
@@ -146,11 +296,8 @@ function ScheduleModal({ form, updateForm, handleCandidateChange, candidates, sa
         {/* Header */}
         <Box sx={{ px:3, py:2.25, borderBottom:`1px solid ${BORDER}`, display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <Typography sx={{ fontSize:17, fontWeight:700, color:TEXT }}>Schedule Interview</Typography>
-          <Box sx={{ display:"flex", alignItems:"center", gap:2 }}>
-            <Typography sx={{ fontSize:10, color:MUTED, fontFamily:"monospace" }}>POST /api/interviews/schedule</Typography>
-            <Box onClick={onClose} sx={{ width:30, height:30, borderRadius:"50%", bgcolor:"#F1F3F7", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", "&:hover":{bgcolor:BORDER} }}>
-              <IcoX />
-            </Box>
+          <Box onClick={onClose} sx={{ width:30, height:30, borderRadius:"50%", bgcolor:"#F1F3F7", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", "&:hover":{bgcolor:BORDER} }}>
+            <IcoX />
           </Box>
         </Box>
 
@@ -177,34 +324,32 @@ function ScheduleModal({ form, updateForm, handleCandidateChange, candidates, sa
             </FormField>
           </Box>
 
+          <FormField label="Date & Time" required>
+            <DateTimePicker value={form.scheduledAt} onChange={v => updateForm("scheduledAt", v)} error={!!conflictWarning} />
+            {conflictChecking && (
+              <Box sx={{ display:"flex", alignItems:"center", gap:0.5, mt:0.5 }}>
+                <CircularProgress size={10} sx={{ color:MUTED }} />
+                <Typography sx={{ fontSize:10, color:MUTED }}>Checking availability…</Typography>
+              </Box>
+            )}
+          </FormField>
+
           <Box sx={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:2 }}>
-            <FormField label="Date & Time" required>
-              <TextField type="datetime-local" fullWidth size="small" value={form.scheduledAt} onChange={e => updateForm("scheduledAt", e.target.value)}
-                sx={{ ...fieldSx, ...(conflictWarning ? { "& .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline":{ borderColor:DANGER } } : {}) }} />
-              {conflictChecking && (
-                <Box sx={{ display:"flex", alignItems:"center", gap:0.5, mt:0.5 }}>
-                  <CircularProgress size={10} sx={{ color:MUTED }} />
-                  <Typography sx={{ fontSize:10, color:MUTED }}>Checking availability…</Typography>
-                </Box>
-              )}
-            </FormField>
             <FormField label="Duration (minutes)">
               <TextField select fullWidth size="small" value={form.durationMinutes} onChange={e => updateForm("durationMinutes", Number(e.target.value))} sx={fieldSx}>
                 {DURATIONS.map(d => <MenuItem key={d} value={d} sx={{ fontSize:13 }}>{d} min</MenuItem>)}
               </TextField>
             </FormField>
-          </Box>
-
-          <Box sx={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:2 }}>
             <FormField label="Location / Format">
               <TextField select fullWidth size="small" value={form.location} onChange={e => updateForm("location", e.target.value)} sx={fieldSx}>
                 {LOCATIONS.map(l => <MenuItem key={l} value={l} sx={{ fontSize:13 }}>{l}</MenuItem>)}
               </TextField>
             </FormField>
-            <FormField label="Meeting Link">
-              <TextField fullWidth size="small" value={form.meetingLink} onChange={e => updateForm("meetingLink", e.target.value)} placeholder="https://meet.google.com/..." sx={fieldSx} />
-            </FormField>
           </Box>
+
+          <FormField label="Meeting Link">
+            <TextField fullWidth size="small" value={form.meetingLink} onChange={e => updateForm("meetingLink", e.target.value)} placeholder="https://meet.google.com/..." sx={fieldSx} />
+          </FormField>
 
           <FormField label="Notes">
             <TextField multiline rows={3} fullWidth value={form.notes} onChange={e => updateForm("notes", e.target.value)} placeholder="Any prep notes for the interviewer..." sx={fieldSx} />
