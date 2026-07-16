@@ -3,7 +3,11 @@ import {
   Box, Paper, Typography, Table, TableHead, TableRow, TableCell,
   TableBody, Button, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, MenuItem, Select, FormControl, InputLabel, Alert, CircularProgress,
+  Tooltip,
 } from "@mui/material";
+import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import SyncIcon from "@mui/icons-material/Sync";
 import { useNavigate } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -22,6 +26,8 @@ const WARN    = "#D97706";
 const WARN_L  = "#FFFBEB";
 const DANGER  = "#DC2626";
 const DANGER_L = "#FEF2F2";
+const HUBSPOT  = "#FF7A59";
+const HUBSPOT_L = "rgba(255,122,89,0.08)";
 
 const CARD_BASE = {
   bgcolor: SURFACE, border: `1px solid ${BORDER}`,
@@ -70,6 +76,22 @@ function empTypeBadge(t) {
   );
 }
 
+function HubSpotBadge({ status }) {
+  if (!status) return null;
+  const failed = status.state === "sync_failed";
+  const linked = Boolean(status.linked);
+  const label = failed ? "Sync failed" : linked ? "In HubSpot" : status.state === "disconnected" ? "HubSpot off" : null;
+  if (!label) return null;
+  return (
+    <Box sx={{
+      display: "inline-flex", alignItems: "center", bgcolor: failed ? DANGER_L : HUBSPOT_L,
+      border: `1px solid ${failed ? "#FECACA" : "rgba(255,122,89,0.25)"}`,
+      borderRadius: "20px", px: 1.25, py: "2px", fontSize: 11, fontWeight: 600,
+      color: failed ? DANGER : HUBSPOT, whiteSpace: "nowrap",
+    }}>{label}</Box>
+  );
+}
+
 const EMPTY_FORM = {
   firstName: "", lastName: "", email: "", phone: "", jobTitle: "",
   employmentType: "PERMANENT", status: "ONBOARDING",
@@ -98,6 +120,48 @@ export default function CrmEmployeesPage() {
   // upload
   const [uploading,  setUploading]  = useState(false);
   const [uploadMsg,  setUploadMsg]  = useState(null);
+  const [hubSpotStatuses, setHubSpotStatuses] = useState({});
+  const [hubSpotBusy, setHubSpotBusy] = useState({});
+  const [hubSpotError, setHubSpotError] = useState("");
+
+  const authHeader = () => ({ Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` });
+
+  async function apiGet(path) {
+    const url = new URL(`${API_BASE}${path}`);
+    url.searchParams.set("loginId", loginId);
+    const res = await fetch(url.toString(), { headers: authHeader() });
+    if (!res.ok) throw new Error(await responseMessage(res));
+    return res.json();
+  }
+
+  async function apiPost(path) {
+    const url = new URL(`${API_BASE}${path}`);
+    url.searchParams.set("loginId", loginId);
+    const res = await fetch(url.toString(), { method: "POST", headers: authHeader() });
+    if (!res.ok) throw new Error(await responseMessage(res));
+    return res.json();
+  }
+
+  async function responseMessage(res) {
+    const text = await res.text().catch(() => "");
+    try {
+      const data = JSON.parse(text);
+      return data.message || data.error || text || `Request failed (${res.status})`;
+    } catch {
+      return text || `Request failed (${res.status})`;
+    }
+  }
+
+  async function loadHubSpotStatuses(employeeList) {
+    const pairs = await Promise.all(employeeList.map(async emp => {
+      try {
+        return [emp.id, await apiGet(`/api/crm/employees/${emp.id}/hubspot/status`)];
+      } catch {
+        return [emp.id, null];
+      }
+    }));
+    setHubSpotStatuses(Object.fromEntries(pairs));
+  }
 
   async function load() {
     setLoading(true);
@@ -117,8 +181,10 @@ export default function CrmEmployeesPage() {
       ]);
       if (!empRes.ok)  throw new Error(`Employees: ${empRes.status}`);
       if (!deptRes.ok) throw new Error(`Departments: ${deptRes.status}`);
-      setEmployees(await empRes.json());
+      const empData = await empRes.json();
+      setEmployees(empData);
       setDepartments(await deptRes.json());
+      await loadHubSpotStatuses(empData);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -188,6 +254,48 @@ export default function CrmEmployeesPage() {
     }
   }
 
+  async function handleHubSpotPush(emp) {
+    setHubSpotBusy(prev => ({ ...prev, [emp.id]: true }));
+    setHubSpotError("");
+    try {
+      const status = await apiPost(`/api/crm/employees/${emp.id}/hubspot/push`);
+      setHubSpotStatuses(prev => ({ ...prev, [emp.id]: status }));
+    } catch (e) {
+      setHubSpotError(`Could not sync ${emp.firstName} ${emp.lastName} to HubSpot. ${e.message || "Please try again."}`);
+      try {
+        const status = await apiGet(`/api/crm/employees/${emp.id}/hubspot/status`);
+        setHubSpotStatuses(prev => ({ ...prev, [emp.id]: status }));
+      } catch {
+        // Best-effort refresh after a failed push.
+      }
+    } finally {
+      setHubSpotBusy(prev => ({ ...prev, [emp.id]: false }));
+    }
+  }
+
+  async function handleBulkHubSpot(mode) {
+    const targets = employees.filter(emp => {
+      const status = hubSpotStatuses[emp.id];
+      if (!status || status.state === "disconnected" || hubSpotBusy[emp.id]) return false;
+      return mode === "sync" ? status.linked : !status.linked;
+    });
+    if (targets.length === 0) return;
+    setHubSpotError("");
+    for (const emp of targets) {
+      await handleHubSpotPush(emp);
+    }
+  }
+
+  const hubSpotPushCount = employees.filter(emp => {
+    const status = hubSpotStatuses[emp.id];
+    return status && status.state !== "disconnected" && !status.linked && !hubSpotBusy[emp.id];
+  }).length;
+  const hubSpotSyncCount = employees.filter(emp => {
+    const status = hubSpotStatuses[emp.id];
+    return status?.linked && !hubSpotBusy[emp.id];
+  }).length;
+  const hubSpotBulkBusy = Object.values(hubSpotBusy).some(Boolean);
+
   const f = (k) => (v) => setForm(p => ({ ...p, [k]: v }));
 
   return (
@@ -223,6 +331,36 @@ export default function CrmEmployeesPage() {
             <input type="file" accept=".xlsx,.xls" hidden onChange={handleUpload} />
           </Button>
           <Button
+            onClick={() => handleBulkHubSpot("push")}
+            variant="outlined"
+            size="small"
+            disabled={hubSpotBulkBusy || hubSpotPushCount === 0}
+            startIcon={hubSpotBulkBusy ? <CircularProgress size={12} sx={{ color: "inherit" }} /> : <HubOutlinedIcon sx={{ fontSize: 14 }} />}
+            sx={{
+              fontSize: 12, fontWeight: 600, textTransform: "none", borderRadius: "8px",
+              borderColor: BORDER, color: HUBSPOT, bgcolor: SURFACE,
+              "&.Mui-disabled": { bgcolor: "#F7F8FA", color: MUTED, borderColor: BORDER },
+              "&:hover": { borderColor: HUBSPOT, bgcolor: HUBSPOT_L },
+            }}
+          >
+            Push to HubSpot
+          </Button>
+          <Button
+            onClick={() => handleBulkHubSpot("sync")}
+            variant="outlined"
+            size="small"
+            disabled={hubSpotBulkBusy || hubSpotSyncCount === 0}
+            startIcon={<SyncIcon sx={{ fontSize: 14 }} />}
+            sx={{
+              fontSize: 12, fontWeight: 600, textTransform: "none", borderRadius: "8px",
+              borderColor: BORDER, color: HUBSPOT, bgcolor: SURFACE,
+              "&.Mui-disabled": { bgcolor: "#F7F8FA", color: MUTED, borderColor: BORDER },
+              "&:hover": { borderColor: HUBSPOT, bgcolor: HUBSPOT_L },
+            }}
+          >
+            Sync HubSpot
+          </Button>
+          <Button
             onClick={() => { setForm(EMPTY_FORM); setSaveError(null); setAddOpen(true); }}
             variant="contained"
             size="small"
@@ -242,6 +380,12 @@ export default function CrmEmployeesPage() {
         <Alert severity={uploadMsg.startsWith("Upload failed") ? "error" : "success"}
           onClose={() => setUploadMsg(null)} sx={{ mb: 2, fontSize: 12 }}>
           {uploadMsg}
+        </Alert>
+      )}
+
+      {hubSpotError && (
+        <Alert severity="error" onClose={() => setHubSpotError("")} sx={{ mb: 2, fontSize: 12, borderRadius: "8px" }}>
+          {hubSpotError}
         </Alert>
       )}
 
@@ -327,10 +471,31 @@ export default function CrmEmployeesPage() {
                   <TableCell sx={{ py: 1.25, px: 2, fontSize: 12, color: MUTED, borderBottom: `1px solid ${BORDER}` }}>
                     {emp.managerName || "—"}
                   </TableCell>
-                  <TableCell sx={{ py: 1.25, px: 2, borderBottom: `1px solid ${BORDER}`, textAlign: "right" }}>
-                    <Box sx={{ fontSize: 12, color: ACCENT, cursor: "pointer", fontWeight: 600 }}
+                  <TableCell sx={{ py: 1.25, px: 2, borderBottom: `1px solid ${BORDER}`, textAlign: "right" }}
+                    onClick={e => e.stopPropagation()}>
+                    <Box sx={{ display: "flex", gap: 0.75, justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
+                      <HubSpotBadge status={hubSpotStatuses[emp.id]} />
+                      {hubSpotStatuses[emp.id]?.linked && hubSpotStatuses[emp.id]?.externalUrl && (
+                        <Tooltip title="Open in HubSpot">
+                          <Button size="small" variant="outlined"
+                            component="a"
+                            href={hubSpotStatuses[emp.id].externalUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            startIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
+                            sx={{
+                              fontSize: 11, fontWeight: 600, borderColor: BORDER, color: HUBSPOT,
+                              bgcolor: SURFACE, borderRadius: "6px", textTransform: "none",
+                              "&:hover": { borderColor: HUBSPOT, bgcolor: HUBSPOT_L }
+                            }}>
+                            Open
+                          </Button>
+                        </Tooltip>
+                      )}
+                      <Box sx={{ fontSize: 12, color: ACCENT, cursor: "pointer", fontWeight: 600 }}
                       onClick={e => { e.stopPropagation(); nav(`/crm/employees/${emp.id}`); }}>
-                      View →
+                        View →
+                      </Box>
                     </Box>
                   </TableCell>
                 </TableRow>

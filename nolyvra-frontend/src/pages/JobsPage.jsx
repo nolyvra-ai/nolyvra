@@ -5,6 +5,8 @@ import {
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
+import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
+import SyncIcon from "@mui/icons-material/Sync";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -42,7 +44,9 @@ async function apiPostJson(path, body = undefined) {
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     let message = text;
-    try { message = JSON.parse(text)?.message || JSON.parse(text)?.error || text; } catch {}
+    try { message = JSON.parse(text)?.message || JSON.parse(text)?.error || text; } catch {
+      // Keep the raw response text when the API does not return JSON.
+    }
     throw new Error(message || `Request failed (${res.status})`);
   }
   return res.status === 204 ? null : res.json();
@@ -56,6 +60,7 @@ const DANGER = "#DC2626", DANGER_BG = "#FEF2F2", DANGER_BR = "#FECACA";
 const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
 const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
 const NEUTRAL_BG = "#F1F3F7", SURFACE = "#FAFBFD", SELECTED_BG = "#EBF2FF";
+const HUBSPOT = "#FF7A59", HUBSPOT_BG = "rgba(255,122,89,0.08)", HUBSPOT_BR = "rgba(255,122,89,0.25)";
 
 const thSx = {
   fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase",
@@ -101,10 +106,18 @@ function StatusBadge({ status }) {
 
 function HubSpotJobBadge({ status }) {
   if (!status) return <Badge label="HubSpot" variant="neutral" />;
-  if (status.state === "linked") return <Badge label="In HubSpot" variant="success" />;
   if (status.state === "sync_failed") return <Badge label="HubSpot failed" variant="danger" />;
   if (status.state === "disconnected") return <Badge label="HubSpot off" variant="neutral" />;
-  return <Badge label="Not in HubSpot" variant="neutral" />;
+  if (!status.linked) return <Badge label="Not in HubSpot" variant="neutral" />;
+  return (
+    <Box sx={{
+      display: "inline-flex", alignItems: "center", bgcolor: HUBSPOT_BG,
+      border: `1px solid ${HUBSPOT_BR}`, borderRadius: "20px", px: 1.25, py: 0.25,
+      fontSize: 11, fontWeight: 600, color: HUBSPOT, whiteSpace: "nowrap"
+    }}>
+      In HubSpot
+    </Box>
+  );
 }
 
 function ScoreBar({ value }) {
@@ -654,7 +667,7 @@ export default function JobsPage() {
   }
 
   async function handlePushJobToHubSpot(jobId, e) {
-    e.stopPropagation();
+    e?.stopPropagation();
     if (hubSpotPushingIds.has(jobId)) return;
     setHubSpotPushingIds(prev => new Set(prev).add(jobId));
     setErr("");
@@ -666,11 +679,36 @@ export default function JobsPage() {
       try {
         const status = await apiGet(`/api/jobs/${jobId}/hubspot/status`);
         setJobHubSpotStatuses(prev => new Map(prev).set(jobId, status));
-      } catch {}
+      } catch {
+        // Best-effort refresh after a failed push.
+      }
     } finally {
       setHubSpotPushingIds(prev => { const next = new Set(prev); next.delete(jobId); return next; });
     }
   }
+
+  async function handleBulkHubSpot(mode) {
+    const targets = visibleJobs.filter(job => {
+      const status = jobHubSpotStatuses.get(job.id);
+      if (!status || status.state === "disconnected" || hubSpotPushingIds.has(job.id)) return false;
+      return mode === "sync" ? status.linked : !status.linked;
+    });
+    if (targets.length === 0) return;
+    setErr("");
+    for (const job of targets) {
+      await handlePushJobToHubSpot(job.id);
+    }
+  }
+
+  const hubSpotPushCount = visibleJobs.filter(job => {
+    const status = jobHubSpotStatuses.get(job.id);
+    return status && status.state !== "disconnected" && !status.linked && !hubSpotPushingIds.has(job.id);
+  }).length;
+  const hubSpotSyncCount = visibleJobs.filter(job => {
+    const status = jobHubSpotStatuses.get(job.id);
+    return status?.linked && !hubSpotPushingIds.has(job.id);
+  }).length;
+  const hubSpotBulkBusy = hubSpotPushingIds.size > 0;
 
   // ── Removed: handleJobSaved — no longer needed ────────────────────────────
 
@@ -711,6 +749,30 @@ export default function JobsPage() {
                 "&.Mui-focused fieldset": { borderColor: ACCENT, borderWidth: 1.5 }
               }
             }} />
+          <Button size="small" variant="outlined"
+            onClick={() => handleBulkHubSpot("push")}
+            disabled={hubSpotBulkBusy || hubSpotPushCount === 0}
+            startIcon={hubSpotBulkBusy ? <CircularProgress size={12} sx={{ color: "inherit" }} /> : <HubOutlinedIcon sx={{ fontSize: 14 }} />}
+            sx={{
+              fontSize: 12, fontWeight: 500, borderRadius: "6px", textTransform: "none",
+              borderColor: BORDER, color: HUBSPOT, bgcolor: "#fff", boxShadow: "none",
+              "&.Mui-disabled": { bgcolor: "#F7F8FA", color: MUTED, borderColor: BORDER },
+              "&:hover": { bgcolor: HUBSPOT_BG, borderColor: HUBSPOT }
+            }}>
+            Push to HubSpot
+          </Button>
+          <Button size="small" variant="outlined"
+            onClick={() => handleBulkHubSpot("sync")}
+            disabled={hubSpotBulkBusy || hubSpotSyncCount === 0}
+            startIcon={<SyncIcon sx={{ fontSize: 14 }} />}
+            sx={{
+              fontSize: 12, fontWeight: 500, borderRadius: "6px", textTransform: "none",
+              borderColor: BORDER, color: HUBSPOT, bgcolor: "#fff", boxShadow: "none",
+              "&.Mui-disabled": { bgcolor: "#F7F8FA", color: MUTED, borderColor: BORDER },
+              "&:hover": { bgcolor: HUBSPOT_BG, borderColor: HUBSPOT }
+            }}>
+            Sync HubSpot
+          </Button>
           <Button size="small" variant="contained"
             startIcon={<AddIcon sx={{ fontSize: 14 }} />}
             onClick={() => nav("/jobs/new")}
@@ -786,7 +848,6 @@ export default function JobsPage() {
                 const avg = jobAvg(job.id);
                 const hubSpotStatus = jobHubSpotStatuses.get(job.id);
                 const hubSpotLinked = hubSpotStatus?.linked;
-                const hubSpotSyncing = hubSpotPushingIds.has(job.id);
                 return (
                   <TableRow key={job.id}
                     onClick={() => setSelectedJobId(isSelected ? null : job.id)}
@@ -861,24 +922,13 @@ export default function JobsPage() {
                             rel="noreferrer"
                             onClick={e => e.stopPropagation()}
                             sx={{
-                              fontSize: 11, fontWeight: 500, borderColor: SUCCESS_BR, color: SUCCESS,
+                              fontSize: 11, fontWeight: 500, borderColor: BORDER, color: HUBSPOT,
                               borderRadius: "6px", textTransform: "none",
-                              "&:hover": { bgcolor: SUCCESS_BG, borderColor: SUCCESS }
+                              "&:hover": { bgcolor: HUBSPOT_BG, borderColor: HUBSPOT }
                             }}>
                             Open
                           </Button>
                         )}
-                        <Button size="small" variant={hubSpotLinked ? "outlined" : "contained"}
-                          onClick={e => handlePushJobToHubSpot(job.id, e)}
-                          disabled={hubSpotSyncing || hubSpotStatus?.state === "disconnected"}
-                          sx={{
-                            fontSize: 11, fontWeight: 500, borderRadius: "6px", textTransform: "none",
-                            ...(hubSpotLinked
-                              ? { borderColor: ACCENT_BR, color: ACCENT, "&:hover": { bgcolor: ACCENT_BG, borderColor: ACCENT } }
-                              : { bgcolor: ACCENT, boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } })
-                          }}>
-                          {hubSpotSyncing ? "Syncing..." : hubSpotLinked ? "Sync HubSpot" : "Push to HubSpot"}
-                        </Button>
                         {/* ── Edit now navigates to edit page with job prepopulated ── */}
                         <Button size="small" variant="outlined"
                           onClick={e => { e.stopPropagation(); nav(`/jobs/${job.id}/edit`); }}

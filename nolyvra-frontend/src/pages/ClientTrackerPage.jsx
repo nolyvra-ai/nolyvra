@@ -226,9 +226,8 @@ function formatFeeTotals(totals) {
 }
 
 // ─── Client row ───────────────────────────────────────────────────────────────
-function ClientRow({ client, onEdit, onSelect, onInvoice, hubSpotStatus, hubSpotBusy, onHubSpotPush }) {
+function ClientRow({ client, onEdit, onSelect, onInvoice, hubSpotStatus }) {
   const feeLabel = formatFeeTotals(client.totalFee);
-  const hubSpotDisconnected = hubSpotStatus?.state === "disconnected";
   const hubSpotLinked = Boolean(hubSpotStatus?.linked);
   const hubSpotFailed = hubSpotStatus?.state === "sync_failed";
   const hubSpotLabel = hubSpotFailed ? "Sync failed" : hubSpotLinked ? "In HubSpot" : null;
@@ -323,27 +322,6 @@ function ClientRow({ client, onEdit, onSelect, onInvoice, hubSpotStatus, hubSpot
             </IconButton>
           </Tooltip>
         )}
-        <Tooltip title={hubSpotDisconnected ? "Connect HubSpot in Settings" : hubSpotLinked ? "Sync to HubSpot" : "Push to HubSpot"}>
-          <span>
-            <Button
-              onClick={e => { e.stopPropagation(); onHubSpotPush(client); }}
-              disabled={!hubSpotStatus || hubSpotDisconnected || hubSpotBusy}
-              size="small"
-              variant="outlined"
-              startIcon={hubSpotBusy
-                ? <CircularProgress size={12} sx={{ color: "inherit" }} />
-                : hubSpotLinked ? <SyncIcon /> : <HubOutlinedIcon />}
-              aria-label={`${hubSpotLinked ? "Sync" : "Push"} ${client.companyName} to HubSpot`}
-              sx={{ height: 28, minWidth: 116, px: "8px", borderRadius: "6px",
-                borderColor: BORDER, color: HUBSPOT, bgcolor: SURFACE,
-                fontSize: 10, fontWeight: 700, textTransform: "none", whiteSpace: "nowrap",
-                "& .MuiButton-startIcon": { mr: "4px", "& svg": { fontSize: 14 } },
-                "&:hover": { borderColor: HUBSPOT, bgcolor: HUBSPOT_L } }}
-            >
-              {hubSpotBusy ? "Syncing..." : hubSpotLinked ? "Sync HubSpot" : "Push to HubSpot"}
-            </Button>
-          </span>
-        </Tooltip>
         <Box onClick={e => { e.stopPropagation(); onInvoice(client); }} sx={{
           px: "8px", py: "5px", borderRadius: "6px",
           border: `1px solid ${BORDER}`, color: MUTED, bgcolor: SURFACE,
@@ -1300,6 +1278,29 @@ export default function ClientTrackerPage() {
     }
   }
 
+  async function handleBulkHubSpot(mode) {
+    const targets = filtered.filter(client => {
+      const status = hubSpotStatuses[client.id];
+      if (!status || status.state === "disconnected" || hubSpotBusy[client.id]) return false;
+      return mode === "sync" ? status.linked : !status.linked;
+    });
+    if (targets.length === 0) return;
+    setHubSpotError("");
+    for (const client of targets) {
+      await handleHubSpotPush(client);
+    }
+  }
+
+  const hubSpotPushCount = filtered.filter(client => {
+    const status = hubSpotStatuses[client.id];
+    return status && status.state !== "disconnected" && !status.linked && !hubSpotBusy[client.id];
+  }).length;
+  const hubSpotSyncCount = filtered.filter(client => {
+    const status = hubSpotStatuses[client.id];
+    return status?.linked && !hubSpotBusy[client.id];
+  }).length;
+  const hubSpotBulkBusy = Object.values(hubSpotBusy).some(Boolean);
+
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: BG, p: "24px 28px" }}>
 
@@ -1331,13 +1332,47 @@ export default function ClientTrackerPage() {
             </Box>
           </Box>
         </Box>
-        <Box onClick={() => setShowAdd(true)} sx={{
-          display: "flex", alignItems: "center", gap: "6px",
-          px: "16px", py: "9px", borderRadius: "9px",
-          bgcolor: ACCENT, color: "#fff", fontSize: 13, fontWeight: 600,
-          cursor: "pointer", "&:hover": { bgcolor: "#1558C0" }, transition: "background .15s",
-        }}>
-          <PlusIcon /> Add Client
+        <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <Button
+            onClick={() => handleBulkHubSpot("push")}
+            variant="outlined"
+            size="small"
+            disabled={hubSpotBulkBusy || hubSpotPushCount === 0}
+            startIcon={hubSpotBulkBusy ? <CircularProgress size={12} sx={{ color: "inherit" }} /> : <HubOutlinedIcon sx={{ fontSize: 14 }} />}
+            sx={{
+              height: 36, px: "12px", borderRadius: "8px", borderColor: BORDER,
+              color: HUBSPOT, bgcolor: SURFACE, fontSize: 12, fontWeight: 700,
+              textTransform: "none", whiteSpace: "nowrap",
+              "&.Mui-disabled": { bgcolor: "#F7F8FA", color: MUTED, borderColor: BORDER },
+              "&:hover": { borderColor: HUBSPOT, bgcolor: HUBSPOT_L },
+            }}
+          >
+            Push to HubSpot
+          </Button>
+          <Button
+            onClick={() => handleBulkHubSpot("sync")}
+            variant="outlined"
+            size="small"
+            disabled={hubSpotBulkBusy || hubSpotSyncCount === 0}
+            startIcon={<SyncIcon sx={{ fontSize: 14 }} />}
+            sx={{
+              height: 36, px: "12px", borderRadius: "8px", borderColor: BORDER,
+              color: HUBSPOT, bgcolor: SURFACE, fontSize: 12, fontWeight: 700,
+              textTransform: "none", whiteSpace: "nowrap",
+              "&.Mui-disabled": { bgcolor: "#F7F8FA", color: MUTED, borderColor: BORDER },
+              "&:hover": { borderColor: HUBSPOT, bgcolor: HUBSPOT_L },
+            }}
+          >
+            Sync HubSpot
+          </Button>
+          <Box onClick={() => setShowAdd(true)} sx={{
+            display: "flex", alignItems: "center", gap: "6px",
+            px: "16px", py: "9px", borderRadius: "9px",
+            bgcolor: ACCENT, color: "#fff", fontSize: 13, fontWeight: 600,
+            cursor: "pointer", "&:hover": { bgcolor: "#1558C0" }, transition: "background .15s",
+          }}>
+            <PlusIcon /> Add Client
+          </Box>
         </Box>
       </Box>
 
@@ -1428,8 +1463,7 @@ export default function ClientTrackerPage() {
                 <ClientRow key={c.id} client={c} onEdit={setEditingClient}
                   onSelect={setSelectedClient} onInvoice={setInvoicingClient}
                   hubSpotStatus={hubSpotStatuses[c.id]}
-                  hubSpotBusy={Boolean(hubSpotBusy[c.id])}
-                  onHubSpotPush={handleHubSpotPush} />
+                  />
               ))
             )}
           </Box>

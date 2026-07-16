@@ -1,6 +1,7 @@
 package com.nolyvra.app.service;
 
 import com.nolyvra.app.model.ClientResponse;
+import com.nolyvra.app.model.EmployeeResponse;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -24,6 +25,16 @@ public class HubSpotContactMapper {
                 putIfPresent(properties, "lastname", name.substring(separator + 1));
             }
         }
+        return properties;
+    }
+
+    public Map<String, String> fromEmployee(EmployeeResponse employee) {
+        Map<String, String> properties = new LinkedHashMap<>();
+        putIfPresent(properties, "email", normalizeEmail(employee.email()));
+        putIfPresent(properties, "firstname", employee.firstName());
+        putIfPresent(properties, "lastname", employee.lastName());
+        putIfPresent(properties, "phone", employee.phone());
+        putIfPresent(properties, "jobtitle", employee.jobTitle());
         return properties;
     }
 
