@@ -1,0 +1,162 @@
+package com.nolyvra.app.service;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+
+import java.net.http.HttpClient;
+import java.net.http.HttpHeaders;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+class HubSpotCrmServiceTest {
+
+    private final HubSpotOAuthService oauthService = mock(HubSpotOAuthService.class);
+    private final HttpClient httpClient = mock(HttpClient.class);
+    private final HubSpotCrmService service =
+            new HubSpotCrmService(oauthService, new ObjectMapper(), httpClient);
+
+    @Test
+    void createCompanyUsesBearerTokenAndCurrentCompaniesEndpoint() throws Exception {
+        HttpResponse<String> response = response(201, "{\"id\":\"company-123\",\"url\":\"https://hubspot.test/123\"}");
+        when(oauthService.getValidAccessToken("login-1")).thenReturn("access-token");
+        when(httpClient.send(any(), anyStringBodyHandler())).thenReturn(response);
+
+        HubSpotCrmService.CrmObject result = service.createCompany(
+                "login-1", Map.of("name", "Nolyvra"));
+
+        ArgumentCaptor<HttpRequest> request = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient).send(request.capture(), anyStringBodyHandler());
+        assertThat(request.getValue().method()).isEqualTo("POST");
+        assertThat(request.getValue().uri().toString())
+                .isEqualTo("https://api.hubapi.com/crm/objects/2026-03/companies");
+        assertThat(request.getValue().headers().firstValue("Authorization"))
+                .contains("Bearer access-token");
+        assertThat(result.id()).isEqualTo("company-123");
+        assertThat(result.url()).isEqualTo("https://hubspot.test/123");
+    }
+
+    @Test
+    void surfacesHubSpotErrorMessage() throws Exception {
+        HttpResponse<String> response = response(400, "{\"message\":\"Invalid property\"}");
+        when(oauthService.getValidAccessToken("login-1")).thenReturn("access-token");
+        when(httpClient.send(any(), anyStringBodyHandler())).thenReturn(response);
+
+        assertThatThrownBy(() -> service.updateCompany(
+                "login-1", "company-123", Map.of("name", "Nolyvra")))
+                .isInstanceOf(HubSpotCrmService.HubSpotApiException.class)
+                .hasMessage("Invalid property");
+    }
+
+    @Test
+    void capturesHubSpotRateLimitMetadata() throws Exception {
+        HttpResponse<String> response = response(
+                429,
+                "{\"message\":\"You have reached your secondly limit.\",\"category\":\"RATE_LIMIT\",\"correlationId\":\"corr-1\"}",
+                Map.of("Retry-After", "1000"));
+        when(oauthService.getValidAccessToken("login-1")).thenReturn("access-token");
+        when(httpClient.send(any(), anyStringBodyHandler())).thenReturn(response);
+
+        assertThatThrownBy(() -> service.createCompany("login-1", Map.of("name", "Nolyvra")))
+                .isInstanceOfSatisfying(HubSpotCrmService.HubSpotApiException.class, e -> {
+                    assertThat(e.getStatusCode()).isEqualTo(429);
+                    assertThat(e.getCategory()).isEqualTo("RATE_LIMIT");
+                    assertThat(e.getCorrelationId()).isEqualTo("corr-1");
+                    assertThat(e.getRetryAfter()).isEqualTo("1000");
+                });
+    }
+
+    @Test
+    void associatesContactToCompanyUsingDefaultAssociationEndpoint() throws Exception {
+        HttpResponse<String> response = response(200, "{}");
+        when(oauthService.getValidAccessToken("login-1")).thenReturn("access-token");
+        when(httpClient.send(any(), anyStringBodyHandler())).thenReturn(response);
+
+        service.associateContactToCompany("login-1", "contact-1", "company-1");
+
+        ArgumentCaptor<HttpRequest> request = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient).send(request.capture(), anyStringBodyHandler());
+        assertThat(request.getValue().method()).isEqualTo("PUT");
+        assertThat(request.getValue().uri().toString()).isEqualTo(
+                "https://api.hubapi.com/crm/objects/2026-03/contact/contact-1"
+                        + "/associations/default/company/company-1");
+    }
+
+    @Test
+    void createDealUsesCurrentDealsEndpoint() throws Exception {
+        HttpResponse<String> response = response(201, "{\"id\":\"deal-123\"}");
+        when(oauthService.getValidAccessToken("login-1")).thenReturn("access-token");
+        when(httpClient.send(any(), anyStringBodyHandler())).thenReturn(response);
+
+        service.createDeal("login-1", Map.of("dealname", "Senior Engineer"));
+
+        ArgumentCaptor<HttpRequest> request = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient).send(request.capture(), anyStringBodyHandler());
+        assertThat(request.getValue().method()).isEqualTo("POST");
+        assertThat(request.getValue().uri().toString())
+                .isEqualTo("https://api.hubapi.com/crm/objects/2026-03/deals");
+    }
+
+    @Test
+    void associatesDealToCompanyUsingDefaultAssociationEndpoint() throws Exception {
+        HttpResponse<String> response = response(200, "{}");
+        when(oauthService.getValidAccessToken("login-1")).thenReturn("access-token");
+        when(httpClient.send(any(), anyStringBodyHandler())).thenReturn(response);
+
+        service.associateDealToCompany("login-1", "deal-1", "company-1");
+
+        ArgumentCaptor<HttpRequest> request = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient).send(request.capture(), anyStringBodyHandler());
+        assertThat(request.getValue().method()).isEqualTo("PUT");
+        assertThat(request.getValue().uri().toString()).isEqualTo(
+                "https://api.hubapi.com/crm/objects/2026-03/deal/deal-1"
+                        + "/associations/default/company/company-1");
+    }
+
+    @Test
+    void associatesDealToContactUsingDefaultAssociationEndpoint() throws Exception {
+        HttpResponse<String> response = response(200, "{}");
+        when(oauthService.getValidAccessToken("login-1")).thenReturn("access-token");
+        when(httpClient.send(any(), anyStringBodyHandler())).thenReturn(response);
+
+        service.associateDealToContact("login-1", "deal-1", "contact-1");
+
+        ArgumentCaptor<HttpRequest> request = ArgumentCaptor.forClass(HttpRequest.class);
+        verify(httpClient).send(request.capture(), anyStringBodyHandler());
+        assertThat(request.getValue().method()).isEqualTo("PUT");
+        assertThat(request.getValue().uri().toString()).isEqualTo(
+                "https://api.hubapi.com/crm/objects/2026-03/deal/deal-1"
+                        + "/associations/default/contact/contact-1");
+    }
+
+    @SuppressWarnings("unchecked")
+    private static HttpResponse.BodyHandler<String> anyStringBodyHandler() {
+        return any(HttpResponse.BodyHandler.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static HttpResponse<String> response(int status, String body) {
+        return response(status, body, Map.of());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static HttpResponse<String> response(int status, String body, Map<String, String> headers) {
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(status);
+        when(response.body()).thenReturn(body);
+        when(response.headers()).thenReturn(HttpHeaders.of(
+                headers.entrySet().stream()
+                        .collect(java.util.stream.Collectors.toMap(
+                                Map.Entry::getKey, e -> java.util.List.of(e.getValue()))),
+                (name, value) -> true));
+        return response;
+    }
+}

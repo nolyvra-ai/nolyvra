@@ -2,9 +2,13 @@ import {
   Box, Paper, Typography, Table, TableHead, TableRow,
   TableCell, TableBody, Button, TextField, InputAdornment,
   Alert, LinearProgress, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions,
+  IconButton, Tooltip,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
+import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import SyncIcon from "@mui/icons-material/Sync";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -27,6 +31,31 @@ async function apiDelete(path) {
   if (!res.ok && res.status !== 204) { const t = await res.text().catch(() => ""); throw new Error(`${res.status} - ${t}`); }
 }
 
+async function apiPostJson(path, body = undefined) {
+  const loginId = localStorage.getItem("loginId") || "";
+  const url = new URL(`${API_BASE}${path}`);
+  url.searchParams.set("loginId", loginId);
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}`
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    let message = text;
+    try { message = JSON.parse(text)?.message || JSON.parse(text)?.error || text; } catch {
+      // Keep the raw response text when the API does not return JSON.
+    }
+    const error = new Error(message || `Request failed (${res.status})`);
+    error.status = res.status;
+    throw error;
+  }
+  return res.status === 204 ? null : res.json();
+}
+
 // ─── Style tokens ─────────────────────────────────────────────────────────────
 const BORDER = "#E8ECF2", MUTED = "#9AA3B4", TEXT = "#0F1623", ACCENT = "#1D72E8";
 const SUCCESS = "#16A34A", SUCCESS_BG = "#F0FDF4", SUCCESS_BR = "#BBF7D0";
@@ -35,6 +64,8 @@ const DANGER = "#DC2626", DANGER_BG = "#FEF2F2", DANGER_BR = "#FECACA";
 const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
 const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
 const NEUTRAL_BG = "#F1F3F7", SURFACE = "#FAFBFD", SELECTED_BG = "#EBF2FF";
+const HUBSPOT = "#FF7A59", HUBSPOT_BG = "rgba(255,122,89,0.08)", HUBSPOT_BR = "rgba(255,122,89,0.25)";
+const HUBSPOT_LABEL_BG = "#FFF1EC";
 
 const thSx = {
   fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase",
@@ -76,6 +107,27 @@ function StatusBadge({ status }) {
     Analysed:    "success",
   };
   return <Badge label={status || "Active"} variant={map[status] ?? "neutral"} />;
+}
+
+function HubSpotJobBadge({ status }) {
+  if (!status) return null;
+  if (status.state !== "sync_failed" && !status.linked) return null;
+  const failed = status.state === "sync_failed";
+  return (
+    <Box sx={{
+      display: "inline-flex", alignItems: "center",
+      bgcolor: failed ? DANGER_BG : HUBSPOT_LABEL_BG,
+      border: `1px solid ${failed ? DANGER_BR : HUBSPOT_BR}`,
+      borderRadius: "4px", px: "6px", py: "1px",
+      fontSize: 9, fontWeight: 700,
+      color: failed ? DANGER : HUBSPOT, whiteSpace: "nowrap",
+      cursor: "default",
+      "&:hover": { bgcolor: failed ? DANGER_BG : HUBSPOT_LABEL_BG },
+    }}
+    onClick={e => e.stopPropagation()}>
+      {failed ? "Sync failed" : "In HubSpot"}
+    </Box>
+  );
 }
 
 function ScoreBar({ value }) {
@@ -329,6 +381,8 @@ export default function JobsPage() {
 
   const [jobs, setJobs] = useState([]);
   const [candidatesByJob, setCandidatesByJob] = useState(new Map());
+  const [jobHubSpotStatuses, setJobHubSpotStatuses] = useState(new Map());
+  const [hubSpotPushingIds, setHubSpotPushingIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [selectedJobId, setSelectedJobId] = useState(null);
@@ -483,6 +537,19 @@ export default function JobsPage() {
         if (cancelled) return;
         setJobs(jobsResp ?? []);
 
+        const statusPairs = await Promise.all(
+          (jobsResp ?? []).map(async (job) => {
+            try {
+              const status = await apiGet(`/api/jobs/${job.id}/hubspot/status`);
+              return [job.id, status];
+            } catch {
+              return [job.id, null];
+            }
+          })
+        );
+        if (cancelled) return;
+        setJobHubSpotStatuses(new Map(statusPairs));
+
         const map = new Map();
         await Promise.all(
           (jobsResp ?? []).map(async (job) => {
@@ -609,6 +676,96 @@ export default function JobsPage() {
     } catch (e) { setErr(e.message); }
   }
 
+  async function handlePushJobToHubSpot(jobId, e) {
+    e?.stopPropagation();
+    if (hubSpotPushingIds.has(jobId)) return;
+    setHubSpotPushingIds(prev => new Set(prev).add(jobId));
+    setErr("");
+    try {
+      const status = await apiPostJson(`/api/jobs/${jobId}/hubspot/push`);
+      setJobHubSpotStatuses(prev => new Map(prev).set(jobId, status));
+    } catch (e) {
+      setErr(e.message || "Failed to sync job with HubSpot");
+      try {
+        const status = await apiGet(`/api/jobs/${jobId}/hubspot/status`);
+        setJobHubSpotStatuses(prev => new Map(prev).set(jobId, status));
+      } catch {
+        // Best-effort refresh after a failed push.
+      }
+    } finally {
+      setHubSpotPushingIds(prev => { const next = new Set(prev); next.delete(jobId); return next; });
+    }
+  }
+
+  async function handleSyncJobWithHubSpot(job, e) {
+    e?.stopPropagation();
+    if (hubSpotPushingIds.has(job.id)) return;
+    setHubSpotPushingIds(prev => new Set(prev).add(job.id));
+    setErr("");
+    try {
+      const status = await apiPostJson(`/api/jobs/${job.id}/hubspot/sync`);
+      setJobHubSpotStatuses(prev => new Map(prev).set(job.id, status));
+      const freshJob = await apiGet(`/api/jobs/${job.id}`);
+      setJobs(prev => prev.map(item => item.id === job.id ? freshJob : item));
+    } catch (e) {
+      if (e.status === 409) {
+        const useHubSpot = window.confirm(`${e.message}\n\nOK: update Nolyvra from HubSpot.\nCancel: choose another action.`);
+        let direction = useHubSpot ? "pull" : null;
+        if (!direction) {
+          const useNolyvra = window.confirm("Overwrite HubSpot with the Nolyvra job instead?");
+          if (!useNolyvra) {
+            setHubSpotPushingIds(prev => { const next = new Set(prev); next.delete(job.id); return next; });
+            return;
+          }
+          direction = "push";
+        }
+        try {
+          const status = await apiPostJson(`/api/jobs/${job.id}/hubspot/sync?direction=${direction}`);
+          setJobHubSpotStatuses(prev => new Map(prev).set(job.id, status));
+          if (direction === "pull") {
+            const freshJob = await apiGet(`/api/jobs/${job.id}`);
+            setJobs(prev => prev.map(item => item.id === job.id ? freshJob : item));
+          }
+        } catch (forcedError) {
+          setErr(forcedError.message || "Failed to resolve HubSpot sync conflict");
+        }
+      } else {
+        setErr(e.message || "Failed to sync job with HubSpot");
+        try {
+          const status = await apiGet(`/api/jobs/${job.id}/hubspot/status`);
+          setJobHubSpotStatuses(prev => new Map(prev).set(job.id, status));
+        } catch {
+          // Best-effort refresh after a failed sync.
+        }
+      }
+    } finally {
+      setHubSpotPushingIds(prev => { const next = new Set(prev); next.delete(job.id); return next; });
+    }
+  }
+
+  async function handleBulkHubSpot() {
+    const targets = visibleJobs.filter(job => {
+      const status = jobHubSpotStatuses.get(job.id);
+      if (!status || status.state === "disconnected" || hubSpotPushingIds.has(job.id)) return false;
+      return true;
+    });
+    if (targets.length === 0) return;
+    setErr("");
+    for (const job of targets) {
+      if (jobHubSpotStatuses.get(job.id)?.linked) {
+        await handleSyncJobWithHubSpot(job);
+      } else {
+        await handlePushJobToHubSpot(job.id);
+      }
+    }
+  }
+
+  const hubSpotActionCount = visibleJobs.filter(job => {
+    const status = jobHubSpotStatuses.get(job.id);
+    return status && status.state !== "disconnected" && !hubSpotPushingIds.has(job.id);
+  }).length;
+  const hubSpotBulkBusy = hubSpotPushingIds.size > 0;
+
   // ── Removed: handleJobSaved — no longer needed ────────────────────────────
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -648,6 +805,27 @@ export default function JobsPage() {
                 "&.Mui-focused fieldset": { borderColor: ACCENT, borderWidth: 1.5 }
               }
             }} />
+          <Button size="small" variant="outlined"
+            onClick={handleBulkHubSpot}
+            disabled={hubSpotBulkBusy || hubSpotActionCount === 0}
+            startIcon={hubSpotBulkBusy
+              ? <SyncIcon sx={{
+                  fontSize: 14,
+                  animation: "hubspotSpin 0.9s linear infinite",
+                  "@keyframes hubspotSpin": {
+                    "0%": { transform: "rotate(0deg)" },
+                    "100%": { transform: "rotate(360deg)" },
+                  },
+                }} />
+              : <HubOutlinedIcon sx={{ fontSize: 14 }} />}
+            sx={{
+              fontSize: 12, fontWeight: 500, borderRadius: "6px", textTransform: "none",
+              borderColor: BORDER, color: HUBSPOT, bgcolor: "#fff", boxShadow: "none",
+              "&.Mui-disabled": { bgcolor: "#F7F8FA", color: MUTED, borderColor: BORDER },
+              "&:hover": { bgcolor: HUBSPOT_BG, borderColor: HUBSPOT }
+            }}>
+            Sync HubSpot
+          </Button>
           <Button size="small" variant="contained"
             startIcon={<AddIcon sx={{ fontSize: 14 }} />}
             onClick={() => nav("/jobs/new")}
@@ -721,6 +899,8 @@ export default function JobsPage() {
                 const isSelected = job.id === selectedJobId;
                 const candCount = (candidatesByJob.get(job.id) ?? []).length;
                 const avg = jobAvg(job.id);
+                const hubSpotStatus = jobHubSpotStatuses.get(job.id);
+                const hubSpotLinked = hubSpotStatus?.linked;
                 return (
                   <TableRow key={job.id}
                     onClick={() => setSelectedJobId(isSelected ? null : job.id)}
@@ -741,9 +921,12 @@ export default function JobsPage() {
                       </Typography>
                     </TableCell>
                     <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
-                      <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT, lineHeight: 1.2 }}>
-                        {job.title}
-                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
+                        <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT, lineHeight: 1.2 }}>
+                          {job.title}
+                        </Typography>
+                        <HubSpotJobBadge status={hubSpotStatus} />
+                      </Box>
                       {job.seniority && (
                         <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>{job.seniority}</Typography>
                       )}
@@ -785,7 +968,26 @@ export default function JobsPage() {
 
                     <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}`, textAlign: "right" }}
                       onClick={e => e.stopPropagation()}>
-                      <Box sx={{ display: "flex", gap: 0.75, justifyContent: "flex-end" }}>
+                      <Box sx={{ display: "flex", gap: 0.75, justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
+                        {hubSpotLinked && hubSpotStatus?.externalUrl && (
+                          <Tooltip title="Open in HubSpot">
+                            <IconButton
+                              component="a"
+                              href={hubSpotStatus.externalUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              size="small"
+                              aria-label={`Open ${job.title} in HubSpot`}
+                              sx={{
+                                width: 28, height: 28, border: `1px solid ${BORDER}`, borderRadius: "6px",
+                                color: HUBSPOT, bgcolor: "#fff",
+                                "&:hover": { bgcolor: HUBSPOT_BG, borderColor: HUBSPOT }
+                              }}>
+                              <OpenInNewIcon sx={{ fontSize: 15 }} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                         {/* ── Edit now navigates to edit page with job prepopulated ── */}
                         <Button size="small" variant="outlined"
                           onClick={e => { e.stopPropagation(); nav(`/jobs/${job.id}/edit`); }}

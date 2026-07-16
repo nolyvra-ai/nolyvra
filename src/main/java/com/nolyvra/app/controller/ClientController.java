@@ -3,9 +3,11 @@ package com.nolyvra.app.controller;
 import com.nolyvra.app.model.BillablePlacementResponse;
 import com.nolyvra.app.model.ClientRequest;
 import com.nolyvra.app.model.ClientResponse;
+import com.nolyvra.app.model.HubSpotSyncStatusResponse;
 import com.nolyvra.app.model.OutreachRequest;
 import com.nolyvra.app.model.PotentialClientResponse;
 import com.nolyvra.app.service.ClientService;
+import com.nolyvra.app.service.HubSpotClientSyncService;
 import com.nolyvra.app.service.XeroInvoiceService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,10 +20,15 @@ public class ClientController {
 
     private final ClientService clientService;
     private final XeroInvoiceService xeroInvoiceService;
+    private final HubSpotClientSyncService hubSpotClientSyncService;
 
-    public ClientController(ClientService clientService, XeroInvoiceService xeroInvoiceService) {
+    public ClientController(
+            ClientService clientService,
+            XeroInvoiceService xeroInvoiceService,
+            HubSpotClientSyncService hubSpotClientSyncService) {
         this.clientService = clientService;
         this.xeroInvoiceService = xeroInvoiceService;
+        this.hubSpotClientSyncService = hubSpotClientSyncService;
     }
 
     @GetMapping
@@ -56,6 +63,28 @@ public class ClientController {
             @PathVariable Long id,
             @RequestParam String loginId) {
         return ResponseEntity.ok(xeroInvoiceService.getBillablePlacements(id, loginId));
+    }
+
+    @PostMapping("/{id}/hubspot/push")
+    public ResponseEntity<HubSpotSyncStatusResponse> pushClientToHubSpot(
+            @PathVariable Long id,
+            @RequestParam String loginId) {
+        return ResponseEntity.ok(hubSpotClientSyncService.pushClient(id, loginId));
+    }
+
+    @PostMapping("/{id}/hubspot/sync")
+    public ResponseEntity<HubSpotSyncStatusResponse> syncClientWithHubSpot(
+            @PathVariable Long id,
+            @RequestParam String loginId,
+            @RequestParam(required = false, defaultValue = "auto") String direction) {
+        return ResponseEntity.ok(hubSpotClientSyncService.syncClient(id, loginId, direction));
+    }
+
+    @GetMapping("/{id}/hubspot/status")
+    public ResponseEntity<HubSpotSyncStatusResponse> getClientHubSpotStatus(
+            @PathVariable Long id,
+            @RequestParam String loginId) {
+        return ResponseEntity.ok(hubSpotClientSyncService.getStatus(id, loginId));
     }
 
     @GetMapping("/potential")

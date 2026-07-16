@@ -106,6 +106,26 @@ public class ClientService {
         }, loginId);
     }
 
+    public ClientResponse getClientForHubSpot(Long id, String loginId) {
+        return jdbc.query("""
+                SELECT id, login_id, company_name, industry, company_size, location,
+                       contact_person, contact_email, contact_title, linkedin_url, notes,
+                       last_funding_event, last_funding_amount, created_at
+                FROM clients
+                WHERE id = ? AND login_id = ?
+                """, (rs, i) -> {
+            var ts = rs.getTimestamp("created_at");
+            return new ClientResponse(
+                    rs.getLong("id"), rs.getString("login_id"), rs.getString("company_name"),
+                    rs.getString("industry"), rs.getString("company_size"), rs.getString("location"),
+                    rs.getString("contact_person"), rs.getString("contact_email"),
+                    rs.getString("contact_title"), rs.getString("linkedin_url"), rs.getString("notes"),
+                    rs.getString("last_funding_event"), rs.getString("last_funding_amount"),
+                    ts != null ? ts.toInstant() : null, 0, 0, 0, List.of(), List.of());
+        }, id, loginId).stream().findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found"));
+    }
+
     // ─── Helper: fetch up to 5 Active/Fulfilling jobs (title + age + status + fee) for a company
 
     public List<ClientResponse.JobSummary> getClientJobs(String companyName, String loginId) {

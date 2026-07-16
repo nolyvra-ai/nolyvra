@@ -2,8 +2,11 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Box, CircularProgress, Dialog, DialogContent, DialogActions,
-  TextField, MenuItem, Checkbox, Button, Alert,
+  TextField, MenuItem, Checkbox, Button, Alert, IconButton, Tooltip,
 } from "@mui/material";
+import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import SyncIcon from "@mui/icons-material/Sync";
 import AddClientDialog from "./AddClientDialog";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -20,6 +23,10 @@ const WARN_L   = "rgba(217,119,6,0.08)";
 const PURPLE   = "#7C3AED";
 const PURPLE_L = "rgba(124,58,237,0.08)";
 const BG       = "#F4F6FA";
+const HUBSPOT  = "#FF7A59";
+const HUBSPOT_L = "rgba(255,122,89,0.08)";
+const HUBSPOT_BR = "rgba(255,122,89,0.25)";
+const HUBSPOT_LABEL_BG = "#FFF1EC";
 
 const CARD_BASE = {
   bgcolor: SURFACE,
@@ -60,6 +67,20 @@ const hdrs    = () => ({
   "Content-Type": "application/json",
 });
 
+async function apiError(response) {
+  const text = await response.text();
+  let message;
+  try {
+    const json = JSON.parse(text);
+    message = json.message || json.error || "Request failed";
+  } catch {
+    message = text || "Request failed";
+  }
+  const error = new Error(message);
+  error.status = response.status;
+  return error;
+}
+
 // ── Last-search cache (restores the last Potential Clients search on page
 // load, if the recruiter has already searched something before) ─────────────
 function potentialSearchCacheKey() { return `nolyvra:potentialClientsCache:${loginId()}`; }
@@ -81,7 +102,7 @@ function savePotentialSearchCache(cache) {
 async function apiGet(path) {
   const sep = path.includes("?") ? "&" : "?";
   const r = await fetch(`${API}${path}${sep}loginId=${encodeURIComponent(loginId())}`, { headers: hdrs() });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await apiError(r);
   return r.json();
 }
 
@@ -90,7 +111,7 @@ async function apiPost(path, body) {
   const r = await fetch(`${API}${path}${sep}loginId=${encodeURIComponent(loginId())}`, {
     method: "POST", headers: hdrs(), body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await apiError(r);
   return r.text();
 }
 
@@ -99,7 +120,7 @@ async function apiPostJson(path, body) {
   const r = await fetch(`${API}${path}${sep}loginId=${encodeURIComponent(loginId())}`, {
     method: "POST", headers: hdrs(), body: JSON.stringify(body),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw await apiError(r);
   return r.json();
 }
 
@@ -229,12 +250,15 @@ function formatFeeTotals(totals) {
 }
 
 // ─── Client row ───────────────────────────────────────────────────────────────
-function ClientRow({ client, onEdit, onSelect, onInvoice }) {
+function ClientRow({ client, onEdit, onSelect, onInvoice, hubSpotStatus }) {
   const feeLabel = formatFeeTotals(client.totalFee);
+  const hubSpotLinked = Boolean(hubSpotStatus?.linked);
+  const hubSpotFailed = hubSpotStatus?.state === "sync_failed";
+  const hubSpotLabel = hubSpotFailed ? "Sync failed" : hubSpotLinked ? "In HubSpot" : null;
   return (
     <Box onClick={() => onSelect(client)} sx={{
       display: "grid",
-      gridTemplateColumns: "2fr 1.5fr 1fr 1.2fr 2fr 1fr",
+      gridTemplateColumns: "2fr 1.5fr 1fr 1.2fr 2fr 2fr",
       alignItems: "center",
       px: "16px", py: "12px",
       borderBottom: `1px solid ${BORDER}`,
@@ -242,7 +266,23 @@ function ClientRow({ client, onEdit, onSelect, onInvoice }) {
       "&:hover": { bgcolor: "#FAFBFD" },
     }}>
       <Box>
-        <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{client.companyName}</Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+          <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{client.companyName}</Box>
+          {hubSpotLabel && (
+            <Box component="span" sx={{
+              px: "6px", py: "1px", borderRadius: "4px", fontSize: 9, fontWeight: 700,
+              color: hubSpotFailed ? "#DC2626" : HUBSPOT,
+              bgcolor: hubSpotFailed ? "#FEF2F2" : HUBSPOT_LABEL_BG,
+              border: `1px solid ${hubSpotFailed ? "rgba(220,38,38,0.18)" : HUBSPOT_BR}`,
+              whiteSpace: "nowrap",
+              cursor: "default",
+              "&:hover": { bgcolor: hubSpotFailed ? "#FEF2F2" : HUBSPOT_LABEL_BG },
+            }}
+            onClick={e => e.stopPropagation()}>
+              {hubSpotLabel}
+            </Box>
+          )}
+        </Box>
         <Box sx={{ fontSize: 11, color: MUTED, mt: "2px" }}>
           {[client.industry, client.location].filter(Boolean).join(" • ")}
         </Box>
@@ -252,6 +292,19 @@ function ClientRow({ client, onEdit, onSelect, onInvoice }) {
           ? <Box sx={{ fontSize: 13, color: TEXT }}>{client.contactPerson}</Box>
           : <Box sx={{ fontSize: 12, color: MUTED }}>—</Box>}
         {client.contactEmail && <Box sx={{ fontSize: 11, color: MUTED, mt: "1px" }}>{client.contactEmail}</Box>}
+        {hubSpotStatus?.contactState === "success" && (
+          <Box sx={{ fontSize: 10, color: HUBSPOT, fontWeight: 600, mt: "2px" }}>Contact synced</Box>
+        )}
+        {hubSpotStatus?.contactState === "failed" && (
+          <Tooltip title={hubSpotStatus.contactSyncError || "Contact sync failed"}>
+            <Box sx={{ fontSize: 10, color: "#DC2626", fontWeight: 600, mt: "2px", width: "fit-content" }}>
+              Contact failed
+            </Box>
+          </Tooltip>
+        )}
+        {hubSpotStatus?.contactState === "skipped" && (
+          <Box sx={{ fontSize: 10, color: MUTED, mt: "2px" }}>Contact skipped: no email</Box>
+        )}
       </Box>
       <Box>
         <Box sx={{ fontSize: 13, fontWeight: 600, color: client.activeJobCount > 0 ? SUCCESS : MUTED }}>
@@ -280,6 +333,23 @@ function ClientRow({ client, onEdit, onSelect, onInvoice }) {
         )}
       </Box>
       <Box sx={{ display: "flex", justifyContent: "flex-end", gap: "6px" }}>
+        {hubSpotLinked && hubSpotStatus.externalUrl && (
+          <Tooltip title="Open in HubSpot">
+            <IconButton
+              component="a"
+              href={hubSpotStatus.externalUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={e => e.stopPropagation()}
+              size="small"
+              aria-label={`Open ${client.companyName} in HubSpot`}
+              sx={{ width: 28, height: 28, border: `1px solid ${BORDER}`, borderRadius: "6px",
+                color: HUBSPOT, bgcolor: SURFACE, "&:hover": { borderColor: HUBSPOT, bgcolor: HUBSPOT_L } }}
+            >
+              <OpenInNewIcon sx={{ fontSize: 15 }} />
+            </IconButton>
+          </Tooltip>
+        )}
         <Box onClick={e => { e.stopPropagation(); onInvoice(client); }} sx={{
           px: "8px", py: "5px", borderRadius: "6px",
           border: `1px solid ${BORDER}`, color: MUTED, bgcolor: SURFACE,
@@ -1143,6 +1213,20 @@ export default function ClientTrackerPage() {
   const [addFromPotential,  setAddFromPotential]  = useState(null);
   const [selectedClient,    setSelectedClient]    = useState(null);
   const [invoicingClient,   setInvoicingClient]   = useState(null);
+  const [hubSpotStatuses,   setHubSpotStatuses]   = useState({});
+  const [hubSpotBusy,       setHubSpotBusy]       = useState({});
+  const [hubSpotError,      setHubSpotError]      = useState("");
+
+  async function loadHubSpotStatuses(clientList) {
+    const results = await Promise.allSettled(
+      clientList.map(client => apiGet(`/api/clients/${client.id}/hubspot/status`))
+    );
+    const statuses = {};
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") statuses[clientList[index].id] = result.value;
+    });
+    setHubSpotStatuses(statuses);
+  }
 
   // ── Bulk outreach (Potential Clients multi-select) ─────────────────────────
   const [selectedIds,       setSelectedIds]       = useState(new Set());
@@ -1197,6 +1281,7 @@ export default function ClientTrackerPage() {
     try {
       const c = await apiGet("/api/clients?");
       setClients(c);
+      await loadHubSpotStatuses(c);
     } catch (e) {
       setError(e.message || "Failed to load clients.");
     } finally {
@@ -1314,6 +1399,88 @@ export default function ClientTrackerPage() {
     setEditingClient(null);
   }
 
+  async function handleHubSpotPush(client) {
+    setHubSpotBusy(prev => ({ ...prev, [client.id]: true }));
+    setHubSpotError("");
+    try {
+      const status = await apiPostJson(`/api/clients/${client.id}/hubspot/push`);
+      setHubSpotStatuses(prev => ({ ...prev, [client.id]: status }));
+    } catch (e) {
+      setHubSpotError(`Could not sync ${client.companyName} to HubSpot. ${e.message || "Please try again."}`);
+      try {
+        const status = await apiGet(`/api/clients/${client.id}/hubspot/status`);
+        setHubSpotStatuses(prev => ({ ...prev, [client.id]: status }));
+      } catch {
+        // Keep the last known state when the status refresh also fails.
+      }
+    } finally {
+      setHubSpotBusy(prev => ({ ...prev, [client.id]: false }));
+    }
+  }
+
+  async function handleHubSpotSync(client) {
+    setHubSpotBusy(prev => ({ ...prev, [client.id]: true }));
+    setHubSpotError("");
+    try {
+      const status = await apiPostJson(`/api/clients/${client.id}/hubspot/sync`);
+      setHubSpotStatuses(prev => ({ ...prev, [client.id]: status }));
+      await loadClients();
+    } catch (e) {
+      if (e.status === 409) {
+        const useHubSpot = window.confirm(`${e.message}\n\nOK: update Nolyvra from HubSpot.\nCancel: choose another action.`);
+        let direction = useHubSpot ? "pull" : null;
+        if (!direction) {
+          const useNolyvra = window.confirm("Overwrite HubSpot with the Nolyvra client instead?");
+          if (!useNolyvra) {
+            setHubSpotBusy(prev => ({ ...prev, [client.id]: false }));
+            return;
+          }
+          direction = "push";
+        }
+        try {
+          const status = await apiPostJson(`/api/clients/${client.id}/hubspot/sync?direction=${direction}`);
+          setHubSpotStatuses(prev => ({ ...prev, [client.id]: status }));
+          if (direction === "pull") await loadClients();
+        } catch (forcedError) {
+          setHubSpotError(`Could not resolve HubSpot sync for ${client.companyName}. ${forcedError.message || "Please try again."}`);
+        }
+      } else {
+        setHubSpotError(`Could not sync ${client.companyName} with HubSpot. ${e.message || "Please try again."}`);
+        try {
+          const status = await apiGet(`/api/clients/${client.id}/hubspot/status`);
+          setHubSpotStatuses(prev => ({ ...prev, [client.id]: status }));
+        } catch {
+          // Keep the last known state when the status refresh also fails.
+        }
+      }
+    } finally {
+      setHubSpotBusy(prev => ({ ...prev, [client.id]: false }));
+    }
+  }
+
+  async function handleBulkHubSpot() {
+    const targets = filtered.filter(client => {
+      const status = hubSpotStatuses[client.id];
+      if (!status || status.state === "disconnected" || hubSpotBusy[client.id]) return false;
+      return true;
+    });
+    if (targets.length === 0) return;
+    setHubSpotError("");
+    for (const client of targets) {
+      if (hubSpotStatuses[client.id]?.linked) {
+        await handleHubSpotSync(client);
+      } else {
+        await handleHubSpotPush(client);
+      }
+    }
+  }
+
+  const hubSpotActionCount = filtered.filter(client => {
+    const status = hubSpotStatuses[client.id];
+    return status && status.state !== "disconnected" && !hubSpotBusy[client.id];
+  }).length;
+  const hubSpotBulkBusy = Object.values(hubSpotBusy).some(Boolean);
+
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: BG, p: "24px 28px" }}>
 
@@ -1345,13 +1512,40 @@ export default function ClientTrackerPage() {
             </Box>
           </Box>
         </Box>
-        <Box onClick={() => setShowAdd(true)} sx={{
-          display: "flex", alignItems: "center", gap: "6px",
-          px: "16px", py: "9px", borderRadius: "9px",
-          bgcolor: ACCENT, color: "#fff", fontSize: 13, fontWeight: 600,
-          cursor: "pointer", "&:hover": { bgcolor: "#1558C0" }, transition: "background .15s",
-        }}>
-          <PlusIcon /> Add Client
+        <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <Button
+            onClick={handleBulkHubSpot}
+            variant="outlined"
+            size="small"
+            disabled={hubSpotBulkBusy || hubSpotActionCount === 0}
+            startIcon={hubSpotBulkBusy
+              ? <SyncIcon sx={{
+                  fontSize: 14,
+                  animation: "hubspotSpin 0.9s linear infinite",
+                  "@keyframes hubspotSpin": {
+                    "0%": { transform: "rotate(0deg)" },
+                    "100%": { transform: "rotate(360deg)" },
+                  },
+                }} />
+              : <HubOutlinedIcon sx={{ fontSize: 14 }} />}
+            sx={{
+              height: 36, px: "12px", borderRadius: "8px", borderColor: BORDER,
+              color: HUBSPOT, bgcolor: SURFACE, fontSize: 12, fontWeight: 700,
+              textTransform: "none", whiteSpace: "nowrap",
+              "&.Mui-disabled": { bgcolor: "#F7F8FA", color: MUTED, borderColor: BORDER },
+              "&:hover": { borderColor: HUBSPOT, bgcolor: HUBSPOT_L },
+            }}
+          >
+            Sync HubSpot
+          </Button>
+          <Box onClick={() => setShowAdd(true)} sx={{
+            display: "flex", alignItems: "center", gap: "6px",
+            px: "16px", py: "9px", borderRadius: "9px",
+            bgcolor: ACCENT, color: "#fff", fontSize: 13, fontWeight: 600,
+            cursor: "pointer", "&:hover": { bgcolor: "#1558C0" }, transition: "background .15s",
+          }}>
+            <PlusIcon /> Add Client
+          </Box>
         </Box>
       </Box>
 
@@ -1380,6 +1574,12 @@ export default function ClientTrackerPage() {
           border: "1px solid rgba(220,38,38,0.18)", color: "#DC2626", fontSize: 13, mb: "20px" }}>
           {error}
         </Box>
+      )}
+
+      {hubSpotError && (
+        <Alert severity="error" onClose={() => setHubSpotError("")} sx={{ mb: "20px", borderRadius: "8px" }}>
+          {hubSpotError}
+        </Alert>
       )}
 
       {!loading && (
@@ -1413,10 +1613,10 @@ export default function ClientTrackerPage() {
             </Box>
 
             <Box sx={{
-              display: "grid", gridTemplateColumns: "2fr 1.5fr 1fr 1.2fr 2fr 1fr",
+              display: "grid", gridTemplateColumns: "2fr 1.5fr 1fr 1.2fr 2fr 2fr",
               px: "16px", py: "8px", borderBottom: `1px solid ${BORDER}`, bgcolor: "#F8FAFC",
             }}>
-              {["Client", "Contact", "Active Jobs", "Total Fee", "Job Details", ""].map((h, i) => (
+              {["Client", "Contact", "Active Jobs", "Total Fee", "Job Details", "Actions"].map((h, i) => (
                 <Box key={i} sx={{ fontSize: 11, fontWeight: 600, color: MUTED,
                   textTransform: "uppercase", letterSpacing: ".5px",
                   textAlign: i === 5 ? "right" : "left" }}>
@@ -1434,7 +1634,9 @@ export default function ClientTrackerPage() {
             ) : (
               filtered.map(c => (
                 <ClientRow key={c.id} client={c} onEdit={setEditingClient}
-                  onSelect={setSelectedClient} onInvoice={setInvoicingClient} />
+                  onSelect={setSelectedClient} onInvoice={setInvoicingClient}
+                  hubSpotStatus={hubSpotStatuses[c.id]}
+                  />
               ))
             )}
           </Box>

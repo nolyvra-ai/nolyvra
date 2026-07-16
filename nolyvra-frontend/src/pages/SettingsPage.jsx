@@ -105,6 +105,14 @@ export default function SettingsPage() {
   const [xeroTenantName, setXeroTenantName] = useState("");
   const [xeroReconnectRequired, setXeroReconnectRequired] = useState(false);
 
+  // HubSpot OAuth
+  const [hubSpotSuccess, setHubSpotSuccess] = useState(searchParams.get("hubspot") === "connected");
+  const [hubSpotError, setHubSpotError] = useState(searchParams.get("hubspot") === "error");
+  const [hubSpotConnected, setHubSpotConnected] = useState(false);
+  const [hubSpotPortalName, setHubSpotPortalName] = useState("");
+  const [hubSpotUserEmail, setHubSpotUserEmail] = useState("");
+  const [hubSpotReconnectRequired, setHubSpotReconnectRequired] = useState(false);
+
   useEffect(() => {
     if (!loginId) return;
     fetch(`${API_BASE}/auth/microsoft/status?loginId=${encodeURIComponent(loginId)}`)
@@ -124,6 +132,16 @@ export default function SettingsPage() {
         setXeroReconnectRequired(!!d.reconnectRequired);
       })
       .catch(() => {});
+    fetch(`${API_BASE}/auth/hubspot/status?loginId=${encodeURIComponent(loginId)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d) return;
+        setHubSpotConnected(!!d.connected);
+        setHubSpotPortalName(d.portalName || "");
+        setHubSpotUserEmail(d.userEmail || "");
+        setHubSpotReconnectRequired(!!d.reconnectRequired);
+      })
+      .catch(() => {});
   }, [loginId]);
 
   function handleOutlookConnect() {
@@ -138,12 +156,25 @@ export default function SettingsPage() {
     window.location.href = `${API_BASE}/auth/xero/connect?loginId=${encodeURIComponent(loginId)}`;
   }
 
+  function handleHubSpotConnect() {
+    window.location.href = `${API_BASE}/auth/hubspot/connect?loginId=${encodeURIComponent(loginId)}`;
+  }
+
   async function handleXeroDisconnect() {
     await fetch(`${API_BASE}/auth/xero/disconnect?loginId=${encodeURIComponent(loginId)}`,
       { method: "DELETE" }).catch(() => {});
     setXeroConnected(false);
     setXeroTenantName("");
     setXeroReconnectRequired(false);
+  }
+
+  async function handleHubSpotDisconnect() {
+    await fetch(`${API_BASE}/auth/hubspot/disconnect?loginId=${encodeURIComponent(loginId)}`,
+      { method: "DELETE" }).catch(() => {});
+    setHubSpotConnected(false);
+    setHubSpotPortalName("");
+    setHubSpotUserEmail("");
+    setHubSpotReconnectRequired(false);
   }
 
   function handleOutlookSave() {
@@ -617,6 +648,18 @@ export default function SettingsPage() {
         <Alert severity="error" onClose={() => setXeroError(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           Failed to connect Xero. Please try again.
+        </Alert>
+      )}
+      {hubSpotSuccess && (
+        <Alert severity="success" onClose={() => setHubSpotSuccess(false)}
+          sx={{ borderRadius: "10px", fontSize: 13 }}>
+          HubSpot connected successfully.
+        </Alert>
+      )}
+      {hubSpotError && (
+        <Alert severity="error" onClose={() => setHubSpotError(false)}
+          sx={{ borderRadius: "10px", fontSize: 13 }}>
+          Failed to connect HubSpot. Please try again.
         </Alert>
       )}
 
@@ -1527,6 +1570,66 @@ export default function SettingsPage() {
                   "&:hover": { bgcolor: "#0FA0D1", boxShadow: "none" }
                 }}>
                 {xeroReconnectRequired ? "Reconnect to Xero" : "Connect to Xero"}
+              </Button>
+            )}
+          </Box>
+
+          {/* HubSpot row */}
+          <Box sx={{
+            p: "12px 14px",
+            bgcolor: hubSpotConnected ? SUCCESS_BG : hubSpotReconnectRequired ? WARN_BG : SURFACE,
+            border: `1px solid ${hubSpotConnected ? SUCCESS_BR : hubSpotReconnectRequired ? WARN_BR : BORDER}`,
+            borderRadius: "8px",
+            display: "flex", flexDirection: "column", gap: 1.25
+          }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+              <Box sx={{
+                width: 24, height: 24, borderRadius: "50%", bgcolor: "#FF5C35",
+                color: "#fff", display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 12, fontWeight: 800, lineHeight: 1, flexShrink: 0
+              }}>
+                H
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
+                  HubSpot
+                </Typography>
+                <Typography sx={{
+                  fontSize: 11,
+                  color: hubSpotConnected ? SUCCESS : hubSpotReconnectRequired ? WARN : MUTED,
+                  mt: 0.25
+                }}>
+                  {hubSpotConnected
+                    ? `Connected · ${hubSpotPortalName || hubSpotUserEmail || "HubSpot"}`
+                    : hubSpotReconnectRequired
+                      ? "Reconnect required"
+                      : "Not connected"}
+                </Typography>
+              </Box>
+              {hubSpotConnected && (
+                <Button size="small" variant="outlined"
+                  onClick={handleHubSpotDisconnect}
+                  sx={{
+                    fontSize: 11, borderRadius: "6px", textTransform: "none",
+                    borderColor: DANGER_BR, color: DANGER, flexShrink: 0,
+                    "&:hover": { bgcolor: DANGER_BG, borderColor: DANGER }
+                  }}>
+                  Disconnect
+                </Button>
+              )}
+            </Box>
+
+            {!hubSpotConnected && (
+              <Button
+                variant="contained"
+                onClick={handleHubSpotConnect}
+                fullWidth
+                sx={{
+                  fontSize: 12, fontWeight: 600, bgcolor: "#FF5C35", borderRadius: "8px",
+                  textTransform: "none", boxShadow: "none",
+                  "&:hover": { bgcolor: "#E84926", boxShadow: "none" }
+                }}>
+                {hubSpotReconnectRequired ? "Reconnect to HubSpot" : "Connect to HubSpot"}
               </Button>
             )}
           </Box>

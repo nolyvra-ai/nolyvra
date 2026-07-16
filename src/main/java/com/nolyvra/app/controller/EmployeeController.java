@@ -3,6 +3,7 @@ package com.nolyvra.app.controller;
 import com.nolyvra.app.model.*;
 import com.nolyvra.app.service.CrmEntitlementService;
 import com.nolyvra.app.service.EmployeeService;
+import com.nolyvra.app.service.HubSpotEmployeeSyncService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -17,11 +18,14 @@ public class EmployeeController {
 
     private final EmployeeService       employeeService;
     private final CrmEntitlementService entitlementService;
+    private final HubSpotEmployeeSyncService hubSpotEmployeeSyncService;
 
     public EmployeeController(EmployeeService employeeService,
-                              CrmEntitlementService entitlementService) {
+                              CrmEntitlementService entitlementService,
+                              HubSpotEmployeeSyncService hubSpotEmployeeSyncService) {
         this.employeeService    = employeeService;
         this.entitlementService = entitlementService;
+        this.hubSpotEmployeeSyncService = hubSpotEmployeeSyncService;
     }
 
     // ─── Employee CRUD ────────────────────────────────────────────────────────
@@ -71,6 +75,31 @@ public class EmployeeController {
             @Valid @RequestBody AssignManagerRequest req) {
         entitlementService.checkEntitled(loginId);
         return employeeService.assignManager(id, req.managerId(), loginId);
+    }
+
+    @PostMapping("/employees/{id}/hubspot/push")
+    public HubSpotSyncStatusResponse pushEmployeeToHubSpot(
+            @PathVariable String id,
+            @RequestParam String loginId) {
+        entitlementService.checkEntitled(loginId);
+        return hubSpotEmployeeSyncService.pushEmployee(id, loginId);
+    }
+
+    @PostMapping("/employees/{id}/hubspot/sync")
+    public HubSpotSyncStatusResponse syncEmployeeWithHubSpot(
+            @PathVariable String id,
+            @RequestParam String loginId,
+            @RequestParam(required = false, defaultValue = "auto") String direction) {
+        entitlementService.checkEntitled(loginId);
+        return hubSpotEmployeeSyncService.syncEmployee(id, loginId, direction);
+    }
+
+    @GetMapping("/employees/{id}/hubspot/status")
+    public HubSpotSyncStatusResponse getEmployeeHubSpotStatus(
+            @PathVariable String id,
+            @RequestParam String loginId) {
+        entitlementService.checkEntitled(loginId);
+        return hubSpotEmployeeSyncService.getStatus(id, loginId);
     }
 
     // ─── Bulk Excel upload ────────────────────────────────────────────────────
