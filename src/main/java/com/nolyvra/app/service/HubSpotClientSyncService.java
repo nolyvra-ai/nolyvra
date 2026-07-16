@@ -7,10 +7,13 @@ import com.nolyvra.app.model.HubSpotSyncStatusResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.Map;
 
 @Service
@@ -27,6 +30,7 @@ public class HubSpotClientSyncService {
     private final ExternalCrmLinkService linkService;
     private final HubSpotCompanyMapper companyMapper;
     private final HubSpotContactSyncService contactSyncService;
+    private final JdbcTemplate jdbc;
 
     public HubSpotClientSyncService(
             ClientService clientService,
@@ -34,13 +38,15 @@ public class HubSpotClientSyncService {
             HubSpotCrmService crmService,
             ExternalCrmLinkService linkService,
             HubSpotCompanyMapper companyMapper,
-            HubSpotContactSyncService contactSyncService) {
+            HubSpotContactSyncService contactSyncService,
+            JdbcTemplate jdbc) {
         this.clientService = clientService;
         this.oauthService = oauthService;
         this.crmService = crmService;
         this.linkService = linkService;
         this.companyMapper = companyMapper;
         this.contactSyncService = contactSyncService;
+        this.jdbc = jdbc;
     }
 
     @Transactional
@@ -97,6 +103,60 @@ public class HubSpotClientSyncService {
         }
     }
 
+    @Transactional
+    public HubSpotSyncStatusResponse syncClient(Long clientId, String loginId, String direction) {
+        ClientResponse client = clientService.getClientForHubSpot(clientId, loginId);
+        HubSpotConnection connection = oauthService.getConnection(loginId);
+        if (connection == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Connect HubSpot before syncing a client");
+        }
+
+        String localId = clientId.toString();
+        linkService.acquireLocalRecordLock(loginId, PROVIDER, LOCAL_TYPE, localId);
+        ExternalCrmLink link = linkService.findByLocalRecord(loginId, PROVIDER, LOCAL_TYPE, localId);
+        HubSpotSyncSupport.requireLinked(link, "client");
+
+        if (HubSpotSyncSupport.isPush(direction)) {
+            return pushClient(clientId, loginId);
+        }
+
+        try {
+            HubSpotCrmService.RemoteObject remote =
+                    crmService.getCompanyForSync(loginId, link.externalId());
+            if (HubSpotSyncSupport.isPull(direction)) {
+                pullCompany(clientId, loginId, remote);
+                ExternalCrmLink saved = linkService.recordSuccess(
+                        loginId, PROVIDER, LOCAL_TYPE, localId, remote.id(),
+                        externalUrl(connection.hubspotPortalId(), remote.id(), link.externalUrl()));
+                return withContactStatus(saved, client, loginId);
+            }
+
+            Instant localUpdatedAt = localUpdatedAt("clients", "id", clientId, loginId);
+            boolean localChanged = HubSpotSyncSupport.changedAfter(localUpdatedAt, link.lastSyncedAt());
+            boolean remoteChanged = HubSpotSyncSupport.changedAfter(remote.updatedAt(), link.lastSyncedAt());
+            if (localChanged && remoteChanged) {
+                HubSpotSyncSupport.rejectConflict("client");
+            }
+            if (remoteChanged) {
+                pullCompany(clientId, loginId, remote);
+                ExternalCrmLink saved = linkService.recordSuccess(
+                        loginId, PROVIDER, LOCAL_TYPE, localId, remote.id(),
+                        externalUrl(connection.hubspotPortalId(), remote.id(), link.externalUrl()));
+                return withContactStatus(saved, client, loginId);
+            }
+            if (localChanged) {
+                return pushClient(clientId, loginId);
+            }
+            return withContactStatus(link, client, loginId);
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            String message = HubSpotErrorSupport.userMessage(e);
+            linkService.recordFailure(loginId, PROVIDER, LOCAL_TYPE, localId, message);
+            throw new ResponseStatusException(HubSpotErrorSupport.responseStatus(e), message, e);
+        }
+    }
+
     public HubSpotSyncStatusResponse getStatus(Long clientId, String loginId) {
         ClientResponse client = clientService.getClientForHubSpot(clientId, loginId);
         if (oauthService.getConnection(loginId) == null) {
@@ -120,8 +180,50 @@ public class HubSpotClientSyncService {
                 contactState, contactLink.externalUrl(), contactLink.lastSyncError());
     }
 
+    private HubSpotSyncStatusResponse withContactStatus(
+            ExternalCrmLink companyLink, ClientResponse client, String loginId) {
+        HubSpotSyncStatusResponse companyStatus = HubSpotSyncStatusResponse.fromLink(companyLink);
+        if (client.contactEmail() == null || client.contactEmail().isBlank()) {
+            return companyStatus.withContact("skipped", null, "Contact email is required");
+        }
+        ExternalCrmLink contactLink = linkService.findByLocalRecord(
+                loginId, PROVIDER, HubSpotContactSyncService.LOCAL_TYPE, Long.toString(client.id()));
+        if (contactLink == null) {
+            return companyStatus.withContact("not_linked", null, null);
+        }
+        String contactState = "failed".equals(contactLink.lastSyncStatus()) ? "failed" : "success";
+        return companyStatus.withContact(
+                contactState, contactLink.externalUrl(), contactLink.lastSyncError());
+    }
+
+    private void pullCompany(Long clientId, String loginId, HubSpotCrmService.RemoteObject remote) {
+        String name = HubSpotSyncSupport.property(remote.properties(), "name");
+        String description = HubSpotSyncSupport.property(remote.properties(), "description");
+        String linkedin = HubSpotSyncSupport.property(remote.properties(), "linkedin_company_page");
+        jdbc.update("""
+                update clients
+                set company_name = coalesce(?, company_name),
+                    notes = coalesce(?, notes),
+                    linkedin_url = coalesce(?, linkedin_url),
+                    updated_at = now()
+                where id = ? and login_id = ?
+                """, name, description, linkedin, clientId, loginId);
+    }
+
+    private Instant localUpdatedAt(String table, String idColumn, Object id, String loginId) {
+        OffsetDateTime updatedAt = jdbc.queryForObject(
+                "select updated_at from " + table + " where " + idColumn + " = ? and login_id = ?",
+                OffsetDateTime.class, id, loginId);
+        return updatedAt == null ? null : updatedAt.toInstant();
+    }
+
     private String companyUrl(String portalId, String companyId) {
         if (portalId == null || portalId.isBlank()) return null;
         return "https://app.hubspot.com/contacts/" + portalId + "/company/" + companyId;
+    }
+
+    private String externalUrl(String portalId, String companyId, String fallback) {
+        String url = companyUrl(portalId, companyId);
+        return url == null ? fallback : url;
     }
 }

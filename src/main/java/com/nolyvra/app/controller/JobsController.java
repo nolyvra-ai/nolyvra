@@ -61,6 +61,14 @@ public class JobsController {
         return hubSpotJobSyncService.pushJob(jobId, loginId);
     }
 
+    @PostMapping("/{jobId}/hubspot/sync")
+    public HubSpotSyncStatusResponse syncJobWithHubSpot(
+            @PathVariable String jobId,
+            @RequestParam String loginId,
+            @RequestParam(required = false, defaultValue = "auto") String direction) {
+        return hubSpotJobSyncService.syncJob(jobId, loginId, direction);
+    }
+
     @GetMapping("/{jobId}/hubspot/status")
     public HubSpotSyncStatusResponse getJobHubSpotStatus(
             @PathVariable String jobId,

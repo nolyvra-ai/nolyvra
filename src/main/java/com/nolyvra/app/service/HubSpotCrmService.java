@@ -12,6 +12,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Instant;
 import java.util.Map;
 import java.util.List;
 
@@ -55,6 +56,13 @@ public class HubSpotCrmService {
         return sendJson(loginId, "GET", "/companies/" + companyId, null);
     }
 
+    public RemoteObject getCompanyForSync(String loginId, String companyId) throws Exception {
+        return mapRemoteObject(sendJson(
+                loginId, "GET",
+                "/companies/" + companyId + "?properties=name,description,linkedin_company_page",
+                null));
+    }
+
     public CrmObject createContact(String loginId, Map<String, String> properties) throws Exception {
         return mapObject(sendJson(
                 loginId, "POST", "/contacts", Map.of("properties", properties)));
@@ -64,6 +72,13 @@ public class HubSpotCrmService {
             String loginId, String contactId, Map<String, String> properties) throws Exception {
         return mapObject(sendJson(
                 loginId, "PATCH", "/contacts/" + contactId, Map.of("properties", properties)));
+    }
+
+    public RemoteObject getContactForSync(String loginId, String contactId) throws Exception {
+        return mapRemoteObject(sendJson(
+                loginId, "GET",
+                "/contacts/" + contactId + "?properties=email,firstname,lastname,phone,jobtitle",
+                null));
     }
 
     public CrmObject createDeal(String loginId, Map<String, String> properties) throws Exception {
@@ -79,6 +94,13 @@ public class HubSpotCrmService {
 
     public JsonNode getDeal(String loginId, String dealId) throws Exception {
         return sendJson(loginId, "GET", "/deals/" + dealId, null);
+    }
+
+    public RemoteObject getDealForSync(String loginId, String dealId) throws Exception {
+        return mapRemoteObject(sendJson(
+                loginId, "GET",
+                "/deals/" + dealId + "?properties=dealname,amount,pipeline,dealstage",
+                null));
     }
 
     public CrmObject findContactByEmail(String loginId, String email) throws Exception {
@@ -172,7 +194,18 @@ public class HubSpotCrmService {
         return new CrmObject(id, response.path("url").asText(null));
     }
 
+    private RemoteObject mapRemoteObject(JsonNode response) {
+        CrmObject object = mapObject(response);
+        String updatedAtText = response.path("updatedAt").asText(null);
+        Instant updatedAt = updatedAtText == null || updatedAtText.isBlank()
+                ? null
+                : Instant.parse(updatedAtText);
+        JsonNode properties = response.path("properties");
+        return new RemoteObject(object.id(), object.url(), updatedAt, properties);
+    }
+
     public record CrmObject(String id, String url) {}
+    public record RemoteObject(String id, String url, Instant updatedAt, JsonNode properties) {}
 
     public static class HubSpotNotConnectedException extends RuntimeException {
         public HubSpotNotConnectedException() {

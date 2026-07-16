@@ -6,6 +6,7 @@ import com.nolyvra.app.model.HubSpotConnection;
 import com.nolyvra.app.model.HubSpotSyncStatusResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.Instant;
 import java.util.List;
@@ -30,8 +31,9 @@ class HubSpotClientSyncServiceTest {
     private final ExternalCrmLinkService linkService = mock(ExternalCrmLinkService.class);
     private final HubSpotCompanyMapper mapper = mock(HubSpotCompanyMapper.class);
     private final HubSpotContactSyncService contactSyncService = mock(HubSpotContactSyncService.class);
+    private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
     private final HubSpotClientSyncService service = new HubSpotClientSyncService(
-            clientService, oauthService, crmService, linkService, mapper, contactSyncService);
+            clientService, oauthService, crmService, linkService, mapper, contactSyncService, jdbc);
 
     @BeforeEach
     void skipContactByDefault() throws Exception {

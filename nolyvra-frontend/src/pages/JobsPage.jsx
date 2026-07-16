@@ -47,7 +47,9 @@ async function apiPostJson(path, body = undefined) {
     try { message = JSON.parse(text)?.message || JSON.parse(text)?.error || text; } catch {
       // Keep the raw response text when the API does not return JSON.
     }
-    throw new Error(message || `Request failed (${res.status})`);
+    const error = new Error(message || `Request failed (${res.status})`);
+    error.status = res.status;
+    throw error;
   }
   return res.status === 204 ? null : res.json();
 }
@@ -687,6 +689,52 @@ export default function JobsPage() {
     }
   }
 
+  async function handleSyncJobWithHubSpot(job, e) {
+    e?.stopPropagation();
+    if (hubSpotPushingIds.has(job.id)) return;
+    setHubSpotPushingIds(prev => new Set(prev).add(job.id));
+    setErr("");
+    try {
+      const status = await apiPostJson(`/api/jobs/${job.id}/hubspot/sync`);
+      setJobHubSpotStatuses(prev => new Map(prev).set(job.id, status));
+      const freshJob = await apiGet(`/api/jobs/${job.id}`);
+      setJobs(prev => prev.map(item => item.id === job.id ? freshJob : item));
+    } catch (e) {
+      if (e.status === 409) {
+        const useHubSpot = window.confirm(`${e.message}\n\nOK: update Nolyvra from HubSpot.\nCancel: choose another action.`);
+        let direction = useHubSpot ? "pull" : null;
+        if (!direction) {
+          const useNolyvra = window.confirm("Overwrite HubSpot with the Nolyvra job instead?");
+          if (!useNolyvra) {
+            setHubSpotPushingIds(prev => { const next = new Set(prev); next.delete(job.id); return next; });
+            return;
+          }
+          direction = "push";
+        }
+        try {
+          const status = await apiPostJson(`/api/jobs/${job.id}/hubspot/sync?direction=${direction}`);
+          setJobHubSpotStatuses(prev => new Map(prev).set(job.id, status));
+          if (direction === "pull") {
+            const freshJob = await apiGet(`/api/jobs/${job.id}`);
+            setJobs(prev => prev.map(item => item.id === job.id ? freshJob : item));
+          }
+        } catch (forcedError) {
+          setErr(forcedError.message || "Failed to resolve HubSpot sync conflict");
+        }
+      } else {
+        setErr(e.message || "Failed to sync job with HubSpot");
+        try {
+          const status = await apiGet(`/api/jobs/${job.id}/hubspot/status`);
+          setJobHubSpotStatuses(prev => new Map(prev).set(job.id, status));
+        } catch {
+          // Best-effort refresh after a failed sync.
+        }
+      }
+    } finally {
+      setHubSpotPushingIds(prev => { const next = new Set(prev); next.delete(job.id); return next; });
+    }
+  }
+
   async function handleBulkHubSpot(mode) {
     const targets = visibleJobs.filter(job => {
       const status = jobHubSpotStatuses.get(job.id);
@@ -696,7 +744,11 @@ export default function JobsPage() {
     if (targets.length === 0) return;
     setErr("");
     for (const job of targets) {
-      await handlePushJobToHubSpot(job.id);
+      if (mode === "sync") {
+        await handleSyncJobWithHubSpot(job);
+      } else {
+        await handlePushJobToHubSpot(job.id);
+      }
     }
   }
 

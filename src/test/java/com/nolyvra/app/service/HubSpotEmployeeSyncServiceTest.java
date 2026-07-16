@@ -5,6 +5,7 @@ import com.nolyvra.app.model.ExternalCrmLink;
 import com.nolyvra.app.model.HubSpotConnection;
 import com.nolyvra.app.model.HubSpotSyncStatusResponse;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -25,8 +26,9 @@ class HubSpotEmployeeSyncServiceTest {
     private final HubSpotCrmService crmService = mock(HubSpotCrmService.class);
     private final ExternalCrmLinkService linkService = mock(ExternalCrmLinkService.class);
     private final HubSpotContactMapper mapper = mock(HubSpotContactMapper.class);
+    private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
     private final HubSpotEmployeeSyncService service = new HubSpotEmployeeSyncService(
-            employeeService, oauthService, crmService, linkService, mapper);
+            employeeService, oauthService, crmService, linkService, mapper, jdbc);
 
     @Test
     void unlinkedEmployeeReusesEmailMatch() throws Exception {

@@ -130,7 +130,11 @@ export default function CrmEmployeesPage() {
     const url = new URL(`${API_BASE}${path}`);
     url.searchParams.set("loginId", loginId);
     const res = await fetch(url.toString(), { headers: authHeader() });
-    if (!res.ok) throw new Error(await responseMessage(res));
+    if (!res.ok) {
+      const err = new Error(await responseMessage(res));
+      err.status = res.status;
+      throw err;
+    }
     return res.json();
   }
 
@@ -138,7 +142,11 @@ export default function CrmEmployeesPage() {
     const url = new URL(`${API_BASE}${path}`);
     url.searchParams.set("loginId", loginId);
     const res = await fetch(url.toString(), { method: "POST", headers: authHeader() });
-    if (!res.ok) throw new Error(await responseMessage(res));
+    if (!res.ok) {
+      const err = new Error(await responseMessage(res));
+      err.status = res.status;
+      throw err;
+    }
     return res.json();
   }
 
@@ -273,6 +281,40 @@ export default function CrmEmployeesPage() {
     }
   }
 
+  async function handleHubSpotSync(emp) {
+    setHubSpotBusy(prev => ({ ...prev, [emp.id]: true }));
+    setHubSpotError("");
+    try {
+      const status = await apiPost(`/api/crm/employees/${emp.id}/hubspot/sync`);
+      setHubSpotStatuses(prev => ({ ...prev, [emp.id]: status }));
+      await load();
+    } catch (e) {
+      if (e.status === 409) {
+        const useHubSpot = window.confirm(`${e.message}\n\nOK: update Nolyvra from HubSpot.\nCancel: choose another action.`);
+        let direction = useHubSpot ? "pull" : null;
+        if (!direction) {
+          const useNolyvra = window.confirm("Overwrite HubSpot with the Nolyvra employee instead?");
+          if (!useNolyvra) {
+            setHubSpotBusy(prev => ({ ...prev, [emp.id]: false }));
+            return;
+          }
+          direction = "push";
+        }
+        try {
+          const status = await apiPost(`/api/crm/employees/${emp.id}/hubspot/sync?direction=${direction}`);
+          setHubSpotStatuses(prev => ({ ...prev, [emp.id]: status }));
+          if (direction === "pull") await load();
+        } catch (forcedError) {
+          setHubSpotError(`Could not resolve HubSpot sync for ${emp.firstName} ${emp.lastName}. ${forcedError.message || "Please try again."}`);
+        }
+      } else {
+        setHubSpotError(`Could not sync ${emp.firstName} ${emp.lastName} with HubSpot. ${e.message || "Please try again."}`);
+      }
+    } finally {
+      setHubSpotBusy(prev => ({ ...prev, [emp.id]: false }));
+    }
+  }
+
   async function handleBulkHubSpot(mode) {
     const targets = employees.filter(emp => {
       const status = hubSpotStatuses[emp.id];
@@ -282,7 +324,11 @@ export default function CrmEmployeesPage() {
     if (targets.length === 0) return;
     setHubSpotError("");
     for (const emp of targets) {
-      await handleHubSpotPush(emp);
+      if (mode === "sync") {
+        await handleHubSpotSync(emp);
+      } else {
+        await handleHubSpotPush(emp);
+      }
     }
   }
 

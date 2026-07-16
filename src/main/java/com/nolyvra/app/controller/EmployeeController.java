@@ -85,6 +85,15 @@ public class EmployeeController {
         return hubSpotEmployeeSyncService.pushEmployee(id, loginId);
     }
 
+    @PostMapping("/employees/{id}/hubspot/sync")
+    public HubSpotSyncStatusResponse syncEmployeeWithHubSpot(
+            @PathVariable String id,
+            @RequestParam String loginId,
+            @RequestParam(required = false, defaultValue = "auto") String direction) {
+        entitlementService.checkEntitled(loginId);
+        return hubSpotEmployeeSyncService.syncEmployee(id, loginId, direction);
+    }
+
     @GetMapping("/employees/{id}/hubspot/status")
     public HubSpotSyncStatusResponse getEmployeeHubSpotStatus(
             @PathVariable String id,

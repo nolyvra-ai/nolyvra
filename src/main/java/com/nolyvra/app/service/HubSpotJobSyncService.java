@@ -12,6 +12,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.Map;
 
 @Service
@@ -43,6 +45,58 @@ public class HubSpotJobSyncService {
         this.linkService = linkService;
         this.dealMapper = dealMapper;
         this.jdbc = jdbc;
+    }
+
+    @Transactional
+    public HubSpotSyncStatusResponse syncJob(String jobId, String loginId, String direction) {
+        getJob(jobId, loginId);
+        HubSpotConnection connection = oauthService.getConnection(loginId);
+        if (connection == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Connect HubSpot before syncing a job");
+        }
+
+        linkService.acquireLocalRecordLock(loginId, PROVIDER, LOCAL_TYPE, jobId);
+        ExternalCrmLink link = linkService.findByLocalRecord(loginId, PROVIDER, LOCAL_TYPE, jobId);
+        HubSpotSyncSupport.requireLinked(link, "job");
+
+        if (HubSpotSyncSupport.isPush(direction)) {
+            return pushJob(jobId, loginId);
+        }
+
+        try {
+            HubSpotCrmService.RemoteObject remote = crmService.getDealForSync(loginId, link.externalId());
+            if (HubSpotSyncSupport.isPull(direction)) {
+                pullDeal(jobId, loginId, remote);
+                ExternalCrmLink saved = linkService.recordSuccess(
+                        loginId, PROVIDER, LOCAL_TYPE, jobId,
+                        remote.id(), externalUrl(connection.hubspotPortalId(), remote.id(), link.externalUrl()));
+                return HubSpotSyncStatusResponse.fromLink(saved);
+            }
+
+            Instant localUpdatedAt = localUpdatedAt(jobId, loginId);
+            boolean localChanged = HubSpotSyncSupport.changedAfter(localUpdatedAt, link.lastSyncedAt());
+            boolean remoteChanged = HubSpotSyncSupport.changedAfter(remote.updatedAt(), link.lastSyncedAt());
+            if (localChanged && remoteChanged) {
+                HubSpotSyncSupport.rejectConflict("job");
+            }
+            if (remoteChanged) {
+                pullDeal(jobId, loginId, remote);
+                ExternalCrmLink saved = linkService.recordSuccess(
+                        loginId, PROVIDER, LOCAL_TYPE, jobId,
+                        remote.id(), externalUrl(connection.hubspotPortalId(), remote.id(), link.externalUrl()));
+                return HubSpotSyncStatusResponse.fromLink(saved);
+            }
+            if (localChanged) {
+                return pushJob(jobId, loginId);
+            }
+            return HubSpotSyncStatusResponse.fromLink(link);
+        } catch (ResponseStatusException e) {
+            throw e;
+        } catch (Exception e) {
+            String message = HubSpotErrorSupport.userMessage(e);
+            linkService.recordFailure(loginId, PROVIDER, LOCAL_TYPE, jobId, message);
+            throw new ResponseStatusException(HubSpotErrorSupport.responseStatus(e), message, e);
+        }
     }
 
     @Transactional
@@ -149,5 +203,29 @@ public class HubSpotJobSyncService {
     private String dealUrl(String portalId, String dealId) {
         if (portalId == null || portalId.isBlank()) return null;
         return "https://app.hubspot.com/contacts/" + portalId + "/deal/" + dealId;
+    }
+
+    private void pullDeal(String jobId, String loginId, HubSpotCrmService.RemoteObject remote) {
+        String dealName = HubSpotSyncSupport.property(remote.properties(), "dealname");
+        jdbc.update("""
+                update jobs
+                set title = coalesce(?, title),
+                    updated_at = now()
+                where id = ? and login_id = ? and is_active = true
+                """, dealName, jobId, loginId);
+    }
+
+    private Instant localUpdatedAt(String jobId, String loginId) {
+        OffsetDateTime updatedAt = jdbc.queryForObject("""
+                select updated_at
+                from jobs
+                where id = ? and login_id = ? and is_active = true
+                """, OffsetDateTime.class, jobId, loginId);
+        return updatedAt == null ? null : updatedAt.toInstant();
+    }
+
+    private String externalUrl(String portalId, String dealId, String fallback) {
+        String url = dealUrl(portalId, dealId);
+        return url == null ? fallback : url;
     }
 }

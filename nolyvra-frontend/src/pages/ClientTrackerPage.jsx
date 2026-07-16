@@ -67,12 +67,16 @@ const hdrs    = () => ({
 
 async function apiError(response) {
   const text = await response.text();
+  let message;
   try {
     const json = JSON.parse(text);
-    return new Error(json.message || json.error || "Request failed");
+    message = json.message || json.error || "Request failed";
   } catch {
-    return new Error(text || "Request failed");
+    message = text || "Request failed";
   }
+  const error = new Error(message);
+  error.status = response.status;
+  return error;
 }
 
 async function apiGet(path) {
@@ -1278,6 +1282,46 @@ export default function ClientTrackerPage() {
     }
   }
 
+  async function handleHubSpotSync(client) {
+    setHubSpotBusy(prev => ({ ...prev, [client.id]: true }));
+    setHubSpotError("");
+    try {
+      const status = await apiPostJson(`/api/clients/${client.id}/hubspot/sync`);
+      setHubSpotStatuses(prev => ({ ...prev, [client.id]: status }));
+      await loadClients();
+    } catch (e) {
+      if (e.status === 409) {
+        const useHubSpot = window.confirm(`${e.message}\n\nOK: update Nolyvra from HubSpot.\nCancel: choose another action.`);
+        let direction = useHubSpot ? "pull" : null;
+        if (!direction) {
+          const useNolyvra = window.confirm("Overwrite HubSpot with the Nolyvra client instead?");
+          if (!useNolyvra) {
+            setHubSpotBusy(prev => ({ ...prev, [client.id]: false }));
+            return;
+          }
+          direction = "push";
+        }
+        try {
+          const status = await apiPostJson(`/api/clients/${client.id}/hubspot/sync?direction=${direction}`);
+          setHubSpotStatuses(prev => ({ ...prev, [client.id]: status }));
+          if (direction === "pull") await loadClients();
+        } catch (forcedError) {
+          setHubSpotError(`Could not resolve HubSpot sync for ${client.companyName}. ${forcedError.message || "Please try again."}`);
+        }
+      } else {
+        setHubSpotError(`Could not sync ${client.companyName} with HubSpot. ${e.message || "Please try again."}`);
+        try {
+          const status = await apiGet(`/api/clients/${client.id}/hubspot/status`);
+          setHubSpotStatuses(prev => ({ ...prev, [client.id]: status }));
+        } catch {
+          // Keep the last known state when the status refresh also fails.
+        }
+      }
+    } finally {
+      setHubSpotBusy(prev => ({ ...prev, [client.id]: false }));
+    }
+  }
+
   async function handleBulkHubSpot(mode) {
     const targets = filtered.filter(client => {
       const status = hubSpotStatuses[client.id];
@@ -1287,7 +1331,11 @@ export default function ClientTrackerPage() {
     if (targets.length === 0) return;
     setHubSpotError("");
     for (const client of targets) {
-      await handleHubSpotPush(client);
+      if (mode === "sync") {
+        await handleHubSpotSync(client);
+      } else {
+        await handleHubSpotPush(client);
+      }
     }
   }
 
