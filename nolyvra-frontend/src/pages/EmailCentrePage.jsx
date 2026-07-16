@@ -200,6 +200,16 @@ export default function EmailCentrePage() {
     toAddress: "", subject: "", body: "", candidateId: "", jobId: "", templateType: "",
   });
 
+  // ── Bulk outreach mode (navigated to from Client Tracker's "Generate Bulk
+  // Outreach") — a shared subject/body template with a literal "{}" merge
+  // field, sent once per recipient with "{}" substituted for their name. ──
+  const [bulkMode,       setBulkMode]       = useState(false);
+  const [bulkRecipients, setBulkRecipients] = useState([]); // [{ name, email, status }]
+  const [bulkSubject,    setBulkSubject]    = useState("");
+  const [bulkBody,       setBulkBody]       = useState("");
+  const [bulkSending,    setBulkSending]    = useState(false);
+  const [bulkResults,    setBulkResults]    = useState(null); // { sent, skipped, failed }
+
   useEffect(() => { injectStyles(); }, []);
 
   useEffect(() => {
@@ -230,7 +240,12 @@ export default function EmailCentrePage() {
       if (hr.status === "fulfilled") setHistory(hr.value);
 
       const s = location.state;
-      if (s && (s.toAddress || s.subject || s.body)) {
+      if (s && Array.isArray(s.bulkRecipients) && s.bulkRecipients.length > 0) {
+        setBulkMode(true);
+        setBulkRecipients(s.bulkRecipients.map(r => ({ name: r.name || "there", email: r.email || "", status: "pending" })));
+        setBulkSubject(s.bulkSubject || "");
+        setBulkBody(s.bulkBodyTemplate ? textToHtml(s.bulkBodyTemplate) : "");
+      } else if (s && (s.toAddress || s.subject || s.body)) {
         setForm(p => ({
           ...p,
           candidateId: s.candidateId || "",
@@ -323,6 +338,48 @@ export default function EmailCentrePage() {
     finally { setSending(false); }
   }
 
+  function updateBulkRecipient(i, email) {
+    setBulkRecipients(prev => prev.map((r, idx) => idx === i ? { ...r, email } : r));
+  }
+
+  async function handleBulkSendAll() {
+    setBulkSending(true); setError(null); setBulkResults(null);
+    let sent = 0, skipped = 0, failed = 0;
+    const recipients = [...bulkRecipients];
+
+    for (let i = 0; i < recipients.length; i++) {
+      const r = recipients[i];
+      if (!r.email || !r.email.trim()) {
+        recipients[i] = { ...r, status: "skipped" };
+        skipped++;
+        setBulkRecipients([...recipients]);
+        continue;
+      }
+      try {
+        const personalizedBody = buildBodyWithSig(bulkBody.replaceAll("{}", r.name), signature);
+        const url = new URL(`${API_BASE}/api/emails/send`);
+        url.searchParams.set("loginId", loginId);
+        const res = await fetch(url.toString(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+          body: JSON.stringify({ toAddress: r.email, subject: bulkSubject, body: personalizedBody, candidateId: "", templateType: "" }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const savedRec = await res.json();
+        setHistory(p => [savedRec, ...p]);
+        recipients[i] = { ...r, status: "sent" };
+        sent++;
+      } catch (e) {
+        recipients[i] = { ...r, status: "failed" };
+        failed++;
+      }
+      setBulkRecipients([...recipients]);
+    }
+
+    setBulkResults({ sent, skipped, failed });
+    setBulkSending(false);
+  }
+
   return (
     <Box sx={{ display:"flex", flexDirection:"column", gap:2 }}>
       <Box sx={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
@@ -344,6 +401,127 @@ export default function EmailCentrePage() {
 
         {/* ── Compose ──────────────────────────────────────────────────────── */}
         <Box sx={{ flex: 1.4 }}>
+          {bulkMode ? (
+          <Paper elevation={0} sx={{ border:`1px solid ${BORDER}`, borderRadius:"10px",
+            overflow:"hidden", bgcolor:"#fff" }}>
+            <Box sx={{ px:2.25, py:1.5, borderBottom:`1px solid ${BORDER}`,
+              display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+              <Box>
+                <Typography sx={{ fontSize:13, fontWeight:600, color:TEXT }}>
+                  Bulk Outreach — {bulkRecipients.length} recipient{bulkRecipients.length === 1 ? "" : "s"}
+                </Typography>
+                <Typography sx={{ fontSize:10.5, color:MUTED, mt:0.25 }}>
+                  "{"{}"}" in the message is replaced with each recipient's name when sent.
+                </Typography>
+              </Box>
+              <Button size="small" onClick={() => { setBulkMode(false); setBulkResults(null); }}
+                sx={{ fontSize:11, color:MUTED, textTransform:"none" }}>
+                Switch to single email
+              </Button>
+            </Box>
+
+            <Box sx={{ p:2.25, display:"flex", flexDirection:"column", gap:1.5 }}>
+              <Box>
+                <Typography sx={{ fontSize:12, fontWeight:600, color:TEXT, mb:0.5 }}>Subject</Typography>
+                <TextField fullWidth size="small" value={bulkSubject}
+                  onChange={e => setBulkSubject(e.target.value)}
+                  placeholder="Email subject…"
+                  sx={{ "& .MuiOutlinedInput-root":{ borderRadius:"8px", fontSize:12 } }} />
+              </Box>
+
+              <Box>
+                <Typography sx={{ fontSize:12, fontWeight:600, color:TEXT, mb:0.5 }}>Message</Typography>
+                <QuillEditor
+                  value={bulkBody}
+                  onChange={html => setBulkBody(html)}
+                  modules={BODY_MODULES}
+                  placeholder="Write your bulk message here…"
+                  className="nolyvra-quill"
+                />
+              </Box>
+
+              <Box>
+                <Box sx={{ display:"flex", alignItems:"center", justifyContent:"space-between", mb:0.5 }}>
+                  <Typography sx={{ fontSize:12, fontWeight:600, color:TEXT }}>Recipients</Typography>
+                  <Typography sx={{ fontSize:10, color:MUTED }}>
+                    Add an email for each row you want to send to — blank rows are skipped.
+                  </Typography>
+                </Box>
+                <Box sx={{ border:`1px solid ${BORDER}`, borderRadius:"8px", overflow:"hidden" }}>
+                  {bulkRecipients.map((r, i) => (
+                    <Box key={i} sx={{ display:"flex", alignItems:"center", gap:1, px:1.5, py:1,
+                      borderBottom: i < bulkRecipients.length - 1 ? `1px solid ${BORDER}` : "none",
+                      bgcolor: i % 2 === 1 ? SURFACE : "#fff" }}>
+                      <Box sx={{ width: 8, height: 8, borderRadius:"50%", flexShrink:0,
+                        bgcolor: r.status === "sent" ? SUCCESS : r.status === "failed" ? DANGER
+                          : r.status === "skipped" ? MUTED : "#D1D5DB" }} />
+                      <Typography sx={{ fontSize:12, fontWeight:600, color:TEXT, width:160, flexShrink:0,
+                        overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                        {r.name}
+                      </Typography>
+                      <TextField size="small" fullWidth value={r.email} disabled={bulkSending}
+                        onChange={e => updateBulkRecipient(i, e.target.value)}
+                        placeholder="email@company.com"
+                        sx={{ "& .MuiOutlinedInput-root":{ borderRadius:"6px", fontSize:12 } }} />
+                      {r.status !== "pending" && (
+                        <Typography sx={{ fontSize:10.5, fontWeight:600, flexShrink:0,
+                          color: r.status === "sent" ? SUCCESS : r.status === "failed" ? DANGER : MUTED }}>
+                          {r.status === "sent" ? "Sent" : r.status === "failed" ? "Failed" : "Skipped"}
+                        </Typography>
+                      )}
+                    </Box>
+                  ))}
+                </Box>
+              </Box>
+
+              {/* ── Signature block ─────────────────────────────────────────── */}
+              <Box>
+                <Box sx={{ display:"flex", alignItems:"center", justifyContent:"space-between", mb:0.5 }}>
+                  <Typography sx={{ fontSize:12, fontWeight:600, color:TEXT }}>Email Signature</Typography>
+                  <Typography sx={{ fontSize:10, color:MUTED }}>
+                    Appended to every email · auto-saved
+                  </Typography>
+                </Box>
+                <Box sx={{ border:`1px solid ${BORDER}`, borderRadius:"8px", bgcolor:SURFACE,
+                  px:1.5, py:1 }}>
+                  <QuillEditor
+                    value={signature}
+                    onChange={handleSignatureChange}
+                    modules={SIG_MODULES}
+                    placeholder="e.g.  Best regards, Your Name | Title | Company"
+                    className="nolyvra-quill-sig"
+                  />
+                </Box>
+              </Box>
+
+              {bulkResults && (
+                <Alert severity={bulkResults.failed > 0 ? "warning" : "success"}>
+                  Sent {bulkResults.sent}{bulkResults.skipped > 0 ? `, skipped ${bulkResults.skipped} (no email)` : ""}{bulkResults.failed > 0 ? `, ${bulkResults.failed} failed` : ""}.
+                </Alert>
+              )}
+
+              <Box sx={{ display:"flex", alignItems:"center", gap:1.5 }}>
+                <Button variant="contained" onClick={handleBulkSendAll}
+                  disabled={bulkSending || !bulkSubject || !bulkBody || bulkRecipients.length === 0}
+                  sx={{ fontSize:12, fontWeight:500, bgcolor:ACCENT, borderRadius:"8px",
+                    textTransform:"none", boxShadow:"none",
+                    "&:hover":{ bgcolor:"#1660CC", boxShadow:"none" } }}>
+                  {bulkSending ? <CircularProgress size={14} sx={{ color:"#fff" }} /> : "✉ Send All"}
+                </Button>
+                {connectedEmailProvider && (
+                  <Box sx={{
+                    display:"inline-flex", alignItems:"center", gap:0.5,
+                    bgcolor:"#EFF6FF", border:"1px solid #BFDBFE",
+                    borderRadius:"20px", px:1.25, py:0.4,
+                    fontSize:11, fontWeight:500, color:"#1D4ED8"
+                  }}>
+                    Sending via {connectedEmailProvider.email || connectedEmailProvider.name}
+                  </Box>
+                )}
+              </Box>
+            </Box>
+          </Paper>
+          ) : (
           <Paper elevation={0} sx={{ border:`1px solid ${BORDER}`, borderRadius:"10px",
             overflow:"hidden", bgcolor:"#fff" }}>
             <Box sx={{ px:2.25, py:1.5, borderBottom:`1px solid ${BORDER}`,
@@ -451,6 +629,7 @@ export default function EmailCentrePage() {
               </Box>
             </Box>
           </Paper>
+          )}
 
           {/* Email history */}
           <Paper elevation={0} sx={{ border:`1px solid ${BORDER}`, borderRadius:"10px",

@@ -46,28 +46,8 @@ const INIT = {
   consent:false,
 };
 
-const DARK_FIELD = {
-  "& .MuiInputBase-input":{ color:"rgba(255,255,255,.85)" },
-  "& .MuiInputBase-root":{ bgcolor:"rgba(255,255,255,.06)" },
-  "& .MuiOutlinedInput-notchedOutline":{ borderColor:"rgba(255,255,255,.15)" },
-  "& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline":{ borderColor:"rgba(74,144,217,.5)" },
-  "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline":{ borderColor:"#4a90d9" },
-  "& .MuiInputLabel-root":{ color:"rgba(255,255,255,.4)" },
-  "& .MuiInputLabel-root.Mui-focused":{ color:"#4a90d9" },
-  "& .MuiSvgIcon-root":{ color:"rgba(255,255,255,.4)" },
-};
-const DARK_AC = {
-  ...DARK_FIELD,
-  "& .MuiChip-root":{ bgcolor:"rgba(74,144,217,.2)", color:"#a8d4ff", border:"1px solid rgba(74,144,217,.3)" },
-  "& .MuiChip-deleteIcon":{ color:"rgba(74,144,217,.6)" },
-  "& .MuiAutocomplete-clearIndicator, & .MuiAutocomplete-popupIndicator":{ color:"rgba(255,255,255,.35)" },
-};
-const LISTBOX_SX = {
-  bgcolor:"#0d1230",
-  border:"1px solid rgba(255,255,255,.1)",
-  "& .MuiAutocomplete-option":{ color:"rgba(255,255,255,.8)", "&:hover":{ bgcolor:"rgba(74,144,217,.12)" } },
-};
-
+// Used by the RESULTS page's charts/tables — kept dark since that page's
+// background and text stay dark navy.
 const SECTION = {
   background:"rgba(255,255,255,.03)",
   border:"1px solid rgba(255,255,255,.07)",
@@ -76,6 +56,39 @@ const SECTION = {
 const SEC_TITLE = {
   fontSize:11, fontWeight:700, color:"#4a90d9", letterSpacing:"2.5px",
   textTransform:"uppercase", fontFamily:"'Space Mono',monospace", marginBottom:20,
+};
+
+// Light section boxes used only on the FORM step (About You, Candidate
+// Sourcing, ATS, CRM, AI Tools, Integration Layer, Consent) — everything
+// below this point is scoped exclusively to those boxes.
+const SECTION_LIGHT = {
+  background:"#fff",
+  border:"1px solid #e5e9f0",
+  boxShadow:"0 1px 3px rgba(15,22,35,.06)",
+  borderRadius:14, padding:"28px 28px 24px", marginBottom:20,
+};
+const LT_TEXT="#0f1623", LT_MUTED="#6b7480", LT_MUTED2="#98a1ad", LT_ERROR="#dc2626";
+
+const LIGHT_FIELD = {
+  "& .MuiInputBase-input":{ color:LT_TEXT },
+  "& .MuiInputBase-root":{ bgcolor:"#f7f8fa" },
+  "& .MuiOutlinedInput-notchedOutline":{ borderColor:"#dde2ea" },
+  "& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline":{ borderColor:"rgba(74,144,217,.6)" },
+  "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline":{ borderColor:"#4a90d9" },
+  "& .MuiInputLabel-root":{ color:LT_MUTED },
+  "& .MuiInputLabel-root.Mui-focused":{ color:"#4a90d9" },
+  "& .MuiSvgIcon-root":{ color:LT_MUTED },
+};
+const LIGHT_AC = {
+  ...LIGHT_FIELD,
+  "& .MuiChip-root":{ bgcolor:"rgba(74,144,217,.12)", color:"#2d6fb3", border:"1px solid rgba(74,144,217,.3)" },
+  "& .MuiChip-deleteIcon":{ color:"rgba(74,144,217,.6)" },
+  "& .MuiAutocomplete-clearIndicator, & .MuiAutocomplete-popupIndicator":{ color:LT_MUTED },
+};
+const LISTBOX_SX_LIGHT = {
+  bgcolor:"#fff",
+  border:"1px solid #e5e9f0",
+  "& .MuiAutocomplete-option":{ color:LT_TEXT, "&:hover":{ bgcolor:"rgba(74,144,217,.08)" } },
 };
 const fmtAUD = n => `$${(n||0).toLocaleString("en-AU")}`;
 
@@ -209,18 +222,20 @@ export default function StackAuditPage() {
 
   return (
     <>
-    <div style={{ fontFamily:"'DM Sans',sans-serif", background:"#06091e", minHeight:"100vh", display:"flex", flexDirection:"column" }}>
+    <div style={{ fontFamily:"'DM Sans',sans-serif", background:"#06050B", minHeight:"100vh", display:"flex", flexDirection:"column", position:"relative", overflow:"hidden" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
         *{box-sizing:border-box;}
+        @keyframes saMesh  { 0%{transform:translate(0,0) scale(1)} 50%{transform:translate(-30px,15px) scale(1.06)} 100%{transform:translate(20px,-10px) scale(1.02)} }
+        @keyframes saSweep { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
         .sa-back{display:inline-flex;align-items:center;gap:8px;background:transparent;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:8px 16px;border-radius:8px;font-size:13px;font-family:inherit;cursor:pointer;transition:all .2s;}
         .sa-back:hover{border-color:rgba(255,255,255,.35);color:#fff;}
-        .sa-toggle{padding:9px 16px;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:rgba(255,255,255,.55);transition:all .2s;}
-        .sa-toggle.on{background:rgba(74,144,217,.18);border-color:rgba(74,144,217,.45);color:#a8d4ff;}
-        .sa-yn{padding:10px 28px;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:rgba(255,255,255,.55);transition:all .2s;}
-        .sa-yn.on{background:rgba(74,144,217,.18);border-color:rgba(74,144,217,.45);color:#a8d4ff;}
-        .sa-rm{padding:6px 12px;border-radius:6px;font-size:12px;font-family:inherit;cursor:pointer;border:1px solid rgba(255,80,80,.22);background:rgba(255,80,80,.06);color:rgba(255,110,110,.65);transition:all .2s;}
-        .sa-rm:hover{background:rgba(255,80,80,.14);color:#ff9090;}
+        .sa-toggle{padding:9px 16px;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:1px solid #dde2ea;background:#f7f8fa;color:#4b5563;transition:all .2s;}
+        .sa-toggle.on{background:rgba(74,144,217,.12);border-color:rgba(74,144,217,.5);color:#2d6fb3;}
+        .sa-yn{padding:10px 28px;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid #dde2ea;background:#f7f8fa;color:#4b5563;transition:all .2s;}
+        .sa-yn.on{background:rgba(74,144,217,.12);border-color:rgba(74,144,217,.5);color:#2d6fb3;}
+        .sa-rm{padding:6px 12px;border-radius:6px;font-size:12px;font-family:inherit;cursor:pointer;border:1px solid rgba(220,38,38,.25);background:rgba(220,38,38,.05);color:#dc2626;transition:all .2s;}
+        .sa-rm:hover{background:rgba(220,38,38,.12);color:#b91c1c;}
         .sa-add{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:1px dashed rgba(74,144,217,.35);background:transparent;color:#4a90d9;transition:all .2s;}
         .sa-add:hover{background:rgba(74,144,217,.08);border-style:solid;}
         .sa-submit{width:100%;padding:15px;border-radius:10px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;border:none;background:linear-gradient(135deg,#4a90d9,#2d6fb3);color:#fff;transition:all .2s;}
@@ -236,8 +251,22 @@ export default function StackAuditPage() {
         @media(max-width:600px){.sa-grid2{grid-template-columns:1fr!important;}}
       `}</style>
 
+      {/* ── Dynamic gradient background (same treatment as the landing page hero) ── */}
+      <div style={{ position:"fixed", inset:0, zIndex:0, pointerEvents:"none", overflow:"hidden" }}>
+        <div style={{ position:"absolute", inset:"-10%",
+          background:`radial-gradient(circle at 18% 28%,rgba(99,102,241,.55) 0%,transparent 40%),
+                      radial-gradient(circle at 78% 22%,rgba(6,182,212,.45) 0%,transparent 44%),
+                      radial-gradient(circle at 62% 78%,rgba(139,92,246,.55) 0%,transparent 42%),
+                      radial-gradient(circle at 22% 82%,rgba(244,114,182,.32) 0%,transparent 40%)`,
+          filter:"blur(40px)", mixBlendMode:"screen", animation:"saMesh 22s ease-in-out infinite alternate" }} />
+        <div style={{ position:"absolute", inset:0, background:"linear-gradient(110deg,transparent 30%,rgba(255,255,255,.1) 50%,transparent 70%)", mixBlendMode:"screen", animation:"saSweep 9s ease-in-out infinite", opacity:.7 }} />
+        <div style={{ position:"absolute", inset:0, background:"repeating-linear-gradient(0deg,rgba(255,255,255,.02) 0 2px,transparent 2px 4px)", opacity:.6 }} />
+        <div style={{ position:"absolute", inset:0, backgroundImage:`linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px)`, backgroundSize:"60px 60px", WebkitMaskImage:"radial-gradient(ellipse 75% 65% at 50% 30%,#000 0%,transparent 75%)", maskImage:"radial-gradient(ellipse 75% 65% at 50% 30%,#000 0%,transparent 75%)" }} />
+        <div style={{ position:"absolute", inset:0, background:"radial-gradient(ellipse 90% 70% at 50% 50%,transparent 35%,rgba(6,5,11,.85) 100%)" }} />
+      </div>
+
       {/* ── Top bar ── */}
-      <div style={{ background:"rgba(6,9,30,.95)", backdropFilter:"blur(12px)", borderBottom:"1px solid rgba(255,255,255,.06)", padding:"0 24px", height:60, display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, zIndex:50 }}>
+      <div style={{ background:"rgba(6,9,30,.7)", backdropFilter:"blur(12px)", borderBottom:"1px solid rgba(255,255,255,.06)", padding:"0 24px", height:60, display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, zIndex:50 }}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
           <img src="/nolyvra_logo.png" alt="nolyvra" style={{ width:32, height:32, borderRadius:7, objectFit:"cover" }} />
           <div style={{ lineHeight:1 }}>
@@ -249,7 +278,7 @@ export default function StackAuditPage() {
       </div>
 
       {/* ── Content ── */}
-      <div style={{ flex:1, maxWidth:720, width:"100%", margin:"0 auto", padding:"48px 20px 80px" }}>
+      <div style={{ position:"relative", zIndex:1, flex:1, maxWidth:720, width:"100%", margin:"0 auto", padding:"48px 20px 80px" }}>
 
         {/* ════════ FORM ════════ */}
         {!report && (
@@ -266,7 +295,7 @@ export default function StackAuditPage() {
             </div>
 
             {/* § 1 — About you */}
-            <div style={SECTION}>
+            <div style={SECTION_LIGHT}>
               <div style={SEC_TITLE}>① About You</div>
               <div className="sa-grid2">
                 {[
@@ -278,16 +307,16 @@ export default function StackAuditPage() {
                   <TextField key={key} label={label} size="small" fullWidth type={type}
                     value={form[key]} onChange={e => setF(key, e.target.value)}
                     error={!!errors[key]} helperText={errors[key]}
-                    sx={DARK_FIELD} FormHelperTextProps={{ sx:{ color:"#f87171" } }}
+                    sx={LIGHT_FIELD} FormHelperTextProps={{ sx:{ color:LT_ERROR } }}
                   />
                 ))}
               </div>
             </div>
 
             {/* § 2 — Candidate sourcing */}
-            <div style={SECTION}>
+            <div style={SECTION_LIGHT}>
               <div style={SEC_TITLE}>② Candidate Sourcing</div>
-              {errors.candidateToggles && <div style={{ color:"#f87171", fontSize:12, marginBottom:12 }}>{errors.candidateToggles}</div>}
+              {errors.candidateToggles && <div style={{ color:LT_ERROR, fontSize:12, marginBottom:12 }}>{errors.candidateToggles}</div>}
               <div style={{ display:"flex", flexWrap:"wrap", gap:10, marginBottom:20 }}>
                 {["LinkedIn","Seek","Indeed","Other"].map(tool => (
                   <button key={tool}
@@ -308,7 +337,7 @@ export default function StackAuditPage() {
                   <TextField label="Other tool name" size="small" fullWidth value={form.otherCandidateName}
                     onChange={e => setF("otherCandidateName", e.target.value)}
                     error={!!errors.otherCandidateName} helperText={errors.otherCandidateName}
-                    sx={{ ...DARK_FIELD, mb:2 }} FormHelperTextProps={{ sx:{ color:"#f87171" } }}
+                    sx={{ ...LIGHT_FIELD, mb:2 }} FormHelperTextProps={{ sx:{ color:LT_ERROR } }}
                   />
                   <div style={{ marginTop:14 }}>
                     <SliderRow label="Other tool — monthly spend"
@@ -320,7 +349,7 @@ export default function StackAuditPage() {
             </div>
 
             {/* § 3 — ATS */}
-            <div style={SECTION}>
+            <div style={SECTION_LIGHT}>
               <div style={SEC_TITLE}>③ Applicant Tracking System (ATS)</div>
               <Autocomplete
                 options={ATS_TOOLS}
@@ -329,10 +358,10 @@ export default function StackAuditPage() {
                 renderInput={params => (
                   <TextField {...params} label="Current ATS tool" size="small"
                     error={!!errors.atsTool} helperText={errors.atsTool}
-                    FormHelperTextProps={{ sx:{ color:"#f87171" } }}
+                    FormHelperTextProps={{ sx:{ color:LT_ERROR } }}
                   />
                 )}
-                sx={{ ...DARK_AC, mb:2.5 }} ListboxProps={{ sx:LISTBOX_SX }}
+                sx={{ ...LIGHT_AC, mb:2.5 }} ListboxProps={{ sx:LISTBOX_SX_LIGHT }}
               />
               <SliderRow label="ATS — monthly spend" value={form.atsExpense} onChange={v => setF("atsExpense",v)} />
               <div style={{ marginTop:20 }}>
@@ -345,16 +374,16 @@ export default function StackAuditPage() {
                     <TextField {...params} label="Which ATS features do you use?" size="small"
                       error={!!errors.atsFeatures}
                       helperText={errors.atsFeatures || "Pick from list or type + Enter"}
-                      FormHelperTextProps={{ sx:{ color: errors.atsFeatures?"#f87171":"rgba(255,255,255,.3)" } }}
+                      FormHelperTextProps={{ sx:{ color: errors.atsFeatures?LT_ERROR:LT_MUTED2 } }}
                     />
                   )}
-                  sx={DARK_AC} ListboxProps={{ sx:LISTBOX_SX }}
+                  sx={LIGHT_AC} ListboxProps={{ sx:LISTBOX_SX_LIGHT }}
                 />
               </div>
             </div>
 
             {/* § 4 — CRM */}
-            <div style={SECTION}>
+            <div style={SECTION_LIGHT}>
               <div style={SEC_TITLE}>④ Internal HR / CRM</div>
               <Autocomplete
                 options={CRM_TOOLS}
@@ -363,10 +392,10 @@ export default function StackAuditPage() {
                 renderInput={params => (
                   <TextField {...params} label="CRM / HRM tool name" size="small"
                     error={!!errors.crmTool} helperText={errors.crmTool}
-                    FormHelperTextProps={{ sx:{ color:"#f87171" } }}
+                    FormHelperTextProps={{ sx:{ color:LT_ERROR } }}
                   />
                 )}
-                sx={{ ...DARK_AC, mb:2.5 }} ListboxProps={{ sx:LISTBOX_SX }}
+                sx={{ ...LIGHT_AC, mb:2.5 }} ListboxProps={{ sx:LISTBOX_SX_LIGHT }}
               />
               <SliderRow label="CRM — monthly spend" value={form.crmExpense} onChange={v => setF("crmExpense",v)} />
               <div style={{ marginTop:20 }}>
@@ -379,18 +408,18 @@ export default function StackAuditPage() {
                     <TextField {...params} label="Which CRM features do you use?" size="small"
                       error={!!errors.crmFeatures}
                       helperText={errors.crmFeatures || "Pick from list or type + Enter"}
-                      FormHelperTextProps={{ sx:{ color: errors.crmFeatures?"#f87171":"rgba(255,255,255,.3)" } }}
+                      FormHelperTextProps={{ sx:{ color: errors.crmFeatures?LT_ERROR:LT_MUTED2 } }}
                     />
                   )}
-                  sx={DARK_AC} ListboxProps={{ sx:LISTBOX_SX }}
+                  sx={LIGHT_AC} ListboxProps={{ sx:LISTBOX_SX_LIGHT }}
                 />
               </div>
             </div>
 
             {/* § 5 — AI tools */}
-            <div style={SECTION}>
+            <div style={SECTION_LIGHT}>
               <div style={SEC_TITLE}>⑤ AI Tools</div>
-              <p style={{ fontSize:13, color:"rgba(255,255,255,.38)", marginTop:-12, marginBottom:20 }}>
+              <p style={{ fontSize:13, color:LT_MUTED, marginTop:-12, marginBottom:20 }}>
                 Add any standalone AI tools your team pays for (e.g. ChatGPT Plus, Jasper, Otter.ai, Roi.ai, sapia.ai). Leave empty if none.
               </p>
               {form.aiTools.map((tool,i) => (
@@ -399,7 +428,7 @@ export default function StackAuditPage() {
                     <TextField label="AI tool name" size="small" fullWidth value={tool.name}
                       onChange={e => { const n=[...form.aiTools]; n[i]={...n[i],name:e.target.value}; setF("aiTools",n); }}
                       error={!!errors[`aiTool_${i}`]} helperText={errors[`aiTool_${i}`]}
-                      sx={DARK_FIELD} FormHelperTextProps={{ sx:{ color:"#f87171" } }}
+                      sx={LIGHT_FIELD} FormHelperTextProps={{ sx:{ color:LT_ERROR } }}
                     />
                     <div style={{ marginTop:12 }}>
                       <SliderRow label="Monthly spend"
@@ -417,12 +446,12 @@ export default function StackAuditPage() {
             </div>
 
             {/* § 6 — Integration layer */}
-            <div style={SECTION}>
+            <div style={SECTION_LIGHT}>
               <div style={SEC_TITLE}>⑥ Integration Layer</div>
-              <p style={{ fontSize:14, color:"rgba(255,255,255,.68)", marginBottom:8, lineHeight:1.55 }}>
+              <p style={{ fontSize:14, color:LT_TEXT, opacity:.85, marginBottom:8, lineHeight:1.55 }}>
                 Are you using an AI agent or integration platform to connect these layers?
               </p>
-              <p style={{ fontSize:12, color:"rgba(255,255,255,.32)", marginBottom:16 }}>
+              <p style={{ fontSize:12, color:LT_MUTED2, marginBottom:16 }}>
                 e.g. Zapier, Make, n8n, a custom LLM workflow
               </p>
               <div style={{ display:"flex", gap:12, marginBottom:8 }}>
@@ -431,7 +460,7 @@ export default function StackAuditPage() {
                 <button className={`sa-yn${form.usesAiAgent===false?" on":""}`}
                   onClick={() => setF("usesAiAgent",false)}>No</button>
               </div>
-              {errors.usesAiAgent && <div style={{ color:"#f87171", fontSize:12, marginBottom:12 }}>{errors.usesAiAgent}</div>}
+              {errors.usesAiAgent && <div style={{ color:LT_ERROR, fontSize:12, marginBottom:12 }}>{errors.usesAiAgent}</div>}
               {form.usesAiAgent === true && (
                 <div style={{ marginTop:18 }}>
                   <SliderRow label="AI agent / integration — monthly spend"
@@ -441,25 +470,25 @@ export default function StackAuditPage() {
             </div>
 
             {/* Consent + submit */}
-            <div style={SECTION}>
+            <div style={SECTION_LIGHT}>
               <FormControlLabel
                 control={
                   <Checkbox checked={form.consent} onChange={e => setF("consent",e.target.checked)}
-                    sx={{ color:"rgba(255,255,255,.28)", "&.Mui-checked":{ color:"#4a90d9" } }} />
+                    sx={{ color:"#c3c9d3", "&.Mui-checked":{ color:"#4a90d9" } }} />
                 }
                 label={
-                  <span style={{ fontSize:13, color:"rgba(255,255,255,.6)", lineHeight:1.55 }}>
+                  <span style={{ fontSize:13, color:LT_TEXT, opacity:.8, lineHeight:1.55 }}>
                     I'm happy for Nolyvra to contact me about my stack audit results.
                   </span>
                 }
               />
-              {errors.consent && <div style={{ color:"#f87171", fontSize:12, marginTop:4 }}>{errors.consent}</div>}
-              <p style={{ fontSize:11, color:"rgba(255,255,255,.26)", marginTop:10, marginBottom:20, lineHeight:1.65 }}>
+              {errors.consent && <div style={{ color:LT_ERROR, fontSize:12, marginTop:4 }}>{errors.consent}</div>}
+              <p style={{ fontSize:11, color:LT_MUTED2, marginTop:10, marginBottom:20, lineHeight:1.65 }}>
                 Your data is used only to generate your audit report and for Nolyvra follow-up.{" "}
                 <a href="/privacy" style={{ color:"#4a90d9", textDecoration:"none" }}>Privacy policy →</a>
               </p>
               {submitError && (
-                <Alert severity="error" sx={{ mb:2, bgcolor:"rgba(239,68,68,.1)", color:"#fca5a5", border:"1px solid rgba(239,68,68,.22)", ".MuiAlert-icon":{ color:"#f87171" } }}>
+                <Alert severity="error" sx={{ mb:2, bgcolor:"rgba(239,68,68,.08)", color:"#b91c1c", border:"1px solid rgba(239,68,68,.25)", ".MuiAlert-icon":{ color:"#dc2626" } }}>
                   {submitError}
                 </Alert>
               )}
@@ -763,12 +792,12 @@ function SliderRow({ label, value, onChange }) {
   return (
     <div>
       <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4 }}>
-        <span style={{ fontSize:12, color:"rgba(255,255,255,.48)" }}>{label}</span>
-        <span style={{ fontSize:13, fontWeight:600, color:"#a8d4ff" }}>{fmtAUD(value)}/mo</span>
+        <span style={{ fontSize:12, color:"#6b7480" }}>{label}</span>
+        <span style={{ fontSize:13, fontWeight:600, color:"#2d6fb3" }}>{fmtAUD(value)}/mo</span>
       </div>
       <Slider value={value} min={0} max={5000} step={50}
         onChange={(_,v) => onChange(v)}
-        sx={{ color:"#4a90d9", "& .MuiSlider-thumb":{ width:16, height:16 }, "& .MuiSlider-rail":{ opacity:.22 } }}
+        sx={{ color:"#4a90d9", "& .MuiSlider-thumb":{ width:16, height:16 }, "& .MuiSlider-rail":{ opacity:1, bgcolor:"#e5e9f0" } }}
       />
     </div>
   );

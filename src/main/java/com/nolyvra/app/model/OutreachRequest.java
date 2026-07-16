@@ -5,5 +5,8 @@ public record OutreachRequest(
     String clientName,
     String contactName,
     String industry,
-    String recentSignals
+    String place,
+    String keyword,
+    String recentSignals,
+    boolean bulk
 ) {}
