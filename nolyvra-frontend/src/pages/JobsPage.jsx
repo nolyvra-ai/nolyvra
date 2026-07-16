@@ -2,10 +2,12 @@ import {
   Box, Paper, Typography, Table, TableHead, TableRow,
   TableCell, TableBody, Button, TextField, InputAdornment,
   Alert, LinearProgress, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions,
+  IconButton, Tooltip,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
 import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import SyncIcon from "@mui/icons-material/Sync";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -63,6 +65,7 @@ const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
 const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
 const NEUTRAL_BG = "#F1F3F7", SURFACE = "#FAFBFD", SELECTED_BG = "#EBF2FF";
 const HUBSPOT = "#FF7A59", HUBSPOT_BG = "rgba(255,122,89,0.08)", HUBSPOT_BR = "rgba(255,122,89,0.25)";
+const HUBSPOT_LABEL_BG = "#FFF1EC";
 
 const thSx = {
   fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase",
@@ -107,17 +110,22 @@ function StatusBadge({ status }) {
 }
 
 function HubSpotJobBadge({ status }) {
-  if (!status) return <Badge label="HubSpot" variant="neutral" />;
-  if (status.state === "sync_failed") return <Badge label="HubSpot failed" variant="danger" />;
-  if (status.state === "disconnected") return <Badge label="HubSpot off" variant="neutral" />;
-  if (!status.linked) return <Badge label="Not in HubSpot" variant="neutral" />;
+  if (!status) return null;
+  if (status.state !== "sync_failed" && !status.linked) return null;
+  const failed = status.state === "sync_failed";
   return (
     <Box sx={{
-      display: "inline-flex", alignItems: "center", bgcolor: HUBSPOT_BG,
-      border: `1px solid ${HUBSPOT_BR}`, borderRadius: "20px", px: 1.25, py: 0.25,
-      fontSize: 11, fontWeight: 600, color: HUBSPOT, whiteSpace: "nowrap"
-    }}>
-      In HubSpot
+      display: "inline-flex", alignItems: "center",
+      bgcolor: failed ? DANGER_BG : HUBSPOT_LABEL_BG,
+      border: `1px solid ${failed ? DANGER_BR : HUBSPOT_BR}`,
+      borderRadius: "4px", px: "6px", py: "1px",
+      fontSize: 9, fontWeight: 700,
+      color: failed ? DANGER : HUBSPOT, whiteSpace: "nowrap",
+      cursor: "default",
+      "&:hover": { bgcolor: failed ? DANGER_BG : HUBSPOT_LABEL_BG },
+    }}
+    onClick={e => e.stopPropagation()}>
+      {failed ? "Sync failed" : "In HubSpot"}
     </Box>
   );
 }
@@ -735,16 +743,16 @@ export default function JobsPage() {
     }
   }
 
-  async function handleBulkHubSpot(mode) {
+  async function handleBulkHubSpot() {
     const targets = visibleJobs.filter(job => {
       const status = jobHubSpotStatuses.get(job.id);
       if (!status || status.state === "disconnected" || hubSpotPushingIds.has(job.id)) return false;
-      return mode === "sync" ? status.linked : !status.linked;
+      return true;
     });
     if (targets.length === 0) return;
     setErr("");
     for (const job of targets) {
-      if (mode === "sync") {
+      if (jobHubSpotStatuses.get(job.id)?.linked) {
         await handleSyncJobWithHubSpot(job);
       } else {
         await handlePushJobToHubSpot(job.id);
@@ -752,13 +760,9 @@ export default function JobsPage() {
     }
   }
 
-  const hubSpotPushCount = visibleJobs.filter(job => {
+  const hubSpotActionCount = visibleJobs.filter(job => {
     const status = jobHubSpotStatuses.get(job.id);
-    return status && status.state !== "disconnected" && !status.linked && !hubSpotPushingIds.has(job.id);
-  }).length;
-  const hubSpotSyncCount = visibleJobs.filter(job => {
-    const status = jobHubSpotStatuses.get(job.id);
-    return status?.linked && !hubSpotPushingIds.has(job.id);
+    return status && status.state !== "disconnected" && !hubSpotPushingIds.has(job.id);
   }).length;
   const hubSpotBulkBusy = hubSpotPushingIds.size > 0;
 
@@ -802,21 +806,18 @@ export default function JobsPage() {
               }
             }} />
           <Button size="small" variant="outlined"
-            onClick={() => handleBulkHubSpot("push")}
-            disabled={hubSpotBulkBusy || hubSpotPushCount === 0}
-            startIcon={hubSpotBulkBusy ? <CircularProgress size={12} sx={{ color: "inherit" }} /> : <HubOutlinedIcon sx={{ fontSize: 14 }} />}
-            sx={{
-              fontSize: 12, fontWeight: 500, borderRadius: "6px", textTransform: "none",
-              borderColor: BORDER, color: HUBSPOT, bgcolor: "#fff", boxShadow: "none",
-              "&.Mui-disabled": { bgcolor: "#F7F8FA", color: MUTED, borderColor: BORDER },
-              "&:hover": { bgcolor: HUBSPOT_BG, borderColor: HUBSPOT }
-            }}>
-            Push to HubSpot
-          </Button>
-          <Button size="small" variant="outlined"
-            onClick={() => handleBulkHubSpot("sync")}
-            disabled={hubSpotBulkBusy || hubSpotSyncCount === 0}
-            startIcon={<SyncIcon sx={{ fontSize: 14 }} />}
+            onClick={handleBulkHubSpot}
+            disabled={hubSpotBulkBusy || hubSpotActionCount === 0}
+            startIcon={hubSpotBulkBusy
+              ? <SyncIcon sx={{
+                  fontSize: 14,
+                  animation: "hubspotSpin 0.9s linear infinite",
+                  "@keyframes hubspotSpin": {
+                    "0%": { transform: "rotate(0deg)" },
+                    "100%": { transform: "rotate(360deg)" },
+                  },
+                }} />
+              : <HubOutlinedIcon sx={{ fontSize: 14 }} />}
             sx={{
               fontSize: 12, fontWeight: 500, borderRadius: "6px", textTransform: "none",
               borderColor: BORDER, color: HUBSPOT, bgcolor: "#fff", boxShadow: "none",
@@ -920,9 +921,12 @@ export default function JobsPage() {
                       </Typography>
                     </TableCell>
                     <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
-                      <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT, lineHeight: 1.2 }}>
-                        {job.title}
-                      </Typography>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
+                        <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT, lineHeight: 1.2 }}>
+                          {job.title}
+                        </Typography>
+                        <HubSpotJobBadge status={hubSpotStatus} />
+                      </Box>
                       {job.seniority && (
                         <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>{job.seniority}</Typography>
                       )}
@@ -965,21 +969,24 @@ export default function JobsPage() {
                     <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}`, textAlign: "right" }}
                       onClick={e => e.stopPropagation()}>
                       <Box sx={{ display: "flex", gap: 0.75, justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
-                        <HubSpotJobBadge status={hubSpotStatus} />
                         {hubSpotLinked && hubSpotStatus?.externalUrl && (
-                          <Button size="small" variant="outlined"
-                            component="a"
-                            href={hubSpotStatus.externalUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={e => e.stopPropagation()}
-                            sx={{
-                              fontSize: 11, fontWeight: 500, borderColor: BORDER, color: HUBSPOT,
-                              borderRadius: "6px", textTransform: "none",
-                              "&:hover": { bgcolor: HUBSPOT_BG, borderColor: HUBSPOT }
-                            }}>
-                            Open
-                          </Button>
+                          <Tooltip title="Open in HubSpot">
+                            <IconButton
+                              component="a"
+                              href={hubSpotStatus.externalUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={e => e.stopPropagation()}
+                              size="small"
+                              aria-label={`Open ${job.title} in HubSpot`}
+                              sx={{
+                                width: 28, height: 28, border: `1px solid ${BORDER}`, borderRadius: "6px",
+                                color: HUBSPOT, bgcolor: "#fff",
+                                "&:hover": { bgcolor: HUBSPOT_BG, borderColor: HUBSPOT }
+                              }}>
+                              <OpenInNewIcon sx={{ fontSize: 15 }} />
+                            </IconButton>
+                          </Tooltip>
                         )}
                         {/* ── Edit now navigates to edit page with job prepopulated ── */}
                         <Button size="small" variant="outlined"

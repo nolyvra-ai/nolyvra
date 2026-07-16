@@ -25,6 +25,8 @@ const PURPLE_L = "rgba(124,58,237,0.08)";
 const BG       = "#F4F6FA";
 const HUBSPOT  = "#FF7A59";
 const HUBSPOT_L = "rgba(255,122,89,0.08)";
+const HUBSPOT_BR = "rgba(255,122,89,0.25)";
+const HUBSPOT_LABEL_BG = "#FFF1EC";
 
 const CARD_BASE = {
   bgcolor: SURFACE,
@@ -252,9 +254,13 @@ function ClientRow({ client, onEdit, onSelect, onInvoice, hubSpotStatus }) {
             <Box component="span" sx={{
               px: "6px", py: "1px", borderRadius: "4px", fontSize: 9, fontWeight: 700,
               color: hubSpotFailed ? "#DC2626" : HUBSPOT,
-              bgcolor: hubSpotFailed ? "rgba(220,38,38,0.07)" : HUBSPOT_L,
+              bgcolor: hubSpotFailed ? "#FEF2F2" : HUBSPOT_LABEL_BG,
+              border: `1px solid ${hubSpotFailed ? "rgba(220,38,38,0.18)" : HUBSPOT_BR}`,
               whiteSpace: "nowrap",
-            }}>
+              cursor: "default",
+              "&:hover": { bgcolor: hubSpotFailed ? "#FEF2F2" : HUBSPOT_LABEL_BG },
+            }}
+            onClick={e => e.stopPropagation()}>
               {hubSpotLabel}
             </Box>
           )}
@@ -1322,16 +1328,16 @@ export default function ClientTrackerPage() {
     }
   }
 
-  async function handleBulkHubSpot(mode) {
+  async function handleBulkHubSpot() {
     const targets = filtered.filter(client => {
       const status = hubSpotStatuses[client.id];
       if (!status || status.state === "disconnected" || hubSpotBusy[client.id]) return false;
-      return mode === "sync" ? status.linked : !status.linked;
+      return true;
     });
     if (targets.length === 0) return;
     setHubSpotError("");
     for (const client of targets) {
-      if (mode === "sync") {
+      if (hubSpotStatuses[client.id]?.linked) {
         await handleHubSpotSync(client);
       } else {
         await handleHubSpotPush(client);
@@ -1339,13 +1345,9 @@ export default function ClientTrackerPage() {
     }
   }
 
-  const hubSpotPushCount = filtered.filter(client => {
+  const hubSpotActionCount = filtered.filter(client => {
     const status = hubSpotStatuses[client.id];
-    return status && status.state !== "disconnected" && !status.linked && !hubSpotBusy[client.id];
-  }).length;
-  const hubSpotSyncCount = filtered.filter(client => {
-    const status = hubSpotStatuses[client.id];
-    return status?.linked && !hubSpotBusy[client.id];
+    return status && status.state !== "disconnected" && !hubSpotBusy[client.id];
   }).length;
   const hubSpotBulkBusy = Object.values(hubSpotBusy).some(Boolean);
 
@@ -1382,27 +1384,20 @@ export default function ClientTrackerPage() {
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
           <Button
-            onClick={() => handleBulkHubSpot("push")}
+            onClick={handleBulkHubSpot}
             variant="outlined"
             size="small"
-            disabled={hubSpotBulkBusy || hubSpotPushCount === 0}
-            startIcon={hubSpotBulkBusy ? <CircularProgress size={12} sx={{ color: "inherit" }} /> : <HubOutlinedIcon sx={{ fontSize: 14 }} />}
-            sx={{
-              height: 36, px: "12px", borderRadius: "8px", borderColor: BORDER,
-              color: HUBSPOT, bgcolor: SURFACE, fontSize: 12, fontWeight: 700,
-              textTransform: "none", whiteSpace: "nowrap",
-              "&.Mui-disabled": { bgcolor: "#F7F8FA", color: MUTED, borderColor: BORDER },
-              "&:hover": { borderColor: HUBSPOT, bgcolor: HUBSPOT_L },
-            }}
-          >
-            Push to HubSpot
-          </Button>
-          <Button
-            onClick={() => handleBulkHubSpot("sync")}
-            variant="outlined"
-            size="small"
-            disabled={hubSpotBulkBusy || hubSpotSyncCount === 0}
-            startIcon={<SyncIcon sx={{ fontSize: 14 }} />}
+            disabled={hubSpotBulkBusy || hubSpotActionCount === 0}
+            startIcon={hubSpotBulkBusy
+              ? <SyncIcon sx={{
+                  fontSize: 14,
+                  animation: "hubspotSpin 0.9s linear infinite",
+                  "@keyframes hubspotSpin": {
+                    "0%": { transform: "rotate(0deg)" },
+                    "100%": { transform: "rotate(360deg)" },
+                  },
+                }} />
+              : <HubOutlinedIcon sx={{ fontSize: 14 }} />}
             sx={{
               height: 36, px: "12px", borderRadius: "8px", borderColor: BORDER,
               color: HUBSPOT, bgcolor: SURFACE, fontSize: 12, fontWeight: 700,

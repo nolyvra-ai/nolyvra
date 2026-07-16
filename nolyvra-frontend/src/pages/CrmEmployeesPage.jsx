@@ -3,7 +3,7 @@ import {
   Box, Paper, Typography, Table, TableHead, TableRow, TableCell,
   TableBody, Button, Dialog, DialogTitle, DialogContent, DialogActions,
   TextField, MenuItem, Select, FormControl, InputLabel, Alert, CircularProgress,
-  Tooltip,
+  IconButton, Tooltip,
 } from "@mui/material";
 import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -28,6 +28,7 @@ const DANGER  = "#DC2626";
 const DANGER_L = "#FEF2F2";
 const HUBSPOT  = "#FF7A59";
 const HUBSPOT_L = "rgba(255,122,89,0.08)";
+const HUBSPOT_LABEL_BG = "#FFF1EC";
 
 const CARD_BASE = {
   bgcolor: SURFACE, border: `1px solid ${BORDER}`,
@@ -80,15 +81,18 @@ function HubSpotBadge({ status }) {
   if (!status) return null;
   const failed = status.state === "sync_failed";
   const linked = Boolean(status.linked);
-  const label = failed ? "Sync failed" : linked ? "In HubSpot" : status.state === "disconnected" ? "HubSpot off" : null;
+  const label = failed ? "Sync failed" : linked ? "In HubSpot" : null;
   if (!label) return null;
   return (
     <Box sx={{
-      display: "inline-flex", alignItems: "center", bgcolor: failed ? DANGER_L : HUBSPOT_L,
+      display: "inline-flex", alignItems: "center", bgcolor: failed ? DANGER_L : HUBSPOT_LABEL_BG,
       border: `1px solid ${failed ? "#FECACA" : "rgba(255,122,89,0.25)"}`,
-      borderRadius: "20px", px: 1.25, py: "2px", fontSize: 11, fontWeight: 600,
+      borderRadius: "4px", px: "6px", py: "1px", fontSize: 9, fontWeight: 700,
       color: failed ? DANGER : HUBSPOT, whiteSpace: "nowrap",
-    }}>{label}</Box>
+      cursor: "default",
+      "&:hover": { bgcolor: failed ? DANGER_L : HUBSPOT_LABEL_BG },
+    }}
+    onClick={e => e.stopPropagation()}>{label}</Box>
   );
 }
 
@@ -315,16 +319,16 @@ export default function CrmEmployeesPage() {
     }
   }
 
-  async function handleBulkHubSpot(mode) {
+  async function handleBulkHubSpot() {
     const targets = employees.filter(emp => {
       const status = hubSpotStatuses[emp.id];
       if (!status || status.state === "disconnected" || hubSpotBusy[emp.id]) return false;
-      return mode === "sync" ? status.linked : !status.linked;
+      return true;
     });
     if (targets.length === 0) return;
     setHubSpotError("");
     for (const emp of targets) {
-      if (mode === "sync") {
+      if (hubSpotStatuses[emp.id]?.linked) {
         await handleHubSpotSync(emp);
       } else {
         await handleHubSpotPush(emp);
@@ -332,13 +336,9 @@ export default function CrmEmployeesPage() {
     }
   }
 
-  const hubSpotPushCount = employees.filter(emp => {
+  const hubSpotActionCount = employees.filter(emp => {
     const status = hubSpotStatuses[emp.id];
-    return status && status.state !== "disconnected" && !status.linked && !hubSpotBusy[emp.id];
-  }).length;
-  const hubSpotSyncCount = employees.filter(emp => {
-    const status = hubSpotStatuses[emp.id];
-    return status?.linked && !hubSpotBusy[emp.id];
+    return status && status.state !== "disconnected" && !hubSpotBusy[emp.id];
   }).length;
   const hubSpotBulkBusy = Object.values(hubSpotBusy).some(Boolean);
 
@@ -377,26 +377,20 @@ export default function CrmEmployeesPage() {
             <input type="file" accept=".xlsx,.xls" hidden onChange={handleUpload} />
           </Button>
           <Button
-            onClick={() => handleBulkHubSpot("push")}
+            onClick={handleBulkHubSpot}
             variant="outlined"
             size="small"
-            disabled={hubSpotBulkBusy || hubSpotPushCount === 0}
-            startIcon={hubSpotBulkBusy ? <CircularProgress size={12} sx={{ color: "inherit" }} /> : <HubOutlinedIcon sx={{ fontSize: 14 }} />}
-            sx={{
-              fontSize: 12, fontWeight: 600, textTransform: "none", borderRadius: "8px",
-              borderColor: BORDER, color: HUBSPOT, bgcolor: SURFACE,
-              "&.Mui-disabled": { bgcolor: "#F7F8FA", color: MUTED, borderColor: BORDER },
-              "&:hover": { borderColor: HUBSPOT, bgcolor: HUBSPOT_L },
-            }}
-          >
-            Push to HubSpot
-          </Button>
-          <Button
-            onClick={() => handleBulkHubSpot("sync")}
-            variant="outlined"
-            size="small"
-            disabled={hubSpotBulkBusy || hubSpotSyncCount === 0}
-            startIcon={<SyncIcon sx={{ fontSize: 14 }} />}
+            disabled={hubSpotBulkBusy || hubSpotActionCount === 0}
+            startIcon={hubSpotBulkBusy
+              ? <SyncIcon sx={{
+                  fontSize: 14,
+                  animation: "hubspotSpin 0.9s linear infinite",
+                  "@keyframes hubspotSpin": {
+                    "0%": { transform: "rotate(0deg)" },
+                    "100%": { transform: "rotate(360deg)" },
+                  },
+                }} />
+              : <HubOutlinedIcon sx={{ fontSize: 14 }} />}
             sx={{
               fontSize: 12, fontWeight: 600, textTransform: "none", borderRadius: "8px",
               borderColor: BORDER, color: HUBSPOT, bgcolor: SURFACE,
@@ -497,7 +491,10 @@ export default function CrmEmployeesPage() {
                   sx={{ cursor: "pointer", "&:last-child td": { borderBottom: 0 } }}
                   onClick={() => nav(`/crm/employees/${emp.id}`)}>
                   <TableCell sx={{ py: 1.25, px: 2, fontSize: 13, fontWeight: 600, color: TEXT, borderBottom: `1px solid ${BORDER}` }}>
-                    {emp.firstName} {emp.lastName}
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.75, minWidth: 0 }}>
+                      <Box component="span">{emp.firstName} {emp.lastName}</Box>
+                      <HubSpotBadge status={hubSpotStatuses[emp.id]} />
+                    </Box>
                   </TableCell>
                   <TableCell sx={{ py: 1.25, px: 2, fontSize: 12, color: MUTED, borderBottom: `1px solid ${BORDER}` }}>
                     {emp.email}
@@ -520,22 +517,22 @@ export default function CrmEmployeesPage() {
                   <TableCell sx={{ py: 1.25, px: 2, borderBottom: `1px solid ${BORDER}`, textAlign: "right" }}
                     onClick={e => e.stopPropagation()}>
                     <Box sx={{ display: "flex", gap: 0.75, justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}>
-                      <HubSpotBadge status={hubSpotStatuses[emp.id]} />
                       {hubSpotStatuses[emp.id]?.linked && hubSpotStatuses[emp.id]?.externalUrl && (
                         <Tooltip title="Open in HubSpot">
-                          <Button size="small" variant="outlined"
+                          <IconButton
                             component="a"
                             href={hubSpotStatuses[emp.id].externalUrl}
                             target="_blank"
                             rel="noreferrer"
-                            startIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
+                            size="small"
+                            aria-label={`Open ${emp.firstName} ${emp.lastName} in HubSpot`}
                             sx={{
-                              fontSize: 11, fontWeight: 600, borderColor: BORDER, color: HUBSPOT,
-                              bgcolor: SURFACE, borderRadius: "6px", textTransform: "none",
+                              width: 28, height: 28, border: `1px solid ${BORDER}`, borderRadius: "6px",
+                              color: HUBSPOT, bgcolor: SURFACE,
                               "&:hover": { borderColor: HUBSPOT, bgcolor: HUBSPOT_L }
                             }}>
-                            Open
-                          </Button>
+                            <OpenInNewIcon sx={{ fontSize: 15 }} />
+                          </IconButton>
                         </Tooltip>
                       )}
                       <Box sx={{ fontSize: 12, color: ACCENT, cursor: "pointer", fontWeight: 600 }}
