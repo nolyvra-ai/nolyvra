@@ -17,6 +17,7 @@ import {
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { usePlanLimit } from "../hooks/usePlanLimit";
+import { validateCvContent } from "../utils/cvValidation";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -313,48 +314,6 @@ export default function AddCandidatePage() {
   }, [bulkAnalysisBatchId]);
 
   // ── Change 1: CV upload — extracts text AND prefills name/email/linkedinUrl ─
-  // ── CV content validator — called after extraction ───────────────────────
-  function validateCvContent(text) {
-    const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
-    if (wordCount < 80) {
-      return "This file doesn't contain enough text to be a CV. Please upload a valid CV document.";
-    }
-
-    const lowerText = text.toLowerCase();
-
-    // Group 1: must have at least 1 career-history keyword
-    const careerKeywords = [
-      "work experience", "employment history", "professional experience",
-      "career history", "work history", "previous employment",
-      "job title", "job description", "responsibilities", "key responsibilities",
-      "internship", "volunteer"
-    ];
-    const hasCareer = careerKeywords.some(k => lowerText.includes(k));
-
-    // Group 2: must have at least 1 education/qualification keyword
-    const educationKeywords = [
-      "education", "qualification", "university", "college", "degree",
-      "bachelor", "master", "phd", "diploma", "certification",
-      "graduated", "gcse", "a-level", "high school"
-    ];
-    const hasEducation = educationKeywords.some(k => lowerText.includes(k));
-
-    // Group 3: must have at least 1 skills/profile keyword
-    const skillsKeywords = [
-      "skills", "competencies", "expertise", "proficient", "summary",
-      "profile", "objective", "about me", "curriculum vitae", "resume",
-      "references", "achievements", "accomplishments"
-    ];
-    const hasSkills = skillsKeywords.some(k => lowerText.includes(k));
-
-    const groupsMatched = [hasCareer, hasEducation, hasSkills].filter(Boolean).length;
-
-    if (groupsMatched < 2) {
-      return "This file doesn't appear to be a CV or resume. Please upload a candidate's CV document (must include employment history and education or skills).";
-    }
-    return null; // valid
-  }
-
   async function handleCvUpload(file) {
     if (!file) return;
     const allowed = ["application/pdf",

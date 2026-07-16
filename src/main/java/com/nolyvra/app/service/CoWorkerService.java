@@ -3,13 +3,11 @@ package com.nolyvra.app.service;
 import com.nolyvra.app.model.*;
 import com.nolyvra.app.config.CoWorkerAnalysisExecutor;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.openai.client.OpenAIClient;
-import com.openai.models.chat.completions.ChatCompletionCreateParams;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
@@ -19,29 +17,32 @@ import java.util.concurrent.ExecutorService;
 @Service
 public class CoWorkerService {
 
-    private final OpenAIClient openAI;
     private final ObjectMapper objectMapper;
     private final JdbcTemplate jdbc;
-    private final String model;
-    private final TokenService tokenService;
+    private final CoWorkerAiClient aiClient;
     private final AnalysisService analysisService; // Change 1: added
     private final ExecutorService analysisPool;
+    private final JobService jobService;
+    private final CandidateService candidateService;
+    private final PlanService planService;
 
     public CoWorkerService(
-            OpenAIClient openAI,
             ObjectMapper objectMapper,
             JdbcTemplate jdbc,
-            TokenService tokenService,
+            CoWorkerAiClient aiClient,
             @Lazy AnalysisService analysisService, // Change 1: added (@Lazy avoids circular dependency)
             CoWorkerAnalysisExecutor analysisExecutor,
-            @Value("${openai.model:gpt-4o-mini}") String model) {
-        this.openAI = openAI;
+            JobService jobService,
+            CandidateService candidateService,
+            PlanService planService) {
         this.objectMapper = objectMapper;
         this.jdbc = jdbc;
-        this.tokenService = tokenService;
+        this.aiClient = aiClient;
         this.analysisService = analysisService; // Change 1: added
         this.analysisPool = analysisExecutor.executorService();
-        this.model = model;
+        this.jobService = jobService;
+        this.candidateService = candidateService;
+        this.planService = planService;
     }
 
     // ─── Main chat endpoint ───────────────────────────────────────────────────
@@ -62,6 +63,13 @@ public class CoWorkerService {
 
         persistMessage(loginId, sessionId, "user", request.message());
 
+<<<<<<< HEAD
+        if (isPipelineSummaryRequest(request.message())) {
+            CoWorkerChatResponse response = buildPipelineSummary(loginId, sessionId);
+            persistMessage(loginId, sessionId, "assistant", response.message());
+            updateSessionLastMessage(sessionId);
+            return response;
+=======
         String systemPrompt = """
                 You are nolyvra Co-worker AI — a helpful recruitment assistant that takes actions inside the app.
 
@@ -130,84 +138,20 @@ public class CoWorkerService {
                     .append(": ")
                     .append(h.content())
                     .append("\n");
+>>>>>>> develop
         }
 
-        String fullSystemPrompt = systemPrompt
-                + (contextHistory.length() > 0
-                        ? "\n\nCONVERSATION SO FAR:\n" + contextHistory
-                        : "");
-
-        var params = ChatCompletionCreateParams.builder()
-                .model(model)
-                .addSystemMessage(fullSystemPrompt)
-                .addUserMessage(request.message())
-                .temperature(0.3)
-                .build();
-
         try {
-            if (!tokenService.deductToken(loginId)) {
-                return new CoWorkerChatResponse(
-                        sessionId,
-                        "You have run out of tokens. Please upgrade your plan to continue.",
-                        null);
-            }
-
-            var completion = openAI.chat().completions().create(params);
-            String content = completion.choices().getFirst().message().content()
-                    .orElse("{\"message\":\"I'm here to help! What would you like me to do?\",\"pendingAction\":{\"type\":\"NONE\",\"description\":\"\",\"params\":{}}}");
-
-            String clean = cleanJson(content);
-
-            // Fix 2: If OpenAI returned plain text instead of JSON, wrap it gracefully
-            if (!clean.startsWith("{")) {
-                persistMessage(loginId, sessionId, "assistant", clean);
-                updateSessionLastMessage(sessionId);
-                return new CoWorkerChatResponse(sessionId, clean, null);
-            }
-
-            var root = objectMapper.readTree(clean);
-
-            String message = root.path("message").asText("How can I help?");
-            persistMessage(loginId, sessionId, "assistant", message);
+            CoWorkerChatResponse response = aiClient.chat(
+                    loginId,
+                    sessionId,
+                    request.message(),
+                    context,
+                    request.history() != null ? request.history() : List.of());
+            persistMessage(loginId, sessionId, "assistant", response.message());
             updateSessionLastMessage(sessionId);
-
-            var pa = root.path("pendingAction");
-            CoWorkerChatResponse.PendingAction pendingAction = null;
-            if (pa != null && !pa.isMissingNode() && !"NONE".equals(pa.path("type").asText("NONE"))) {
-                var paramsNode = pa.path("params");
-                Map<String, Object> actionParams;
-                if (paramsNode.isArray()) {
-                    // AI returned params as array (e.g. multiple candidates) — wrap it
-                    @SuppressWarnings("unchecked")
-                    List<Object> list = objectMapper.convertValue(paramsNode, List.class);
-                    actionParams = new java.util.LinkedHashMap<>();
-                    actionParams.put("items", list);
-                    // Also extract candidateIds/candidateNames for convenience
-                    List<String> ids = new ArrayList<>();
-                    List<String> names = new ArrayList<>();
-                    for (Object item : list) {
-                        if (item instanceof Map<?,?> m) {
-                            if (m.get("candidateId") != null) ids.add(m.get("candidateId").toString());
-                            if (m.get("candidateName") != null) names.add(m.get("candidateName").toString());
-                        }
-                    }
-                    if (!ids.isEmpty()) actionParams.put("candidateIds", ids);
-                    if (!names.isEmpty()) actionParams.put("candidateNames", names);
-                } else {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> m = objectMapper.convertValue(paramsNode, Map.class);
-                    actionParams = m != null ? m : new java.util.LinkedHashMap<>();
-                }
-                pendingAction = new CoWorkerChatResponse.PendingAction(
-                        pa.path("type").asText(),
-                        pa.path("description").asText(),
-                        actionParams);
-            }
-
-            return new CoWorkerChatResponse(sessionId, message, pendingAction);
-
+            return response;
         } catch (Exception e) {
-            // Fix 1: log full error to backend, return generic message to UI
             System.err.println("[CoWorker] chat() failed: " + e.getMessage());
             e.printStackTrace();
             return new CoWorkerChatResponse(
@@ -215,7 +159,165 @@ public class CoWorkerService {
         }
     }
 
+    private boolean isPipelineSummaryRequest(String message) {
+        if (message == null || message.isBlank()) return false;
+        String lower = message.toLowerCase(Locale.ROOT);
+        return (lower.contains("pipeline") && (lower.contains("movement") || lower.contains("summary") || lower.contains("summarise") || lower.contains("summarize")))
+                || (lower.contains("stalled") && lower.contains("candidate"));
+    }
+
+    private CoWorkerChatResponse buildPipelineSummary(String loginId, Long sessionId) {
+        try {
+            Integer stageMoves = jdbc.queryForObject("""
+                    select count(*)
+                    from activity_timeline
+                    where login_id = ?
+                      and event_type = 'STAGE_CHANGED'
+                      and created_at >= date_trunc('week', now())
+                    """, Integer.class, loginId);
+            Integer added = jdbc.queryForObject("""
+                    select count(*)
+                    from activity_timeline
+                    where login_id = ?
+                      and event_type = 'CANDIDATE_ADDED'
+                      and created_at >= date_trunc('week', now())
+                    """, Integer.class, loginId);
+
+            List<Map<String, Object>> stageBreakdown = jdbc.query("""
+                    select coalesce(nullif(trim(replace(note, 'Stage updated to:', '')), ''), 'Unknown') as stage,
+                           count(*) as count
+                    from activity_timeline
+                    where login_id = ?
+                      and event_type = 'STAGE_CHANGED'
+                      and created_at >= date_trunc('week', now())
+                    group by stage
+                    order by count desc, stage asc
+                    """, (rs, r) -> {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("stage", rs.getString("stage"));
+                row.put("count", rs.getInt("count"));
+                return row;
+            }, loginId);
+
+            List<Map<String, Object>> recentMoves = jdbc.query("""
+                    select c.name, coalesce(j.title, 'Unassigned') as job_title,
+                           c.stage, a.note, a.created_at
+                    from activity_timeline a
+                    join candidates c on c.id = a.candidate_id
+                    left join jobs j on j.id = c.job_id
+                    where a.login_id = ?
+                      and a.event_type = 'STAGE_CHANGED'
+                      and a.created_at >= date_trunc('week', now())
+                      and c.is_active = true
+                    order by a.created_at desc
+                    limit 8
+                    """, (rs, r) -> {
+                OffsetDateTime movedAt = rs.getObject("created_at", OffsetDateTime.class);
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("name", rs.getString("name"));
+                row.put("jobTitle", rs.getString("job_title"));
+                row.put("stage", rs.getString("stage"));
+                row.put("note", rs.getString("note"));
+                row.put("movedAt", movedAt);
+                return row;
+            }, loginId);
+
+            List<Map<String, Object>> stalled = jdbc.query("""
+                    select c.id, c.name, c.stage, coalesce(j.title, 'Unassigned') as job_title,
+                           greatest(c.updated_at, coalesce(max(a.created_at), c.created_at)) as last_activity,
+                           extract(day from now() - greatest(c.updated_at, coalesce(max(a.created_at), c.created_at)))::int as days_stalled
+                    from candidates c
+                    left join jobs j on j.id = c.job_id
+                    left join activity_timeline a on a.candidate_id = c.id and a.login_id = c.login_id
+                    where c.login_id = ?
+                      and c.is_active = true
+                      and c.stage not in ('Selected', 'Rejected')
+                    group by c.id, c.name, c.stage, j.title, c.updated_at, c.created_at
+                    having greatest(c.updated_at, coalesce(max(a.created_at), c.created_at)) < now() - interval '5 days'
+                    order by days_stalled desc, c.name asc
+                    limit 10
+                    """, (rs, r) -> {
+                OffsetDateTime lastActivity = rs.getObject("last_activity", OffsetDateTime.class);
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("id", rs.getString("id"));
+                row.put("name", rs.getString("name"));
+                row.put("stage", rs.getString("stage"));
+                row.put("jobTitle", rs.getString("job_title"));
+                row.put("lastActivity", lastActivity);
+                row.put("daysStalled", rs.getInt("days_stalled"));
+                return row;
+            }, loginId);
+
+            String message = formatPipelineSummary(
+                    stageMoves != null ? stageMoves : 0,
+                    added != null ? added : 0,
+                    stageBreakdown,
+                    recentMoves,
+                    stalled);
+            return new CoWorkerChatResponse(sessionId, message, null);
+        } catch (Exception e) {
+            System.err.println("[CoWorker] buildPipelineSummary() failed: " + e.getMessage());
+            e.printStackTrace();
+            return new CoWorkerChatResponse(
+                    sessionId,
+                    "I could not summarise pipeline movement right now. Please try again.",
+                    null);
+        }
+    }
+
+    private String formatPipelineSummary(
+            int stageMoves,
+            int added,
+            List<Map<String, Object>> stageBreakdown,
+            List<Map<String, Object>> recentMoves,
+            List<Map<String, Object>> stalled) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("This week's pipeline movement: ")
+                .append(stageMoves).append(" stage change(s) and ")
+                .append(added).append(" new candidate(s) added.");
+
+        if (!stageBreakdown.isEmpty()) {
+            sb.append("\n\nStage movement breakdown:");
+            for (Map<String, Object> row : stageBreakdown) {
+                sb.append("\n- ").append(row.get("stage")).append(": ").append(row.get("count"));
+            }
+        }
+
+        if (!recentMoves.isEmpty()) {
+            sb.append("\n\nRecent movements:");
+            for (Map<String, Object> row : recentMoves) {
+                sb.append("\n- ")
+                        .append(row.get("name"))
+                        .append(" → ")
+                        .append(row.get("stage"))
+                        .append(" (")
+                        .append(row.get("jobTitle"))
+                        .append(")");
+            }
+        }
+
+        if (stalled.isEmpty()) {
+            sb.append("\n\nNo stalled active candidates found using the 5-day inactivity threshold.");
+        } else {
+            sb.append("\n\nStalled candidates to review:");
+            for (Map<String, Object> row : stalled) {
+                sb.append("\n- ")
+                        .append(row.get("name"))
+                        .append(" has been in ")
+                        .append(row.get("stage"))
+                        .append(" for ")
+                        .append(row.get("daysStalled"))
+                        .append(" day(s) without activity (")
+                        .append(row.get("jobTitle"))
+                        .append(")");
+            }
+        }
+
+        return sb.toString();
+    }
+
     // ─── Confirm + execute action ─────────────────────────────────────────────
+
 
     public Map<String, Object> confirmAction(String loginId, CoWorkerConfirmRequest req) {
         String type = req.actionType();
@@ -228,6 +330,8 @@ public class CoWorkerService {
             case "MOVE_PIPELINE" -> executeMovePipeline(loginId, params);
             case "EMAIL" -> buildEmailNavigation(params);
             case "CREATE_REMINDER" -> executeCreateReminder(loginId, params);
+            case "CREATE_JOB" -> executeCreateJob(loginId, params);
+            case "ADD_CANDIDATES" -> executeAddCandidates(loginId, params);
             default -> Map.of("message", "Unknown action type: " + type, "success", false);
         };
     }
@@ -509,6 +613,158 @@ public class CoWorkerService {
             e.printStackTrace();
             return Map.of("message", "Could not create the reminder. Please try again.", "success", false);
         }
+    }
+
+    private Map<String, Object> executeCreateJob(String loginId, Map<String, Object> params) {
+        String title = textParam(params, "title", "");
+        String jdText = textParam(params, "jdText", "");
+
+        if (title.isBlank() || jdText.isBlank()) {
+            return Map.of(
+                    "message", "I need at least a job title and job description before creating the job.",
+                    "success", false);
+        }
+
+        try {
+            if (planService != null && planService.isJobLimitReached(loginId)) {
+                return Map.of(
+                        "message", "Your job limit has been reached. Please upgrade your plan before creating another job.",
+                        "success", false);
+            }
+
+            JobCreateRequest request = new JobCreateRequest(
+                    title,
+                    textParam(params, "company", ""),
+                    textParam(params, "jobType", "Full-time"),
+                    textParam(params, "seniority", null),
+                    jdText,
+                    textParam(params, "location", ""),
+                    listParam(params, "stackTags"),
+                    textParam(params, "jobStatus", "Active"),
+                    decimalParam(params, "salary"),
+                    textParam(params, "currency", "AUD"),
+                    decimalParam(params, "feePercentage"));
+
+            Long taskId = createTask(loginId, "CREATE_JOB", "Created job: " + title);
+            JobResponse job = jobService.createJob(request, loginId);
+            markTaskDone(taskId);
+
+            return Map.of(
+                    "message", "Job created: " + job.title() + ". Opening the candidate add page so you can start filling it.",
+                    "success", true,
+                    "jobId", job.id(),
+                    "navigateTo", "/jobs/" + job.id() + "/add-candidates-modern");
+        } catch (Exception e) {
+            System.err.println("[CoWorker] executeCreateJob() failed: " + e.getMessage());
+            e.printStackTrace();
+            return Map.of("message", "Could not create the job. Please try again.", "success", false);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> executeAddCandidates(String loginId, Map<String, Object> params) {
+        Object rawCandidates = params.get("candidates");
+        List<Map<String, Object>> candidates = new ArrayList<>();
+        if (rawCandidates instanceof Collection<?> collection) {
+            for (Object item : collection) {
+                if (item instanceof Map<?, ?> map) {
+                    Map<String, Object> normalized = new LinkedHashMap<>();
+                    map.forEach((k, v) -> {
+                        if (k != null) normalized.put(k.toString(), v);
+                    });
+                    candidates.add(normalized);
+                }
+            }
+        } else if (params.get("name") != null || params.get("cvText") != null) {
+            candidates.add(params);
+        }
+
+        if (candidates.isEmpty()) {
+            return Map.of("message", "No CV candidates were provided.", "success", false);
+        }
+
+        String jobId = textParam(params, "jobId", null);
+        if (jobId != null && jobId.equalsIgnoreCase("null")) jobId = null;
+        String jobTitle = textParam(params, "jobTitle", null);
+
+        Long taskId = createTask(loginId, "ADD_CANDIDATES",
+                "Attached " + candidates.size() + " CV candidate(s)"
+                        + (jobTitle != null ? " to " + jobTitle : ""));
+
+        int created = 0;
+        int skipped = 0;
+        List<String> createdNames = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+
+        for (Map<String, Object> candidate : candidates) {
+            String name = textParam(candidate, "name", "");
+            String cvText = textParam(candidate, "cvText", "");
+
+            if (name.isBlank() || cvText.isBlank()) {
+                skipped++;
+                errors.add((name.isBlank() ? "Unnamed candidate" : name) + ": missing name or CV text");
+                continue;
+            }
+
+            try {
+                if (planService != null && planService.isCandidateLimitReached(loginId)) {
+                    skipped++;
+                    errors.add(name + ": candidate limit reached");
+                    continue;
+                }
+
+                CandidateCreateRequest request = CandidateCreateRequest.builder()
+                        .name(name)
+                        .email(textParam(candidate, "email", null))
+                        .phone(textParam(candidate, "phone", null))
+                        .linkedinUrl(textParam(candidate, "linkedinUrl", null))
+                        .cvText(cvText)
+                        .skills(listParam(candidate, "skills"))
+                        .currentTitle(textParam(candidate, "currentTitle", null))
+                        .location(textParam(candidate, "location", null))
+                        .state(textParam(candidate, "state", null))
+                        .yearsExperience(decimalParam(candidate, "yearsExperience"))
+                        .seniorityLevel(textParam(candidate, "seniorityLevel", null))
+                        .expectedSalaryMin(decimalParam(candidate, "expectedSalaryMin"))
+                        .expectedSalaryMax(decimalParam(candidate, "expectedSalaryMax"))
+                        .salaryCurrency(textParam(candidate, "salaryCurrency", null))
+                        .noticePeriodWeeks(integerParam(candidate, "noticePeriodWeeks"))
+                        .workRights(textParam(candidate, "workRights", null))
+                        .remoteFlexible(booleanParam(candidate, "remoteFlexible"))
+                        .build();
+
+                CandidateResponse createdCandidate = jobId != null && !jobId.isBlank()
+                        ? candidateService.addCandidate(jobId, request, loginId)
+                        : candidateService.addCandidateUnassigned(request, loginId);
+                created++;
+                createdNames.add(createdCandidate.name());
+            } catch (IllegalStateException e) {
+                skipped++;
+                errors.add(name + ": " + e.getMessage());
+            } catch (Exception e) {
+                skipped++;
+                errors.add(name + ": could not be added");
+                System.err.println("[CoWorker] executeAddCandidates() failed for " + name + ": " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        markTaskDone(taskId);
+
+        String target = jobTitle != null && !jobTitle.isBlank()
+                ? " to " + jobTitle
+                : (jobId != null && !jobId.isBlank() ? " to " + jobId : " as unassigned");
+        String message = created + " candidate(s) added" + target
+                + (createdNames.isEmpty() ? "." : ": " + String.join(", ", createdNames) + ".")
+                + (skipped > 0 ? " " + skipped + " skipped. " + String.join("; ", errors) : "");
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("message", message);
+        result.put("success", created > 0);
+        result.put("created", created);
+        result.put("skipped", skipped);
+        if (taskId != null) result.put("taskId", taskId);
+        return result;
     }
 
     // ─── Reschedule + notify + next slots (multi-step) ───────────────────────
@@ -812,11 +1068,67 @@ public class CoWorkerService {
         }
     }
 
-    private static String cleanJson(String s) {
-        String t = s.strip();
-        if (t.startsWith("```")) {
-            t = t.replaceAll("(?s)^```[a-z]*\\n?", "").replaceAll("```$", "").strip();
+    private static String textParam(Map<String, Object> params, String key, String fallback) {
+        Object value = params.get(key);
+        if (value == null) return fallback;
+        String text = value.toString().trim();
+        return text.isEmpty() ? fallback : text;
+    }
+
+    private static BigDecimal decimalParam(Map<String, Object> params, String key) {
+        Object value = params.get(key);
+        if (value == null) return null;
+        if (value instanceof BigDecimal decimal) return decimal;
+        if (value instanceof Number number) return BigDecimal.valueOf(number.doubleValue());
+        String text = value.toString().trim();
+        if (text.isEmpty() || text.equalsIgnoreCase("null")) return null;
+        try {
+            return new BigDecimal(text.replace(",", ""));
+        } catch (NumberFormatException e) {
+            return null;
         }
-        return t;
+    }
+
+    private static Integer integerParam(Map<String, Object> params, String key) {
+        Object value = params.get(key);
+        if (value == null) return null;
+        if (value instanceof Number number) return number.intValue();
+        String text = value.toString().trim();
+        if (text.isEmpty() || text.equalsIgnoreCase("null")) return null;
+        try {
+            return Integer.parseInt(text.replace(",", ""));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static Boolean booleanParam(Map<String, Object> params, String key) {
+        Object value = params.get(key);
+        if (value == null) return null;
+        if (value instanceof Boolean bool) return bool;
+        String text = value.toString().trim();
+        if (text.isEmpty() || text.equalsIgnoreCase("null")) return null;
+        return Boolean.parseBoolean(text);
+    }
+
+    private static List<String> listParam(Map<String, Object> params, String key) {
+        Object value = params.get(key);
+        if (value instanceof Collection<?> collection) {
+            return collection.stream()
+                    .filter(Objects::nonNull)
+                    .map(Object::toString)
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .distinct()
+                    .toList();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            return Arrays.stream(text.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isBlank())
+                    .distinct()
+                    .toList();
+        }
+        return List.of();
     }
 }
