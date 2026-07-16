@@ -60,6 +60,24 @@ const hdrs    = () => ({
   "Content-Type": "application/json",
 });
 
+// ── Last-search cache (restores the last Potential Clients search on page
+// load, if the recruiter has already searched something before) ─────────────
+function potentialSearchCacheKey() { return `nolyvra:potentialClientsCache:${loginId()}`; }
+
+function loadPotentialSearchCache() {
+  if (!loginId()) return null;
+  try {
+    const raw = localStorage.getItem(potentialSearchCacheKey());
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function savePotentialSearchCache(cache) {
+  if (!loginId()) return;
+  try { localStorage.setItem(potentialSearchCacheKey(), JSON.stringify(cache)); }
+  catch { /* storage full/unavailable — ignore */ }
+}
+
 async function apiGet(path) {
   const sep = path.includes("?") ? "&" : "?";
   const r = await fetch(`${API}${path}${sep}loginId=${encodeURIComponent(loginId())}`, { headers: hdrs() });
@@ -1190,6 +1208,20 @@ export default function ClientTrackerPage() {
     loadClients();
   }, []);
 
+  // Restore the last Potential Clients search (filters + results) on page
+  // load, if the recruiter has already searched something before.
+  useEffect(() => {
+    const cached = loadPotentialSearchCache();
+    if (cached && cached.potentialSearched) {
+      setSearchIndustry(cached.searchIndustry ?? "");
+      setSearchPlace(cached.searchPlace ?? "");
+      setSearchSize(cached.searchSize ?? "");
+      setSearchKeyword(cached.searchKeyword ?? "");
+      setPotential(cached.potential ?? []);
+      setPotentialSearched(true);
+    }
+  }, []);
+
   function buildPotentialParams() {
     const params = new URLSearchParams();
     if (searchIndustry.trim()) params.set("industry",    searchIndustry.trim());
@@ -1209,6 +1241,7 @@ export default function ClientTrackerPage() {
       const qs = buildPotentialParams();
       const p = await apiGet(`/api/clients/potential${qs ? "?" + qs : ""}`);
       setPotential(p);
+      savePotentialSearchCache({ searchIndustry, searchPlace, searchSize, searchKeyword, potential: p, potentialSearched: true });
     } catch (e) {
       setPotentialError(e.message || "Failed to fetch potential clients.");
     } finally {
@@ -1224,7 +1257,9 @@ export default function ClientTrackerPage() {
       const fresh = await apiGet(`/api/clients/potential/load-more${qs ? "?" + qs : ""}`);
       const existingIds = new Set(potential.filter(pc => pc.externalId).map(pc => pc.externalId));
       const deduped = (fresh ?? []).filter(pc => pc.externalId && !existingIds.has(pc.externalId));
-      setPotential(prev => [...prev, ...deduped]);
+      const combined = [...potential, ...deduped];
+      setPotential(combined);
+      savePotentialSearchCache({ searchIndustry, searchPlace, searchSize, searchKeyword, potential: combined, potentialSearched: true });
     } catch (e) {
       setPotentialError(e.message || "Failed to load more potential clients.");
     } finally {

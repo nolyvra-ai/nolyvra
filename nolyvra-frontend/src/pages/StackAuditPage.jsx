@@ -222,10 +222,12 @@ export default function StackAuditPage() {
 
   return (
     <>
-    <div style={{ fontFamily:"'DM Sans',sans-serif", background:"#06091e", minHeight:"100vh", display:"flex", flexDirection:"column" }}>
+    <div style={{ fontFamily:"'DM Sans',sans-serif", background:"#06050B", minHeight:"100vh", display:"flex", flexDirection:"column", position:"relative", overflow:"hidden" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
         *{box-sizing:border-box;}
+        @keyframes saMesh  { 0%{transform:translate(0,0) scale(1)} 50%{transform:translate(-30px,15px) scale(1.06)} 100%{transform:translate(20px,-10px) scale(1.02)} }
+        @keyframes saSweep { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
         .sa-back{display:inline-flex;align-items:center;gap:8px;background:transparent;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:8px 16px;border-radius:8px;font-size:13px;font-family:inherit;cursor:pointer;transition:all .2s;}
         .sa-back:hover{border-color:rgba(255,255,255,.35);color:#fff;}
         .sa-toggle{padding:9px 16px;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:1px solid #dde2ea;background:#f7f8fa;color:#4b5563;transition:all .2s;}
@@ -249,8 +251,22 @@ export default function StackAuditPage() {
         @media(max-width:600px){.sa-grid2{grid-template-columns:1fr!important;}}
       `}</style>
 
+      {/* ── Dynamic gradient background (same treatment as the landing page hero) ── */}
+      <div style={{ position:"fixed", inset:0, zIndex:0, pointerEvents:"none", overflow:"hidden" }}>
+        <div style={{ position:"absolute", inset:"-10%",
+          background:`radial-gradient(circle at 18% 28%,rgba(99,102,241,.55) 0%,transparent 40%),
+                      radial-gradient(circle at 78% 22%,rgba(6,182,212,.45) 0%,transparent 44%),
+                      radial-gradient(circle at 62% 78%,rgba(139,92,246,.55) 0%,transparent 42%),
+                      radial-gradient(circle at 22% 82%,rgba(244,114,182,.32) 0%,transparent 40%)`,
+          filter:"blur(40px)", mixBlendMode:"screen", animation:"saMesh 22s ease-in-out infinite alternate" }} />
+        <div style={{ position:"absolute", inset:0, background:"linear-gradient(110deg,transparent 30%,rgba(255,255,255,.1) 50%,transparent 70%)", mixBlendMode:"screen", animation:"saSweep 9s ease-in-out infinite", opacity:.7 }} />
+        <div style={{ position:"absolute", inset:0, background:"repeating-linear-gradient(0deg,rgba(255,255,255,.02) 0 2px,transparent 2px 4px)", opacity:.6 }} />
+        <div style={{ position:"absolute", inset:0, backgroundImage:`linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px)`, backgroundSize:"60px 60px", WebkitMaskImage:"radial-gradient(ellipse 75% 65% at 50% 30%,#000 0%,transparent 75%)", maskImage:"radial-gradient(ellipse 75% 65% at 50% 30%,#000 0%,transparent 75%)" }} />
+        <div style={{ position:"absolute", inset:0, background:"radial-gradient(ellipse 90% 70% at 50% 50%,transparent 35%,rgba(6,5,11,.85) 100%)" }} />
+      </div>
+
       {/* ── Top bar ── */}
-      <div style={{ background:"rgba(6,9,30,.95)", backdropFilter:"blur(12px)", borderBottom:"1px solid rgba(255,255,255,.06)", padding:"0 24px", height:60, display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, zIndex:50 }}>
+      <div style={{ background:"rgba(6,9,30,.7)", backdropFilter:"blur(12px)", borderBottom:"1px solid rgba(255,255,255,.06)", padding:"0 24px", height:60, display:"flex", alignItems:"center", justifyContent:"space-between", position:"sticky", top:0, zIndex:50 }}>
         <div style={{ display:"flex", alignItems:"center", gap:10 }}>
           <img src="/nolyvra_logo.png" alt="nolyvra" style={{ width:32, height:32, borderRadius:7, objectFit:"cover" }} />
           <div style={{ lineHeight:1 }}>
@@ -262,7 +278,7 @@ export default function StackAuditPage() {
       </div>
 
       {/* ── Content ── */}
-      <div style={{ flex:1, maxWidth:720, width:"100%", margin:"0 auto", padding:"48px 20px 80px" }}>
+      <div style={{ position:"relative", zIndex:1, flex:1, maxWidth:720, width:"100%", margin:"0 auto", padding:"48px 20px 80px" }}>
 
         {/* ════════ FORM ════════ */}
         {!report && (

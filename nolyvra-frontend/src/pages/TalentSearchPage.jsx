@@ -99,6 +99,24 @@ function statusFromStage(stage) {
   return { label: "Pending", bg: "#F1F3F7", border: BORDER, color: MUTED };
 }
 
+// ── Last-search cache (restores the last query + results on page load,
+// so revisiting doesn't burn a token re-running an AI search) ───────────────
+function talentSearchCacheKey(loginId) { return `nolyvra:talentSearchCache:${loginId}`; }
+
+function loadTalentSearchCache(loginId) {
+  if (!loginId) return null;
+  try {
+    const raw = localStorage.getItem(talentSearchCacheKey(loginId));
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveTalentSearchCache(loginId, cache) {
+  if (!loginId) return;
+  try { localStorage.setItem(talentSearchCacheKey(loginId), JSON.stringify(cache)); }
+  catch { /* storage full/unavailable — ignore */ }
+}
+
 export function TalentSearchPage() {
   const nav = useNavigate();
   const loginId = localStorage.getItem("loginId") || "";
@@ -129,6 +147,20 @@ export function TalentSearchPage() {
 
   // ── New: view toggle ──────────────────────────────────────────────────────
   const [viewMode, setViewMode] = useState("cards");
+
+  // Restore the last search (query + results) on page load, if the recruiter
+  // has already searched something before — avoids a blank page and avoids
+  // re-spending a token just to re-run the same AI search on revisit.
+  useEffect(() => {
+    const cached = loadTalentSearchCache(loginId);
+    if (cached && cached.query) {
+      setQuery(cached.query);
+      setSearchedQuery(cached.searchedQuery ?? cached.query);
+      setResult(cached.result ?? null);
+      setAllResults(cached.allResults ?? []);
+      setPage(cached.page ?? 0);
+    }
+  }, [loginId]);
 
   // ── Import dialog ────────────────────────────────────────────────────────
   const [importOpen,        setImportOpen]        = useState(false);
@@ -218,8 +250,10 @@ export function TalentSearchPage() {
     try {
       const data = await fetchResults(searchQuery, 0);
       const sorted = sortResults(data.results ?? [], searchQuery);
+      const newResult = { ...data, results: sorted };
       setAllResults(sorted);
-      setResult({ ...data, results: sorted });
+      setResult(newResult);
+      saveTalentSearchCache(loginId, { query: searchQuery, searchedQuery: searchQuery, result: newResult, allResults: sorted, page: 0 });
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
@@ -231,8 +265,10 @@ export function TalentSearchPage() {
       const data = await fetchResults(searchedQuery, nextPage);
       const newSorted = sortResults(data.results ?? [], searchedQuery);
       const combined = [...allResults, ...newSorted];
+      const newResult = { ...result, results: combined };
       setAllResults(combined);
-      setResult(prev => ({ ...prev, results: combined }));
+      setResult(newResult);
+      saveTalentSearchCache(loginId, { query, searchedQuery, result: newResult, allResults: combined, page: nextPage });
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }
@@ -253,13 +289,15 @@ export function TalentSearchPage() {
       const existingIds = new Set(allResults.filter(c => c.coresignalId).map(c => c.coresignalId));
       const deduped = (fresh ?? []).filter(c => c.coresignalId && !existingIds.has(c.coresignalId));
       const combined = [...allResults, ...deduped];
-      setAllResults(combined);
-      setResult(prev => prev && ({
-        ...prev,
+      const newResult = result && {
+        ...result,
         results: combined,
-        coreSignalCount: (prev.coreSignalCount ?? 0) + deduped.length,
-        totalFound: (prev.totalFound ?? 0) + deduped.length,
-      }));
+        coreSignalCount: (result.coreSignalCount ?? 0) + deduped.length,
+        totalFound: (result.totalFound ?? 0) + deduped.length,
+      };
+      setAllResults(combined);
+      setResult(newResult);
+      saveTalentSearchCache(loginId, { query, searchedQuery, result: newResult, allResults: combined, page });
     } catch (e) { setError(e.message); }
     finally { setExternalLoadingMore(false); }
   }
