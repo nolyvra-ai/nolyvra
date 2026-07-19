@@ -49,8 +49,6 @@ public class CoWorkerService {
 
     public CoWorkerChatResponse chat(String loginId, CoWorkerChatRequest request) {
         String context = buildContext(loginId);
-        String nowLine = OffsetDateTime.now(ZoneOffset.UTC)
-                .format(java.time.format.DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy 'at' HH:mm 'UTC'"));
 
         // Resolve or create session
         Long sessionId = request.sessionId();
@@ -63,82 +61,11 @@ public class CoWorkerService {
 
         persistMessage(loginId, sessionId, "user", request.message());
 
-<<<<<<< HEAD
         if (isPipelineSummaryRequest(request.message())) {
             CoWorkerChatResponse response = buildPipelineSummary(loginId, sessionId);
             persistMessage(loginId, sessionId, "assistant", response.message());
             updateSessionLastMessage(sessionId);
             return response;
-=======
-        String systemPrompt = """
-                You are nolyvra Co-worker AI — a helpful recruitment assistant that takes actions inside the app.
-
-                Current date and time: %s
-                Always use this as "now" when resolving relative dates/times (e.g. "tomorrow", "next Monday",
-                "in 2 weeks") into ISO datetimes. Never use any other year unless the user explicitly states one.
-
-                You have access to the following recruitment data for this recruiter:
-                %s
-
-                When the user asks you to do something, you MUST return EXACTLY ONE JSON object:
-                {
-                  "message": "<friendly conversational reply, briefly confirm what you found and what you plan to do>",
-                  "pendingAction": {
-                    "type": "RUN_ANALYSIS|SCHEDULE_INTERVIEW|RESCHEDULE_AND_NOTIFY|MOVE_PIPELINE|EMAIL|CREATE_REMINDER|NONE",
-                    "description": "<1-sentence human-readable action description>",
-                    "params": { <action-specific parameters — see below> }
-                  }
-                }
-
-                Set pendingAction.type to "NONE" and params to {} if the message is just a question or greeting.
-
-                Parameter schemas per action type:
-
-                RUN_ANALYSIS:
-                  { "candidateIds": ["cand-xxx", ...], "candidateNames": ["Name", ...], "jobTitle": "..." }
-
-                SCHEDULE_INTERVIEW:
-                  { "candidateId": "cand-xxx", "candidateName": "...", "interviewType": "Phone Screen|Video Interview|In-Person", "scheduledAt": "ISO datetime or null if not specified", "notes": "..." }
-
-                RESCHEDULE_AND_NOTIFY:
-                  { "interviewId": "int-xxx or null", "candidateId": "cand-xxx", "candidateName": "...", "interviewType": "...", "newScheduledAt": "ISO datetime or null", "notes": "..." }
-                  Use this for any reschedule request, or multi-step (reschedule + notify candidate + next available slots).
-
-                MOVE_PIPELINE:
-                  { "candidateIds": ["cand-xxx", ...], "candidateNames": ["Name", ...], "toStage": "Screening|Interview|Assessment|Offer|Selected|Rejected", "jobTitle": "..." }
-
-                EMAIL:
-                  { "candidateId": "cand-xxx", "candidateName": "...", "emailType": "FOLLOW_UP|INTERVIEW_INVITE|REJECTION|OFFER", "subject": "suggested subject", "body": "suggested email body" }
-                  NOTE: For email actions, the app will navigate to the email centre page with fields pre-populated. No email is sent automatically.
-
-                CREATE_REMINDER:
-                  { "title": "...", "candidateId": "cand-xxx or null", "dueAt": "ISO datetime", "priority": "High|Normal|Low" }
-
-                Rules:
-                - Always match candidate and job names to real IDs from the context above.
-                - If you cannot find a match, say so in the message and set pendingAction type to NONE.
-                - For EMAIL actions, always mention in your message that you will take the user to the email page.
-                - For questions about upcoming meetings or free time, answer directly from UPCOMING INTERVIEWS data above — set pendingAction to NONE.
-                - For reschedule + notify + next slots requests, always use RESCHEDULE_AND_NOTIFY (not SCHEDULE_INTERVIEW).
-                - Keep your message friendly, concise and specific (mention names and counts).
-                - No markdown. No extra keys.
-                - CRITICAL: You MUST respond with ONLY a valid JSON object. Never respond with plain text. Even for greetings or questions, wrap your reply in the JSON structure above with pendingAction type NONE.
-                - CRITICAL: params must ALWAYS be a JSON object {}, never a JSON array []. If scheduling multiple candidates, pick the first one and mention you will handle others separately.
-                """
-                .formatted(nowLine, context);
-
-        List<CoWorkerChatRequest.ChatMessage> history = request.history() != null
-                ? request.history()
-                : List.of();
-        int start = Math.max(0, history.size() - 10);
-        StringBuilder contextHistory = new StringBuilder();
-        for (int i = start; i < history.size(); i++) {
-            var h = history.get(i);
-            contextHistory.append(h.role().toUpperCase())
-                    .append(": ")
-                    .append(h.content())
-                    .append("\n");
->>>>>>> develop
         }
 
         try {
