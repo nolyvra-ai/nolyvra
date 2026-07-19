@@ -30,7 +30,8 @@ const FIELD_SX = {
 
 const empty = {
   companyName: "", industry: "", companySize: "", location: "",
-  contactPerson: "", contactEmail: "", contactTitle: "", linkedinUrl: "", notes: "",
+  contactPerson: "", contactEmail: "", contactTitle: "", contactPhone: "", linkedinUrl: "",
+  secondaryContacts: [], note: "",
 };
 
 function toForm(data) {
@@ -43,8 +44,12 @@ function toForm(data) {
     contactPerson: data.contactPerson || "",
     contactEmail:  data.contactEmail  || "",
     contactTitle:  data.contactTitle  || "",
+    contactPhone:  data.contactPhone  || "",
     linkedinUrl:   data.linkedinUrl   || "",
-    notes:         data.notes         || "",
+    secondaryContacts: data.secondaryContacts || [],
+    // Notes are an add-only timestamped log now — this field is always blank on
+    // open; typing here and saving appends a new entry, it doesn't edit history.
+    note: "",
   };
 }
 
@@ -66,6 +71,21 @@ export default function AddClientDialog({ open, onClose, onSaved, initialData = 
 
   function set(field) {
     return e => setForm(f => ({ ...f, [field]: e.target.value }));
+  }
+
+  function addContact() {
+    setForm(f => ({ ...f, secondaryContacts: [...f.secondaryContacts, { name: "", title: "", email: "", phone: "" }] }));
+  }
+
+  function removeContact(index) {
+    setForm(f => ({ ...f, secondaryContacts: f.secondaryContacts.filter((_, i) => i !== index) }));
+  }
+
+  function setContactField(index, field) {
+    return e => setForm(f => ({
+      ...f,
+      secondaryContacts: f.secondaryContacts.map((c, i) => i === index ? { ...c, [field]: e.target.value } : c),
+    }));
   }
 
   function handleClose() {
@@ -142,15 +162,46 @@ export default function AddClientDialog({ open, onClose, onSaved, initialData = 
               fullWidth sx={FIELD_SX} size="small" placeholder="e.g. Head of Talent" />
 
             <TextField label="Contact Email" value={form.contactEmail} onChange={set("contactEmail")}
-              type="email" fullWidth sx={{ ...FIELD_SX, gridColumn: "1 / -1" }} size="small" />
+              type="email" fullWidth sx={FIELD_SX} size="small" />
+
+            <TextField label="Contact Phone" value={form.contactPhone} onChange={set("contactPhone")}
+              fullWidth sx={FIELD_SX} size="small" />
 
             <TextField label="LinkedIn URL" value={form.linkedinUrl} onChange={set("linkedinUrl")}
               fullWidth sx={{ ...FIELD_SX, gridColumn: "1 / -1" }} size="small"
               placeholder="https://linkedin.com/company/…" />
+          </Box>
 
-            <TextField label="Notes" value={form.notes} onChange={set("notes")}
-              fullWidth multiline rows={3} sx={{ ...FIELD_SX, gridColumn: "1 / -1" }} size="small"
-              placeholder="Relationship history, preferences, context…" />
+          <Box sx={{ mt: "18px" }}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: "8px" }}>
+              <Box sx={{ fontSize: 12, fontWeight: 600, color: "#0F1623" }}>Additional Contacts</Box>
+              <Button onClick={addContact} size="small"
+                sx={{ textTransform: "none", fontSize: 12, color: "#1D72E8" }}>
+                + Add Contact
+              </Button>
+            </Box>
+            {form.secondaryContacts.map((c, i) => (
+              <Box key={i} sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr auto", gap: "8px", mb: "8px" }}>
+                <TextField label="Name" value={c.name} onChange={setContactField(i, "name")}
+                  size="small" fullWidth sx={FIELD_SX} />
+                <TextField label="Title" value={c.title} onChange={setContactField(i, "title")}
+                  size="small" fullWidth sx={FIELD_SX} />
+                <TextField label="Email" type="email" value={c.email} onChange={setContactField(i, "email")}
+                  size="small" fullWidth sx={FIELD_SX} />
+                <TextField label="Phone" value={c.phone} onChange={setContactField(i, "phone")}
+                  size="small" fullWidth sx={FIELD_SX} />
+                <Button onClick={() => removeContact(i)} size="small"
+                  sx={{ minWidth: "32px", color: "#8A94A6", "&:hover": { color: "#DC2626" } }}>
+                  ✕
+                </Button>
+              </Box>
+            ))}
+          </Box>
+
+          <Box sx={{ mt: "18px" }}>
+            <TextField label="Add a Note" value={form.note} onChange={set("note")}
+              fullWidth multiline rows={3} sx={FIELD_SX} size="small"
+              placeholder="Add a new note — previous notes stay visible in the client's timeline…" />
           </Box>
         </DialogContent>
 

@@ -18,5 +18,7 @@ public record JobResponse(
     BigDecimal salary,
     String currency,
     BigDecimal feePercentage,
+    String feeType,
+    BigDecimal fixedFee,
     BigDecimal estimatedFee
 ) {}

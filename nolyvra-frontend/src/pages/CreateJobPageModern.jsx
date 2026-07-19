@@ -324,7 +324,7 @@ export default function CreateJobPageModern() {
   const [form, setForm] = useState({
     title: "", company: "", location: "",
     jobType: "Full-time", jobStatus: "Active",
-    salary: "", currency: "AUD", feePercentage: "",
+    salary: "", currency: "AUD", feePercentage: "", feeType: "PERCENTAGE", fixedFee: "",
   });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -431,6 +431,8 @@ export default function CreateJobPageModern() {
           salary:    form.salary !== "" ? Number(form.salary) : null,
           currency:  form.currency,
           feePercentage: form.feePercentage !== "" ? Number(form.feePercentage) : null,
+          feeType:   form.feeType,
+          fixedFee:  form.fixedFee !== "" ? Number(form.fixedFee) : null,
           jdText:    editedJD,
           seniority: aiResponse?.seniorityLevel || null,
           stackTags: [...new Set([
@@ -842,20 +844,59 @@ export default function CreateJobPageModern() {
               </Box>
             </Box>
             <Box>
-              <FieldLabel>% Fees</FieldLabel>
-              <TextField fullWidth size="small" type="number" value={form.feePercentage}
-                onChange={e => setForm(p => ({ ...p, feePercentage: e.target.value }))}
-                placeholder="e.g. 15"
-                sx={fieldSx} />
-            </Box>
-            {form.salary !== "" && form.feePercentage !== "" && (
-              <Box sx={{ display: "flex", alignItems: "flex-end", fontSize: 13, color: MUTED }}>
-                Estimated Fee:{" "}
-                <Box component="span" sx={{ fontWeight: 700, color: SUCCESS, ml: 0.5 }}>
-                  {form.currency} {(Number(form.salary) * Number(form.feePercentage) / 100)
-                    .toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
+                <FieldLabel>{form.feeType === "FIXED" ? "Fixed Fee" : "% Fees"}</FieldLabel>
+                <Box sx={{ display: "flex", border: `1px solid ${BORDER}`, borderRadius: "6px", overflow: "hidden" }}>
+                  <Box onClick={() => setForm(p => ({ ...p, feeType: "PERCENTAGE" }))}
+                    sx={{
+                      px: 1, py: 0.25, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                      bgcolor: form.feeType !== "FIXED" ? ACCENT_L : "transparent",
+                      color: form.feeType !== "FIXED" ? ACCENT : MUTED,
+                    }}>
+                    %
+                  </Box>
+                  <Box onClick={() => setForm(p => ({ ...p, feeType: "FIXED" }))}
+                    sx={{
+                      px: 1, py: 0.25, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                      borderLeft: `1px solid ${BORDER}`,
+                      bgcolor: form.feeType === "FIXED" ? ACCENT_L : "transparent",
+                      color: form.feeType === "FIXED" ? ACCENT : MUTED,
+                    }}>
+                    Fixed
+                  </Box>
                 </Box>
               </Box>
+              {form.feeType === "FIXED" ? (
+                <TextField fullWidth size="small" type="number" value={form.fixedFee}
+                  onChange={e => setForm(p => ({ ...p, fixedFee: e.target.value }))}
+                  placeholder="e.g. 5000"
+                  sx={fieldSx} />
+              ) : (
+                <TextField fullWidth size="small" type="number" value={form.feePercentage}
+                  onChange={e => setForm(p => ({ ...p, feePercentage: e.target.value }))}
+                  placeholder="e.g. 15"
+                  sx={fieldSx} />
+              )}
+            </Box>
+            {form.feeType === "FIXED" ? (
+              form.fixedFee !== "" && (
+                <Box sx={{ display: "flex", alignItems: "flex-end", fontSize: 13, color: MUTED }}>
+                  Estimated Fee:{" "}
+                  <Box component="span" sx={{ fontWeight: 700, color: SUCCESS, ml: 0.5 }}>
+                    {form.currency} {Number(form.fixedFee).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </Box>
+                </Box>
+              )
+            ) : (
+              form.salary !== "" && form.feePercentage !== "" && (
+                <Box sx={{ display: "flex", alignItems: "flex-end", fontSize: 13, color: MUTED }}>
+                  Estimated Fee:{" "}
+                  <Box component="span" sx={{ fontWeight: 700, color: SUCCESS, ml: 0.5 }}>
+                    {form.currency} {(Number(form.salary) * Number(form.feePercentage) / 100)
+                      .toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </Box>
+                </Box>
+              )
             )}
           </Box>
 

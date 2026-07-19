@@ -120,7 +120,7 @@ public class XeroInvoiceService {
     public List<BillablePlacementResponse> getBillablePlacements(Long clientId, String loginId) {
         String companyName = resolveClientCompanyName(clientId, loginId);
         return jdbc.query("""
-                SELECT id, title, currency, salary, fee_percentage
+                SELECT id, title, currency, salary, fee_percentage, fee_type, fixed_fee
                 FROM jobs
                 WHERE login_id = ? AND lower(company) = lower(?)
                   AND lower(status) = 'complete' AND xero_invoice_id IS NULL
@@ -129,13 +129,17 @@ public class XeroInvoiceService {
                 (rs, i) -> {
                     BigDecimal salary = rs.getBigDecimal("salary");
                     BigDecimal feePercentage = rs.getBigDecimal("fee_percentage");
+                    String feeType = rs.getString("fee_type");
+                    BigDecimal fixedFee = rs.getBigDecimal("fixed_fee");
                     return new BillablePlacementResponse(
                             rs.getString("id"),
                             rs.getString("title"),
                             rs.getString("currency"),
                             salary,
                             feePercentage,
-                            computeEstimatedFee(salary, feePercentage));
+                            feeType,
+                            fixedFee,
+                            computeEstimatedFee(salary, feePercentage, feeType, fixedFee));
                 },
                 loginId, companyName);
     }
@@ -148,7 +152,9 @@ public class XeroInvoiceService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found"));
     }
 
-    private static BigDecimal computeEstimatedFee(BigDecimal salary, BigDecimal feePercentage) {
+    private static BigDecimal computeEstimatedFee(
+            BigDecimal salary, BigDecimal feePercentage, String feeType, BigDecimal fixedFee) {
+        if ("FIXED".equals(feeType)) return fixedFee;
         if (salary == null || feePercentage == null) return null;
         return salary.multiply(feePercentage)
                 .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);

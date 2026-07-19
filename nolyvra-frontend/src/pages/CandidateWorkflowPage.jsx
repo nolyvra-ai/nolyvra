@@ -106,9 +106,11 @@ export default function CandidateWorkflowPage() {
   const [error,         setError]         = useState(null);
   const [selectedStage, setSelectedStage] = useState("");
   const [stageLoading,  setStageLoading]  = useState(false);
-  const [notes,         setNotes]         = useState("");
-  const [notesSaving,      setNotesSaving]      = useState(false);
-  const [notesSaved,       setNotesSaved]       = useState(false);
+  const [notes,         setNotes]         = useState([]);
+  const [notesLoading,  setNotesLoading]  = useState(true);
+  const [newNote,       setNewNote]       = useState("");
+  const [addingNote,    setAddingNote]    = useState(false);
+  const [noteError,     setNoteError]     = useState(null);
   const [analysisRunning,  setAnalysisRunning]  = useState(false); // Change 1
   const [analysisError,    setAnalysisError]    = useState(null);  // Change 1
 
@@ -144,15 +146,21 @@ export default function CandidateWorkflowPage() {
 
   useEffect(() => {
     apiGet(`/api/candidates/${candidateId}/workflow`)
-      .then(d => { setWorkflow(d); setSelectedStage(d.stage); setNotes(d.recruiterNotes || ""); })
+      .then(d => { setWorkflow(d); setSelectedStage(d.stage); })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
+
+    setNotesLoading(true);
+    apiGet(`/api/candidates/${candidateId}/notes`)
+      .then(d => setNotes(d || []))
+      .catch(() => {})
+      .finally(() => setNotesLoading(false));
   }, [candidateId]);
 
   async function handleUpdateStage() {
     setStageLoading(true);
     try {
-      await apiPatch(`/api/candidates/${candidateId}/stage`, { stage: selectedStage, recruiterNotes: notes });
+      await apiPatch(`/api/candidates/${candidateId}/stage`, { stage: selectedStage });
       setWorkflow(p => ({ ...p, stage: selectedStage }));
     } catch(e) { setError(e.message); }
     finally { setStageLoading(false); }
@@ -188,14 +196,17 @@ export default function CandidateWorkflowPage() {
     finally { setStageLoading(false); }
   }
 
-  async function handleSaveNotes() {
-    setNotesSaving(true);
+  async function handleAddNote() {
+    if (!newNote.trim()) return;
+    setAddingNote(true);
+    setNoteError(null);
     try {
-      await apiPatch(`/api/candidates/${candidateId}/notes`, { notes });
-      setNotesSaved(true);
-      setTimeout(() => setNotesSaved(false), 2000);
-    } catch(e) { setError(e.message); }
-    finally { setNotesSaving(false); }
+      await apiPost(`/api/candidates/${candidateId}/notes`, { note: newNote.trim() });
+      const updated = await apiGet(`/api/candidates/${candidateId}/notes`);
+      setNotes(updated || []);
+      setNewNote("");
+    } catch(e) { setNoteError(e.message); }
+    finally { setAddingNote(false); }
   }
 
   // Change 2: run analysis handler
@@ -764,16 +775,34 @@ export default function CandidateWorkflowPage() {
           <Card>
             <CardHead title="Recruiter Notes" />
             <Box sx={{p:1.75}}>
-              <TextField multiline rows={4} fullWidth value={notes}
-                onChange={e => { setNotes(e.target.value); setNotesSaved(false); }}
-                placeholder="Add notes…"
-                sx={{"& .MuiOutlinedInput-root":{borderRadius:"8px",fontSize:12,fontFamily:"monospace"}}} />
-              <Button fullWidth variant="outlined" size="small" onClick={handleSaveNotes}
-                disabled={notesSaving}
-                sx={{mt:1,fontSize:11,borderColor:BORDER,color:notesSaved?SUCCESS:TEXT,
-                  borderRadius:"6px",textTransform:"none"}}>
-                {notesSaving ? <CircularProgress size={12} /> : notesSaved ? "✓ Saved" : "Save Notes"}
+              <TextField multiline rows={3} fullWidth value={newNote}
+                onChange={e => setNewNote(e.target.value)}
+                placeholder="Add a note…" disabled={addingNote}
+                sx={{"& .MuiOutlinedInput-root":{borderRadius:"8px",fontSize:12}}} />
+              <Button fullWidth variant="outlined" size="small" onClick={handleAddNote}
+                disabled={addingNote || !newNote.trim()}
+                sx={{mt:1,fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
+                {addingNote ? <CircularProgress size={12} /> : "Add Note"}
               </Button>
+              {noteError && (
+                <Typography sx={{fontSize:11,color:DANGER,mt:0.75}}>{noteError}</Typography>
+              )}
+              {notesLoading ? (
+                <Typography sx={{fontSize:11,color:MUTED,mt:1.25}}>Loading notes…</Typography>
+              ) : notes.length === 0 ? (
+                <Typography sx={{fontSize:11,color:MUTED,mt:1.25}}>No notes yet.</Typography>
+              ) : (
+                <Box sx={{mt:1.25}}>
+                  {notes.map((n,i) => (
+                    <Box key={n.id} sx={{py:1,borderTop:i>0?`1px solid #F0F2F6`:"none"}}>
+                      <Typography sx={{fontSize:12,color:TEXT,whiteSpace:"pre-wrap"}}>{n.note}</Typography>
+                      <Typography sx={{fontSize:10,color:MUTED,mt:0.25}}>
+                        {n.createdAt ? new Date(n.createdAt).toLocaleString("en-GB") : ""}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              )}
             </Box>
           </Card>
 

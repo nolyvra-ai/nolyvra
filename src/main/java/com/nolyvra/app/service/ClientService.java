@@ -1,9 +1,12 @@
 package com.nolyvra.app.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.nolyvra.app.model.ClientContact;
+import com.nolyvra.app.model.ClientNoteResponse;
 import com.nolyvra.app.model.ClientRequest;
 import com.nolyvra.app.model.ClientResponse;
 import com.nolyvra.app.model.OutreachRequest;
@@ -65,7 +68,8 @@ public class ClientService {
     public List<ClientResponse> getClients(String loginId) {
         String sql = """
                 SELECT c.id, c.login_id, c.company_name, c.industry, c.company_size, c.location,
-                       c.contact_person, c.contact_email, c.contact_title, c.linkedin_url, c.notes,
+                       c.contact_person, c.contact_email, c.contact_title, c.contact_phone,
+                       c.linkedin_url, c.secondary_contacts,
                        c.last_funding_event, c.last_funding_amount, c.created_at,
                        COUNT(DISTINCT j.id) FILTER (WHERE lower(j.status) = 'active') AS active_job_count,
                        COUNT(DISTINCT cand.id) FILTER (WHERE cand.stage = 'Selected') AS filled_job_count,
@@ -80,11 +84,12 @@ public class ClientService {
 
         return jdbc.query(sql, (rs, i) -> {
             String companyName = rs.getString("company_name");
+            long clientId = rs.getLong("id");
             List<ClientResponse.JobSummary> recentJobs = getClientJobs(companyName, loginId);
             List<ClientResponse.FeeTotal> totalFee = getClientFeeTotals(companyName, loginId);
             var ts = rs.getTimestamp("created_at");
             return new ClientResponse(
-                    rs.getLong("id"),
+                    clientId,
                     rs.getString("login_id"),
                     companyName,
                     rs.getString("industry"),
@@ -93,8 +98,10 @@ public class ClientService {
                     rs.getString("contact_person"),
                     rs.getString("contact_email"),
                     rs.getString("contact_title"),
+                    rs.getString("contact_phone"),
                     rs.getString("linkedin_url"),
-                    rs.getString("notes"),
+                    parseSecondaryContacts(rs.getString("secondary_contacts")),
+                    getLatestNote(clientId, loginId),
                     rs.getString("last_funding_event"),
                     rs.getString("last_funding_amount"),
                     ts != null ? ts.toInstant() : null,
@@ -109,17 +116,21 @@ public class ClientService {
     public ClientResponse getClientForHubSpot(Long id, String loginId) {
         return jdbc.query("""
                 SELECT id, login_id, company_name, industry, company_size, location,
-                       contact_person, contact_email, contact_title, linkedin_url, notes,
+                       contact_person, contact_email, contact_title, contact_phone,
+                       linkedin_url, secondary_contacts,
                        last_funding_event, last_funding_amount, created_at
                 FROM clients
                 WHERE id = ? AND login_id = ?
                 """, (rs, i) -> {
+            long clientId = rs.getLong("id");
             var ts = rs.getTimestamp("created_at");
             return new ClientResponse(
-                    rs.getLong("id"), rs.getString("login_id"), rs.getString("company_name"),
+                    clientId, rs.getString("login_id"), rs.getString("company_name"),
                     rs.getString("industry"), rs.getString("company_size"), rs.getString("location"),
                     rs.getString("contact_person"), rs.getString("contact_email"),
-                    rs.getString("contact_title"), rs.getString("linkedin_url"), rs.getString("notes"),
+                    rs.getString("contact_title"), rs.getString("contact_phone"), rs.getString("linkedin_url"),
+                    parseSecondaryContacts(rs.getString("secondary_contacts")),
+                    getLatestNote(clientId, loginId),
                     rs.getString("last_funding_event"), rs.getString("last_funding_amount"),
                     ts != null ? ts.toInstant() : null, 0, 0, 0, List.of(), List.of());
         }, id, loginId).stream().findFirst()
@@ -130,7 +141,7 @@ public class ClientService {
 
     public List<ClientResponse.JobSummary> getClientJobs(String companyName, String loginId) {
         return jdbc.query("""
-                SELECT title, status, salary, currency, fee_percentage,
+                SELECT title, status, salary, currency, fee_percentage, fee_type, fixed_fee,
                        EXTRACT(DAY FROM now() - created_at)::int AS days_old
                 FROM jobs
                 WHERE login_id = ? AND lower(company) = lower(?)
@@ -145,7 +156,7 @@ public class ClientService {
 
     public List<ClientResponse.JobSummary> getAllClientJobs(String companyName, String loginId) {
         return jdbc.query("""
-                SELECT title, status, salary, currency, fee_percentage,
+                SELECT title, status, salary, currency, fee_percentage, fee_type, fixed_fee,
                        EXTRACT(DAY FROM now() - created_at)::int AS days_old
                 FROM jobs
                 WHERE login_id = ? AND lower(company) = lower(?)
@@ -158,6 +169,8 @@ public class ClientService {
     private ClientResponse.JobSummary mapJobSummary(java.sql.ResultSet rs) throws java.sql.SQLException {
         BigDecimal salary = rs.getBigDecimal("salary");
         BigDecimal feePercentage = rs.getBigDecimal("fee_percentage");
+        String feeType = rs.getString("fee_type");
+        BigDecimal fixedFee = rs.getBigDecimal("fixed_fee");
         return new ClientResponse.JobSummary(
                 rs.getString("title"),
                 rs.getInt("days_old"),
@@ -165,10 +178,14 @@ public class ClientService {
                 salary,
                 rs.getString("currency"),
                 feePercentage,
-                computeEstimatedFee(salary, feePercentage));
+                feeType,
+                fixedFee,
+                computeEstimatedFee(salary, feePercentage, feeType, fixedFee));
     }
 
-    private static BigDecimal computeEstimatedFee(BigDecimal salary, BigDecimal feePercentage) {
+    private static BigDecimal computeEstimatedFee(
+            BigDecimal salary, BigDecimal feePercentage, String feeType, BigDecimal fixedFee) {
+        if ("FIXED".equals(feeType)) return fixedFee;
         if (salary == null || feePercentage == null) return null;
         return salary.multiply(feePercentage)
                 .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
@@ -178,11 +195,18 @@ public class ClientService {
 
     public List<ClientResponse.FeeTotal> getClientFeeTotals(String companyName, String loginId) {
         return jdbc.query("""
-                SELECT currency, SUM(salary * fee_percentage / 100) AS total
+                SELECT currency, SUM(
+                           CASE WHEN fee_type = 'FIXED' THEN fixed_fee
+                                ELSE salary * fee_percentage / 100
+                           END
+                       ) AS total
                 FROM jobs
                 WHERE login_id = ? AND lower(company) = lower(?)
                   AND lower(status) IN ('active', 'fulfilling')
-                  AND salary IS NOT NULL AND fee_percentage IS NOT NULL
+                  AND (
+                    (fee_type = 'FIXED' AND fixed_fee IS NOT NULL)
+                    OR (fee_type <> 'FIXED' AND salary IS NOT NULL AND fee_percentage IS NOT NULL)
+                  )
                 GROUP BY currency
                 ORDER BY currency
                 """,
@@ -199,19 +223,24 @@ public class ClientService {
                 UPDATE clients SET
                     company_name = ?, industry = ?, company_size = ?,
                     location = ?, contact_person = ?, contact_email = ?,
-                    contact_title = ?, linkedin_url = ?, notes = ?,
+                    contact_title = ?, contact_phone = ?, linkedin_url = ?, secondary_contacts = CAST(? AS jsonb),
                     updated_at = now()
                 WHERE id = ? AND login_id = ?
                 """,
                 req.companyName(), req.industry(), req.companySize(), req.location(),
-                req.contactPerson(), req.contactEmail(), req.contactTitle(),
-                req.linkedinUrl(), req.notes(), id, loginId);
+                req.contactPerson(), req.contactEmail(), req.contactTitle(), req.contactPhone(),
+                req.linkedinUrl(), serializeSecondaryContacts(req.secondaryContacts()), id, loginId);
         if (updated == 0)
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found");
 
+        if (req.note() != null && !req.note().isBlank())
+            jdbc.update("INSERT INTO client_notes (client_id, login_id, note) VALUES (?, ?, ?)",
+                    id, loginId, req.note().trim());
+
         String sql = """
                 SELECT c.id, c.login_id, c.company_name, c.industry, c.company_size, c.location,
-                       c.contact_person, c.contact_email, c.contact_title, c.linkedin_url, c.notes,
+                       c.contact_person, c.contact_email, c.contact_title, c.contact_phone,
+                       c.linkedin_url, c.secondary_contacts,
                        c.last_funding_event, c.last_funding_amount, c.created_at,
                        COUNT(DISTINCT j.id) FILTER (WHERE lower(j.status) = 'active') AS active_job_count,
                        COUNT(DISTINCT cand.id) FILTER (WHERE cand.stage = 'Selected') AS filled_job_count,
@@ -224,14 +253,17 @@ public class ClientService {
                 """;
         return jdbc.query(sql, (rs, i) -> {
             String companyName = rs.getString("company_name");
+            long clientId = rs.getLong("id");
             List<ClientResponse.JobSummary> recentJobs = getClientJobs(companyName, loginId);
             List<ClientResponse.FeeTotal> totalFee = getClientFeeTotals(companyName, loginId);
             var ts = rs.getTimestamp("created_at");
             return new ClientResponse(
-                    rs.getLong("id"), rs.getString("login_id"), companyName,
+                    clientId, rs.getString("login_id"), companyName,
                     rs.getString("industry"), rs.getString("company_size"), rs.getString("location"),
                     rs.getString("contact_person"), rs.getString("contact_email"), rs.getString("contact_title"),
-                    rs.getString("linkedin_url"), rs.getString("notes"),
+                    rs.getString("contact_phone"), rs.getString("linkedin_url"),
+                    parseSecondaryContacts(rs.getString("secondary_contacts")),
+                    getLatestNote(clientId, loginId),
                     rs.getString("last_funding_event"), rs.getString("last_funding_amount"),
                     ts != null ? ts.toInstant() : null,
                     rs.getInt("active_job_count"), rs.getInt("filled_job_count"), rs.getInt("total_job_count"),
@@ -245,20 +277,86 @@ public class ClientService {
     public ClientResponse createClient(ClientRequest req, String loginId) {
         Long id = jdbc.queryForObject("""
                 INSERT INTO clients (login_id, company_name, industry, company_size, location,
-                    contact_person, contact_email, contact_title, linkedin_url, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    contact_person, contact_email, contact_title, contact_phone, linkedin_url, secondary_contacts)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb))
                 RETURNING id
                 """,
                 Long.class,
                 loginId, req.companyName(), req.industry(), req.companySize(), req.location(),
-                req.contactPerson(), req.contactEmail(), req.contactTitle(),
-                req.linkedinUrl(), req.notes());
+                req.contactPerson(), req.contactEmail(), req.contactTitle(), req.contactPhone(),
+                req.linkedinUrl(), serializeSecondaryContacts(req.secondaryContacts()));
+
+        String latestNote = null;
+        if (req.note() != null && !req.note().isBlank()) {
+            jdbc.update("INSERT INTO client_notes (client_id, login_id, note) VALUES (?, ?, ?)",
+                    id, loginId, req.note().trim());
+            latestNote = req.note().trim();
+        }
 
         return new ClientResponse(
                 id != null ? id : 0L, loginId, req.companyName(), req.industry(),
                 req.companySize(), req.location(), req.contactPerson(), req.contactEmail(),
-                req.contactTitle(), req.linkedinUrl(), req.notes(),
+                req.contactTitle(), req.contactPhone(), req.linkedinUrl(),
+                req.secondaryContacts() != null ? req.secondaryContacts() : List.of(), latestNote,
                 null, null, Instant.now(), 0, 0, 0, List.of(), List.of());
+    }
+
+    // ─── Secondary contacts JSONB helpers ─────────────────────────────────────
+
+    private List<ClientContact> parseSecondaryContacts(String json) {
+        if (json == null || json.isBlank()) return List.of();
+        try {
+            return objectMapper.readValue(json, new TypeReference<List<ClientContact>>() {});
+        } catch (Exception e) {
+            log.warn("[Clients] failed to parse secondary_contacts: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private String serializeSecondaryContacts(List<ClientContact> contacts) {
+        try {
+            return objectMapper.writeValueAsString(contacts != null ? contacts : List.of());
+        } catch (Exception e) {
+            return "[]";
+        }
+    }
+
+    // ─── Client notes ──────────────────────────────────────────────────────────
+
+    private String getLatestNote(long clientId, String loginId) {
+        return jdbc.query(
+                "SELECT note FROM client_notes WHERE client_id = ? AND login_id = ? ORDER BY created_at DESC LIMIT 1",
+                (rs, i) -> rs.getString("note"), clientId, loginId)
+                .stream().findFirst().orElse(null);
+    }
+
+    public List<ClientNoteResponse> getClientNotes(Long clientId, String loginId) {
+        ensureClientExists(clientId, loginId);
+        return jdbc.query("""
+                SELECT id, note, created_at FROM client_notes
+                WHERE client_id = ? AND login_id = ?
+                ORDER BY created_at DESC
+                """, (rs, i) -> {
+            var ts = rs.getTimestamp("created_at");
+            return new ClientNoteResponse(rs.getLong("id"), rs.getString("note"),
+                    ts != null ? ts.toInstant() : null);
+        }, clientId, loginId);
+    }
+
+    public List<ClientNoteResponse> addClientNote(Long clientId, String loginId, String note) {
+        if (note == null || note.isBlank())
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Note text is required");
+        ensureClientExists(clientId, loginId);
+        jdbc.update("INSERT INTO client_notes (client_id, login_id, note) VALUES (?, ?, ?)",
+                clientId, loginId, note.trim());
+        return getClientNotes(clientId, loginId);
+    }
+
+    private void ensureClientExists(Long clientId, String loginId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM clients WHERE id = ? AND login_id = ?", Integer.class, clientId, loginId);
+        if (count == null || count == 0)
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found");
     }
 
     // ─── GET /api/clients/{id}/jobs ────────────────────────────────────────────

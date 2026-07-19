@@ -15,5 +15,7 @@ public record JobCreateRequest(
     String jobStatus,
     BigDecimal salary,
     String currency,
-    BigDecimal feePercentage
+    BigDecimal feePercentage,
+    String feeType,
+    BigDecimal fixedFee
 ) {}

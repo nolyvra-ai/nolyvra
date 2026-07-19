@@ -8,5 +8,7 @@ public record BillablePlacementResponse(
         String currency,
         BigDecimal salary,
         BigDecimal feePercentage,
+        String feeType,
+        BigDecimal fixedFee,
         BigDecimal estimatedFee
 ) {}

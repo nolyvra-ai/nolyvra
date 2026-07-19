@@ -123,7 +123,7 @@ export default function CreateJobPage() {
 
   const [form, setForm] = useState({
     title: "", company: "", location: "", jobType: "Full-time", jdText: "", jobStatus: "Fulfilling",
-    salary: "", currency: "AUD", feePercentage: "",
+    salary: "", currency: "AUD", feePercentage: "", feeType: "PERCENTAGE", fixedFee: "",
   });
   const [clientCompanies, setClientCompanies] = useState([]);
   const [briefText, setBriefText] = useState("");
@@ -169,6 +169,8 @@ export default function CreateJobPage() {
           salary: job.salary ?? "",
           currency: job.currency ?? "AUD",
           feePercentage: job.feePercentage ?? "",
+          feeType: job.feeType ?? "PERCENTAGE",
+          fixedFee: job.fixedFee ?? "",
         });
         if (job.jdText) setPreviewSkills(extractSkillsFromJd(job.jdText));
       })
@@ -226,6 +228,7 @@ export default function CreateJobPage() {
       const feeFields = {
         salary: form.salary !== "" ? Number(form.salary) : null,
         feePercentage: form.feePercentage !== "" ? Number(form.feePercentage) : null,
+        fixedFee: form.fixedFee !== "" ? Number(form.fixedFee) : null,
       };
       if (isEditMode) {
         const url = new URL(`${API_BASE}/api/jobs/${jobId}`);
@@ -382,21 +385,62 @@ export default function CreateJobPage() {
                   </Box>
                 </Box>
                 <Box>
-                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT, mb: 0.5 }}>% Fees</Typography>
-                  <TextField fullWidth size="small" type="number" value={form.feePercentage}
-                    onChange={e => updateForm("feePercentage", e.target.value)}
-                    placeholder="e.g. 15"
-                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }} />
+                  <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.5 }}>
+                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT }}>
+                      {form.feeType === "FIXED" ? "Fixed Fee" : "% Fees"}
+                    </Typography>
+                    <Box sx={{ display: "flex", border: `1px solid ${BORDER}`, borderRadius: "6px", overflow: "hidden" }}>
+                      <Box onClick={() => updateForm("feeType", "PERCENTAGE")}
+                        sx={{
+                          px: 1, py: 0.25, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                          bgcolor: form.feeType !== "FIXED" ? ACCENT_BG : "transparent",
+                          color: form.feeType !== "FIXED" ? ACCENT : MUTED,
+                        }}>
+                        %
+                      </Box>
+                      <Box onClick={() => updateForm("feeType", "FIXED")}
+                        sx={{
+                          px: 1, py: 0.25, fontSize: 11, fontWeight: 600, cursor: "pointer",
+                          borderLeft: `1px solid ${BORDER}`,
+                          bgcolor: form.feeType === "FIXED" ? ACCENT_BG : "transparent",
+                          color: form.feeType === "FIXED" ? ACCENT : MUTED,
+                        }}>
+                        Fixed
+                      </Box>
+                    </Box>
+                  </Box>
+                  {form.feeType === "FIXED" ? (
+                    <TextField fullWidth size="small" type="number" value={form.fixedFee}
+                      onChange={e => updateForm("fixedFee", e.target.value)}
+                      placeholder="e.g. 5000"
+                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }} />
+                  ) : (
+                    <TextField fullWidth size="small" type="number" value={form.feePercentage}
+                      onChange={e => updateForm("feePercentage", e.target.value)}
+                      placeholder="e.g. 15"
+                      sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }} />
+                  )}
                 </Box>
               </Box>
-              {form.salary !== "" && form.feePercentage !== "" && (
-                <Box sx={{ mt: 1.25, fontSize: 12, color: MUTED }}>
-                  Estimated Fee:{" "}
-                  <Box component="span" sx={{ fontWeight: 700, color: SUCCESS }}>
-                    {form.currency} {(Number(form.salary) * Number(form.feePercentage) / 100)
-                      .toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              {form.feeType === "FIXED" ? (
+                form.fixedFee !== "" && (
+                  <Box sx={{ mt: 1.25, fontSize: 12, color: MUTED }}>
+                    Estimated Fee:{" "}
+                    <Box component="span" sx={{ fontWeight: 700, color: SUCCESS }}>
+                      {form.currency} {Number(form.fixedFee).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </Box>
                   </Box>
-                </Box>
+                )
+              ) : (
+                form.salary !== "" && form.feePercentage !== "" && (
+                  <Box sx={{ mt: 1.25, fontSize: 12, color: MUTED }}>
+                    Estimated Fee:{" "}
+                    <Box component="span" sx={{ fontWeight: 700, color: SUCCESS }}>
+                      {form.currency} {(Number(form.salary) * Number(form.feePercentage) / 100)
+                        .toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </Box>
+                  </Box>
+                )
               )}
 
               {/* Change 3: Job Status dropdown — only visible in edit mode */}

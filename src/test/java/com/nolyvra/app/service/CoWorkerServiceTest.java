@@ -121,6 +121,8 @@ class CoWorkerServiceTest {
                         null,
                         "AUD",
                         null,
+                        null,
+                        null,
                         null));
 
         Map<String, Object> result = service.confirmAction(

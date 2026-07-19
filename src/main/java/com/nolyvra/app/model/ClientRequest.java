@@ -1,5 +1,7 @@
 package com.nolyvra.app.model;
 
+import java.util.List;
+
 public record ClientRequest(
     String companyName,
     String industry,
@@ -8,6 +10,8 @@ public record ClientRequest(
     String contactPerson,
     String contactEmail,
     String contactTitle,
+    String contactPhone,
     String linkedinUrl,
-    String notes
+    List<ClientContact> secondaryContacts,
+    String note
 ) {}

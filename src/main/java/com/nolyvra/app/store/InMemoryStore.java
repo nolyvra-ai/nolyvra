@@ -16,7 +16,7 @@ public class InMemoryStore {
 
   public JobResponse saveJob(String title, String company, String jobType, String seniority, String jdText, String location, List<String> stackTags, String jobStatus) {
     String id = UUID.randomUUID().toString();
-    JobResponse job = new JobResponse(id, title, company, jobType, seniority, jdText,location,stackTags, Instant.now(), jobStatus, null, null, null, null);
+    JobResponse job = new JobResponse(id, title, company, jobType, seniority, jdText,location,stackTags, Instant.now(), jobStatus, null, null, null, null, null, null);
     jobs.put(id, job);
     return job;
   }

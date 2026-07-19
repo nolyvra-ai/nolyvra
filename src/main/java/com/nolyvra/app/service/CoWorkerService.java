@@ -570,7 +570,9 @@ public class CoWorkerService {
                     textParam(params, "jobStatus", "Active"),
                     decimalParam(params, "salary"),
                     textParam(params, "currency", "AUD"),
-                    decimalParam(params, "feePercentage"));
+                    decimalParam(params, "feePercentage"),
+                    null,
+                    null);
 
             Long taskId = createTask(loginId, "CREATE_JOB", "Created job: " + title);
             JobResponse job = jobService.createJob(request, loginId);

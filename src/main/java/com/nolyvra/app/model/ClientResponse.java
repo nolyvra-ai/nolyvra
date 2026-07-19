@@ -14,8 +14,10 @@ public record ClientResponse(
     String contactPerson,
     String contactEmail,
     String contactTitle,
+    String contactPhone,
     String linkedinUrl,
-    String notes,
+    List<ClientContact> secondaryContacts,
+    String latestNote,
     String lastFundingEvent,
     String lastFundingAmount,
     Instant createdAt,
@@ -31,5 +33,6 @@ public record ClientResponse(
 
     public record JobSummary(
         String title, int daysOld, String status,
-        BigDecimal salary, String currency, BigDecimal feePercentage, BigDecimal estimatedFee) {}
+        BigDecimal salary, String currency, BigDecimal feePercentage,
+        String feeType, BigDecimal fixedFee, BigDecimal estimatedFee) {}
 }

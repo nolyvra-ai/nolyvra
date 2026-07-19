@@ -12,7 +12,7 @@ public class HubSpotCompanyMapper {
     public Map<String, String> fromClient(ClientResponse client) {
         Map<String, String> properties = new LinkedHashMap<>();
         putIfPresent(properties, "name", client.companyName());
-        putIfPresent(properties, "description", client.notes());
+        putIfPresent(properties, "description", client.latestNote());
         putIfPresent(properties, "linkedin_company_page", client.linkedinUrl());
 
         // industry, location, and companySize are free-form in Nolyvra but

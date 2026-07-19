@@ -4,6 +4,7 @@ import com.nolyvra.app.model.WorkflowResponse;
 import com.nolyvra.app.service.WorkflowService;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -21,6 +22,13 @@ public class WorkflowController {
             @PathVariable String candidateId,
             @RequestParam String loginId) {
         return workflowService.getWorkflow(candidateId, loginId);
+    }
+
+    @GetMapping("/{candidateId}/notes")
+    public List<WorkflowResponse.ActivityEvent> getNotes(
+            @PathVariable String candidateId,
+            @RequestParam String loginId) {
+        return workflowService.getNotes(candidateId, loginId);
     }
 
     @PostMapping("/{candidateId}/notes")

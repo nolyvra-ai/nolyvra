@@ -20,6 +20,22 @@ async function apiGet(path) {
   return res.json();
 }
 
+async function apiPost(path, body) {
+  const loginId = localStorage.getItem("loginId") || "";
+  const url = new URL(`${API_BASE}${path}`);
+  url.searchParams.set("loginId", loginId);
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`${res.status} ${res.statusText} - ${text}`);
+  }
+  return res.json();
+}
+
 // ─── Style tokens ─────────────────────────────────────────────────────────────
 const BORDER      = "#E8ECF2";
 const MUTED       = "#9AA3B4";
@@ -478,9 +494,11 @@ export default function AnalysisPage() {
   const [loading,          setLoading]          = useState(true);
   const [err,              setErr]              = useState("");
   const [interviewAnalysis, setInterviewAnalysis] = useState(null);
-  const [notes,      setNotes]      = useState("");
-  const [notesSaving, setNotesSaving] = useState(false);
-  const [notesSaved,  setNotesSaved]  = useState(false);
+  const [notes,        setNotes]        = useState([]);
+  const [notesLoading, setNotesLoading] = useState(true);
+  const [newNote,      setNewNote]      = useState("");
+  const [addingNote,   setAddingNote]   = useState(false);
+  const [noteError,    setNoteError]    = useState(null);
   const [rerunning,  setRerunning]  = useState(false);
   const printRef = useRef(null); // ref for the printable content area
 
@@ -497,7 +515,6 @@ export default function AnalysisPage() {
         if (cancelled) return;
         setAnalysis(analysisResp);
         setCandidate(candidateResp);
-        setNotes(analysisResp?.recruiterNotes ?? "");
         if (interviewResp.length > 0) setInterviewAnalysis(interviewResp[0]);
       } catch (e) {
         if (!cancelled) setErr(e?.message || "Failed to load analysis");
@@ -506,6 +523,11 @@ export default function AnalysisPage() {
       }
     }
     load();
+    setNotesLoading(true);
+    apiGet(`/api/candidates/${candidateId}/notes`)
+      .then(d => { if (!cancelled) setNotes(d || []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setNotesLoading(false); });
     return () => { cancelled = true; };
   }, [candidateId]);
 
@@ -524,22 +546,19 @@ export default function AnalysisPage() {
     }
   }
 
-  async function handleSaveNotes() {
-    setNotesSaving(true);
+  async function handleAddNote() {
+    if (!newNote.trim()) return;
+    setAddingNote(true);
+    setNoteError(null);
     try {
-      const url = new URL(`${API_BASE}/api/candidates/${candidateId}/notes`);
-      url.searchParams.set("loginId", loginId);
-      await fetch(url.toString(), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
-        body: JSON.stringify({ notes }),
-      });
-      setNotesSaved(true);
-      setTimeout(() => setNotesSaved(false), 2000);
+      await apiPost(`/api/candidates/${candidateId}/notes`, { note: newNote.trim() });
+      const updated = await apiGet(`/api/candidates/${candidateId}/notes`);
+      setNotes(updated || []);
+      setNewNote("");
     } catch (e) {
-      console.error("Save notes failed", e);
+      setNoteError(e?.message || "Failed to add note");
     } finally {
-      setNotesSaving(false);
+      setAddingNote(false);
     }
   }
 
@@ -1076,10 +1095,11 @@ export default function AnalysisPage() {
                 <Card>
                   <CardHead title="Recruiter Notes" />
                   <Box sx={{ p: 2 }}>
-                    <TextField multiline rows={4} fullWidth
-                      placeholder="Add your notes here…"
-                      value={notes}
-                      onChange={(e) => { setNotes(e.target.value); setNotesSaved(false); }}
+                    <TextField multiline rows={3} fullWidth
+                      placeholder="Add a note…"
+                      value={newNote}
+                      disabled={addingNote}
+                      onChange={(e) => setNewNote(e.target.value)}
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           fontSize: 12, bgcolor: SURFACE, borderRadius: "6px",
@@ -1089,14 +1109,33 @@ export default function AnalysisPage() {
                         },
                       }} />
                     <Button fullWidth size="small" variant="outlined"
-                      onClick={handleSaveNotes} disabled={notesSaving}
-                      sx={{ mt: 1, fontSize: 11,
-                        borderColor: notesSaved ? SUCCESS_BR : BORDER,
-                        color: notesSaved ? SUCCESS : TEXT,
+                      onClick={handleAddNote} disabled={addingNote || !newNote.trim()}
+                      sx={{ mt: 1, fontSize: 11, borderColor: BORDER, color: TEXT,
                         borderRadius: "6px", textTransform: "none",
                         "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE } }}>
-                      {notesSaving ? <CircularProgress size={12} /> : notesSaved ? "✓ Saved" : "Save Notes"}
+                      {addingNote ? <CircularProgress size={12} /> : "Add Note"}
                     </Button>
+                    {noteError && (
+                      <Typography sx={{ fontSize: 11, color: DANGER, mt: 1 }}>{noteError}</Typography>
+                    )}
+                    {notesLoading ? (
+                      <Typography sx={{ fontSize: 11, color: MUTED, mt: 1.5 }}>Loading notes…</Typography>
+                    ) : notes.length === 0 ? (
+                      <Typography sx={{ fontSize: 11, color: MUTED, mt: 1.5 }}>No notes yet.</Typography>
+                    ) : (
+                      <Box sx={{ mt: 1.5 }}>
+                        {notes.map((n, i) => (
+                          <Box key={n.id} sx={{ py: 1, borderTop: i > 0 ? `1px solid #F0F2F6` : "none" }}>
+                            <Typography sx={{ fontSize: 12, color: TEXT, whiteSpace: "pre-wrap" }}>
+                              {n.note}
+                            </Typography>
+                            <Typography sx={{ fontSize: 10, color: MUTED, mt: 0.25 }}>
+                              {n.createdAt ? new Date(n.createdAt).toLocaleString("en-GB") : ""}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    )}
                   </Box>
                 </Card>
 

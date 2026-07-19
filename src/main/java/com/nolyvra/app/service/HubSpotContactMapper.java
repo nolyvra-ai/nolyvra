@@ -14,6 +14,7 @@ public class HubSpotContactMapper {
         Map<String, String> properties = new LinkedHashMap<>();
         putIfPresent(properties, "email", normalizeEmail(client.contactEmail()));
         putIfPresent(properties, "jobtitle", client.contactTitle());
+        putIfPresent(properties, "phone", client.contactPhone());
 
         String name = trimToNull(client.contactPerson());
         if (name != null) {

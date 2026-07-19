@@ -1,6 +1,8 @@
 package com.nolyvra.app.controller;
 
 import com.nolyvra.app.model.BillablePlacementResponse;
+import com.nolyvra.app.model.ClientNoteRequest;
+import com.nolyvra.app.model.ClientNoteResponse;
 import com.nolyvra.app.model.ClientRequest;
 import com.nolyvra.app.model.ClientResponse;
 import com.nolyvra.app.model.HubSpotSyncStatusResponse;
@@ -56,6 +58,21 @@ public class ClientController {
             @PathVariable Long id,
             @RequestParam String loginId) {
         return ResponseEntity.ok(clientService.getClientJobsById(id, loginId));
+    }
+
+    @GetMapping("/{id}/notes")
+    public ResponseEntity<List<ClientNoteResponse>> getClientNotes(
+            @PathVariable Long id,
+            @RequestParam String loginId) {
+        return ResponseEntity.ok(clientService.getClientNotes(id, loginId));
+    }
+
+    @PostMapping("/{id}/notes")
+    public ResponseEntity<List<ClientNoteResponse>> addClientNote(
+            @PathVariable Long id,
+            @RequestParam String loginId,
+            @RequestBody ClientNoteRequest req) {
+        return ResponseEntity.ok(clientService.addClientNote(id, loginId, req.note()));
     }
 
     @GetMapping("/{id}/billable-placements")

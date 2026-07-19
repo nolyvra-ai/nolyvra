@@ -150,7 +150,7 @@ class HubSpotJobSyncServiceTest {
                 "job-1", "Senior Engineer", "Nolyvra", "Full-time",
                 null, "Build things", "Melbourne", List.of(), Instant.now(),
                 "Active", new BigDecimal("180000.00"), "AUD",
-                new BigDecimal("20.00"), new BigDecimal("36000.00"));
+                new BigDecimal("20.00"), null, null, new BigDecimal("36000.00"));
     }
 
     private HubSpotConnection connection() {

@@ -21,7 +21,7 @@ class HubSpotDealMapperTest {
                 "job-1", " Senior Engineer ", "Nolyvra", "Full-time",
                 null, "Build things", "Melbourne", List.of(), Instant.now(),
                 "Active", new BigDecimal("180000.00"), "AUD",
-                new BigDecimal("20.00"), new BigDecimal("36000.00"));
+                new BigDecimal("20.00"), null, null, new BigDecimal("36000.00"));
 
         Map<String, String> properties = mapper.fromJob(job);
 
@@ -36,7 +36,7 @@ class HubSpotDealMapperTest {
         JobResponse job = new JobResponse(
                 "job-1", "Senior Engineer", "Nolyvra", "Full-time",
                 null, null, null, List.of(), Instant.now(),
-                "Active", null, "AUD", null, null);
+                "Active", null, "AUD", null, null, null, null);
 
         assertThat(mapper.fromJob(job)).containsEntry("dealname", "Senior Engineer")
                 .doesNotContainKey("amount");

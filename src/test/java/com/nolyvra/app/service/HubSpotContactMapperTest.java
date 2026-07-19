@@ -17,19 +17,20 @@ class HubSpotContactMapperTest {
     private final HubSpotContactMapper mapper = new HubSpotContactMapper();
 
     @Test
-    void mapsEmailNameAndTitleToStandardContactProperties() {
+    void mapsEmailNameTitleAndPhoneToStandardContactProperties() {
         Map<String, String> properties = mapper.fromClient(
-                client("  Ada   Lovelace ", " ADA@Example.COM ", " CTO "));
+                client("  Ada   Lovelace ", " ADA@Example.COM ", " CTO ", " +61 400 111 222 "));
 
         assertThat(properties).containsEntry("email", "ada@example.com")
                 .containsEntry("firstname", "Ada")
                 .containsEntry("lastname", "Lovelace")
-                .containsEntry("jobtitle", "CTO");
+                .containsEntry("jobtitle", "CTO")
+                .containsEntry("phone", "+61 400 111 222");
     }
 
     @Test
     void keepsSingleNameAsFirstNameAndOmitsMissingEmail() {
-        Map<String, String> properties = mapper.fromClient(client("Prince", " ", null));
+        Map<String, String> properties = mapper.fromClient(client("Prince", " ", null, null));
 
         assertThat(properties).containsOnly(Map.entry("firstname", "Prince"));
     }
@@ -45,10 +46,10 @@ class HubSpotContactMapperTest {
                 .containsEntry("jobtitle", "Engineer");
     }
 
-    private ClientResponse client(String name, String email, String title) {
+    private ClientResponse client(String name, String email, String title, String phone) {
         return new ClientResponse(
                 42L, "login-1", "Nolyvra", null, null, null,
-                name, email, title, null, null, null, null,
+                name, email, title, phone, null, List.of(), null, null, null,
                 Instant.now(), 0, 0, 0, List.of(), List.of());
     }
 

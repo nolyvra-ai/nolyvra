@@ -50,6 +50,8 @@ public class JobService {
         OffsetDateTime created = rs.getObject("created_at", OffsetDateTime.class);
         BigDecimal salary = rs.getBigDecimal("salary");
         BigDecimal feePercentage = rs.getBigDecimal("fee_percentage");
+        String feeType = rs.getString("fee_type");
+        BigDecimal fixedFee = rs.getBigDecimal("fixed_fee");
         return new JobResponse(
                 rs.getString("id"),
                 rs.getString("title"),
@@ -64,12 +66,18 @@ public class JobService {
                 salary,
                 rs.getString("currency"),
                 feePercentage,
-                computeEstimatedFee(salary, feePercentage));
+                feeType,
+                fixedFee,
+                computeEstimatedFee(salary, feePercentage, feeType, fixedFee));
     };
 
-    // ─── Estimated fee = salary * fee% / 100 — always computed, never stored ──
+    // ─── Estimated fee — FIXED: the flat fee as-is. PERCENTAGE (default,
+    // including pre-existing jobs with no fee_type set): salary * fee% / 100.
+    // Never stored — always derived. ──────────────────────────────────────────
 
-    private static BigDecimal computeEstimatedFee(BigDecimal salary, BigDecimal feePercentage) {
+    private static BigDecimal computeEstimatedFee(
+            BigDecimal salary, BigDecimal feePercentage, String feeType, BigDecimal fixedFee) {
+        if ("FIXED".equals(feeType)) return fixedFee;
         if (salary == null || feePercentage == null) return null;
         return salary.multiply(feePercentage)
                 .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
@@ -79,15 +87,16 @@ public class JobService {
 
     public JobResponse createJob(JobCreateRequest req, String loginId) {
         String id = "job-" + UUID.randomUUID();
+        String feeType = req.feeType() != null ? req.feeType() : "PERCENTAGE";
         jdbc.update("""
                 insert into jobs
                     (id, title, company, job_type, jd_text, location, login_id, status, is_active,
-                     salary, currency, fee_percentage)
-                values (?, ?, ?, ?, ?, ?, ?, 'Active', true, ?, ?, ?)
+                     salary, currency, fee_percentage, fee_type, fixed_fee)
+                values (?, ?, ?, ?, ?, ?, ?, 'Active', true, ?, ?, ?, ?, ?)
                 """,
                 id, req.title(), req.company(), req.jobType(),
                 req.jdText(), req.location(), loginId,
-                req.salary(), req.currency(), req.feePercentage());
+                req.salary(), req.currency(), req.feePercentage(), feeType, req.fixedFee());
 
         autoCreateClientIfNew(req.company(), req.location(), loginId);
 
@@ -96,8 +105,8 @@ public class JobService {
                 req.seniority(), req.jdText(), req.location(),
                 req.stackTags() != null ? req.stackTags() : List.of(),
                 Instant.now(), req.jobStatus(),
-                req.salary(), req.currency(), req.feePercentage(),
-                computeEstimatedFee(req.salary(), req.feePercentage()));
+                req.salary(), req.currency(), req.feePercentage(), feeType, req.fixedFee(),
+                computeEstimatedFee(req.salary(), req.feePercentage(), feeType, req.fixedFee()));
     }
 
     // ─── List ─────────────────────────────────────────────────────────────────
@@ -105,7 +114,7 @@ public class JobService {
     public List<JobResponse> listJobs(String loginId) {
         return jdbc.query("""
                 select id, title, company, job_type, jd_text, created_at, location, status,
-                       salary, currency, fee_percentage
+                       salary, currency, fee_percentage, fee_type, fixed_fee
                 from jobs
                 where login_id = ?
                   and is_active = true
@@ -118,7 +127,7 @@ public class JobService {
     public Optional<JobResponse> getJob(String jobId, String loginId) {
         return jdbc.query("""
                 select id, title, company, job_type, jd_text, created_at, location, status,
-                       salary, currency, fee_percentage
+                       salary, currency, fee_percentage, fee_type, fixed_fee
                 from jobs
                 where id = ?
                   and login_id = ?
@@ -129,10 +138,12 @@ public class JobService {
     // ─── Update ───────────────────────────────────────────────────────────────
 
     public Optional<JobResponse> updateJob(String jobId, JobCreateRequest req, String loginId) {
+        String feeType = req.feeType() != null ? req.feeType() : "PERCENTAGE";
         int updated = jdbc.update("""
                 update jobs
                 set title = ?, company = ?, job_type = ?, jd_text = ?,
                     location = ?, status = ?, salary = ?, currency = ?, fee_percentage = ?,
+                    fee_type = ?, fixed_fee = ?,
                     updated_at = now()
                 where id = ?
                   and login_id = ?
@@ -140,7 +151,8 @@ public class JobService {
                 """,
                 req.title(), req.company(), req.jobType(), req.jdText(),
                 req.location(), req.jobStatus() != null ? req.jobStatus() : "Fulfilling",
-                req.salary(), req.currency(), req.feePercentage(), jobId, loginId);
+                req.salary(), req.currency(), req.feePercentage(), feeType, req.fixedFee(),
+                jobId, loginId);
         if (updated == 0)
             return Optional.empty();
         autoCreateClientIfNew(req.company(), req.location(), loginId);

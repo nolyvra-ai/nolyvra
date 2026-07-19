@@ -142,6 +142,24 @@ public class WorkflowService {
         recordEvent(candidateId, loginId, "NOTE_ADDED", note, null);
     }
 
+    public List<WorkflowResponse.ActivityEvent> getNotes(String candidateId, String loginId) {
+        return jdbc.query("""
+                select id, note, created_at
+                from activity_timeline
+                where candidate_id = ? and login_id = ? and event_type = 'NOTE_ADDED'
+                order by created_at desc
+                """,
+                (rs, r) -> {
+                    OffsetDateTime odt = rs.getObject("created_at", OffsetDateTime.class);
+                    return new WorkflowResponse.ActivityEvent(
+                            rs.getLong("id"),
+                            "NOTE_ADDED",
+                            buildEventDescription("NOTE_ADDED", null),
+                            rs.getString("note"),
+                            odt != null ? odt.toInstant() : Instant.now());
+                }, candidateId, loginId);
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private String buildEventDescription(String eventType, String eventDataJson) {

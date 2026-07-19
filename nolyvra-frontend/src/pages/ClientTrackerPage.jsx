@@ -371,11 +371,24 @@ function ClientRow({ client, onEdit, onSelect, onInvoice, hubSpotStatus }) {
   );
 }
 
-// ─── Client job detail dialog — full job list + individual fee, on row select ──
-function ClientJobsDialog({ client, onClose }) {
+// ─── Client detail dialog — read-only client record + notes timeline + jobs ──
+function formatNoteTimestamp(iso) {
+  if (!iso) return "";
+  return new Date(iso).toLocaleString(undefined, {
+    day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function ClientDetailDialog({ client, onClose }) {
   const [jobs, setJobs]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr]         = useState("");
+
+  const [notes, setNotes]               = useState([]);
+  const [notesLoading, setNotesLoading] = useState(true);
+  const [newNote, setNewNote]           = useState("");
+  const [addingNote, setAddingNote]     = useState(false);
+  const [noteError, setNoteError]       = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -384,10 +397,33 @@ function ClientJobsDialog({ client, onClose }) {
       .then(data => { if (!cancelled) setJobs(data || []); })
       .catch(e => { if (!cancelled) setErr(e.message || "Failed to load jobs."); })
       .finally(() => { if (!cancelled) setLoading(false); });
+
+    setNotesLoading(true);
+    apiGet(`/api/clients/${client.id}/notes`)
+      .then(data => { if (!cancelled) setNotes(data || []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setNotesLoading(false); });
+
     return () => { cancelled = true; };
   }, [client.id]);
 
+  async function handleAddNote() {
+    if (!newNote.trim()) return;
+    setAddingNote(true);
+    setNoteError("");
+    try {
+      const updated = await apiPostJson(`/api/clients/${client.id}/notes`, { note: newNote.trim() });
+      setNotes(updated || []);
+      setNewNote("");
+    } catch (e) {
+      setNoteError(e.message || "Failed to add note.");
+    } finally {
+      setAddingNote(false);
+    }
+  }
+
   const totalLabel = formatFeeTotals(client.totalFee);
+  const secondaryContacts = client.secondaryContacts || [];
 
   return (
     <Dialog open onClose={onClose} maxWidth="sm" fullWidth
@@ -398,13 +434,7 @@ function ClientJobsDialog({ client, onClose }) {
           <Box>
             <Box sx={{ fontSize: 17, fontWeight: 700, color: TEXT }}>{client.companyName}</Box>
             <Box sx={{ fontSize: 12, color: MUTED, mt: "4px" }}>
-              {jobs.length} job{jobs.length !== 1 ? "s" : ""}
-              {totalLabel && (
-                <>
-                  {" · "}Total Fee (Active/Fulfilling):{" "}
-                  <Box component="span" sx={{ color: SUCCESS, fontWeight: 700 }}>{totalLabel}</Box>
-                </>
-              )}
+              {[client.industry, client.location].filter(Boolean).join(" • ") || "No details set"}
             </Box>
           </Box>
           <Box onClick={onClose} sx={{ cursor: "pointer", color: MUTED, lineHeight: 0,
@@ -413,46 +443,135 @@ function ClientJobsDialog({ client, onClose }) {
           </Box>
         </Box>
 
-        <Box sx={{ px: "24px", py: "16px", maxHeight: "60vh", overflowY: "auto" }}>
-          {loading && (
-            <Box sx={{ display: "flex", justifyContent: "center", py: "32px" }}>
-              <CircularProgress size={24} sx={{ color: ACCENT }} />
-            </Box>
-          )}
-          {!loading && err && (
-            <Box sx={{ fontSize: 13, color: "#DC2626" }}>{err}</Box>
-          )}
-          {!loading && !err && jobs.length === 0 && (
-            <Box sx={{ fontSize: 13, color: MUTED, textAlign: "center", py: "24px" }}>
-              No jobs for this client yet.
-            </Box>
-          )}
-          {!loading && !err && jobs.map((job, i) => (
-            <Box key={i} sx={{
-              display: "flex", justifyContent: "space-between", alignItems: "center",
-              py: "10px", borderBottom: i < jobs.length - 1 ? `1px solid ${BORDER}` : "none",
-            }}>
-              <Box>
-                <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{job.title}</Box>
-                  <JobStatusTag status={job.status} />
+        <Box sx={{ px: "24px", py: "16px", maxHeight: "70vh", overflowY: "auto" }}>
+
+          <Box sx={{ ...CARD_BASE, p: "14px 16px", mb: "16px" }}>
+            <SectionLabel>Company Details</SectionLabel>
+            <DetailRow label="Industry" value={client.industry} />
+            <DetailRow label="Company Size" value={client.companySize} />
+            <DetailRow label="Location" value={client.location} />
+            {client.linkedinUrl && (
+              <DetailRow label="LinkedIn" value={
+                <Box component="a" href={client.linkedinUrl} target="_blank" rel="noopener noreferrer"
+                  sx={{ color: ACCENT, "&:hover": { textDecoration: "underline" } }}>
+                  View Profile
+                </Box>
+              } />
+            )}
+          </Box>
+
+          <Box sx={{ ...CARD_BASE, p: "14px 16px", mb: "16px" }}>
+            <SectionLabel>Contacts</SectionLabel>
+            {client.contactPerson ? (
+              <Box sx={{ mb: secondaryContacts.length > 0 ? "10px" : 0 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{client.contactPerson}</Box>
+                  <Tag color={ACCENT} bg={ACCENT_L}>Primary</Tag>
                 </Box>
                 <Box sx={{ fontSize: 11, color: MUTED, mt: "2px" }}>
-                  {job.salary != null ? `${job.currency} ${Number(job.salary).toLocaleString()}` : "No salary set"}
-                  {job.feePercentage != null ? ` · ${job.feePercentage}% fee` : ""}
-                  {` · ${job.daysOld}d`}
+                  {[client.contactTitle, client.contactEmail, client.contactPhone].filter(Boolean).join(" · ") || "—"}
                 </Box>
               </Box>
-              <Box sx={{
-                fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
-                color: job.estimatedFee != null ? SUCCESS : MUTED,
-              }}>
-                {job.estimatedFee != null
-                  ? `${job.currency} ${Number(job.estimatedFee).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-                  : "—"}
+            ) : (
+              <Box sx={{ fontSize: 12, color: MUTED }}>No primary contact set</Box>
+            )}
+            {secondaryContacts.map((c, i) => (
+              <Box key={i} sx={{ mt: "10px", pt: "10px", borderTop: `1px solid ${BORDER}` }}>
+                <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{c.name || "—"}</Box>
+                <Box sx={{ fontSize: 11, color: MUTED, mt: "2px" }}>
+                  {[c.title, c.email, c.phone].filter(Boolean).join(" · ") || "—"}
+                </Box>
               </Box>
+            ))}
+          </Box>
+
+          <Box sx={{ ...CARD_BASE, p: "14px 16px", mb: "16px" }}>
+            <SectionLabel>Notes</SectionLabel>
+            <Box sx={{ display: "flex", gap: "8px", mb: "12px", alignItems: "flex-start" }}>
+              <TextField value={newNote} onChange={e => setNewNote(e.target.value)}
+                placeholder="Add a note…" size="small" fullWidth multiline maxRows={4} sx={FIELD_SX}
+                disabled={addingNote} />
+              <Button onClick={handleAddNote} disabled={addingNote || !newNote.trim()} variant="contained"
+                sx={{ borderRadius: "8px", textTransform: "none", fontSize: 12, fontWeight: 600,
+                  bgcolor: ACCENT, boxShadow: "none", flexShrink: 0,
+                  "&:hover": { bgcolor: "#1558C0", boxShadow: "none" } }}>
+                {addingNote ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Add"}
+              </Button>
             </Box>
-          ))}
+            {noteError && (
+              <Box sx={{ fontSize: 11, color: "#DC2626", mb: "8px" }}>{noteError}</Box>
+            )}
+            {notesLoading && (
+              <Box sx={{ display: "flex", justifyContent: "center", py: "12px" }}>
+                <CircularProgress size={18} sx={{ color: ACCENT }} />
+              </Box>
+            )}
+            {!notesLoading && notes.length === 0 && (
+              <Box sx={{ fontSize: 12, color: MUTED, textAlign: "center", py: "8px" }}>
+                No notes yet.
+              </Box>
+            )}
+            {!notesLoading && notes.map((n, i) => (
+              <Box key={n.id} sx={{ py: "8px", borderTop: i > 0 ? `1px solid ${BORDER}` : "none" }}>
+                <Box sx={{ fontSize: 13, color: TEXT, whiteSpace: "pre-wrap" }}>{n.note}</Box>
+                <Box sx={{ fontSize: 10, color: MUTED, mt: "3px" }}>{formatNoteTimestamp(n.createdAt)}</Box>
+              </Box>
+            ))}
+          </Box>
+
+          <Box sx={{ ...CARD_BASE, p: "14px 16px" }}>
+            <SectionLabel>Jobs</SectionLabel>
+            <Box sx={{ fontSize: 12, color: MUTED, mb: "10px" }}>
+              {jobs.length} job{jobs.length !== 1 ? "s" : ""}
+              {totalLabel && (
+                <>
+                  {" · "}Total Fee (Active/Fulfilling):{" "}
+                  <Box component="span" sx={{ color: SUCCESS, fontWeight: 700 }}>{totalLabel}</Box>
+                </>
+              )}
+            </Box>
+            {loading && (
+              <Box sx={{ display: "flex", justifyContent: "center", py: "24px" }}>
+                <CircularProgress size={20} sx={{ color: ACCENT }} />
+              </Box>
+            )}
+            {!loading && err && (
+              <Box sx={{ fontSize: 12, color: "#DC2626" }}>{err}</Box>
+            )}
+            {!loading && !err && jobs.length === 0 && (
+              <Box sx={{ fontSize: 12, color: MUTED, textAlign: "center", py: "12px" }}>
+                No jobs for this client yet.
+              </Box>
+            )}
+            {!loading && !err && jobs.map((job, i) => (
+              <Box key={i} sx={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                py: "10px", borderBottom: i < jobs.length - 1 ? `1px solid ${BORDER}` : "none",
+              }}>
+                <Box>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{job.title}</Box>
+                    <JobStatusTag status={job.status} />
+                  </Box>
+                  <Box sx={{ fontSize: 11, color: MUTED, mt: "2px" }}>
+                    {job.salary != null ? `${job.currency} ${Number(job.salary).toLocaleString()}` : "No salary set"}
+                    {job.feeType === "FIXED"
+                      ? " · Fixed fee"
+                      : job.feePercentage != null ? ` · ${job.feePercentage}% fee` : ""}
+                    {` · ${job.daysOld}d`}
+                  </Box>
+                </Box>
+                <Box sx={{
+                  fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
+                  color: job.estimatedFee != null ? SUCCESS : MUTED,
+                }}>
+                  {job.estimatedFee != null
+                    ? `${job.currency} ${Number(job.estimatedFee).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                    : "—"}
+                </Box>
+              </Box>
+            ))}
+          </Box>
         </Box>
       </DialogContent>
     </Dialog>
@@ -508,9 +627,11 @@ function InvoiceDialog({ client, onClose, onInvoiced }) {
         setConfig(configData || { configAvailable: false, accounts: [], taxRates: [] });
         const initialLines = {};
         list.forEach(p => {
-          const description = (p.feePercentage != null && p.salary != null)
-            ? `${p.title} — ${p.feePercentage}% of ${p.currency} ${p.salary}`
-            : p.title;
+          const description = p.feeType === "FIXED"
+            ? `${p.title} — Fixed fee`
+            : (p.feePercentage != null && p.salary != null)
+              ? `${p.title} — ${p.feePercentage}% of ${p.currency} ${p.salary}`
+              : p.title;
           initialLines[p.jobId] = {
             include: true,
             candidateName: "",
@@ -1840,7 +1961,7 @@ export default function ClientTrackerPage() {
         initialData={addFromPotential}
       />
       {selectedClient && (
-        <ClientJobsDialog client={selectedClient} onClose={() => setSelectedClient(null)} />
+        <ClientDetailDialog client={selectedClient} onClose={() => setSelectedClient(null)} />
       )}
       {invoicingClient && (
         <InvoiceDialog
