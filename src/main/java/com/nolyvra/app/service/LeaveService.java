@@ -26,25 +26,40 @@ public class LeaveService {
 
     // ─── Seed data ────────────────────────────────────────────────────────────
 
-    private record SeedType(String name, int days, boolean paid, String color) {}
+    private record SeedType(String name, int days, boolean paid, String color, boolean unlimited) {}
 
     private static final List<SeedType> SEED_TYPES = List.of(
-        new SeedType("Annual Leave",   25, true,  "#1D72E8"),
-        new SeedType("Sick Leave",     10, true,  "#16A34A"),
-        new SeedType("Parental Leave", 90, true,  "#7C3AED"),
-        new SeedType("Study Leave",     5, true,  "#D97706"),
-        new SeedType("Unpaid Leave",    0, false, "#8A94A6")
+        new SeedType("Annual Leave",    25, true,  "#1D72E8", false),
+        new SeedType("Sick Leave",      10, true,  "#16A34A", false),
+        new SeedType("Parental Leave",  90, true,  "#7C3AED", false),
+        new SeedType("Study Leave",      5, true,  "#D97706", false),
+        new SeedType("Unpaid Leave",     0, false, "#8A94A6", false),
+        new SeedType("Work From Home",   0, true,  "#0D9488", true)
     );
 
     private void seedDefaultTypes(String loginId) {
         for (SeedType s : SEED_TYPES) {
-            String id = "ltyp-" + UUID.randomUUID();
-            jdbc.update("""
-                    INSERT INTO leave_type (id, login_id, name, default_days_per_year, is_paid, color)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    ON CONFLICT DO NOTHING
-                    """, id, loginId, s.name(), s.days(), s.paid(), s.color());
+            insertSeedType(loginId, s);
         }
+    }
+
+    private void insertSeedType(String loginId, SeedType s) {
+        String id = "ltyp-" + UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO leave_type (id, login_id, name, default_days_per_year, is_paid, color, is_unlimited)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT DO NOTHING
+                """, id, loginId, s.name(), s.days(), s.paid(), s.color(), s.unlimited());
+    }
+
+    // Backfills "Work From Home" for tenants seeded before it was added as a
+    // default type. Deliberately narrow — re-running the full SEED_TYPES list
+    // here would resurrect any other default type an admin had since deleted.
+    private void ensureWorkFromHomeType(String loginId) {
+        SEED_TYPES.stream()
+                .filter(s -> s.name().equals("Work From Home"))
+                .findFirst()
+                .ifPresent(s -> insertSeedType(loginId, s));
     }
 
     // ─── Leave types ──────────────────────────────────────────────────────────
@@ -55,16 +70,18 @@ public class LeaveService {
                 String.class, loginId);
         if (ids.isEmpty()) {
             seedDefaultTypes(loginId);
-            ids = jdbc.queryForList(
-                    "SELECT id FROM leave_type WHERE login_id = ? AND is_active = true ORDER BY created_at",
-                    String.class, loginId);
+        } else {
+            ensureWorkFromHomeType(loginId);
         }
+        ids = jdbc.queryForList(
+                "SELECT id FROM leave_type WHERE login_id = ? AND is_active = true ORDER BY created_at",
+                String.class, loginId);
         return ids.stream().map(id -> getType(id, loginId)).toList();
     }
 
     private LeaveTypeResponse getType(String id, String loginId) {
         Map<String, Object> row = jdbc.queryForMap(
-                "SELECT id, login_id, name, default_days_per_year, is_paid, color " +
+                "SELECT id, login_id, name, default_days_per_year, is_paid, color, is_unlimited " +
                 "FROM leave_type WHERE id = ? AND login_id = ? AND is_active = true",
                 id, loginId);
         return mapType(row);
@@ -77,28 +94,31 @@ public class LeaveService {
                 (String) row.get("name"),
                 ((Number) row.get("default_days_per_year")).intValue(),
                 (Boolean) row.get("is_paid"),
-                (String) row.get("color")
+                (String) row.get("color"),
+                (Boolean) row.get("is_unlimited")
         );
     }
 
     public LeaveTypeResponse createType(LeaveTypeRequest req, String loginId) {
         String id = "ltyp-" + UUID.randomUUID();
         String color = (req.color() != null && !req.color().isBlank()) ? req.color() : "#1D72E8";
+        int days = req.isUnlimited() ? 0 : req.defaultDaysPerYear();
         jdbc.update("""
-                INSERT INTO leave_type (id, login_id, name, default_days_per_year, is_paid, color)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """, id, loginId, req.name().trim(), req.defaultDaysPerYear(), req.isPaid(), color);
+                INSERT INTO leave_type (id, login_id, name, default_days_per_year, is_paid, color, is_unlimited)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """, id, loginId, req.name().trim(), days, req.isPaid(), color, req.isUnlimited());
         return getType(id, loginId);
     }
 
     public LeaveTypeResponse updateType(String id, LeaveTypeRequest req, String loginId) {
         requireTypeOwned(id, loginId);
         String color = (req.color() != null && !req.color().isBlank()) ? req.color() : "#1D72E8";
+        int days = req.isUnlimited() ? 0 : req.defaultDaysPerYear();
         jdbc.update("""
                 UPDATE leave_type
-                SET name = ?, default_days_per_year = ?, is_paid = ?, color = ?
+                SET name = ?, default_days_per_year = ?, is_paid = ?, color = ?, is_unlimited = ?
                 WHERE id = ? AND login_id = ? AND is_active = true
-                """, req.name().trim(), req.defaultDaysPerYear(), req.isPaid(), color, id, loginId);
+                """, req.name().trim(), days, req.isPaid(), color, req.isUnlimited(), id, loginId);
         return getType(id, loginId);
     }
 
@@ -134,7 +154,7 @@ public class LeaveService {
 
         return jdbc.queryForList("""
                 SELECT elb.id, elb.employee_id, elb.leave_type_id, elb.year, elb.allocated_days,
-                       lt.name AS type_name, lt.color, lt.is_paid,
+                       lt.name AS type_name, lt.color, lt.is_paid, lt.is_unlimited,
                        COALESCE((
                            SELECT SUM(lr.days_requested)
                            FROM leave_request lr
@@ -162,7 +182,8 @@ public class LeaveService {
                             (String) row.get("color"),
                             (Boolean) row.get("is_paid"),
                             year,
-                            allocated, used, remaining
+                            allocated, used, remaining,
+                            (Boolean) row.get("is_unlimited")
                     );
                 }).toList();
     }
@@ -242,7 +263,16 @@ public class LeaveService {
     }
 
     public void cancelRequest(String requestId, String loginId) {
+        cancelRequest(requestId, loginId, null);
+    }
+
+    // requireEmployeeId: when non-null (employee self-service calls), the request
+    // must belong to that employee — otherwise a 404 (not "belongs to someone else").
+    public void cancelRequest(String requestId, String loginId, String requireEmployeeId) {
         Map<String, Object> existing = requireRequestOwned(requestId, loginId);
+        if (requireEmployeeId != null && !requireEmployeeId.equals(existing.get("employee_id"))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Leave request not found: " + requestId);
+        }
         if (!"PENDING".equals(existing.get("status"))) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only pending requests can be cancelled");
         }
@@ -295,7 +325,7 @@ public class LeaveService {
 
     private Map<String, Object> requireRequestOwned(String requestId, String loginId) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, status FROM leave_request WHERE id = ? AND login_id = ? AND is_active = true",
+                "SELECT id, status, employee_id FROM leave_request WHERE id = ? AND login_id = ? AND is_active = true",
                 requestId, loginId);
         if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Leave request not found: " + requestId);
         return rows.get(0);

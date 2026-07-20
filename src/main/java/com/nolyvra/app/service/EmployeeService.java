@@ -23,9 +23,52 @@ public class EmployeeService {
     private final JdbcTemplate       jdbc;
     private final DepartmentService  departmentService;
 
+    // SHA-256 of "Welcome1" — same default used for tenant onboarding
+    // (see UserService.DEFAULT_PASSWORD_HASH). Set on every new employee.
+    private static final String DEFAULT_PASSWORD_HASH =
+            "7e19e31ae82d749034fc921f777f717ba5b57c6add9add889eb536ac6effcde0";
+
     public EmployeeService(JdbcTemplate jdbc, DepartmentService departmentService) {
         this.jdbc              = jdbc;
         this.departmentService = departmentService;
+    }
+
+    // ─── Employee login ───────────────────────────────────────────────────────
+    // Matches on email + password_hash across all tenants — employees.email has
+    // no uniqueness constraint, so the first active match is used.
+
+    public Optional<Map<String, Object>> login(String email, String passwordHash) {
+        List<Map<String, Object>> rows = jdbc.query("""
+                SELECT id, login_id, first_name, last_name, email
+                FROM employees
+                WHERE email = ? AND password_hash = ? AND is_active = true
+                ORDER BY created_at
+                LIMIT 1
+                """,
+                (rs, r) -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("employeeId", rs.getString("id"));
+                    m.put("loginId",    rs.getString("login_id"));
+                    m.put("firstName",  rs.getString("first_name"));
+                    m.put("lastName",   rs.getString("last_name"));
+                    m.put("email",      rs.getString("email"));
+                    return m;
+                }, email, passwordHash);
+        return rows.stream().findFirst();
+    }
+
+    // ─── Employee self-service password change ────────────────────────────────
+
+    public boolean changePassword(String employeeId, String currentPasswordHash, String newPasswordHash) {
+        List<String> rows = jdbc.query("""
+                SELECT id FROM employees WHERE id = ? AND password_hash = ? AND is_active = true
+                """,
+                (rs, r) -> rs.getString("id"), employeeId, currentPasswordHash);
+        if (rows.isEmpty()) return false;
+
+        jdbc.update("UPDATE employees SET password_hash = ?, updated_at = now() WHERE id = ?",
+                newPasswordHash, employeeId);
+        return true;
     }
 
     // ─── RowMapper ────────────────────────────────────────────────────────────
@@ -90,14 +133,14 @@ public class EmployeeService {
                 INSERT INTO employees
                   (id, login_id, first_name, last_name, email, phone,
                    job_title, employment_type, status, manager_id, department_id,
-                   start_date, end_date)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+                   start_date, end_date, password_hash)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 id, loginId,
                 req.firstName(), req.lastName(), req.email(), req.phone(),
                 req.jobTitle(), req.employmentType().name(), status,
                 req.managerId(), req.departmentId(),
-                req.startDate(), req.endDate());
+                req.startDate(), req.endDate(), DEFAULT_PASSWORD_HASH);
         return getById(id, loginId).orElseThrow();
     }
 

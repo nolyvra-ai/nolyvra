@@ -12,5 +12,6 @@ public record LeaveBalanceResponse(
         int year,
         BigDecimal allocatedDays,
         BigDecimal usedDays,
-        BigDecimal remainingDays
+        BigDecimal remainingDays,
+        boolean isUnlimited
 ) {}

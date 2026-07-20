@@ -65,6 +65,7 @@ function StepDots({ step }) {
 export default function LoginPage() {
   const nav = useNavigate();
 
+  const [loginMode, setLoginMode] = useState("tenant"); // "tenant" | "employee"
   const [step, setStep]           = useState(0); // 0=email, 1=password, 2=ready
   const [email, setEmail]         = useState("");
   const [password, setPassword]   = useState("");
@@ -132,23 +133,51 @@ export default function LoginPage() {
     if (e.key === "Enter" && password.length >= 6) handleSubmit();
   }
 
+  // ── Mode toggle ────────────────────────────────────────────────────────────
+  function switchLoginMode(mode) {
+    if (mode === loginMode) return;
+    setLoginMode(mode);
+    setStep(0); setEmail(""); setPassword(""); setPwHint(""); setApiError("");
+  }
+
   // ── Submit → API call ──────────────────────────────────────────────────────
   async function handleSubmit() {
     if (loading || password.length < 6) return;
     setLoading(true);
     setApiError("");
 
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+
     try {
       const encryptedPassword = await encryptPassword(password);
 
-      const res = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || "http://localhost:8080"}/api/login`,
-        {
+      if (loginMode === "employee") {
+        const res = await fetch(`${API_BASE}/api/auth/employee-login`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ loginId: email.trim(), password: encryptedPassword }),
+          body: JSON.stringify({ email: email.trim(), password: encryptedPassword }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || `Login failed (${res.status})`);
         }
-      );
+
+        localStorage.setItem("loginId",      data.loginId);
+        localStorage.setItem("employeeId",   data.employeeId);
+        localStorage.setItem("name",         `${data.firstName} ${data.lastName}`.trim());
+        localStorage.setItem("sessionToken", data.sessionToken);
+        localStorage.setItem("authType",     "EMPLOYEE");
+        setSuccess(true);
+        nav("/crm/my-leave");
+        return;
+      }
+
+      const res = await fetch(`${API_BASE}/api/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ loginId: email.trim(), password: encryptedPassword }),
+      });
 
       const data = await res.json();
 
@@ -165,6 +194,8 @@ export default function LoginPage() {
       localStorage.setItem("loginId",      data.id);
       localStorage.setItem("name",         data.name);
       localStorage.setItem("sessionToken", data.sessionToken);
+      localStorage.removeItem("authType");
+      localStorage.removeItem("employeeId");
       setSuccess(true);
       nav("/dashboard");
     } catch (err) {
@@ -175,9 +206,10 @@ export default function LoginPage() {
   }
 
   // ── Dynamic heading ────────────────────────────────────────────────────────
+  const employeeNote = loginMode === "employee" ? " (Employee)" : "";
   const heading =
     step === 0 ? { title: "Welcome!",              desc: "Enter your email to continue to nolyvra." }  :
-    step === 1 ? { title: "Enter your password",   desc: `Signing in as ${email.trim()}`               }  :
+    step === 1 ? { title: "Enter your password",   desc: `Signing in as ${email.trim()}${employeeNote}` }  :
                  { title: "Ready to sign in",       desc: "Click below to access your nolyvra workspace." };
 
   // ── Shared modal styles ────────────────────────────────────────────────────
@@ -410,6 +442,34 @@ export default function LoginPage() {
                   MVP v0.1
                 </div>
               </div>
+            </div>
+
+            {/* Login mode toggle */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 24 }}>
+              {[
+                { key: "tenant",   label: "Login" },
+                { key: "employee", label: "Employee Login" },
+              ].map(opt => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => switchLoginMode(opt.key)}
+                  style={{
+                    flex: 1,
+                    padding: "8px 0",
+                    borderRadius: 8,
+                    border: `1px solid ${loginMode === opt.key ? "#1D72E8" : "rgba(255,255,255,0.14)"}`,
+                    background: loginMode === opt.key ? "rgba(29,114,232,0.16)" : "transparent",
+                    color: loginMode === opt.key ? "#fff" : "rgba(255,255,255,0.45)",
+                    fontSize: 12, fontWeight: 600,
+                    fontFamily: "'DM Sans', sans-serif",
+                    cursor: "pointer",
+                    transition: "all .15s",
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
 
             {/* Step dots */}

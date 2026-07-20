@@ -108,7 +108,16 @@ public class ExpenseService {
     }
 
     public void cancel(String id, String loginId) {
-        requireOwned(id, loginId, "IN_PROGRESS");
+        cancel(id, loginId, null);
+    }
+
+    // requireEmployeeId: when non-null (employee self-service calls), the expense
+    // must belong to that employee — otherwise a 404 (not "belongs to someone else").
+    public void cancel(String id, String loginId, String requireEmployeeId) {
+        ExpenseSubmissionResponse existing = requireOwned(id, loginId, "IN_PROGRESS");
+        if (requireEmployeeId != null && !requireEmployeeId.equals(existing.employeeId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Expense not found: " + id);
+        }
         jdbc.update("UPDATE expense_submission SET status = 'CANCELLED', updated_at = now(), is_active = false WHERE id = ? AND login_id = ?",
                 id, loginId);
     }

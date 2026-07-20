@@ -6,5 +6,6 @@ public record LeaveTypeRequest(
         @NotBlank String name,
         int defaultDaysPerYear,
         boolean isPaid,
-        String color
+        String color,
+        boolean isUnlimited
 ) {}

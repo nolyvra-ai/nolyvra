@@ -1,5 +1,6 @@
 package com.nolyvra.app.controller;
 
+import com.nolyvra.app.config.SessionContext;
 import com.nolyvra.app.model.*;
 import com.nolyvra.app.service.CrmEntitlementService;
 import com.nolyvra.app.service.DisciplinaryService;
@@ -11,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
@@ -23,15 +25,25 @@ public class HrCaseController {
     private final GrievanceService      grievanceService;
     private final DisciplinaryService   disciplinaryService;
     private final CrmEntitlementService entitlementService;
+    private final SessionContext        sessionContext;
 
     public HrCaseController(ExpenseService expenseService,
                              GrievanceService grievanceService,
                              DisciplinaryService disciplinaryService,
-                             CrmEntitlementService entitlementService) {
+                             CrmEntitlementService entitlementService,
+                             SessionContext sessionContext) {
         this.expenseService      = expenseService;
         this.grievanceService    = grievanceService;
         this.disciplinaryService = disciplinaryService;
         this.entitlementService  = entitlementService;
+        this.sessionContext      = sessionContext;
+    }
+
+    // Employee sessions may only ever act on their own employeeId.
+    private void requireOwnEmployee(String employeeId) {
+        if (sessionContext.isEmployee() && !sessionContext.employeeId().equals(employeeId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not permitted for this employee.");
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -61,6 +73,7 @@ public class HrCaseController {
     public List<ExpenseSubmissionResponse> listEmployeeExpenses(
             @PathVariable String employeeId, @RequestParam String loginId) {
         entitlementService.checkEntitled(loginId);
+        requireOwnEmployee(employeeId);
         return expenseService.listByEmployee(employeeId, loginId);
     }
 
@@ -76,6 +89,7 @@ public class HrCaseController {
             @RequestParam(required = false) String notes,
             @RequestParam(required = false) MultipartFile receipt) {
         entitlementService.checkEntitled(loginId);
+        requireOwnEmployee(employeeId);
         java.math.BigDecimal amt = amount != null && !amount.isBlank()
                 ? new java.math.BigDecimal(amount) : null;
         java.time.LocalDate dt = expenseDate != null && !expenseDate.isBlank()
@@ -111,7 +125,7 @@ public class HrCaseController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void cancelExpense(@PathVariable String id, @RequestParam String loginId) {
         entitlementService.checkEntitled(loginId);
-        expenseService.cancel(id, loginId);
+        expenseService.cancel(id, loginId, sessionContext.isEmployee() ? sessionContext.employeeId() : null);
     }
 
     @GetMapping("/expenses/{id}/receipt")
@@ -144,6 +158,7 @@ public class HrCaseController {
     public List<GrievanceResponse> listEmployeeGrievances(
             @PathVariable String employeeId, @RequestParam String loginId) {
         entitlementService.checkEntitled(loginId);
+        requireOwnEmployee(employeeId);
         return grievanceService.listByEmployee(employeeId, loginId);
     }
 
@@ -156,6 +171,7 @@ public class HrCaseController {
             @RequestParam(required = false) String description,
             @RequestParam(required = false) MultipartFile complaint) {
         entitlementService.checkEntitled(loginId);
+        requireOwnEmployee(employeeId);
         return grievanceService.create(employeeId,
                 new GrievanceCreateRequest(title, description),
                 complaint, loginId);
@@ -188,7 +204,7 @@ public class HrCaseController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void cancelGrievance(@PathVariable String id, @RequestParam String loginId) {
         entitlementService.checkEntitled(loginId);
-        grievanceService.cancel(id, loginId);
+        grievanceService.cancel(id, loginId, sessionContext.isEmployee() ? sessionContext.employeeId() : null);
     }
 
     @GetMapping("/grievances/{id}/complaint")

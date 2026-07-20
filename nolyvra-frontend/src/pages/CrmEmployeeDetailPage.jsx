@@ -779,7 +779,12 @@ function LeaveEntitlementSection({ employeeId, loginId }) {
                       )}
                     </Box>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      {editingId === b.leaveTypeId ? (
+                      {b.isUnlimited ? (
+                        <Box sx={{ fontSize: 10.5, fontWeight: 700, color: PURPLE, bgcolor: PURPLE_L,
+                                    border: `1px solid ${PURPLE_BR}`, borderRadius: "4px", px: "6px", py: "1px" }}>
+                          Unlimited
+                        </Box>
+                      ) : editingId === b.leaveTypeId ? (
                         <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
                           <TextField size="small" type="number" value={editVal}
                             onChange={e => setEditVal(e.target.value)}
@@ -813,17 +818,19 @@ function LeaveEntitlementSection({ employeeId, loginId }) {
                       )}
                     </Box>
                   </Box>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                    <Box sx={{ flex: 1, height: 6, bgcolor: "#F0F2F6", borderRadius: "3px", overflow: "hidden" }}>
-                      <Box sx={{
-                        width: `${pct}%`, height: "100%", bgcolor: barColor,
-                        borderRadius: "3px", transition: "width 0.4s ease",
-                      }} />
+                  {!b.isUnlimited && (
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                      <Box sx={{ flex: 1, height: 6, bgcolor: "#F0F2F6", borderRadius: "3px", overflow: "hidden" }}>
+                        <Box sx={{
+                          width: `${pct}%`, height: "100%", bgcolor: barColor,
+                          borderRadius: "3px", transition: "width 0.4s ease",
+                        }} />
+                      </Box>
+                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: isOver ? DANGER : SUCCESS, minWidth: 60, textAlign: "right" }}>
+                        {isOver ? `${Number(b.usedDays) - Number(b.allocatedDays)}d over` : `${Number(b.remainingDays)}d left`}
+                      </Typography>
                     </Box>
-                    <Typography sx={{ fontSize: 11, fontWeight: 700, color: isOver ? DANGER : SUCCESS, minWidth: 60, textAlign: "right" }}>
-                      {isOver ? `${Number(b.usedDays) - Number(b.allocatedDays)}d over` : `${Number(b.remainingDays)}d left`}
-                    </Typography>
-                  </Box>
+                  )}
                 </Box>
               );
             })}

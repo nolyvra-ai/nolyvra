@@ -235,16 +235,16 @@ function ActionDialog({ open, action, requestId, loginId, onClose, onDone }) {
 function LeaveTypesTab({ loginId, types, onRefresh }) {
   const [showAdd,   setShowAdd]   = useState(false);
   const [editId,    setEditId]    = useState(null);
-  const [form,      setForm]      = useState({ name: "", defaultDaysPerYear: 0, isPaid: true, color: "#1D72E8" });
+  const [form,      setForm]      = useState({ name: "", defaultDaysPerYear: 0, isPaid: true, color: "#1D72E8", isUnlimited: false });
   const [saving,    setSaving]    = useState(false);
 
   function startEdit(t) {
     setEditId(t.id);
-    setForm({ name: t.name, defaultDaysPerYear: t.defaultDaysPerYear, isPaid: t.isPaid, color: t.color });
+    setForm({ name: t.name, defaultDaysPerYear: t.defaultDaysPerYear, isPaid: t.isPaid, color: t.color, isUnlimited: t.isUnlimited });
   }
 
   function resetForm() {
-    setForm({ name: "", defaultDaysPerYear: 0, isPaid: true, color: "#1D72E8" });
+    setForm({ name: "", defaultDaysPerYear: 0, isPaid: true, color: "#1D72E8", isUnlimited: false });
     setEditId(null); setShowAdd(false);
   }
 
@@ -284,6 +284,7 @@ function LeaveTypesTab({ loginId, types, onRefresh }) {
         onKeyDown={e => e.key === "Escape" && resetForm()}
         sx={{ flex: "1 1 160px", "& .MuiInputBase-input": { fontSize: 12 } }} />
       <TextField size="small" label="Days/year" type="number" value={form.defaultDaysPerYear}
+        disabled={form.isUnlimited}
         onChange={e => setForm(f => ({ ...f, defaultDaysPerYear: parseInt(e.target.value) || 0 }))}
         sx={{ width: 100, "& .MuiInputBase-input": { fontSize: 12 } }} />
       <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
@@ -296,6 +297,11 @@ function LeaveTypesTab({ loginId, types, onRefresh }) {
         control={<Switch size="small" checked={form.isPaid}
           onChange={e => setForm(f => ({ ...f, isPaid: e.target.checked }))} />}
         label={<Typography sx={{ fontSize: 11 }}>Paid</Typography>}
+        sx={{ mt: 0.25 }} />
+      <FormControlLabel
+        control={<Switch size="small" checked={form.isUnlimited}
+          onChange={e => setForm(f => ({ ...f, isUnlimited: e.target.checked }))} />}
+        label={<Typography sx={{ fontSize: 11 }}>Unlimited</Typography>}
         sx={{ mt: 0.25 }} />
       <Box sx={{ display: "flex", gap: 1, alignItems: "center", mt: 0.25 }}>
         <Button size="small" variant="contained" onClick={save} disabled={saving || !form.name.trim()}
@@ -346,7 +352,13 @@ function LeaveTypesTab({ loginId, types, onRefresh }) {
                   </Box>
                 </TableCell>
                 <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, color: TEXT, borderBottom: `1px solid ${BORDER}` }}>
-                  {t.defaultDaysPerYear} days
+                  {t.isUnlimited ? (
+                    <Box sx={{
+                      display: "inline-flex", fontSize: 10.5, fontWeight: 700,
+                      color: PURPLE, bgcolor: PURPLE_L, border: `1px solid ${PURPLE_BR}`,
+                      borderRadius: "4px", px: "6px", py: "1px",
+                    }}>Unlimited</Box>
+                  ) : `${t.defaultDaysPerYear} days`}
                 </TableCell>
                 <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
                   <Box sx={{
@@ -456,7 +468,7 @@ export default function CrmLeavePage() {
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2.5 }}>
         <Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <Typography sx={{ fontSize: 20, fontWeight: 800, color: TEXT }}>Leave Management</Typography>
+            <Typography sx={{ fontSize: 20, fontWeight: 800, color: TEXT }}>Leave / Work From Home</Typography>
             {pendingCount > 0 && (
               <Box sx={{
                 fontSize: 10, fontWeight: 700, color: WARN, bgcolor: WARN_L,
@@ -465,7 +477,7 @@ export default function CrmLeavePage() {
             )}
           </Box>
           <Typography sx={{ fontSize: 12.5, color: MUTED, mt: 0.25 }}>
-            Manage employee leave requests and entitlements
+            Manage employee leave / work from home requests and entitlements
           </Typography>
         </Box>
         {tab === 0 && (

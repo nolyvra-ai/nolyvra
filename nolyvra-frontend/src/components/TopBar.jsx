@@ -62,21 +62,26 @@ export default function TopBar() {
   const { pathname } = useLocation();
   const nav = useNavigate();
   const loginId = localStorage.getItem("name") || "";
+  const isEmployee = localStorage.getItem("authType") === "EMPLOYEE";
   const { mode } = useAppMode();
 
   const [tokens, setTokens] = useState(null);
 
   useEffect(() => {
     const id = localStorage.getItem("loginId") || "";
-    if (!id) return;
+    if (!id || isEmployee) return;
     fetch(`${API_BASE}/api/plans/me?loginId=${encodeURIComponent(id)}`, { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setTokens(d.tokensRemaining); })
       .catch(() => {});
-  }, [pathname]); // refresh on every navigation
+  }, [pathname, isEmployee]); // refresh on every navigation
 
   function handleLogout() {
     localStorage.removeItem("loginId");
+    localStorage.removeItem("name");
+    localStorage.removeItem("sessionToken");
+    localStorage.removeItem("authType");
+    localStorage.removeItem("employeeId");
     nav("/login");
   }
 
@@ -120,7 +125,17 @@ export default function TopBar() {
 
       <Box component="span" sx={{ fontSize: 14, color: "rgba(255,255,255,0.15)", mr: 0.5, userSelect: "none", flexShrink: 0 }}>│</Box>
 
-      {mode === "crmx" ? (
+      {isEmployee ? (
+        <Box sx={{
+          px: "14px", py: "4px", borderRadius: "20px", flexShrink: 0,
+          background: "linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)",
+          color: "#fff", fontSize: 12, fontWeight: 700,
+          display: "flex", alignItems: "center", gap: "6px",
+          userSelect: "none",
+        }}>
+          ✦ My CRM
+        </Box>
+      ) : mode === "crmx" ? (
         <Box sx={{
           px: "14px", py: "4px", borderRadius: "20px", flexShrink: 0,
           background: "linear-gradient(135deg, #7C3AED 0%, #4F46E5 100%)",

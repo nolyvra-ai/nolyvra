@@ -6,5 +6,6 @@ public record LeaveTypeResponse(
         String name,
         int defaultDaysPerYear,
         boolean isPaid,
-        String color
+        String color,
+        boolean isUnlimited
 ) {}

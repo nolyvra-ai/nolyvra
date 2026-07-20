@@ -1,7 +1,9 @@
 package com.nolyvra.app.controller;
 
+import com.nolyvra.app.config.SessionContext;
 import com.nolyvra.app.service.SessionService;
 import com.nolyvra.app.service.AdminSettingsService;
+import com.nolyvra.app.service.EmployeeService;
 import com.nolyvra.app.service.RegisterInterestNotificationService;
 import com.nolyvra.app.service.UserService;
 import org.springframework.http.ResponseEntity;
@@ -15,22 +17,31 @@ import java.util.Map;
 public class AuthController {
 
     private final UserService userService;
+    private final EmployeeService employeeService;
     private final SessionService sessionService;
+    private final SessionContext sessionContext;
     private final AdminSettingsService adminSettingsService;
     private final RegisterInterestNotificationService registerInterestNotificationService;
 
     public AuthController(
             UserService userService,
+            EmployeeService employeeService,
             SessionService sessionService,
+            SessionContext sessionContext,
             AdminSettingsService adminSettingsService,
             RegisterInterestNotificationService registerInterestNotificationService) {
         this.userService = userService;
+        this.employeeService = employeeService;
         this.sessionService = sessionService;
+        this.sessionContext = sessionContext;
         this.adminSettingsService = adminSettingsService;
         this.registerInterestNotificationService = registerInterestNotificationService;
     }
 
     // POST /api/auth/change-password?loginId=x
+    // For an employee session, updates the employee's own password instead of
+    // the tenant's — loginId is ignored in that case (identity comes from the
+    // session, not the request).
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(
             @RequestParam String loginId,
@@ -49,12 +60,38 @@ public class AuthController {
                     .body(Map.of("error", "New password must be at least 6 characters."));
         }
 
-        boolean updated = userService.changePassword(loginId, currentPassword, newPassword);
+        boolean updated = sessionContext.isEmployee()
+                ? employeeService.changePassword(sessionContext.employeeId(), currentPassword, newPassword)
+                : userService.changePassword(loginId, currentPassword, newPassword);
         if (!updated) {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "Current password is incorrect."));
         }
         return ResponseEntity.ok(Map.of("status", "updated"));
+    }
+
+    // POST /api/auth/employee-login
+    // Employee self-service login — separate from tenant /api/auth/login.
+    @PostMapping("/employee-login")
+    public ResponseEntity<?> employeeLogin(@RequestBody Map<String, String> body) {
+        String email    = body.getOrDefault("email",    "").trim();
+        String password = body.getOrDefault("password", "").trim();
+
+        if (email.isBlank() || password.isBlank()) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "email and password are required."));
+        }
+
+        return employeeService.login(email, password)
+                .<ResponseEntity<?>>map(result -> {
+                    String employeeId = (String) result.get("employeeId");
+                    String tenantLoginId = (String) result.get("loginId");
+                    String sessionToken = sessionService.createEmployeeSession(employeeId, tenantLoginId);
+                    result.put("sessionToken", sessionToken);
+                    return ResponseEntity.ok(result);
+                })
+                .orElse(ResponseEntity.status(401)
+                        .body(Map.of("error", "Invalid credentials.")));
     }
 
     // POST /api/auth/register
@@ -86,7 +123,12 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<?> logout(@RequestHeader(value = "Authorization", required = false) String authHeader) {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            sessionService.invalidateSession(authHeader.substring(7).trim());
+            String token = authHeader.substring(7).trim();
+            if (sessionContext.isEmployee()) {
+                sessionService.invalidateEmployeeSession(token);
+            } else {
+                sessionService.invalidateSession(token);
+            }
         }
         return ResponseEntity.ok(Map.of("status", "logged out"));
     }

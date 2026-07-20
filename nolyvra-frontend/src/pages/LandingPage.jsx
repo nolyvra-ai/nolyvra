@@ -854,14 +854,17 @@ export default function LandingPage() {
               { name:"Peppard",     src:"/peppard.png" },
               { name:"Cornerstone", src:"/cornerstone.png" },
               { name:"InTimeTec",   src:"/intimetec.png" },
-              { name:"Eve",         src:"/eve_logo.png" },
-              { name:"Freshwater",  src:"/freshwater_logo.png" },
               { name:"HNH",         src:"/hnh_logo.png" },
               { name:"Kitbag",      src:"/kitbag_logo.png" },
               { name:"Pinpoint",    src:"/pinpoint_logo.png" },
               { name:"Rec2",        src:"/rec2_logo.png" },
               { name:"Revise",      src:"/revise_logo.png" },
+              { name:"Exclaim",     src:"/exclaim_logo.png" },
               { name:"Ross",        src:"/ross_logo.png" },
+              { name:"Lynx",        src:"/lynx_logo.png" },
+              { name:"Odin",        src:"/odin_logo.png" },
+              { name:"Stratacon",   src:"/stratacon_logo.png" },
+              { name:"WnW",         src:"/wnw_logo.png" },
             ]).map(({name,src},i)=>(
               <div key={i} className="nl-int-chip" style={{ padding:"10px 18px" }}>
                 <img src={src} alt={name} style={{ height:28,maxWidth:120,objectFit:"contain",display:"block" }} />

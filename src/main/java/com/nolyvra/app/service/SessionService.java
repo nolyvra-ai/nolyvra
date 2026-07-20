@@ -81,8 +81,67 @@ public class SessionService {
             if (deleted > 0) {
                 System.out.println("[SessionService] Cleaned up " + deleted + " expired session(s).");
             }
+            int deletedEmp = jdbc.update("delete from employee_sessions where expires_at < now()");
+            if (deletedEmp > 0) {
+                System.out.println("[SessionService] Cleaned up " + deletedEmp + " expired employee session(s).");
+            }
         } catch (Exception e) {
             System.err.println("[SessionService] cleanupExpiredSessions() failed: " + e.getMessage());
+        }
+    }
+
+    // ─── Employee sessions ────────────────────────────────────────────────────
+    // Mirrors the tenant session methods above, backed by a separate table so
+    // tenant login behavior is untouched.
+
+    public record EmployeeSessionInfo(String employeeId, String loginId) {}
+
+    public String createEmployeeSession(String employeeId, String loginId) {
+        jdbc.update("""
+                update employee_sessions
+                set is_active = false
+                where employee_id = ? and is_active = true
+                """, employeeId);
+
+        UUID token = UUID.randomUUID();
+        OffsetDateTime now = OffsetDateTime.now();
+        jdbc.update("""
+                insert into employee_sessions (token, employee_id, login_id, created_at, expires_at, is_active)
+                values (?::uuid, ?, ?, ?, ?, true)
+                """,
+                token.toString(), employeeId, loginId, now, now.plusHours(SESSION_HOURS));
+
+        return token.toString();
+    }
+
+    public Optional<EmployeeSessionInfo> validateEmployeeSession(String token) {
+        if (token == null || token.isBlank()) return Optional.empty();
+        try {
+            List<EmployeeSessionInfo> rows = jdbc.query("""
+                    select employee_id, login_id from employee_sessions
+                    where token = ?::uuid
+                      and is_active = true
+                      and expires_at > now()
+                    """,
+                    (rs, r) -> new EmployeeSessionInfo(rs.getString("employee_id"), rs.getString("login_id")),
+                    token);
+            return rows.stream().findFirst();
+        } catch (Exception e) {
+            System.err.println("[SessionService] validateEmployeeSession() failed: " + e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    public void invalidateEmployeeSession(String token) {
+        if (token == null || token.isBlank()) return;
+        try {
+            jdbc.update("""
+                    update employee_sessions
+                    set is_active = false
+                    where token = ?::uuid
+                    """, token);
+        } catch (Exception e) {
+            System.err.println("[SessionService] invalidateEmployeeSession() failed: " + e.getMessage());
         }
     }
 }

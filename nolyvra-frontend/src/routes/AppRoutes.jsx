@@ -35,6 +35,11 @@ import CrmExpensePage             from "../pages/CrmExpensePage";
 import CrmGrievancePage           from "../pages/CrmGrievancePage";
 import CrmDisciplinaryPage        from "../pages/CrmDisciplinaryPage";
 import CrmCoWorkerPage            from "../pages/CrmCoWorkerPage";
+import CrmMyLeavePage             from "../pages/CrmMyLeavePage";
+import CrmMyExpensePage           from "../pages/CrmMyExpensePage";
+import CrmMyGrievancePage         from "../pages/CrmMyGrievancePage";
+import CrmTimesheetsPage          from "../pages/CrmTimesheetsPage";
+import CrmMyTimesheetPage         from "../pages/CrmMyTimesheetPage";
 
 export default function AppRoutes() {
   return (
@@ -80,6 +85,11 @@ export default function AppRoutes() {
       <Route path="/crm/grievances"                     element={<CrmGrievancePage />} />
       <Route path="/crm/disciplinary"                   element={<CrmDisciplinaryPage />} />
       <Route path="/crm/coworker"                        element={<CrmCoWorkerPage />} />
+      <Route path="/crm/my-leave"                        element={<CrmMyLeavePage />} />
+      <Route path="/crm/my-expenses"                     element={<CrmMyExpensePage />} />
+      <Route path="/crm/my-grievances"                   element={<CrmMyGrievancePage />} />
+      <Route path="/crm/timesheets"                      element={<CrmTimesheetsPage />} />
+      <Route path="/crm/my-timesheet"                     element={<CrmMyTimesheetPage />} />
       <Route path="*"                                   element={<Navigate to="/" replace />} />
     </Routes>
   );

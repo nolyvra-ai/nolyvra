@@ -61,8 +61,107 @@ function PlanBadge({ name }) {
   );
 }
 
+// ─── Employee self-service settings (password + logout only) ─────────────────
+function EmployeeSettingsPanel() {
+  const nav = useNavigate();
+  const loginId = localStorage.getItem("loginId") || "";
+
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword,     setNewPassword]     = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [saving,  setSaving]  = useState(false);
+  const [error,   setError]   = useState("");
+  const [success, setSuccess] = useState(false);
+
+  function handleLogout() {
+    localStorage.removeItem("loginId");
+    localStorage.removeItem("name");
+    localStorage.removeItem("sessionToken");
+    localStorage.removeItem("authType");
+    localStorage.removeItem("employeeId");
+    nav("/login");
+  }
+
+  async function updatePassword() {
+    setError(""); setSuccess(false);
+    if (!currentPassword || !newPassword) {
+      setError("Current and new password are required."); return;
+    }
+    if (newPassword.length < 6) {
+      setError("New password must be at least 6 characters."); return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("New password and confirmation do not match."); return;
+    }
+    setSaving(true);
+    try {
+      const encoder = new TextEncoder();
+      const hash = async (plain) => {
+        const buf = await crypto.subtle.digest("SHA-256", encoder.encode(plain));
+        return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+      };
+      const res = await fetch(`${API_BASE}/api/auth/change-password?loginId=${encodeURIComponent(loginId)}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}`,
+        },
+        body: JSON.stringify({
+          currentPassword: await hash(currentPassword),
+          newPassword: await hash(newPassword),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Failed to update password."); return; }
+      setSuccess(true);
+      setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+    } catch (e) {
+      setError(e.message || "Failed to update password.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Box sx={{ p: 3, maxWidth: 480 }}>
+      <Typography sx={{ fontSize: 20, fontWeight: 800, color: TEXT, mb: 2.5 }}>Settings</Typography>
+
+      <Paper elevation={0} sx={{ border: `1px solid ${BORDER}`, borderRadius: "12px", p: 3, mb: 2.5 }}>
+        <Typography sx={{ fontSize: 14, fontWeight: 700, color: TEXT, mb: 2 }}>Update Password</Typography>
+        {error && <Alert severity="error" sx={{ fontSize: 12, mb: 2 }}>{error}</Alert>}
+        {success && <Alert severity="success" sx={{ fontSize: 12, mb: 2 }}>Password updated.</Alert>}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <TextField size="small" type="password" label="Current password" value={currentPassword}
+            onChange={e => setCurrentPassword(e.target.value)} fullWidth />
+          <TextField size="small" type="password" label="New password" value={newPassword}
+            onChange={e => setNewPassword(e.target.value)} fullWidth />
+          <TextField size="small" type="password" label="Confirm new password" value={confirmPassword}
+            onChange={e => setConfirmPassword(e.target.value)} fullWidth />
+          <Button variant="contained" onClick={updatePassword} disabled={saving} sx={{
+            textTransform: "none", borderRadius: "8px", boxShadow: "none",
+            bgcolor: ACCENT, alignSelf: "flex-start",
+          }}>
+            {saving ? "Updating…" : "Update Password"}
+          </Button>
+        </Box>
+      </Paper>
+
+      <Paper elevation={0} sx={{ border: `1px solid ${BORDER}`, borderRadius: "12px", p: 3 }}>
+        <Typography sx={{ fontSize: 14, fontWeight: 700, color: TEXT, mb: 1.5 }}>Logout</Typography>
+        <Button variant="outlined" color="error" onClick={handleLogout} sx={{ textTransform: "none", borderRadius: "8px" }}>
+          Logout
+        </Button>
+      </Paper>
+    </Box>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function SettingsPage() {
+  if (localStorage.getItem("authType") === "EMPLOYEE") {
+    return <EmployeeSettingsPanel />;
+  }
+
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
   const loginId = localStorage.getItem("loginId") || "";

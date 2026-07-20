@@ -1,11 +1,13 @@
 package com.nolyvra.app.controller;
 
+import com.nolyvra.app.config.SessionContext;
 import com.nolyvra.app.model.*;
 import com.nolyvra.app.service.CrmEntitlementService;
 import com.nolyvra.app.service.LeaveService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -16,10 +18,20 @@ public class LeaveController {
 
     private final LeaveService           leaveService;
     private final CrmEntitlementService  entitlementService;
+    private final SessionContext         sessionContext;
 
-    public LeaveController(LeaveService leaveService, CrmEntitlementService entitlementService) {
+    public LeaveController(LeaveService leaveService, CrmEntitlementService entitlementService,
+                            SessionContext sessionContext) {
         this.leaveService       = leaveService;
         this.entitlementService = entitlementService;
+        this.sessionContext     = sessionContext;
+    }
+
+    // Employee sessions may only ever act on their own employeeId.
+    private void requireOwnEmployee(String employeeId) {
+        if (sessionContext.isEmployee() && !sessionContext.employeeId().equals(employeeId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Not permitted for this employee.");
+        }
     }
 
     // ─── Leave types ──────────────────────────────────────────────────────────
@@ -63,6 +75,7 @@ public class LeaveController {
             @RequestParam String loginId,
             @RequestParam(required = false) Integer year) {
         entitlementService.checkEntitled(loginId);
+        requireOwnEmployee(employeeId);
         int y = (year != null && year > 0) ? year : LocalDate.now().getYear();
         return leaveService.getEmployeeBalance(employeeId, y, loginId);
     }
@@ -85,7 +98,8 @@ public class LeaveController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String employeeId) {
         entitlementService.checkEntitled(loginId);
-        return leaveService.listRequests(loginId, status, employeeId);
+        String effectiveEmployeeId = sessionContext.isEmployee() ? sessionContext.employeeId() : employeeId;
+        return leaveService.listRequests(loginId, status, effectiveEmployeeId);
     }
 
     @PostMapping("/employees/{employeeId}/leave/requests")
@@ -95,6 +109,7 @@ public class LeaveController {
             @RequestParam String loginId,
             @Valid @RequestBody LeaveRequestCreateRequest req) {
         entitlementService.checkEntitled(loginId);
+        requireOwnEmployee(employeeId);
         return leaveService.submitRequest(employeeId, req, loginId);
     }
 
@@ -113,6 +128,6 @@ public class LeaveController {
             @PathVariable String requestId,
             @RequestParam String loginId) {
         entitlementService.checkEntitled(loginId);
-        leaveService.cancelRequest(requestId, loginId);
+        leaveService.cancelRequest(requestId, loginId, sessionContext.isEmployee() ? sessionContext.employeeId() : null);
     }
 }
