@@ -22,6 +22,8 @@ import AgentEconomyPage       from "../pages/AgentEconomyPage";
 import StackAuditPage         from "../pages/StackAuditPage";
 import InterviewAnalysisPage  from "../pages/InterviewAnalysisPage";
 import ClientTrackerPage       from "../pages/ClientTrackerPage";
+import ContactDetailPage       from "../pages/ContactDetailPage";
+import ContactsListPage        from "../pages/ContactsListPage";
 import PrivacyPage             from "../pages/PrivacyPage";
 import TermsPage               from "../pages/TermsPage";
 import CrmEmployeesPage        from "../pages/CrmEmployeesPage";
@@ -74,6 +76,8 @@ export default function AppRoutes() {
       <Route path="/settings"                           element={<SettingsPage />} />
       <Route path="/coworker"                           element={<CoWorkerPage />} />
       <Route path="/clients"                            element={<ClientTrackerPage />} />
+      <Route path="/contacts"                           element={<ContactsListPage />} />
+      <Route path="/contacts/:id"                       element={<ContactDetailPage />} />
       <Route path="/crm/employees"                      element={<CrmEmployeesPage />} />
       <Route path="/crm/employees/:id"                  element={<CrmEmployeeDetailPage />} />
       <Route path="/crm/departments"                    element={<CrmDepartmentsPage />} />

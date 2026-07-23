@@ -3,15 +3,21 @@ package com.nolyvra.app.controller;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nolyvra.app.model.CandidateCreateRequest;
+import com.nolyvra.app.model.CandidateExperienceResponse;
+import com.nolyvra.app.model.CandidateFileResponse;
 import com.nolyvra.app.model.CandidateFilterRequest;
 import com.nolyvra.app.model.CandidateListItemResponse;
 import com.nolyvra.app.model.CandidateResponse;
 import com.nolyvra.app.model.CandidateSearchResult;
 import com.nolyvra.app.model.CandidateUpdateRequest;
+import com.nolyvra.app.model.JobApplicationResponse;
 import com.nolyvra.app.model.StageUpdateRequest;
+import com.nolyvra.app.service.CandidateExperienceService;
+import com.nolyvra.app.service.CandidateFileService;
 import com.nolyvra.app.service.CandidateService;
 import com.nolyvra.app.service.CvFormatService;
 import com.nolyvra.app.service.InterviewQuestionsService;
+import com.nolyvra.app.service.JobApplicationService;
 import com.nolyvra.app.service.TalentSearchService;
 import com.nolyvra.app.service.WorkflowService;
 import jakarta.validation.Valid;
@@ -38,6 +44,9 @@ public class CandidatesController {
     private final InterviewQuestionsService interviewQuestionsService;
     private final TalentSearchService talentSearchService;
     private final CvFormatService cvFormatService;
+    private final CandidateFileService candidateFileService;
+    private final CandidateExperienceService candidateExperienceService;
+    private final JobApplicationService jobApplicationService;
     private final ObjectMapper objectMapper;
 
     public CandidatesController(CandidateService candidateService,
@@ -45,12 +54,18 @@ public class CandidatesController {
                                 InterviewQuestionsService interviewQuestionsService,
                                 TalentSearchService talentSearchService,
                                 CvFormatService cvFormatService,
+                                CandidateFileService candidateFileService,
+                                CandidateExperienceService candidateExperienceService,
+                                JobApplicationService jobApplicationService,
                                 ObjectMapper objectMapper) {
         this.candidateService          = candidateService;
         this.workflowService           = workflowService;
         this.interviewQuestionsService = interviewQuestionsService;
         this.talentSearchService       = talentSearchService;
         this.cvFormatService           = cvFormatService;
+        this.candidateFileService      = candidateFileService;
+        this.candidateExperienceService = candidateExperienceService;
+        this.jobApplicationService     = jobApplicationService;
         this.objectMapper              = objectMapper;
     }
 
@@ -64,7 +79,7 @@ public class CandidatesController {
             CandidateResponse candidate = candidateService.addCandidate(jobId, req, loginId);
             // Record timeline event
             workflowService.recordEvent(candidate.id(), loginId, "CANDIDATE_ADDED",
-                    "Added to pipeline for " + jobId, null);
+                    "Added to pipeline for " + jobId, null, jobId);
             return candidate;
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
@@ -111,6 +126,27 @@ public class CandidatesController {
         return candidateService.getCandidate(candidateId, loginId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Candidate not found: " + candidateId));
+    }
+
+    // ── Candidate <-> Job Application (many-to-many) — not wired into any UI
+    // yet, but the backend is ready for the Phase 2 "Jobs Applied" tab ───────
+    @GetMapping("/candidates/{candidateId}/applications")
+    public List<JobApplicationResponse> getApplications(
+            @PathVariable String candidateId,
+            @RequestParam String loginId) {
+        return candidateService.getApplications(candidateId, loginId);
+    }
+
+    @PostMapping("/candidates/{candidateId}/applications")
+    public CandidateResponse addApplication(
+            @PathVariable String candidateId,
+            @RequestParam String loginId,
+            @RequestParam String jobId) {
+        try {
+            return candidateService.addApplication(candidateId, jobId, loginId);
+        } catch (IllegalStateException e) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
+        }
     }
 
     // ── Format CV: stamp candidate data into a recruiter's stored .docx
@@ -281,6 +317,25 @@ public class CandidatesController {
         return Map.of("stage", req.stage(), "status", "updated");
     }
 
+    // ── Per-job-application stage (Phase 2A — Jobs Applied tab approve/reject) ─
+    // Unlike the candidate-level PATCH above (which moves the person's cached
+    // "most recent" stage), this targets one specific job_applications row —
+    // approving/rejecting a candidate for Job A no longer touches Job B.
+    @PatchMapping("/candidates/{candidateId}/applications/{applicationId}/stage")
+    public Map<String, String> updateApplicationStage(
+            @PathVariable String candidateId,
+            @PathVariable String applicationId,
+            @RequestParam String loginId,
+            @Valid @RequestBody StageUpdateRequest req) {
+        jobApplicationService.updateStage(applicationId, req.stage(), loginId);
+        if (req.recruiterNotes() != null) {
+            candidateService.updateNotes(candidateId, req.recruiterNotes(), loginId);
+        }
+        workflowService.recordEvent(candidateId, loginId, "STAGE_CHANGED",
+                "Stage updated to: " + req.stage(), null);
+        return Map.of("stage", req.stage(), "status", "updated");
+    }
+
     // ── MVP2: Update recruiter notes ─────────────────────────────────────────
     @PatchMapping("/candidates/{candidateId}/notes")
     public Map<String, String> updateNotes(
@@ -293,11 +348,14 @@ public class CandidatesController {
     }
 
     // ── Interview Questions: generate via OpenAI ──────────────────────────────
+    // jobId is optional — pass it from the Jobs Applied tab to target one
+    // specific application; omit it for the old job-agnostic behavior.
     @PostMapping("/candidates/{candidateId}/interview-questions/generate")
     public JsonNode generateInterviewQuestions(
             @PathVariable String candidateId,
-            @RequestParam String loginId) {
-        String json = interviewQuestionsService.generateQuestions(candidateId, loginId);
+            @RequestParam String loginId,
+            @RequestParam(required = false) String jobId) {
+        String json = interviewQuestionsService.generateQuestions(candidateId, loginId, jobId);
         try {
             return objectMapper.readTree(json);
         } catch (Exception e) {
@@ -311,12 +369,71 @@ public class CandidatesController {
     public Map<String, String> saveInterviewQuestions(
             @PathVariable String candidateId,
             @RequestParam String loginId,
+            @RequestParam(required = false) String jobId,
             @RequestBody Map<String, Object> body) throws Exception {
         Object qs = body.get("questions");
         String questionsStr = (qs instanceof String s)
                 ? s
                 : objectMapper.writeValueAsString(qs);
-        interviewQuestionsService.saveQuestions(candidateId, loginId, questionsStr);
+        interviewQuestionsService.saveQuestions(candidateId, loginId, questionsStr, jobId);
         return Map.of("status", "saved");
+    }
+
+    // ── Files (Phase 2A — candidate detail page's Files tab) ──────────────────
+
+    @GetMapping("/candidates/{candidateId}/files")
+    public ResponseEntity<List<CandidateFileResponse>> getCandidateFiles(
+            @PathVariable String candidateId,
+            @RequestParam String loginId) {
+        return ResponseEntity.ok(candidateFileService.getCandidateFiles(candidateId, loginId));
+    }
+
+    @PostMapping(value = "/candidates/{candidateId}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<CandidateFileResponse> uploadCandidateFile(
+            @PathVariable String candidateId,
+            @RequestParam String loginId,
+            @RequestParam MultipartFile file) {
+        return ResponseEntity.ok(candidateFileService.uploadCandidateFile(candidateId, loginId, file));
+    }
+
+    @GetMapping("/candidates/{candidateId}/files/{fileId}")
+    public ResponseEntity<byte[]> downloadCandidateFile(
+            @PathVariable String candidateId,
+            @PathVariable Long fileId,
+            @RequestParam String loginId) {
+        Map<String, Object> raw = candidateFileService.getCandidateFileRaw(candidateId, fileId, loginId);
+        byte[] data = (byte[]) raw.get("file_data");
+        String name = (String) raw.get("file_name");
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + name + "\"")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(data);
+    }
+
+    @DeleteMapping("/candidates/{candidateId}/files/{fileId}")
+    public ResponseEntity<Void> deleteCandidateFile(
+            @PathVariable String candidateId,
+            @PathVariable Long fileId,
+            @RequestParam String loginId) {
+        candidateFileService.deleteCandidateFile(candidateId, fileId, loginId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ── Work Experience / Education (Phase 2A) ────────────────────────────────
+    // GET auto-generates on first call and caches on the candidate row; POST
+    // .../generate forces a fresh extraction (e.g. after the CV is updated).
+
+    @GetMapping("/candidates/{candidateId}/experience")
+    public CandidateExperienceResponse getExperience(
+            @PathVariable String candidateId,
+            @RequestParam String loginId) {
+        return candidateExperienceService.getExperience(candidateId, loginId);
+    }
+
+    @PostMapping("/candidates/{candidateId}/experience/generate")
+    public CandidateExperienceResponse regenerateExperience(
+            @PathVariable String candidateId,
+            @RequestParam String loginId) {
+        return candidateExperienceService.getExperience(candidateId, loginId, true);
     }
 }

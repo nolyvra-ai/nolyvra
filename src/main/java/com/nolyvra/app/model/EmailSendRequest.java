@@ -7,5 +7,6 @@ public record EmailSendRequest(
     @NotBlank String subject,
     @NotBlank String body,
     String candidateId,     // optional — links email to candidate timeline
-    String templateType     // INTERVIEW_INVITE | FOLLOW_UP | REJECTION | OFFER
+    String templateType,    // INTERVIEW_INVITE | FOLLOW_UP | REJECTION | OFFER
+    Long clientId           // optional — links email to a client's Related Emails tab
 ) {}

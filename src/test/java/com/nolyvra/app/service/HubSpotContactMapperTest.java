@@ -49,8 +49,10 @@ class HubSpotContactMapperTest {
     private ClientResponse client(String name, String email, String title, String phone) {
         return new ClientResponse(
                 42L, "login-1", "Nolyvra", null, null, null,
-                name, email, title, phone, null, List.of(), null, null, null,
-                Instant.now(), 0, 0, 0, List.of(), List.of());
+                name, email, title, phone, null,
+                null, null, null, null, null, null, null, null,
+                List.of(), null, null, null,
+                Instant.now(), 0, 0, 0, List.of(), List.of(), "CLIENT");
     }
 
     private EmployeeResponse employee() {

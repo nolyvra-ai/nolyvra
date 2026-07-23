@@ -5,6 +5,7 @@ import com.nolyvra.app.model.CandidateCreateRequest;
 import com.nolyvra.app.model.CandidateListItemResponse;
 import com.nolyvra.app.model.CandidateResponse;
 import com.nolyvra.app.model.CandidateUpdateRequest;
+import com.nolyvra.app.model.JobApplicationResponse;
 import com.nolyvra.app.model.StageUpdateRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -23,10 +24,16 @@ public class CandidateService {
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
+    private final JobApplicationService jobApplicationService;
+    private final CandidateImportService candidateImportService;
 
-    public CandidateService(JdbcTemplate jdbc, ObjectMapper objectMapper) {
+    public CandidateService(JdbcTemplate jdbc, ObjectMapper objectMapper,
+                             JobApplicationService jobApplicationService,
+                             CandidateImportService candidateImportService) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
+        this.jobApplicationService = jobApplicationService;
+        this.candidateImportService = candidateImportService;
     }
 
     private String skillsToJson(List<String> skills) {
@@ -74,7 +81,8 @@ public class CandidateService {
                 rs.getString("salary_currency"),
                 (Integer) rs.getObject("notice_period_weeks"),
                 rs.getString("work_rights"),
-                (Boolean) rs.getObject("remote_flexible"));
+                (Boolean) rs.getObject("remote_flexible"),
+                (Boolean) rs.getObject("is_client"));
     };
 
     private static final RowMapper<CandidateListItemResponse> CANDIDATE_LIST_MAPPER = (rs, rowNum) -> {
@@ -139,7 +147,29 @@ public class CandidateService {
 
     // ─── Create ───────────────────────────────────────────────────────────────
 
+    // candidates.job_id / stage act as a cache of the person's most recently
+    // created active application — kept in sync on every write so every
+    // existing (job-agnostic) read path keeps working unchanged. The
+    // job_applications table is the source of truth for "all applications";
+    // see additional/sql/V56__job_applications.sql.
     public CandidateResponse addCandidate(String jobId, CandidateCreateRequest req, String loginId) {
+        String existingId = candidateImportService.findExistingCandidateId(
+                loginId, req.name(), req.email(), req.phone(), null, req.state(), req.currentTitle());
+
+        if (existingId != null) {
+            if (jobApplicationService.getApplicationForJob(existingId, jobId, loginId).isPresent()) {
+                throw new IllegalStateException(
+                    req.name() + " is already in the pipeline for this job.");
+            }
+            jobApplicationService.createApplication(existingId, jobId, loginId);
+            jdbc.update("""
+                    update candidates
+                    set job_id = ?, stage = 'Screening', updated_at = now()
+                    where id = ? and login_id = ?
+                    """, jobId, existingId, loginId);
+            return getCandidate(existingId, loginId).orElseThrow();
+        }
+
         if (isDuplicate(jobId, req.name(), loginId)) {
             throw new IllegalStateException(
                 req.name() + " is already in the pipeline for this job.");
@@ -159,12 +189,13 @@ public class CandidateService {
                 req.currentTitle(), req.location(), req.state(), req.yearsExperience(), req.seniorityLevel(),
                 req.expectedSalaryMin(), req.expectedSalaryMax(), req.salaryCurrency(),
                 req.noticePeriodWeeks(), req.workRights(), req.remoteFlexible());
+        jobApplicationService.createApplication(id, jobId, loginId);
 
         return new CandidateResponse(id, jobId, req.name(), req.email(),
                 req.phone(), req.linkedinUrl(), Instant.now(), "Screening", req.cvText(), req.skills(),
                 req.currentTitle(), req.location(), req.state(), req.yearsExperience(), req.seniorityLevel(),
                 req.expectedSalaryMin(), req.expectedSalaryMax(), req.salaryCurrency(),
-                req.noticePeriodWeeks(), req.workRights(), req.remoteFlexible());
+                req.noticePeriodWeeks(), req.workRights(), req.remoteFlexible(), false);
     }
 
     // Create candidate without job assignment (job_id = null — "Not Assigned")
@@ -193,7 +224,7 @@ public class CandidateService {
                 req.phone(), req.linkedinUrl(), Instant.now(), "Screening", req.cvText(), req.skills(),
                 req.currentTitle(), req.location(), req.state(), req.yearsExperience(), req.seniorityLevel(),
                 req.expectedSalaryMin(), req.expectedSalaryMax(), req.salaryCurrency(),
-                req.noticePeriodWeeks(), req.workRights(), req.remoteFlexible());
+                req.noticePeriodWeeks(), req.workRights(), req.remoteFlexible(), false);
     }
 
     // ─── Read ─────────────────────────────────────────────────────────────────
@@ -202,7 +233,7 @@ public class CandidateService {
             id, job_id, name, email, phone_number, linkedin_url, created_at, stage, cv_text, skills,
             current_title, location, state, years_experience, seniority_level,
             expected_salary_min, expected_salary_max, salary_currency,
-            notice_period_weeks, work_rights, remote_flexible
+            notice_period_weeks, work_rights, remote_flexible, is_client
             """;
 
     public Optional<CandidateResponse> getCandidate(String candidateId, String loginId) {
@@ -215,15 +246,25 @@ public class CandidateService {
                 """.formatted(CANDIDATE_COLUMNS), CANDIDATE_MAPPER, candidateId, loginId).stream().findFirst();
     }
 
+    // Lists everyone with an active application to this job — via
+    // job_applications, not the candidates.job_id cache, since a person can
+    // now have applications to other jobs that are more recent (and so
+    // "win" the cache). jobId/stage in the response reflect THIS job's
+    // application, not the person's cached most-recent one.
     public List<CandidateResponse> getCandidatesByJob(String jobId, String loginId) {
         return jdbc.query("""
-                select %s
-                from candidates
-                where job_id = ?
-                  and login_id = ?
-                  and is_active = true
-                order by created_at desc
-                """.formatted(CANDIDATE_COLUMNS), CANDIDATE_MAPPER, jobId, loginId);
+                select c.id, ja.job_id, c.name, c.email, c.phone_number, c.linkedin_url, c.created_at, ja.stage,
+                       c.cv_text, c.skills, c.current_title, c.location, c.state, c.years_experience,
+                       c.seniority_level, c.expected_salary_min, c.expected_salary_max, c.salary_currency,
+                       c.notice_period_weeks, c.work_rights, c.remote_flexible, c.is_client
+                from job_applications ja
+                join candidates c on c.id = ja.candidate_id
+                where ja.job_id = ?
+                  and ja.login_id = ?
+                  and ja.is_active = true
+                  and c.is_active = true
+                order by ja.created_at desc
+                """, CANDIDATE_MAPPER, jobId, loginId);
     }
 
     public List<CandidateResponse> getAllCandidates(String loginId) {
@@ -289,6 +330,15 @@ public class CandidateService {
         return status != null && ("active".equalsIgnoreCase(status) || "fulfilling".equalsIgnoreCase(status));
     }
 
+    // Finds or creates the job_applications row for (candidateId, jobId) —
+    // used wherever a candidate is pointed at a job (new or reassigned) so
+    // job_applications stays the source of truth alongside the
+    // candidates.job_id/stage cache.
+    private JobApplicationResponse ensureApplication(String candidateId, String jobId, String loginId) {
+        return jobApplicationService.getApplicationForJob(candidateId, jobId, loginId)
+                .orElseGet(() -> jobApplicationService.createApplication(candidateId, jobId, loginId));
+    }
+
     public Optional<CandidateResponse> updateCandidate(String candidateId, CandidateUpdateRequest req, String loginId) {
         Optional<CandidateResponse> existing = getCandidate(candidateId, loginId);
         if (existing.isEmpty()) {
@@ -296,6 +346,10 @@ public class CandidateService {
         }
         String currentJobId = existing.get().jobId();
         String effectiveJobId = isJobOpen(currentJobId, loginId) ? currentJobId : req.jobId();
+
+        if (effectiveJobId != null && !effectiveJobId.equals(currentJobId)) {
+            ensureApplication(candidateId, effectiveJobId, loginId);
+        }
 
         if (isDuplicateExcluding(effectiveJobId, req.name(), loginId, candidateId)) {
             throw new IllegalStateException(
@@ -325,6 +379,9 @@ public class CandidateService {
     // ─── Update stage ─────────────────────────────────────────────────────────
 
     public boolean updateStage(String candidateId, StageUpdateRequest req, String loginId) {
+        jobApplicationService.getMostRecentActiveApplication(candidateId, loginId)
+                .ifPresent(app -> jobApplicationService.updateStage(app.id(), req.stage(), loginId));
+
         int rows = jdbc.update("""
                 update candidates
                 set stage = ?,
@@ -336,6 +393,33 @@ public class CandidateService {
                 """,
                 req.stage(), req.recruiterNotes(), candidateId, loginId);
         return rows > 0;
+    }
+
+    // ─── Applications (Candidate <-> Job, many-to-many) ────────────────────────
+
+    public List<JobApplicationResponse> getApplications(String candidateId, String loginId) {
+        return jobApplicationService.getApplicationsForCandidate(candidateId, loginId);
+    }
+
+    // Applies an existing candidate to another job — creates the
+    // job_applications row and points the candidates.job_id/stage cache at
+    // it (same "most recent" semantics as addCandidate).
+    public CandidateResponse addApplication(String candidateId, String jobId, String loginId) {
+        Optional<CandidateResponse> existing = getCandidate(candidateId, loginId);
+        if (existing.isEmpty()) {
+            throw new IllegalStateException("Candidate not found: " + candidateId);
+        }
+        if (jobApplicationService.getApplicationForJob(candidateId, jobId, loginId).isPresent()) {
+            throw new IllegalStateException(
+                existing.get().name() + " is already in the pipeline for this job.");
+        }
+        jobApplicationService.createApplication(candidateId, jobId, loginId);
+        jdbc.update("""
+                update candidates
+                set job_id = ?, stage = 'Screening', updated_at = now()
+                where id = ? and login_id = ?
+                """, jobId, candidateId, loginId);
+        return getCandidate(candidateId, loginId).orElseThrow();
     }
 
     // ─── Update notes ─────────────────────────────────────────────────────────

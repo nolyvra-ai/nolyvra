@@ -65,6 +65,19 @@ public class AnalysisService {
                 .orElseThrow(() -> new IllegalArgumentException("Candidate not found: " + candidateId));
     }
 
+    // A person can now have applications to more than one job, so "the
+    // latest analyses row for this candidate_id" is ambiguous — it must be
+    // scoped to a job. candidates.job_id is kept in sync (by
+    // CandidateService) as the person's most recently active application,
+    // so it's the right default "current job" to filter analyses by.
+    // Returns null for a candidate with no job at all (analyses can't exist
+    // for them yet), in which case callers fall back to unfiltered lookup.
+    private String resolveCurrentJobId(String candidateId) {
+        return jdbc.query("select job_id from candidates where id = ?",
+                (rs, r) -> rs.getString("job_id"), candidateId)
+                .stream().findFirst().orElse(null);
+    }
+
     // ─── Core analysis ────────────────────────────────────────────────────────
     // MVP2: expanded OpenAI prompt now returns all fields in one call.
     // No extra API calls needed for matchedSkills, strengthSignals, aiVerdict etc.
@@ -84,14 +97,15 @@ public class AnalysisService {
     // ─── MVP2: AI Candidate Summary ──────────────────────────────────────────
 
     public CandidateSummaryResponse getCandidateSummary(String candidateId, String loginId) {
+        String jobId = resolveCurrentJobId(candidateId);
         // Fix: list + get(0) avoids NPE when column value is null
         List<String> summaryRows = jdbc.query("""
                 select ai_summary_json from analyses
-                where candidate_id = ?
+                where candidate_id = ? and (job_id = ? or ? is null)
                 order by analyzed_at desc limit 1
                 """,
                 (rs, r) -> rs.getString("ai_summary_json"),
-                candidateId);
+                candidateId, jobId, jobId);
         String stored = summaryRows.isEmpty() ? null : summaryRows.get(0);
 
         if (stored != null && !stored.isBlank() && !stored.equals("null")) {
@@ -141,9 +155,11 @@ public class AnalysisService {
             jdbc.update("""
                     update analyses set ai_summary_json = ?::jsonb
                     where candidate_id = ? and id = (
-                        select id from analyses where candidate_id = ? order by analyzed_at desc limit 1
+                        select id from analyses where candidate_id = ?
+                        and (job_id = ? or ? is null)
+                        order by analyzed_at desc limit 1
                     )
-                    """, cleanContent, candidateId, candidateId);
+                    """, cleanContent, candidateId, candidateId, jobId, jobId);
             return result;
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse candidate summary: " + e.getMessage(), e);
@@ -155,14 +171,15 @@ public class AnalysisService {
     // ─── MVP2: Fraud Detection ────────────────────────────────────────────────
 
     public FraudSignalResponse getFraudSignals(String candidateId, String loginId) {
+        String jobId = resolveCurrentJobId(candidateId);
         // Fix: list + get(0) avoids NPE when column value is null
         List<String> fraudRows = jdbc.query("""
                 select fraud_signals_json from analyses
-                where candidate_id = ?
+                where candidate_id = ? and (job_id = ? or ? is null)
                 order by analyzed_at desc limit 1
                 """,
                 (rs, r) -> rs.getString("fraud_signals_json"),
-                candidateId);
+                candidateId, jobId, jobId);
         String stored = fraudRows.isEmpty() ? null : fraudRows.get(0);
 
         if (stored != null && !stored.isBlank() && !stored.equals("null")) {
@@ -217,9 +234,11 @@ public class AnalysisService {
             jdbc.update("""
                     update analyses set fraud_signals_json = ?::jsonb
                     where candidate_id = ? and id = (
-                        select id from analyses where candidate_id = ? order by analyzed_at desc limit 1
+                        select id from analyses where candidate_id = ?
+                        and (job_id = ? or ? is null)
+                        order by analyzed_at desc limit 1
                     )
-                    """, cleanContent, candidateId, candidateId);
+                    """, cleanContent, candidateId, candidateId, jobId, jobId);
             return result;
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse fraud signals: " + e.getMessage(), e);
@@ -229,14 +248,15 @@ public class AnalysisService {
     // ─── MVP2: Placement Probability ─────────────────────────────────────────
 
     public PlacementProbabilityResponse getPlacementProbability(String candidateId, String loginId) {
+        String jobId = resolveCurrentJobId(candidateId);
         // Fix: list + get(0) avoids NPE when column value is null
         List<String> placementRows = jdbc.query("""
                 select placement_prob_json from analyses
-                where candidate_id = ?
+                where candidate_id = ? and (job_id = ? or ? is null)
                 order by analyzed_at desc limit 1
                 """,
                 (rs, r) -> rs.getString("placement_prob_json"),
-                candidateId);
+                candidateId, jobId, jobId);
         String stored = placementRows.isEmpty() ? null : placementRows.get(0);
 
         if (stored != null && !stored.isBlank() && !stored.equals("null")) {
@@ -287,9 +307,11 @@ public class AnalysisService {
             jdbc.update("""
                     update analyses set placement_prob_json = ?::jsonb
                     where candidate_id = ? and id = (
-                        select id from analyses where candidate_id = ? order by analyzed_at desc limit 1
+                        select id from analyses where candidate_id = ?
+                        and (job_id = ? or ? is null)
+                        order by analyzed_at desc limit 1
                     )
-                    """, cleanContent, candidateId, candidateId);
+                    """, cleanContent, candidateId, candidateId, jobId, jobId);
             return result;
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse placement probability: " + e.getMessage(), e);
@@ -313,7 +335,7 @@ public class AnalysisService {
                                 : null,
                         rs.getString("stage"),
                         rs.getString("cv_text"),
-                        null, null, null, null, null, null, null, null, null, null, null, null),
+                        null, null, null, null, null, null, null, null, null, null, null, null, null),
                 candidateId).stream().findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Candidate not found: " + candidateId));
     }
@@ -343,21 +365,23 @@ public class AnalysisService {
     }
 
     public List<AnalysisResponse> getAnalysisForCandidate(String candidateId) {
+        String jobId = resolveCurrentJobId(candidateId);
         return jdbc.query("""
                 select id, candidate_id, candidate_name, job_id, analyzed_at,
                        consistency_score, capability_score, risk_level, timeline_match_percent
-                from analyses where candidate_id = ?
+                from analyses where candidate_id = ? and (job_id = ? or ? is null)
                 order by analyzed_at desc limit 1
-                """, ANALYSIS_MAPPER, candidateId);
+                """, ANALYSIS_MAPPER, candidateId, jobId, jobId);
     }
 
     public CandidateAnalysisResponse getAIAnalysisForCandidate(String candidateId) {
+        String jobId = resolveCurrentJobId(candidateId);
         List<CandidateAnalysisResponse> results = jdbc.query("""
                 select a.candidate_id, a.job_id, a.analyzed_at, a.analysis_json,
                        c.name as candidate_name
                 from analyses a
                 join candidates c on c.id = a.candidate_id
-                where a.candidate_id = ?
+                where a.candidate_id = ? and (a.job_id = ? or ? is null)
                 order by a.analyzed_at desc limit 1
                 """,
                 (rs, rowNum) -> {
@@ -390,7 +414,7 @@ public class AnalysisService {
                         throw new RuntimeException(
                                 "Failed to parse analysis_json: " + e.getMessage(), e);
                     }
-                }, candidateId);
+                }, candidateId, jobId, jobId);
 
         // ── Change: return null instead of throwing when no analysis exists ──
         return results.isEmpty() ? null : results.get(0);

@@ -49,7 +49,8 @@ public class EmailService {
                 rs.getString("body"),
                 rs.getString("template_type"),
                 rs.getString("status"),
-                sentAt != null ? sentAt.toInstant() : null);
+                sentAt != null ? sentAt.toInstant() : null,
+                (Long) rs.getObject("client_id"));
     };
 
     private static final RowMapper<EmailTemplateResponse> TEMPLATE_MAPPER = (rs, rowNum) -> {
@@ -92,42 +93,53 @@ public class EmailService {
             System.err.println("Failed to send email: " + e.getMessage());
         }
 
+        // Blank string (not null) means "no candidate" from the frontend's default
+        // form state — must become a real null, or the FK to candidates rejects it.
+        String candidateId = (req.candidateId() != null && !req.candidateId().isBlank())
+                ? req.candidateId() : null;
+
         // Persist history regardless of send status
         var keys = new org.springframework.jdbc.support.GeneratedKeyHolder();
         final String finalStatus = status;
         jdbc.update(con -> {
             var ps = con.prepareStatement("""
                     insert into email_history
-                        (candidate_id, login_id, to_address, subject, body, template_type, status)
-                    values (?, ?, ?, ?, ?, ?, ?)
+                        (candidate_id, login_id, to_address, subject, body, template_type, status, client_id)
+                    values (?, ?, ?, ?, ?, ?, ?, ?)
                     """, new String[]{"id"});
-            ps.setString(1, req.candidateId());
+            ps.setString(1, candidateId);
             ps.setString(2, loginId);
             ps.setString(3, req.toAddress());
             ps.setString(4, req.subject());
             ps.setString(5, req.body());
             ps.setString(6, req.templateType());
             ps.setString(7, finalStatus);
+            if (req.clientId() != null) {
+                ps.setLong(8, req.clientId());
+            } else {
+                ps.setNull(8, java.sql.Types.BIGINT);
+            }
             return ps;
         }, keys);
 
         Long newId = keys.getKey() != null ? keys.getKey().longValue() : null;
 
         // Record in activity timeline if linked to a candidate
-        if (req.candidateId() != null && !req.candidateId().isBlank()) {
-            workflowService.recordEvent(req.candidateId(), loginId, "EMAIL_SENT",
+        if (candidateId != null) {
+            workflowService.recordEvent(candidateId, loginId, "EMAIL_SENT",
                     "Email sent: " + req.subject(), null);
         }
 
         return new EmailHistoryResponse(
                 newId,
-                req.candidateId(),
+                candidateId,
                 req.toAddress(),
                 req.subject(),
                 req.body(),
                 req.templateType(),
                 finalStatus,
-                java.time.Instant.now());
+                java.time.Instant.now(),
+                req.clientId());
     }
 
     public boolean sendSystemEmail(String toAddress, String subject, String body) {
@@ -156,14 +168,14 @@ public class EmailService {
     public List<EmailHistoryResponse> getEmailHistory(String loginId, String candidateId) {
         if (candidateId != null && !candidateId.isBlank()) {
             return jdbc.query("""
-                    select id, candidate_id, to_address, subject, body, template_type, status, sent_at
+                    select id, candidate_id, to_address, subject, body, template_type, status, sent_at, client_id
                     from email_history
                     where login_id = ? and candidate_id = ?
                     order by sent_at desc
                     """, HISTORY_MAPPER, loginId, candidateId);
         }
         return jdbc.query("""
-                select id, candidate_id, to_address, subject, body, template_type, status, sent_at
+                select id, candidate_id, to_address, subject, body, template_type, status, sent_at, client_id
                 from email_history
                 where login_id = ?
                 order by sent_at desc

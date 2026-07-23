@@ -3,6 +3,7 @@ package com.nolyvra.app.controller;
 import com.nolyvra.app.config.SessionContext;
 import com.nolyvra.app.service.SessionService;
 import com.nolyvra.app.service.AdminSettingsService;
+import com.nolyvra.app.service.CandidateMergeMigrationService;
 import com.nolyvra.app.service.EmployeeService;
 import com.nolyvra.app.service.RegisterInterestNotificationService;
 import com.nolyvra.app.service.UserService;
@@ -22,6 +23,7 @@ public class AuthController {
     private final SessionContext sessionContext;
     private final AdminSettingsService adminSettingsService;
     private final RegisterInterestNotificationService registerInterestNotificationService;
+    private final CandidateMergeMigrationService candidateMergeMigrationService;
 
     public AuthController(
             UserService userService,
@@ -29,13 +31,15 @@ public class AuthController {
             SessionService sessionService,
             SessionContext sessionContext,
             AdminSettingsService adminSettingsService,
-            RegisterInterestNotificationService registerInterestNotificationService) {
+            RegisterInterestNotificationService registerInterestNotificationService,
+            CandidateMergeMigrationService candidateMergeMigrationService) {
         this.userService = userService;
         this.employeeService = employeeService;
         this.sessionService = sessionService;
         this.sessionContext = sessionContext;
         this.adminSettingsService = adminSettingsService;
         this.registerInterestNotificationService = registerInterestNotificationService;
+        this.candidateMergeMigrationService = candidateMergeMigrationService;
     }
 
     // POST /api/auth/change-password?loginId=x
@@ -204,6 +208,22 @@ public class AuthController {
 
         Map<String, Object> result = userService.onboardUser(targetId, loginId);
         return ResponseEntity.ok(result);
+    }
+
+    // POST /api/auth/admin/migrate-applications?loginId=x&targetLoginId=y
+    // Admin only — one-off Candidate <-> Job Application data migration for a
+    // single tenant (see CandidateMergeMigrationService). Idempotent: safe to
+    // call again, it skips tenants that already have job_applications rows.
+    @PostMapping("/admin/migrate-applications")
+    public ResponseEntity<?> migrateApplications(
+            @RequestParam String loginId,
+            @RequestParam String targetLoginId) {
+
+        if (!userService.isAdmin(loginId)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied."));
+        }
+
+        return ResponseEntity.ok(candidateMergeMigrationService.migrateTenant(targetLoginId));
     }
 
     // GET /api/auth/admin/register-interest-notifications?loginId=x

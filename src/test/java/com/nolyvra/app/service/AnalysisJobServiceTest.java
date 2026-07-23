@@ -116,7 +116,7 @@ class AnalysisJobServiceTest {
                 Instant.now(),
                 "New",
                 "CV text",
-                null, null, null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null, null, null);
         when(analysisService.getJobIdNameForCandidate("cand-1")).thenReturn(candidate);
 
         service.processQueuedJobs();
@@ -174,7 +174,7 @@ class AnalysisJobServiceTest {
                 Instant.now(),
                 "New",
                 "CV text",
-                null, null, null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 
     @SuppressWarnings("unchecked")

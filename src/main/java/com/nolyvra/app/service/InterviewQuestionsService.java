@@ -20,38 +20,74 @@ public class InterviewQuestionsService {
     private final ObjectMapper objectMapper;
     private final String model;
     private final TokenService tokenService;
+    private final JobApplicationService jobApplicationService;
 
     public InterviewQuestionsService(
             JdbcTemplate jdbc,
             OpenAIClient openAI,
             ObjectMapper objectMapper,
             TokenService tokenService,
-            @Value("${openai.model:gpt-4o-mini}") String model) {
+            @Value("${openai.model:gpt-4o-mini}") String model,
+            JobApplicationService jobApplicationService) {
         this.jdbc = jdbc;
         this.openAI = openAI;
         this.objectMapper = objectMapper;
         this.tokenService = tokenService;
         this.model = model;
+        this.jobApplicationService = jobApplicationService;
     }
 
     // ─── Generate questions via OpenAI ────────────────────────────────────────
 
     public String generateQuestions(String candidateId, String loginId) {
+        return generateQuestions(candidateId, loginId, null);
+    }
+
+    // jobId is optional — when given (Jobs Applied tab), questions are
+    // generated against that specific job's JD instead of the candidate's
+    // cached "current" job.
+    public String generateQuestions(String candidateId, String loginId, String jobId) {
         if (!tokenService.deductToken(loginId))
             throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
-        CandidateContext ctx = loadContext(candidateId, loginId);
+        CandidateContext ctx = loadContext(candidateId, loginId, jobId);
         String result = callOpenAI(buildSystemPrompt(), buildUserPrompt(ctx));
         return result;
     }
 
-    // ─── Save questions to candidates table ──────────────────────────────────
+    // ─── Save questions ───────────────────────────────────────────────────────
+    // Written to both candidates.interview_questions (cache, read by every
+    // existing job-agnostic route) and the resolved job_applications row
+    // (source of truth per job — see V56__job_applications.sql).
 
     public void saveQuestions(String candidateId, String loginId, String questions) {
-        int rows = jdbc.update("""
+        saveQuestions(candidateId, loginId, questions, null);
+    }
+
+    public void saveQuestions(String candidateId, String loginId, String questions, String jobId) {
+        if (jobId == null) {
+            int rows = jdbc.update("""
+                    update candidates set interview_questions = ?
+                    where id = ? and login_id = ?
+                    """, questions, candidateId, loginId);
+            if (rows == 0) throw new IllegalArgumentException("Candidate not found: " + candidateId);
+
+            jobApplicationService.getMostRecentActiveApplication(candidateId, loginId)
+                    .ifPresent(app -> jobApplicationService.updateInterviewQuestions(app.id(), questions, loginId));
+            return;
+        }
+
+        var application = jobApplicationService.getApplicationForJob(candidateId, jobId, loginId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "No application found for candidate " + candidateId + " and job " + jobId));
+        jobApplicationService.updateInterviewQuestions(application.id(), questions, loginId);
+
+        // Only refresh the legacy job-agnostic cache when this job is the
+        // candidate's current one — otherwise an older application's
+        // questions would incorrectly overwrite it.
+        jdbc.update("""
                 update candidates set interview_questions = ?
-                where id = ? and login_id = ?
-                """, questions, candidateId, loginId);
-        if (rows == 0) throw new IllegalArgumentException("Candidate not found: " + candidateId);
+                where id = ? and login_id = ? and job_id = ?
+                """, questions, candidateId, loginId, jobId);
     }
 
     // ─── Private helpers ──────────────────────────────────────────────────────
@@ -64,20 +100,41 @@ public class InterviewQuestionsService {
             String analysisQuestions  // existing AI-suggested questions from analysis_json, may be null
     ) {}
 
-    private CandidateContext loadContext(String candidateId, String loginId) {
-        return jdbc.query("""
-                select c.name, c.cv_text, coalesce(j.title,'') as job_title,
-                       coalesce(j.jd_text,'') as jd_text,
-                       a.analysis_json
-                from candidates c
-                left join jobs j on j.id = c.job_id
-                left join lateral (
-                    select analysis_json from analyses
-                    where candidate_id = c.id
-                    order by analyzed_at desc limit 1
-                ) a on true
-                where c.id = ? and c.login_id = ?
-                """, rs -> {
+    private CandidateContext loadContext(String candidateId, String loginId, String jobId) {
+        String sql = jobId != null
+            ? """
+              select c.name, c.cv_text, coalesce(j.title,'') as job_title,
+                     coalesce(j.jd_text,'') as jd_text,
+                     a.analysis_json
+              from candidates c
+              join job_applications ja on ja.candidate_id = c.id and ja.job_id = ?
+              join jobs j on j.id = ja.job_id
+              left join lateral (
+                  select analysis_json from analyses
+                  where candidate_id = c.id and job_id = ?
+                  order by analyzed_at desc limit 1
+              ) a on true
+              where c.id = ? and c.login_id = ?
+              """
+            : """
+              select c.name, c.cv_text, coalesce(j.title,'') as job_title,
+                     coalesce(j.jd_text,'') as jd_text,
+                     a.analysis_json
+              from candidates c
+              left join jobs j on j.id = c.job_id
+              left join lateral (
+                  select analysis_json from analyses
+                  where candidate_id = c.id
+                    and (job_id = c.job_id or c.job_id is null)
+                  order by analyzed_at desc limit 1
+              ) a on true
+              where c.id = ? and c.login_id = ?
+              """;
+        Object[] params = jobId != null
+            ? new Object[]{ jobId, jobId, candidateId, loginId }
+            : new Object[]{ candidateId, loginId };
+
+        return jdbc.query(sql, rs -> {
             if (!rs.next()) throw new IllegalArgumentException("Candidate not found: " + candidateId);
             String analysisQs = extractSuggestedQuestions(rs.getString("analysis_json"));
             return new CandidateContext(
@@ -86,7 +143,7 @@ public class InterviewQuestionsService {
                     rs.getString("job_title"),
                     rs.getString("jd_text"),
                     analysisQs);
-        }, candidateId, loginId);
+        }, params);
     }
 
     private String extractSuggestedQuestions(String analysisJson) {

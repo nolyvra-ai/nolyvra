@@ -16,6 +16,14 @@ public record ClientResponse(
     String contactTitle,
     String contactPhone,
     String linkedinUrl,
+    String facebookUrl,
+    String twitterUrl,
+    String website,
+    String aboutCompany,
+    String fullAddress,
+    String locality,
+    String state,
+    String country,
     List<ClientContact> secondaryContacts,
     String latestNote,
     String lastFundingEvent,
@@ -25,7 +33,8 @@ public record ClientResponse(
     int    filledJobCount,
     int    totalJobCount,
     List<JobSummary> recentJobs,
-    List<FeeTotal> totalFee
+    List<FeeTotal> totalFee,
+    String status
 ) {
     // Sum of estimated fees from Active/Fulfilling jobs only — broken out per currency,
     // since fees in different currencies cannot be meaningfully added together.

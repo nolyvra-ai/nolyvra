@@ -17,7 +17,10 @@ import static org.mockito.Mockito.*;
 class CandidateServiceTest {
 
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
-    private final CandidateService service = new CandidateService(jdbc, new ObjectMapper());
+    private final JobApplicationService jobApplicationService = mock(JobApplicationService.class);
+    private final CandidateImportService candidateImportService = mock(CandidateImportService.class);
+    private final CandidateService service =
+            new CandidateService(jdbc, new ObjectMapper(), jobApplicationService, candidateImportService);
 
     @Test
     void getCandidateListUsesLightweightQueryAndMapsLatestAnalysis() {

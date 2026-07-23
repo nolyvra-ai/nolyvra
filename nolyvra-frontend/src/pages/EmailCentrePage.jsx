@@ -197,7 +197,7 @@ export default function EmailCentrePage() {
       : null;
 
   const [form, setForm] = useState({
-    toAddress: "", subject: "", body: "", candidateId: "", jobId: "", templateType: "",
+    toAddress: "", subject: "", body: "", candidateId: "", jobId: "", templateType: "", clientId: "",
   });
 
   // ── Bulk outreach mode (navigated to from Client Tracker's "Generate Bulk
@@ -252,6 +252,7 @@ export default function EmailCentrePage() {
           toAddress:   s.toAddress   || "",
           subject:     s.subject     || "",
           body:        s.body ? textToHtml(s.body) : "",
+          clientId:    s.clientId    || "",
         }));
       }
     });
@@ -327,7 +328,13 @@ export default function EmailCentrePage() {
       url.searchParams.set("loginId", loginId);
       const res = await fetch(url.toString(), {
         method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
-        body: JSON.stringify({ ...form, body: buildBodyWithSig(form.body, signature) }),
+        body: JSON.stringify({
+          ...form,
+          body: buildBodyWithSig(form.body, signature),
+          // clientId must be a real number or omitted — the backend field is a
+          // Long, and an empty string fails to deserialize.
+          clientId: form.clientId ? Number(form.clientId) : null,
+        }),
       });
       if (!res.ok) throw new Error(await res.text());
       const sent = await res.json();
@@ -630,42 +637,9 @@ export default function EmailCentrePage() {
             </Box>
           </Paper>
           )}
-
-          {/* Email history */}
-          <Paper elevation={0} sx={{ border:`1px solid ${BORDER}`, borderRadius:"10px",
-            overflow:"hidden", bgcolor:"#fff", mt:2 }}>
-            <Box sx={{ px:2.25, py:1.5, borderBottom:`1px solid ${BORDER}` }}>
-              <Typography sx={{ fontSize:13, fontWeight:600, color:TEXT }}>Email History</Typography>
-            </Box>
-            <Box sx={{ maxHeight:300, overflowY:"auto" }}>
-              {history.length === 0 ? (
-                <Box sx={{ p:3, textAlign:"center" }}>
-                  <Typography sx={{ fontSize:12, color:MUTED }}>No emails sent yet.</Typography>
-                </Box>
-              ) : history.map((e, i) => (
-                <Box key={e.id} sx={{ display:"flex", gap:1, alignItems:"flex-start",
-                  px:2.25, py:1.25,
-                  borderBottom: i < history.length-1 ? `1px solid #F0F2F6` : "none" }}>
-                  <Box sx={{ width:8, height:8, borderRadius:"50%",
-                    bgcolor: e.status==="Sent" ? SUCCESS : MUTED, mt:"5px", flexShrink:0 }} />
-                  <Box sx={{ flex:1, minWidth:0 }}>
-                    <Typography sx={{ fontSize:12, fontWeight:600, color:TEXT,
-                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                      {e.subject}
-                    </Typography>
-                    <Typography sx={{ fontSize:11, color:MUTED }}>To: {e.toAddress}</Typography>
-                    <Typography sx={{ fontSize:10, color:MUTED, mt:0.25 }}>
-                      {e.sentAt ? new Date(e.sentAt).toLocaleString("en-GB") : "—"}
-                    </Typography>
-                  </Box>
-                  <Badge label={e.status} variant={e.status==="Sent" ? "success" : "neutral"} />
-                </Box>
-              ))}
-            </Box>
-          </Paper>
         </Box>
 
-        {/* ── Templates sidebar ─────────────────────────────────────────────── */}
+        {/* ── Templates + Email History sidebar ─────────────────────────────── */}
         <Box sx={{ flex:"0 0 240px" }}>
           <Paper elevation={0} sx={{ border:`1px solid ${BORDER}`, borderRadius:"10px",
             overflow:"hidden", bgcolor:"#fff" }}>
@@ -700,6 +674,39 @@ export default function EmailCentrePage() {
               Format with fonts, colours, lists and links. Your signature is saved automatically.
             </Typography>
           </Box>
+
+          {/* Email history */}
+          <Paper elevation={0} sx={{ border:`1px solid ${BORDER}`, borderRadius:"10px",
+            overflow:"hidden", bgcolor:"#fff", mt:1.5 }}>
+            <Box sx={{ px:2.25, py:1.5, borderBottom:`1px solid ${BORDER}` }}>
+              <Typography sx={{ fontSize:13, fontWeight:600, color:TEXT }}>Email History</Typography>
+            </Box>
+            <Box sx={{ maxHeight:300, overflowY:"auto" }}>
+              {history.length === 0 ? (
+                <Box sx={{ p:3, textAlign:"center" }}>
+                  <Typography sx={{ fontSize:12, color:MUTED }}>No emails sent yet.</Typography>
+                </Box>
+              ) : history.map((e, i) => (
+                <Box key={e.id} sx={{ display:"flex", gap:1, alignItems:"flex-start",
+                  px:2.25, py:1.25,
+                  borderBottom: i < history.length-1 ? `1px solid #F0F2F6` : "none" }}>
+                  <Box sx={{ width:8, height:8, borderRadius:"50%",
+                    bgcolor: e.status==="Sent" ? SUCCESS : MUTED, mt:"5px", flexShrink:0 }} />
+                  <Box sx={{ flex:1, minWidth:0 }}>
+                    <Typography sx={{ fontSize:12, fontWeight:600, color:TEXT,
+                      overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                      {e.subject}
+                    </Typography>
+                    <Typography sx={{ fontSize:11, color:MUTED }}>To: {e.toAddress}</Typography>
+                    <Typography sx={{ fontSize:10, color:MUTED, mt:0.25 }}>
+                      {e.sentAt ? new Date(e.sentAt).toLocaleString("en-GB") : "—"}
+                    </Typography>
+                  </Box>
+                  <Badge label={e.status} variant={e.status==="Sent" ? "success" : "neutral"} />
+                </Box>
+              ))}
+            </Box>
+          </Paper>
         </Box>
       </Box>
     </Box>

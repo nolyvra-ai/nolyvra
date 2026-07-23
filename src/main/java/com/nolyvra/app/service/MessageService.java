@@ -36,8 +36,25 @@ public class MessageService {
 
     public MessageGenerateResponse generateMessage(MessageGenerateRequest req, String loginId) {
 
-        // Load candidate info
-        var rows = jdbc.query("""
+        // Load candidate info — when jobId is given (Jobs Applied tab, one
+        // candidate with multiple applications), target that specific
+        // job_applications row instead of the candidate's cached "current" job.
+        var rows = req.jobId() != null
+            ? jdbc.query("""
+                select c.name, c.email, ja.stage, j.title as job_title, j.company
+                from candidates c
+                join job_applications ja on ja.candidate_id = c.id and ja.job_id = ?
+                join jobs j on j.id = ja.job_id
+                where c.id = ?
+                """,
+                (rs, r) -> new String[]{
+                        rs.getString("name"),
+                        rs.getString("email"),
+                        rs.getString("stage"),
+                        rs.getString("job_title"),
+                        rs.getString("company")
+                }, req.jobId(), req.candidateId())
+            : jdbc.query("""
                 select c.name, c.email, c.stage, j.title as job_title, j.company
                 from candidates c
                 join jobs j on j.id = c.job_id

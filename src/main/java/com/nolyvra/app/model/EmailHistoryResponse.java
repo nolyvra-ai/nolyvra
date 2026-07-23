@@ -10,5 +10,6 @@ public record EmailHistoryResponse(
     String body,
     String templateType,
     String status,
-    Instant sentAt
+    Instant sentAt,
+    Long clientId
 ) {}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Box, Paper, Typography, Button, TextField, MenuItem, Alert, CircularProgress,
-  Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Checkbox, FormControlLabel } from "@mui/material";
+  Dialog, DialogTitle, DialogContent, DialogActions, IconButton, Checkbox, FormControlLabel,
+  Tabs, Tab, Tooltip } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -15,11 +16,15 @@ const SURFACE = "#FAFBFD";
 
 const STAGES = ["Screening","Interview","Assessment","Offer","Selected","Rejected"];
 
+function authHeader() {
+  return { Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` };
+}
+
 async function apiGet(path) {
   const loginId = localStorage.getItem("loginId") || "";
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
-  const res = await fetch(url.toString(), { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
+  const res = await fetch(url.toString(), { headers: authHeader() });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -29,7 +34,7 @@ async function apiPatch(path, body) {
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
   const res = await fetch(url.toString(), {
-    method: "PATCH", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+    method: "PATCH", headers: { "Content-Type": "application/json", ...authHeader() },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -41,11 +46,25 @@ async function apiPost(path, body) {
   const url = new URL(`${API_BASE}${path}`);
   url.searchParams.set("loginId", loginId);
   const res = await fetch(url.toString(), {
-    method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+    method: "POST", headers: { "Content-Type": "application/json", ...authHeader() },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
+}
+
+async function apiDelete(path) {
+  const loginId = localStorage.getItem("loginId") || "";
+  const url = new URL(`${API_BASE}${path}`);
+  url.searchParams.set("loginId", loginId);
+  const res = await fetch(url.toString(), { method: "DELETE", headers: authHeader() });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+function formatBytes(n) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function Badge({ label, variant = "neutral" }) {
@@ -96,23 +115,295 @@ function CardHead({ title, action, isNew=false }) {
   );
 }
 
+function TabEmptyState({ icon, title, desc }) {
+  return (
+    <Box sx={{ py: "40px", textAlign: "center" }}>
+      <Box sx={{ fontSize: 36, mb: "10px", color: "#C7CDD6" }}>{icon}</Box>
+      <Box sx={{ fontSize: 13, fontWeight: 700, color: TEXT, mb: "4px" }}>{title}</Box>
+      {desc && <Box sx={{ fontSize: 11.5, color: MUTED }}>{desc}</Box>}
+    </Box>
+  );
+}
+
+const TABS = [
+  { key: "jobs",       label: "Jobs Applied" },
+  { key: "activity",   label: "Activity Pipeline" },
+  { key: "notes",      label: "Recruiter's Note" },
+  { key: "cv",         label: "CV / Resume" },
+  { key: "email",      label: "Email" },
+  { key: "files",      label: "Files" },
+  { key: "meetings",   label: "Meetings" },
+];
+
+// ─── One row in the Jobs Applied tab — owns its own message/stage/interview
+// -analysis state so expanding/acting on one job never touches another. ───
+function JobApplicationRow({ application, candidateId, candidateName, candidateEmail,
+    expanded, onToggle, onStageChanged, onOpenQuestions }) {
+
+  const [selectedStage, setSelectedStage] = useState(application.stage);
+  const [stageLoading,  setStageLoading]  = useState(false);
+  const [msgType,    setMsgType]    = useState("INTERVIEW_INVITE");
+  const [msgPrompt,  setMsgPrompt]  = useState("");
+  const [msgLoading, setMsgLoading] = useState(false);
+  const [msgResult,  setMsgResult]  = useState(null);
+  const [msgError,   setMsgError]   = useState(null);
+  const [analyses,        setAnalyses]        = useState([]);
+  const [analysesLoading, setAnalysesLoading] = useState(false);
+  const nav = useNavigate();
+
+  useEffect(() => { setSelectedStage(application.stage); }, [application.stage]);
+
+  useEffect(() => {
+    if (!expanded) return;
+    setAnalysesLoading(true);
+    apiGet(`/api/candidates/${candidateId}/interview-analysis?jobId=${application.jobId}`)
+      .then(d => setAnalyses(d || []))
+      .catch(() => {})
+      .finally(() => setAnalysesLoading(false));
+  }, [expanded, candidateId, application.jobId]);
+
+  async function changeStage(stage) {
+    setStageLoading(true);
+    try {
+      await apiPatch(`/api/candidates/${candidateId}/applications/${application.id}/stage`, { stage });
+      onStageChanged(application.id, stage);
+    } catch (e) { console.error(e); }
+    finally { setStageLoading(false); }
+  }
+
+  async function handleGenerateMessage() {
+    setMsgLoading(true); setMsgError(null); setMsgResult(null);
+    try {
+      const data = await apiPost("/api/messages/generate", {
+        candidateId, jobId: application.jobId, messageType: msgType,
+        customPrompt: msgPrompt || null,
+      });
+      setMsgResult(data);
+    } catch (e) { setMsgError(e.message); }
+    finally { setMsgLoading(false); }
+  }
+
+  const latestAnalysis = analyses[0];
+
+  return (
+    <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: "8px", overflow: "hidden", mb: 1.25 }}>
+      <Box onClick={onToggle} sx={{ px: 2, py: 1.5, bgcolor: SURFACE, display: "flex",
+        alignItems: "center", justifyContent: "space-between", cursor: "pointer",
+        "&:hover": { bgcolor: "#F0F2F6" } }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT }}>
+            {application.jobTitle || "Untitled Role"}
+          </Typography>
+          <Typography sx={{ fontSize: 12, color: MUTED }}>{application.jobCompany}</Typography>
+          <Badge label={application.stage} variant={
+            application.stage === "Selected" ? "success" :
+            application.stage === "Rejected" ? "danger" : "accent"} />
+        </Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Typography sx={{ fontSize: 11, color: MUTED }}>
+            Applied {application.createdAt ? new Date(application.createdAt).toLocaleDateString("en-GB") : ""}
+          </Typography>
+          <Typography sx={{ fontSize: 13, color: MUTED }}>{expanded ? "▾" : "▸"}</Typography>
+        </Box>
+      </Box>
+
+      {expanded && (
+        <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
+
+          {/* Stage stepper */}
+          <Box>
+            <Box sx={{ display: "flex", mb: 1 }}>
+              {["Screening","Interview","Assessment","Offer","Selected"].map((s,i) => {
+                const isCurrent = application.stage === s;
+                const isPast    = STAGES.indexOf(application.stage) > i;
+                return (
+                  <Box key={s} sx={{flex:1,py:"8px",px:"10px",textAlign:"center",fontSize:10.5,fontWeight:500,
+                    bgcolor: isCurrent ? ACCENT_BG : isPast ? "#F0FDF4" : "#fff",
+                    color:   isCurrent ? ACCENT    : isPast ? SUCCESS    : MUTED,
+                    border:`1px solid ${isCurrent?ACCENT:isPast?SUCCESS_BR:BORDER}`,
+                    borderRight: i < 4 ? "none" : `1px solid ${isCurrent?ACCENT:BORDER}`,
+                    borderRadius: i===0?"6px 0 0 6px":i===4?"0 6px 6px 0":"0",
+                  }}>{s}</Box>
+                );
+              })}
+            </Box>
+            <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+              <TextField select size="small" value={selectedStage} onChange={e => setSelectedStage(e.target.value)}
+                sx={{width:180,"& .MuiOutlinedInput-root":{borderRadius:"8px",fontSize:12}}}>
+                {STAGES.map(s => <MenuItem key={s} value={s} sx={{fontSize:12}}>{s}</MenuItem>)}
+              </TextField>
+              <Button variant="contained" size="small" disabled={stageLoading}
+                onClick={() => changeStage(selectedStage)}
+                sx={{fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>
+                {stageLoading ? <CircularProgress size={12} sx={{color:"#fff"}} /> : "Update Stage"}
+              </Button>
+              <Button variant="contained" size="small" disabled={stageLoading || application.stage === "Selected"}
+                onClick={() => changeStage("Selected")}
+                sx={{fontSize:11,bgcolor:SUCCESS,borderRadius:"6px",textTransform:"none",boxShadow:"none","&:hover":{bgcolor:"#15803D",boxShadow:"none"},"&.Mui-disabled":{bgcolor:SUCCESS_BG,color:SUCCESS}}}>
+                ✓ {application.stage === "Selected" ? "Approved" : "Approve"}
+              </Button>
+              <Button variant="contained" size="small" disabled={stageLoading || application.stage === "Rejected"}
+                onClick={() => changeStage("Rejected")}
+                sx={{fontSize:11,bgcolor:DANGER,borderRadius:"6px",textTransform:"none",boxShadow:"none","&:hover":{bgcolor:"#B91C1C",boxShadow:"none"},"&.Mui-disabled":{bgcolor:DANGER_BG,color:DANGER}}}>
+                ✗ {application.stage === "Rejected" ? "Rejected" : "Reject"}
+              </Button>
+              {(application.stage === "Selected" || application.stage === "Rejected") && (
+                <Button variant="outlined" size="small" disabled={stageLoading}
+                  onClick={() => changeStage("Screening")}
+                  sx={{fontSize:11,borderRadius:"6px",textTransform:"none",borderColor:WARN,color:WARN,"&:hover":{bgcolor:WARN_BG,borderColor:WARN}}}>
+                  ↩ Revert to Screening
+                </Button>
+              )}
+              <Button variant="outlined" size="small" onClick={() => onOpenQuestions(application)}
+                sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none","&:hover":{bgcolor:SURFACE}}}>
+                💡 Suggested Questions
+              </Button>
+            </Box>
+          </Box>
+
+          {/* AI Message Generator */}
+          <Card isNew>
+            <CardHead title="AI Message Generator" isNew />
+            <Box sx={{p:2}}>
+              <Box sx={{display:"flex",gap:1,flexWrap:"wrap",mb:1}}>
+                {[["INTERVIEW_INVITE","Interview Invitation"],["FOLLOW_UP","Follow-up"],
+                  ["REJECTION","Rejection"],["OFFER","Offer"]].map(([v,label]) => (
+                  <Button key={v} size="small" variant={msgType===v?"contained":"outlined"}
+                    onClick={() => setMsgType(v)}
+                    sx={{fontSize:11,borderRadius:"6px",textTransform:"none",
+                      ...(msgType===v ? {bgcolor:ACCENT,boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}
+                        : {borderColor:BORDER,color:TEXT,"&:hover":{borderColor:ACCENT,color:ACCENT}})}}>
+                    {label}
+                  </Button>
+                ))}
+              </Box>
+              <TextField multiline rows={2} fullWidth value={msgPrompt}
+                onChange={e => setMsgPrompt(e.target.value)}
+                placeholder={`e.g. 'Write a professional ${msgType.toLowerCase().replace("_"," ")} for ${candidateName}'`}
+                sx={{mb:1.5,"& .MuiOutlinedInput-root":{borderRadius:"8px",fontSize:12}}} />
+              <Button variant="contained" onClick={handleGenerateMessage} disabled={msgLoading}
+                sx={{fontSize:12,fontWeight:600,bgcolor:PURPLE,borderRadius:"8px",textTransform:"none",
+                  mb:msgResult?1.5:0,boxShadow:"none","&:hover":{bgcolor:"#6D28D9",boxShadow:"none"}}}>
+                {msgLoading ? <><CircularProgress size={14} sx={{color:"#fff",mr:1}} /> Generating…</> : "✦ Generate Message"}
+              </Button>
+              {msgError && <Alert severity="error" sx={{mt:1}}>{msgError}</Alert>}
+              {msgResult && (
+                <Box sx={{bgcolor:"#F8F7FF",border:`1px solid ${PURPLE_BR}`,borderRadius:"7px",p:1.75}}>
+                  <Box sx={{mb:1}}>
+                    <Typography sx={{fontSize:11,fontWeight:600,color:TEXT,mb:0.5}}>Subject</Typography>
+                    <TextField fullWidth size="small" defaultValue={msgResult.subject}
+                      sx={{"& .MuiOutlinedInput-root":{borderRadius:"8px",fontSize:12}}} />
+                  </Box>
+                  <TextField multiline rows={6} fullWidth defaultValue={msgResult.body}
+                    sx={{"& .MuiOutlinedInput-root":{borderRadius:"8px",fontSize:12,fontFamily:"monospace"}}} />
+                  <Box sx={{display:"flex",gap:1,mt:1.25}}>
+                    <Button variant="contained" size="small" onClick={() => nav("/email", {
+                        state: { candidateId, candidateName, toAddress: candidateEmail || "",
+                          subject: msgResult.subject || "", body: msgResult.body || "" }
+                      })}
+                      sx={{flex:1,fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>
+                      ✉ Send Email
+                    </Button>
+                    <Button size="small" variant="outlined" onClick={() => navigator.clipboard?.writeText(msgResult.body)}
+                      sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
+                      📋 Copy
+                    </Button>
+                    <Button size="small" variant="outlined" onClick={handleGenerateMessage}
+                      sx={{fontSize:11,borderColor:PURPLE_BR,color:PURPLE,borderRadius:"6px",textTransform:"none"}}>
+                      ✦ Regenerate
+                    </Button>
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          </Card>
+
+          {/* Interview Analysis (compact) */}
+          <Card>
+            <CardHead title="Interview Analysis" action={
+              <Box sx={{ display:"flex", gap:1 }}>
+                <Button size="small" onClick={() => nav(`/candidates/${candidateId}/interview-analysis`)}
+                  sx={{ fontSize: 11, textTransform:"none", color: PURPLE }}>Analyze Transcript</Button>
+              </Box>
+            } />
+            <Box sx={{p:2}}>
+              {analysesLoading ? (
+                <Box sx={{ display:"flex", justifyContent:"center", py:1.5 }}><CircularProgress size={18} /></Box>
+              ) : !latestAnalysis ? (
+                <Typography sx={{fontSize:12,color:MUTED}}>No interview analysis for this job yet.</Typography>
+              ) : (
+                <Box>
+                  <Box sx={{ display:"flex", gap:1.5, flexWrap:"wrap", mb:1 }}>
+                    {[["Communication",latestAnalysis.communicationScore],["Technical",latestAnalysis.technicalScore],
+                      ["Cultural Fit",latestAnalysis.culturalFitScore]].map(([label,score]) => (
+                      <Box key={label} sx={{ fontSize:11, color:MUTED }}>
+                        {label}: <b style={{color:TEXT}}>{score ?? "—"}</b>
+                      </Box>
+                    ))}
+                  </Box>
+                  {latestAnalysis.hiringRecommendation && (
+                    <Badge label={latestAnalysis.hiringRecommendation} variant={
+                      /strong yes|yes/i.test(latestAnalysis.hiringRecommendation) ? "success" :
+                      /no/i.test(latestAnalysis.hiringRecommendation) ? "danger" : "warning"} />
+                  )}
+                  <Button size="small" onClick={() => nav(`/candidates/${candidateId}/interview-analysis`)}
+                    sx={{ display:"block", mt:1, fontSize: 11, textTransform:"none", color: ACCENT }}>
+                    View Full Report →
+                  </Button>
+                </Box>
+              )}
+            </Box>
+          </Card>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 export default function CandidateWorkflowPage() {
   const { candidateId } = useParams();
   const nav = useNavigate();
   const loginId = localStorage.getItem("loginId") || "";
 
-  const [workflow,      setWorkflow]      = useState(null);
+  const [candidate,     setCandidate]     = useState(null);
+  const [workflow,      setWorkflow]      = useState(null); // only used for activityTimeline + capabilityScore/riskLevel
   const [loading,       setLoading]       = useState(true);
   const [error,         setError]         = useState(null);
-  const [selectedStage, setSelectedStage] = useState("");
-  const [stageLoading,  setStageLoading]  = useState(false);
+  const [linkedContact,      setLinkedContact]      = useState(null);
+  const [linkedClientNotes,  setLinkedClientNotes]  = useState([]);
   const [notes,         setNotes]         = useState([]);
   const [notesLoading,  setNotesLoading]  = useState(true);
   const [newNote,       setNewNote]       = useState("");
   const [addingNote,    setAddingNote]    = useState(false);
   const [noteError,     setNoteError]     = useState(null);
-  const [analysisRunning,  setAnalysisRunning]  = useState(false); // Change 1
-  const [analysisError,    setAnalysisError]    = useState(null);  // Change 1
+  const [analysisRunning,  setAnalysisRunning]  = useState(false);
+  const [analysisError,    setAnalysisError]    = useState(null);
+
+  const [tab, setTab] = useState("jobs");
+
+  // Jobs Applied
+  const [applications, setApplications] = useState([]);
+  const [applicationsLoading, setApplicationsLoading] = useState(true);
+  const [expandedJobId, setExpandedJobId] = useState(null);
+
+  // Work Experience / Education
+  const [experience, setExperience] = useState(null);
+  const [experienceLoading, setExperienceLoading] = useState(true);
+  const [experienceRegenerating, setExperienceRegenerating] = useState(false);
+
+  // Email tab
+  const [emails, setEmails] = useState([]);
+  const [emailsLoading, setEmailsLoading] = useState(true);
+
+  // Files tab
+  const [files, setFiles] = useState([]);
+  const [filesLoading, setFilesLoading] = useState(true);
+  const [fileUploading, setFileUploading] = useState(false);
+  const [fileError, setFileError] = useState("");
+
+  // Meetings tab
+  const [meetings, setMeetings] = useState([]);
+  const [meetingsLoading, setMeetingsLoading] = useState(true);
 
   // Format CV dialog state
   const [formatCvOpen,            setFormatCvOpen]            = useState(false);
@@ -122,78 +413,82 @@ export default function CandidateWorkflowPage() {
   const [formatCvAttachScore,     setFormatCvAttachScore]     = useState(false);
   const [formatCvLoading,         setFormatCvLoading]         = useState(false);
   const [formatCvError,           setFormatCvError]           = useState("");
-
-  // Add-new-template sub-state (within the Format CV dialog)
   const [newTemplateName,       setNewTemplateName]       = useState("");
   const [newTemplateFile,       setNewTemplateFile]       = useState(null);
   const [newTemplateUploading,  setNewTemplateUploading]  = useState(false);
   const [newTemplateError,      setNewTemplateError]      = useState("");
 
-  // Suggestive Questions dialog state
+  // Suggestive Questions dialog state — shared across Jobs Applied rows;
+  // `questionsApp` tracks which application it's currently targeting.
   const [questionsOpen,       setQuestionsOpen]       = useState(false);
-  const [questionsData,       setQuestionsData]       = useState(null);   // parsed JSON
+  const [questionsApp,        setQuestionsApp]        = useState(null);
+  const [questionsData,       setQuestionsData]       = useState(null);
   const [questionsGenerating, setQuestionsGenerating] = useState(false);
   const [questionsSaving,     setQuestionsSaving]     = useState(false);
   const [questionsSaved,      setQuestionsSaved]      = useState(false);
   const [expandedSections,    setExpandedSections]    = useState({});
 
-  // AI Message Generator state
-  const [msgType,      setMsgType]      = useState("INTERVIEW_INVITE");
-  const [msgPrompt,    setMsgPrompt]    = useState("");
-  const [msgLoading,   setMsgLoading]   = useState(false);
-  const [msgResult,    setMsgResult]    = useState(null);
-  const [msgError,     setMsgError]     = useState(null);
-
   useEffect(() => {
-    apiGet(`/api/candidates/${candidateId}/workflow`)
-      .then(d => { setWorkflow(d); setSelectedStage(d.stage); })
+    setLoading(true);
+    apiGet(`/api/candidates/${candidateId}`)
+      .then(setCandidate)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
+
+    apiGet(`/api/candidates/${candidateId}/workflow`).then(setWorkflow).catch(() => {});
+
+    setApplicationsLoading(true);
+    apiGet(`/api/candidates/${candidateId}/applications`)
+      .then(d => setApplications(d || []))
+      .catch(() => {})
+      .finally(() => setApplicationsLoading(false));
+
+    setExperienceLoading(true);
+    apiGet(`/api/candidates/${candidateId}/experience`)
+      .then(setExperience)
+      .catch(() => {})
+      .finally(() => setExperienceLoading(false));
 
     setNotesLoading(true);
     apiGet(`/api/candidates/${candidateId}/notes`)
       .then(d => setNotes(d || []))
       .catch(() => {})
       .finally(() => setNotesLoading(false));
+
+    setEmailsLoading(true);
+    apiGet(`/api/emails/history?candidateId=${candidateId}`)
+      .then(d => setEmails(d || []))
+      .catch(() => {})
+      .finally(() => setEmailsLoading(false));
+
+    setFilesLoading(true);
+    apiGet(`/api/candidates/${candidateId}/files`)
+      .then(d => setFiles(d || []))
+      .catch(() => {})
+      .finally(() => setFilesLoading(false));
+
+    setMeetingsLoading(true);
+    apiGet(`/api/interviews/candidate/${candidateId}`)
+      .then(d => setMeetings(d || []))
+      .catch(() => {})
+      .finally(() => setMeetingsLoading(false));
   }, [candidateId]);
 
-  async function handleUpdateStage() {
-    setStageLoading(true);
-    try {
-      await apiPatch(`/api/candidates/${candidateId}/stage`, { stage: selectedStage });
-      setWorkflow(p => ({ ...p, stage: selectedStage }));
-    } catch(e) { setError(e.message); }
-    finally { setStageLoading(false); }
-  }
+  // Reverse lookup — is this candidate linked to a Client Contact?
+  useEffect(() => {
+    setLinkedContact(null);
+    setLinkedClientNotes([]);
+    apiGet(`/api/contacts/by-candidate/${candidateId}`)
+      .then(c => {
+        setLinkedContact(c);
+        return apiGet(`/api/clients/${c.clientId}/notes`);
+      })
+      .then(n => setLinkedClientNotes(n || []))
+      .catch(() => {});
+  }, [candidateId]);
 
-  async function handleApprove() {
-    setStageLoading(true);
-    try {
-      await apiPatch(`/api/candidates/${candidateId}/stage`, { stage: "Selected" });
-      setWorkflow(p => ({ ...p, stage: "Selected" }));
-      setSelectedStage("Selected");
-    } catch(e) { setError(e.message); }
-    finally { setStageLoading(false); }
-  }
-
-  async function handleReject() {
-    setStageLoading(true);
-    try {
-      await apiPatch(`/api/candidates/${candidateId}/stage`, { stage: "Rejected" });
-      setWorkflow(p => ({ ...p, stage: "Rejected" }));
-      setSelectedStage("Rejected");
-    } catch(e) { setError(e.message); }
-    finally { setStageLoading(false); }
-  }
-
-  async function handleRevert() {
-    setStageLoading(true);
-    try {
-      await apiPatch(`/api/candidates/${candidateId}/stage`, { stage: "Screening" });
-      setWorkflow(p => ({ ...p, stage: "Screening" }));
-      setSelectedStage("Screening");
-    } catch(e) { setError(e.message); }
-    finally { setStageLoading(false); }
+  function handleStageChanged(applicationId, stage) {
+    setApplications(prev => prev.map(a => a.id === applicationId ? { ...a, stage } : a));
   }
 
   async function handleAddNote() {
@@ -209,9 +504,8 @@ export default function CandidateWorkflowPage() {
     finally { setAddingNote(false); }
   }
 
-  // Change 2: run analysis handler
   async function handleRunAnalysis() {
-    if (!workflow.cvText?.trim()) {
+    if (!candidate?.cvText?.trim()) {
       setAnalysisError("Please upload a CV first before running analysis.");
       return;
     }
@@ -219,15 +513,24 @@ export default function CandidateWorkflowPage() {
     try {
       const url = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
       url.searchParams.set("loginId", loginId);
-      await fetch(url.toString(), { method: "POST", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
-      // Refresh workflow to pick up new scores
+      await fetch(url.toString(), { method: "POST", headers: authHeader() });
       const updated = await apiGet(`/api/candidates/${candidateId}/workflow`);
       setWorkflow(updated);
-      // Navigate to analysis result page after completion
       nav(`/analysis/${candidateId}`);
     } catch(e) { setAnalysisError(e.message); }
     finally { setAnalysisRunning(false); }
   }
+
+  async function handleRegenerateExperience() {
+    setExperienceRegenerating(true);
+    try {
+      const data = await apiPost(`/api/candidates/${candidateId}/experience/generate`, {});
+      setExperience(data);
+    } catch (e) { console.error(e); }
+    finally { setExperienceRegenerating(false); }
+  }
+
+  // ── CV templates / Format CV ──────────────────────────────────────────────
 
   async function loadCvTemplates() {
     setFormatCvTemplatesLoading(true);
@@ -260,11 +563,7 @@ export default function CandidateWorkflowPage() {
       const url = new URL(`${API_BASE}/api/cv-templates`);
       url.searchParams.set("loginId", loginId);
       url.searchParams.set("name", newTemplateName.trim());
-      const res = await fetch(url.toString(), {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
-        body: fd,
-      });
+      const res = await fetch(url.toString(), { method: "POST", headers: authHeader(), body: fd });
       if (!res.ok) throw new Error((await res.text().catch(() => "")) || "Failed to upload template");
       const created = await res.json();
       setFormatCvTemplates(prev => [created, ...prev]);
@@ -282,10 +581,7 @@ export default function CandidateWorkflowPage() {
     try {
       const url = new URL(`${API_BASE}/api/cv-templates/${templateId}`);
       url.searchParams.set("loginId", loginId);
-      const res = await fetch(url.toString(), {
-        method: "DELETE",
-        headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
-      });
+      const res = await fetch(url.toString(), { method: "DELETE", headers: authHeader() });
       if (!res.ok) throw new Error((await res.text().catch(() => "")) || "Failed to delete template");
       setFormatCvTemplates(prev => prev.filter(t => t.id !== templateId));
       if (formatCvTemplateId === templateId) setFormatCvTemplateId("");
@@ -302,16 +598,13 @@ export default function CandidateWorkflowPage() {
       url.searchParams.set("loginId", loginId);
       url.searchParams.set("templateId", formatCvTemplateId);
       url.searchParams.set("attachScore", formatCvAttachScore ? "true" : "false");
-      const res = await fetch(url.toString(), {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
-      });
+      const res = await fetch(url.toString(), { method: "POST", headers: authHeader() });
       if (!res.ok) throw new Error((await res.text().catch(() => "")) || "Failed to format CV");
       const blob = await res.blob();
       const downloadUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = downloadUrl;
-      a.download = `${(workflow.candidateName || "candidate").replace(/\s+/g, "_")}_formatted_cv.docx`;
+      a.download = `${(candidate.name || "candidate").replace(/\s+/g, "_")}_formatted_cv.docx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -324,17 +617,22 @@ export default function CandidateWorkflowPage() {
     }
   }
 
+  // ── Suggested Questions (shared dialog, scoped to questionsApp) ───────────
+
   function parseQuestionsJson(raw) {
     if (!raw) return null;
     try {
       const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
       if (parsed && parsed.questions && parsed.skillsRequired) return parsed;
-    } catch {}
+    } catch {
+      // not valid JSON — fall through to null
+    }
     return null;
   }
 
-  function handleOpenQuestions() {
-    setQuestionsData(parseQuestionsJson(workflow.interviewQuestions));
+  function handleOpenQuestions(application) {
+    setQuestionsApp(application);
+    setQuestionsData(parseQuestionsJson(application.interviewQuestions));
     setQuestionsSaved(false);
     setExpandedSections({ coreSkills: true, gapBased: true, experienceDeepDive: true,
       behavioural: true, authenticityCheck: true, communicationCultural: true });
@@ -342,11 +640,13 @@ export default function CandidateWorkflowPage() {
   }
 
   async function handleGenerateQuestions() {
+    if (!questionsApp) return;
     setQuestionsGenerating(true);
     try {
       const url = new URL(`${API_BASE}/api/candidates/${candidateId}/interview-questions/generate`);
       url.searchParams.set("loginId", loginId);
-      const res = await fetch(url.toString(), { method: "POST", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
+      url.searchParams.set("jobId", questionsApp.jobId);
+      const res = await fetch(url.toString(), { method: "POST", headers: authHeader() });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setQuestionsData(data);
@@ -357,473 +657,453 @@ export default function CandidateWorkflowPage() {
   }
 
   async function handleSaveQuestions() {
-    if (!questionsData) return;
+    if (!questionsData || !questionsApp) return;
     setQuestionsSaving(true);
     try {
       const url = new URL(`${API_BASE}/api/candidates/${candidateId}/interview-questions`);
       url.searchParams.set("loginId", loginId);
+      url.searchParams.set("jobId", questionsApp.jobId);
       await fetch(url.toString(), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+        method: "PATCH", headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify({ questions: questionsData }),
       });
+      setApplications(prev => prev.map(a => a.id === questionsApp.id
+        ? { ...a, interviewQuestions: JSON.stringify(questionsData) } : a));
       setQuestionsSaved(true);
       setTimeout(() => setQuestionsSaved(false), 2500);
     } catch (e) { console.error("Save questions failed", e); }
     finally { setQuestionsSaving(false); }
   }
 
-  async function handleGenerateMessage() {
-    setMsgLoading(true); setMsgError(null); setMsgResult(null);
+  // ── Files tab ──────────────────────────────────────────────────────────────
+
+  async function handleFileUpload(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setFileUploading(true); setFileError("");
     try {
-      const data = await apiPost("/api/messages/generate", {
-        candidateId, messageType: msgType,
-        customPrompt: msgPrompt || null,
-      });
-      setMsgResult(data);
-    } catch(e) { setMsgError(e.message); }
-    finally { setMsgLoading(false); }
+      const fd = new FormData();
+      fd.append("file", file);
+      const url = new URL(`${API_BASE}/api/candidates/${candidateId}/files`);
+      url.searchParams.set("loginId", loginId);
+      const res = await fetch(url.toString(), { method: "POST", headers: authHeader(), body: fd });
+      if (!res.ok) throw new Error((await res.text().catch(() => "")) || "Failed to upload file");
+      const created = await res.json();
+      setFiles(prev => [created, ...prev]);
+    } catch (e) {
+      setFileError(e.message || "Failed to upload file.");
+    } finally {
+      setFileUploading(false);
+    }
+  }
+
+  async function handleFileDelete(fileId) {
+    if (!window.confirm("Delete this file?")) return;
+    try {
+      await apiDelete(`/api/candidates/${candidateId}/files/${fileId}`);
+      setFiles(prev => prev.filter(f => f.id !== fileId));
+    } catch (e) {
+      setFileError(e.message || "Failed to delete file.");
+    }
+  }
+
+  function handleFileDownload(f) {
+    const url = new URL(`${API_BASE}/api/candidates/${candidateId}/files/${f.id}`);
+    url.searchParams.set("loginId", loginId);
+    fetch(url.toString(), { headers: authHeader() })
+      .then(r => r.blob())
+      .then(blob => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = f.fileName;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      })
+      .catch(() => setFileError("Failed to download file."));
+  }
+
+  // ── Meetings tab ───────────────────────────────────────────────────────────
+
+  async function handleCancelMeeting(interviewId) {
+    if (!window.confirm("Cancel this interview?")) return;
+    try {
+      await apiPatch(`/api/interviews/${interviewId}/cancel`, {});
+      setMeetings(prev => prev.map(m => m.id === interviewId ? { ...m, status: "Cancelled" } : m));
+    } catch (e) { console.error(e); }
   }
 
   if (loading) return <Box sx={{p:4,textAlign:"center"}}><CircularProgress /></Box>;
   if (error)   return <Alert severity="error">{error}</Alert>;
-  if (!workflow) return null;
+  if (!candidate) return null;
 
-  const isAnalysed = workflow.capabilityScore != null;
+  const isAnalysed = workflow?.capabilityScore != null;
 
   return (
     <Box sx={{display:"flex",flexDirection:"column",gap:2}}>
-      {/* Change 3: analysis error banner */}
-      {analysisError && (
-        <Alert severity="error" onClose={() => setAnalysisError(null)}>{analysisError}</Alert>
-      )}
-      {/* Header */}
-      <Box sx={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <Box>
-          <Box sx={{display:"flex",alignItems:"center",gap:1}}>
-            <Typography sx={{fontSize:15,fontWeight:600,color:TEXT}}>
-              Candidate Workflow — {workflow.candidateName}
-            </Typography>
-            <NewTag />
+      {/* Header — person info only */}
+      <Box sx={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",
+        border:`1px solid ${BORDER}`,borderRadius:"10px",p:"18px 22px",bgcolor:"#fff"}}>
+        <Box sx={{display:"flex",gap:2,alignItems:"center"}}>
+          <Box sx={{width:52,height:52,borderRadius:"50%",bgcolor:ACCENT,color:"#fff",display:"flex",
+            alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,flexShrink:0}}>
+            {candidate.name?.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
           </Box>
-          <Typography sx={{fontSize:11,color:MUTED,mt:0.25}}>
-            {workflow.jobTitle} · {workflow.company} · Pipeline management
-          </Typography>
+          <Box>
+            <Typography sx={{fontSize:18,fontWeight:700,color:TEXT}}>{candidate.name}</Typography>
+            {candidate.currentTitle && (
+              <Typography sx={{fontSize:13,color:MUTED,mt:0.25}}>{candidate.currentTitle}</Typography>
+            )}
+            <Box sx={{display:"flex",gap:0.75,flexWrap:"wrap",mt:1}}>
+              {candidate.email && <Badge label={`✉ ${candidate.email}`} />}
+              {candidate.phone && <Badge label={`☎ ${candidate.phone}`} />}
+              {(candidate.location || candidate.state) && (
+                <Badge label={`📍 ${[candidate.location, candidate.state].filter(Boolean).join(", ")}`} />
+              )}
+              {candidate.linkedinUrl && (
+                <Box component="a" href={candidate.linkedinUrl} target="_blank" rel="noopener noreferrer"
+                  sx={{textDecoration:"none"}}>
+                  <Badge label="🔗 LinkedIn" variant="accent" />
+                </Box>
+              )}
+            </Box>
+          </Box>
         </Box>
-        <Box sx={{display:"flex",gap:1}}>
+        <Box sx={{display:"flex",gap:1,flexShrink:0}}>
           <Button variant="outlined" size="small" onClick={() => nav("/candidates")}
             sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
-            ← Back to Candidates
-          </Button>
-          {/* Change 3: show Run Analysis or View Analysis based on isAnalysed */}
-          <Button variant="outlined" size="small"
-            onClick={() => nav(`/candidates/${candidateId}/interview-analysis`)}
-            sx={{fontSize:11,borderColor:PURPLE_BR,color:PURPLE,borderRadius:"6px",
-              textTransform:"none","&:hover":{bgcolor:PURPLE_BG}}}>
-            🎤 Interview Analysis
+            ← Back
           </Button>
           <Button variant="outlined" size="small"
-            disabled={!workflow.cvText?.trim()}
-            onClick={openFormatCvDialog}
-            sx={{fontSize:11,borderColor:ACCENT_BR,color:ACCENT,borderRadius:"6px",
-              textTransform:"none","&:hover":{bgcolor:ACCENT_BG},
-              "&.Mui-disabled":{borderColor:BORDER,color:MUTED}}}>
-            📄 Format CV
+            onClick={() => nav("/candidates/new", { state: { prefill: { candidateId } } })}
+            sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
+            ✎ Edit Profile
           </Button>
-          {!workflow.cvText?.trim() && (
-            <Button variant="outlined" size="small"
-              onClick={() => nav("/candidates/new", { state: { prefill: {
-                name: workflow.candidateName ?? "",
-                email: workflow.email ?? "",
-                linkedinUrl: workflow.linkedinUrl ?? "",
-                cvText: "",
-              }}})}
-              sx={{fontSize:11,borderColor:WARN_BR,color:WARN,borderRadius:"6px",
-                textTransform:"none","&:hover":{bgcolor:WARN_BG,borderColor:WARN}}}>
-              ⬆ Upload CV
-            </Button>
-          )}
-          {isAnalysed ? (
-            <Button variant="contained" size="small" onClick={() => nav(`/analysis/${candidateId}`)}
-              sx={{fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",
-                boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>
-              📊 View Analysis
-            </Button>
-          ) : (
-            <Button variant="contained" size="small" onClick={handleRunAnalysis}
-              disabled={analysisRunning}
-              sx={{fontSize:11,bgcolor:PURPLE,borderRadius:"6px",textTransform:"none",
-                boxShadow:"none","&:hover":{bgcolor:"#6D28D9",boxShadow:"none"}}}>
-              {analysisRunning
-                ? <><CircularProgress size={12} sx={{color:"#fff",mr:0.75}}/> Running…</>
-                : "🔍 Run Analysis"}
-            </Button>
-          )}
+          <Button variant="outlined" size="small"
+            onClick={() => nav("/email", { state: { candidateId, candidateName: candidate.name, toAddress: candidate.email || "" } })}
+            sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
+            ✉ Send Email
+          </Button>
+          <Button variant="contained" size="small"
+            onClick={() => nav("/scheduler", { state: { candidateId } })}
+            sx={{fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>
+            📅 Schedule Interview
+          </Button>
         </Box>
       </Box>
 
-      {/* Profile hero */}
-      <Box sx={{background:"linear-gradient(135deg,#1B3A6B 0%,#0F1623 100%)",
-        borderRadius:"10px",p:"20px 24px",color:"#fff",display:"flex",gap:2.5,alignItems:"center"}}>
-        <Box sx={{width:52,height:52,borderRadius:"50%",bgcolor:ACCENT,color:"#fff",display:"flex",
-          alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,flexShrink:0}}>
-          {workflow.candidateName?.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
-        </Box>
-        <Box sx={{flex:1}}>
-          <Typography sx={{fontSize:18,fontWeight:700,mb:0.5}}>{workflow.candidateName}</Typography>
-          <Typography sx={{fontSize:13,color:"rgba(255,255,255,0.6)",mb:1}}>
-            {workflow.jobTitle} · {workflow.company}
-          </Typography>
-          <Box sx={{display:"flex",gap:0.75,flexWrap:"wrap"}}>
-            <Box sx={{bgcolor:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.8)",
-              px:"10px",py:"3px",borderRadius:"20px",fontSize:11}}>
-              Stage: {workflow.stage}
+      {/* Linked Client Contact */}
+      {linkedContact && (
+        <Paper elevation={0} sx={{ border:`1px solid ${BORDER}`, borderRadius:"10px", p:"16px 18px", bgcolor:"#fff" }}>
+          <Box sx={{ display:"flex", alignItems:"center", justifyContent:"space-between", mb:"8px" }}>
+            <Box sx={{ fontSize:13, fontWeight:700, color:TEXT }}>Linked Client Contact</Box>
+            <Button size="small" onClick={() => nav(`/contacts/${linkedContact.id}`)}
+              sx={{ fontSize:11, textTransform:"none", color:ACCENT }}>
+              View full contact profile →
+            </Button>
+          </Box>
+          <Box sx={{ fontSize:12.5, color:TEXT, fontWeight:600 }}>{linkedContact.name}</Box>
+          <Box sx={{ fontSize:11.5, color:MUTED, mt:"2px" }}>
+            {[linkedContact.title, linkedContact.clientCompanyName].filter(Boolean).join(" · ") || "—"}
+          </Box>
+          {linkedClientNotes.length > 0 && (
+            <Box sx={{ mt:"10px", pt:"10px", borderTop:`1px solid ${BORDER}` }}>
+              <Box sx={{ fontSize:10, fontWeight:700, color:MUTED, textTransform:"uppercase", letterSpacing:".5px", mb:"6px" }}>
+                Client Notes
+              </Box>
+              {linkedClientNotes.slice(0, 3).map((n, i) => (
+                <Box key={n.id || i} sx={{ fontSize:12, color:TEXT, mb:"4px", whiteSpace:"pre-wrap" }}>{n.note}</Box>
+              ))}
             </Box>
-            {workflow.email && (
-              <Box sx={{bgcolor:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.8)",
-                px:"10px",py:"3px",borderRadius:"20px",fontSize:11}}>
-                ✉ {workflow.email}
-              </Box>
-            )}
-            {workflow.phone && (
-              <Box sx={{bgcolor:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.8)",
-                px:"10px",py:"3px",borderRadius:"20px",fontSize:11}}>
-                ☎ {workflow.phone}
-              </Box>
-            )}
-            {(workflow.location || workflow.state) && (
-              <Box sx={{bgcolor:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.8)",
-                px:"10px",py:"3px",borderRadius:"20px",fontSize:11}}>
-                📍 {[workflow.location, workflow.state].filter(Boolean).join(", ")}
-              </Box>
-            )}
-            {workflow.linkedinUrl && (
-              <Box component="a" href={workflow.linkedinUrl} target="_blank" rel="noopener noreferrer"
-                sx={{bgcolor:"rgba(255,255,255,0.1)",color:"rgba(255,255,255,0.8)",
-                px:"10px",py:"3px",borderRadius:"20px",fontSize:11,textDecoration:"none",
-                "&:hover":{bgcolor:"rgba(255,255,255,0.18)",color:"#fff"}}}>
-                🔗 LinkedIn
-              </Box>
-            )}
-          </Box>
-        </Box>
-        <Box sx={{textAlign:"right",flexShrink:0}}>
-          <Typography sx={{fontSize:10,color:"rgba(255,255,255,0.4)",textTransform:"uppercase",letterSpacing:".5px",mb:0.5}}>
-            Match Score
-          </Typography>
-          <Typography sx={{fontSize:36,fontWeight:700,lineHeight:1,
-            color:workflow.capabilityScore>=80?"#86EFAC":workflow.capabilityScore>=60?"#FDE047":"#FCA5A5"}}>
-            {workflow.capabilityScore ?? "—"}{workflow.capabilityScore != null ? "%" : ""}
-          </Typography>
-          <Box sx={{mt:0.75}}>
-            <Badge label={workflow.riskLevel ? `${workflow.riskLevel} Risk` : "Not Analysed"}
-              variant={workflow.riskLevel==="High"?"danger":workflow.riskLevel==="Medium"?"warning":"accent"} />
-          </Box>
-        </Box>
-      </Box>
+          )}
+        </Paper>
+      )}
 
-      {/* Pipeline stages */}
-      <Box>
-        <Typography sx={{fontSize:11,fontWeight:600,color:MUTED,textTransform:"uppercase",letterSpacing:".5px",mb:1}}>
-          Workflow Stage
-        </Typography>
-        <Box sx={{display:"flex",mb:1.5}}>
-          {["Screening","Interview","Assessment","Offer","Selected"].map((s,i) => {
-            const isCurrent = workflow.stage === s;
-            const isPast    = STAGES.indexOf(workflow.stage) > i;
-            return (
-              <Box key={s} sx={{flex:1,py:"10px",px:"14px",textAlign:"center",fontSize:11,fontWeight:500,
-                bgcolor: isCurrent ? ACCENT_BG : isPast ? "#F0FDF4" : SURFACE,
-                color:   isCurrent ? ACCENT    : isPast ? SUCCESS    : MUTED,
-                border:`1px solid ${isCurrent?ACCENT:isPast?SUCCESS_BR:BORDER}`,
-                borderRight: i < 4 ? "none" : `1px solid ${isCurrent?ACCENT:BORDER}`,
-                borderRadius: i===0?"6px 0 0 6px":i===4?"0 6px 6px 0":"0",
-              }}>
-                <Box component="span" sx={{display:"block",fontSize:16,fontWeight:700,mb:"2px"}}>
-                  {isPast ? "✓" : `${i+1}`}
-                </Box>
-                {s}
-              </Box>
-            );
-          })}
-        </Box>
-        <Box sx={{display:"flex",gap:1,alignItems:"center"}}>
-          <Typography sx={{fontSize:12,color:MUTED}}>Move to stage:</Typography>
-          <TextField select size="small" value={selectedStage} onChange={e => setSelectedStage(e.target.value)}
-            sx={{width:200,"& .MuiOutlinedInput-root":{borderRadius:"8px",fontSize:12}}}>
-            {STAGES.map(s => <MenuItem key={s} value={s} sx={{fontSize:12}}>{s}</MenuItem>)}
-          </TextField>
-          <Button variant="contained" size="small" onClick={handleUpdateStage} disabled={stageLoading}
-            sx={{fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",
-              boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>
-            {stageLoading ? <CircularProgress size={12} sx={{color:"#fff"}} /> : "Update Stage"}
+      {/* Work Experience / Education */}
+      <Card>
+        <CardHead title="Work Experience & Education" action={
+          <Button size="small" onClick={handleRegenerateExperience} disabled={experienceRegenerating}
+            sx={{fontSize:11,textTransform:"none",color:PURPLE}}>
+            {experienceRegenerating ? <CircularProgress size={12} sx={{mr:0.75}} /> : "✦"} Regenerate
           </Button>
-        </Box>
-      </Box>
-
-      <Box sx={{display:"flex",gap:2,alignItems:"flex-start"}}>
-        <Box sx={{flex:1.3,display:"flex",flexDirection:"column",gap:2}}>
-
-          {/* AI Message Generator */}
-          <Card isNew>
-            <CardHead title="AI Message Generator" isNew
-              />
-            <Box sx={{p:2.25}}>
-              <Typography sx={{fontSize:12,fontWeight:600,color:TEXT,mb:0.75}}>What message do you need?</Typography>
-              <Box sx={{display:"flex",gap:1,flexWrap:"wrap",mb:1}}>
-                {[["INTERVIEW_INVITE","Interview Invitation"],["FOLLOW_UP","Follow-up"],
-                  ["REJECTION","Rejection"],["OFFER","Offer"]].map(([v,label]) => (
-                  <Button key={v} size="small" variant={msgType===v?"contained":"outlined"}
-                    onClick={() => setMsgType(v)}
-                    sx={{fontSize:11,borderRadius:"6px",textTransform:"none",
-                      ...(msgType===v ? {bgcolor:ACCENT,boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}
-                        : {borderColor:BORDER,color:TEXT,"&:hover":{borderColor:ACCENT,color:ACCENT}})}}>
-                    {label}
-                  </Button>
+        } />
+        <Box sx={{p:2.25}}>
+          {experienceLoading ? (
+            <Box sx={{ display:"flex", justifyContent:"center", py:2 }}><CircularProgress size={20} /></Box>
+          ) : (
+            <Box sx={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3}}>
+              <Box>
+                <Typography sx={{fontSize:11,fontWeight:700,color:MUTED,textTransform:"uppercase",letterSpacing:".5px",mb:1}}>
+                  Work Experience
+                </Typography>
+                {(!experience?.workExperience || experience.workExperience.length === 0) ? (
+                  <Typography sx={{fontSize:12,color:MUTED}}>No work history extracted from the CV.</Typography>
+                ) : experience.workExperience.map((w, i) => (
+                  <Box key={i} sx={{py:1.25,borderTop:i>0?`1px solid #F0F2F6`:"none"}}>
+                    <Typography sx={{fontSize:12.5,fontWeight:600,color:TEXT}}>{w.title} · {w.company}</Typography>
+                    <Typography sx={{fontSize:11,color:MUTED,mt:0.25}}>{[w.startDate, w.endDate].filter(Boolean).join(" – ")}</Typography>
+                    {w.description && <Typography sx={{fontSize:11.5,color:TEXT,mt:0.5}}>{w.description}</Typography>}
+                  </Box>
                 ))}
               </Box>
-              <TextField multiline rows={2} fullWidth value={msgPrompt}
-                onChange={e => setMsgPrompt(e.target.value)}
-                placeholder={`e.g. 'Write a professional ${msgType.toLowerCase().replace("_"," ")} for ${workflow.candidateName}'`}
-                sx={{mb:1.5,"& .MuiOutlinedInput-root":{borderRadius:"8px",fontSize:12}}} />
-              <Button variant="contained" onClick={handleGenerateMessage} disabled={msgLoading}
-                sx={{fontSize:12,fontWeight:600,bgcolor:PURPLE,borderRadius:"8px",textTransform:"none",
-                  mb:msgResult?1.5:0,boxShadow:"none","&:hover":{bgcolor:"#6D28D9",boxShadow:"none"}}}>
-                {msgLoading ? <><CircularProgress size={14} sx={{color:"#fff",mr:1}} /> Generating…</> : "✦ Generate Message"}
-              </Button>
-              {msgError && <Alert severity="error" sx={{mt:1}}>{msgError}</Alert>}
-
-              {msgResult && (
-                <Box sx={{bgcolor:"#F8F7FF",border:`1px solid ${PURPLE_BR}`,borderRadius:"7px",p:1.75}}>
-                  <Typography sx={{fontSize:10,fontWeight:700,color:PURPLE,textTransform:"uppercase",letterSpacing:".5px",mb:1}}>
-                    ✦ Generated Message — Editable
-                  </Typography>
-                  <Box sx={{mb:1}}>
-                    <Typography sx={{fontSize:11,fontWeight:600,color:TEXT,mb:0.5}}>Subject</Typography>
-                    <TextField fullWidth size="small" defaultValue={msgResult.subject}
-                      sx={{"& .MuiOutlinedInput-root":{borderRadius:"8px",fontSize:12}}} />
+              <Box>
+                <Typography sx={{fontSize:11,fontWeight:700,color:MUTED,textTransform:"uppercase",letterSpacing:".5px",mb:1}}>
+                  Education
+                </Typography>
+                {(!experience?.education || experience.education.length === 0) ? (
+                  <Typography sx={{fontSize:12,color:MUTED}}>No education history extracted from the CV.</Typography>
+                ) : experience.education.map((ed, i) => (
+                  <Box key={i} sx={{py:1.25,borderTop:i>0?`1px solid #F0F2F6`:"none"}}>
+                    <Typography sx={{fontSize:12.5,fontWeight:600,color:TEXT}}>{ed.degree}{ed.fieldOfStudy ? ` — ${ed.fieldOfStudy}` : ""}</Typography>
+                    <Typography sx={{fontSize:11,color:MUTED,mt:0.25}}>{ed.institution}</Typography>
+                    <Typography sx={{fontSize:11,color:MUTED}}>{[ed.startDate, ed.endDate].filter(Boolean).join(" – ")}</Typography>
                   </Box>
-                  <TextField multiline rows={7} fullWidth defaultValue={msgResult.body}
-                    sx={{"& .MuiOutlinedInput-root":{borderRadius:"8px",fontSize:12,fontFamily:"monospace"}}} />
-                  <Box sx={{display:"flex",gap:1,mt:1.25}}>
-                    <Button variant="contained" size="small" onClick={() => nav("/email", {
-                        state: {
-                          candidateId,
-                          candidateName: workflow.candidateName,
-                          toAddress: workflow.email || "",
-                          subject: msgResult.subject || "",
-                          body: msgResult.body || "",
-                        }
-                      })}
-                      sx={{flex:1,fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",
-                        boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>
-                      ✉ Send Email
-                    </Button>
-                    <Button size="small" variant="outlined"
-                      onClick={() => navigator.clipboard?.writeText(msgResult.body)}
-                      sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
-                      📋 Copy
-                    </Button>
-                    <Button size="small" variant="outlined" onClick={handleGenerateMessage}
-                      sx={{fontSize:11,borderColor:PURPLE_BR,color:PURPLE,borderRadius:"6px",textTransform:"none"}}>
-                      ✦ Regenerate
-                    </Button>
-                  </Box>
-                </Box>
-              )}
+                ))}
+              </Box>
             </Box>
-          </Card>
-
-          {/* Activity Timeline */}
-          <Card>
-            <CardHead title="Activity Timeline" />
-            <Box sx={{p:0,px:2.25}}>
-              {(workflow.activityTimeline || []).length === 0 ? (
-                <Typography sx={{py:2.5,fontSize:12,color:MUTED}}>No activity recorded yet.</Typography>
-              ) : (
-                workflow.activityTimeline.map((ev,i) => (
-                  <Box key={ev.id} sx={{display:"flex",gap:1.25,alignItems:"flex-start",
-                    py:1.25,borderBottom:i<workflow.activityTimeline.length-1?`1px solid #F0F2F6`:"none"}}>
-                    <Box sx={{width:8,height:8,borderRadius:"50%",bgcolor:ACCENT,mt:"5px",flexShrink:0}} />
-                    <Box>
-                      <Typography sx={{fontSize:12,fontWeight:600,color:TEXT}}>{ev.description}</Typography>
-                      {ev.note && <Typography sx={{fontSize:11,color:MUTED,mt:0.25}}>{ev.note}</Typography>}
-                      <Typography sx={{fontSize:10,color:MUTED,mt:0.25}}>
-                        {ev.createdAt ? new Date(ev.createdAt).toLocaleString("en-GB") : ""}
-                      </Typography>
-                    </Box>
-                  </Box>
-                ))
-              )}
-            </Box>
-          </Card>
+          )}
         </Box>
+      </Card>
 
-        {/* Right panel */}
-        <Box sx={{flex:"0 0 220px",display:"flex",flexDirection:"column",gap:2}}>
-          <Card>
-            <CardHead title="Actions" />
-            <Box sx={{p:1.75,display:"flex",flexDirection:"column",gap:1}}>
-              <Button fullWidth variant="outlined" size="small"
-                onClick={() => nav("/candidates/new", { state: { prefill: { candidateId } } })}
-                sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none",justifyContent:"flex-start"}}>
-                ✎ Edit Profile
+      {/* Tabs */}
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{
+        borderBottom: `1px solid ${BORDER}`,
+        "& .MuiTab-root": { fontSize: 12.5, fontWeight: 600, textTransform: "none", minHeight: 40, color: MUTED },
+        "& .Mui-selected": { color: ACCENT },
+        "& .MuiTabs-indicator": { bgcolor: ACCENT },
+      }}>
+        {TABS.map(t => {
+          const badge =
+            t.key === "jobs"     ? applications.length :
+            t.key === "notes"    ? notes.length :
+            t.key === "email"    ? emails.length :
+            t.key === "files"    ? files.length :
+            t.key === "meetings" ? meetings.length : null;
+          return (
+            <Tab key={t.key} value={t.key} label={
+              <Box sx={{ display:"flex", alignItems:"center", gap:"6px" }}>
+                {t.label}
+                {badge !== null && (
+                  <Box sx={{ fontSize:10, fontWeight:700, color:MUTED, bgcolor:"#F1F3F7", borderRadius:"10px", px:"6px", py:"1px" }}>{badge}</Box>
+                )}
+              </Box>
+            } />
+          );
+        })}
+      </Tabs>
+
+      <Paper elevation={0} sx={{ border:`1px solid ${BORDER}`, borderRadius:"10px", p:"18px", bgcolor:"#fff" }}>
+
+        {tab === "jobs" && (
+          applicationsLoading ? <Box sx={{ display:"flex", justifyContent:"center", py:4 }}><CircularProgress size={20} /></Box> :
+          applications.length === 0 ? <TabEmptyState icon="💼" title="No Applications Yet" desc="This candidate hasn't been added to any job yet." /> :
+          applications.map(app => (
+            <JobApplicationRow key={app.id} application={app}
+              candidateId={candidateId} candidateName={candidate.name} candidateEmail={candidate.email}
+              expanded={expandedJobId === app.id}
+              onToggle={() => setExpandedJobId(prev => prev === app.id ? null : app.id)}
+              onStageChanged={handleStageChanged}
+              onOpenQuestions={handleOpenQuestions} />
+          ))
+        )}
+
+        {tab === "activity" && (
+          (workflow?.activityTimeline || []).length === 0 ? (
+            <TabEmptyState icon="🕒" title="No Activity Recorded Yet" />
+          ) : (
+            workflow.activityTimeline.map((ev,i) => (
+              <Box key={ev.id} sx={{display:"flex",gap:1.25,alignItems:"flex-start",
+                py:1.25,borderBottom:i<workflow.activityTimeline.length-1?`1px solid #F0F2F6`:"none"}}>
+                <Box sx={{ width:8, height:8, borderRadius:"50%", bgcolor:ACCENT, mt:"5px", flexShrink:0 }} />
+                <Box>
+                  <Typography sx={{fontSize:12,fontWeight:600,color:TEXT}}>{ev.description}</Typography>
+                  {ev.note && <Typography sx={{fontSize:11,color:MUTED,mt:0.25}}>{ev.note}</Typography>}
+                  <Typography sx={{fontSize:10,color:MUTED,mt:0.25}}>
+                    {ev.createdAt ? new Date(ev.createdAt).toLocaleString("en-GB") : ""}
+                  </Typography>
+                </Box>
+              </Box>
+            ))
+          )
+        )}
+
+        {tab === "notes" && (
+          <Box>
+            <TextField multiline rows={3} fullWidth value={newNote}
+              onChange={e => setNewNote(e.target.value)}
+              placeholder="Add a note…" disabled={addingNote}
+              sx={{mb:1,"& .MuiOutlinedInput-root":{borderRadius:"8px",fontSize:12}}} />
+            <Button variant="outlined" size="small" onClick={handleAddNote}
+              disabled={addingNote || !newNote.trim()}
+              sx={{mb:1.5,fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
+              {addingNote ? <CircularProgress size={12} /> : "Add Note"}
+            </Button>
+            {noteError && <Typography sx={{fontSize:11,color:DANGER,mb:1}}>{noteError}</Typography>}
+            {notesLoading ? (
+              <Box sx={{ display:"flex", justifyContent:"center", py:2 }}><CircularProgress size={18} /></Box>
+            ) : notes.length === 0 ? (
+              <TabEmptyState icon="📝" title="No Notes Yet" />
+            ) : (
+              notes.map((n,i) => (
+                <Box key={n.id} sx={{py:1,borderTop:i>0?`1px solid #F0F2F6`:"none"}}>
+                  <Typography sx={{fontSize:12,color:TEXT,whiteSpace:"pre-wrap"}}>{n.note}</Typography>
+                  <Typography sx={{fontSize:10,color:MUTED,mt:0.25}}>
+                    {n.createdAt ? new Date(n.createdAt).toLocaleString("en-GB") : ""}
+                  </Typography>
+                </Box>
+              ))
+            )}
+          </Box>
+        )}
+
+        {tab === "cv" && (
+          <Box>
+            {analysisError && <Alert severity="error" sx={{mb:1.5}} onClose={() => setAnalysisError(null)}>{analysisError}</Alert>}
+            <Box sx={{ display:"flex", gap:1, flexWrap:"wrap", mb:2 }}>
+              <Button variant="outlined" size="small" disabled={!candidate.cvText?.trim()} onClick={openFormatCvDialog}
+                sx={{fontSize:11,borderColor:ACCENT_BR,color:ACCENT,borderRadius:"6px",textTransform:"none","&:hover":{bgcolor:ACCENT_BG},"&.Mui-disabled":{borderColor:BORDER,color:MUTED}}}>
+                📄 Format CV
               </Button>
-              <Button fullWidth variant="outlined" size="small" onClick={() => nav("/email")}
-                sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none",justifyContent:"flex-start"}}>
-                ✉ Send Email
-              </Button>
-              <Button fullWidth variant="outlined" size="small" onClick={() => nav("/scheduler")}
-                sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none",justifyContent:"flex-start"}}>
-                📅 Schedule Interview
-              </Button>
-              <Button fullWidth variant="outlined" size="small"
-                onClick={() => nav(`/candidates/${candidateId}/interview-analysis`)}
-                sx={{fontSize:11,borderColor:PURPLE_BR,color:PURPLE,borderRadius:"6px",textTransform:"none",justifyContent:"flex-start","&:hover":{bgcolor:PURPLE_BG}}}>
-                🎤 Interview Analysis
-              </Button>
-              <Button fullWidth variant="outlined" size="small"
-                onClick={handleOpenQuestions}
-                sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none",justifyContent:"flex-start","&:hover":{bgcolor:SURFACE}}}>
-                💡 Suggestive Questions
-              </Button>
-              {/* Upload CV button — shown in sidebar when CV is missing */}
-              {!workflow.cvText?.trim() && (
-                <Button fullWidth variant="outlined" size="small"
+              {!candidate.cvText?.trim() && (
+                <Button variant="outlined" size="small"
                   onClick={() => nav("/candidates/new", { state: { prefill: {
-                    name: workflow.candidateName ?? "",
-                    email: workflow.email ?? "",
-                    linkedinUrl: workflow.linkedinUrl ?? "",
-                    cvText: "",
-                  }}})}
-                  sx={{fontSize:11,borderColor:WARN_BR,color:WARN,borderRadius:"6px",
-                    textTransform:"none",justifyContent:"flex-start","&:hover":{bgcolor:WARN_BG,borderColor:WARN}}}>
+                    name: candidate.name ?? "", email: candidate.email ?? "",
+                    linkedinUrl: candidate.linkedinUrl ?? "", cvText: "" } } })}
+                  sx={{fontSize:11,borderColor:WARN_BR,color:WARN,borderRadius:"6px",textTransform:"none","&:hover":{bgcolor:WARN_BG,borderColor:WARN}}}>
                   ⬆ Upload CV
                 </Button>
               )}
-              {/* Change 3: show Run Analysis or View Analysis in Actions panel */}
               {isAnalysed ? (
-                <Button fullWidth variant="contained" size="small" onClick={() => nav(`/analysis/${candidateId}`)}
-                  sx={{fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",boxShadow:"none",justifyContent:"flex-start","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>
-                  📊 View Analysis
+                <Button variant="contained" size="small" onClick={() => nav(`/analysis/${candidateId}`)}
+                  sx={{fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>
+                  📊 View Analysis {workflow?.capabilityScore != null ? `(${workflow.capabilityScore}%)` : ""}
                 </Button>
               ) : (
-                <Button fullWidth variant="contained" size="small" onClick={handleRunAnalysis}
-                  disabled={analysisRunning}
-                  sx={{fontSize:11,bgcolor:PURPLE,borderRadius:"6px",textTransform:"none",boxShadow:"none",justifyContent:"flex-start","&:hover":{bgcolor:"#6D28D9",boxShadow:"none"}}}>
-                  {analysisRunning
-                    ? <><CircularProgress size={12} sx={{color:"#fff",mr:0.75}}/> Running…</>
-                    : "🔍 Run Analysis"}
-                </Button>
-              )}
-              <Box sx={{height:1,bgcolor:BORDER,my:0.5}} />
-              <Button fullWidth variant="contained" size="small"
-                onClick={handleApprove}
-                disabled={stageLoading || workflow.stage === "Selected"}
-                sx={{fontSize:11,bgcolor:SUCCESS,borderRadius:"6px",textTransform:"none",boxShadow:"none",justifyContent:"flex-start","&:hover":{bgcolor:"#15803D",boxShadow:"none"},"&.Mui-disabled":{bgcolor:SUCCESS_BG,color:SUCCESS}}}>
-                ✓ {workflow.stage === "Selected" ? "Approved" : "Approve"}
-              </Button>
-              <Button fullWidth variant="contained" size="small"
-                onClick={handleReject}
-                disabled={stageLoading || workflow.stage === "Rejected"}
-                sx={{fontSize:11,bgcolor:DANGER,borderRadius:"6px",textTransform:"none",boxShadow:"none",justifyContent:"flex-start","&:hover":{bgcolor:"#B91C1C",boxShadow:"none"},"&.Mui-disabled":{bgcolor:DANGER_BG,color:DANGER}}}>
-                ✗ {workflow.stage === "Rejected" ? "Rejected" : "Reject"}
-              </Button>
-              {(workflow.stage === "Selected" || workflow.stage === "Rejected") && (
-                <Button fullWidth variant="outlined" size="small"
-                  onClick={handleRevert}
-                  disabled={stageLoading}
-                  sx={{fontSize:11,borderRadius:"6px",textTransform:"none",borderColor:WARN,color:WARN,justifyContent:"flex-start","&:hover":{bgcolor:WARN_BG,borderColor:WARN}}}>
-                  ↩ Revert to Screening
+                <Button variant="contained" size="small" onClick={handleRunAnalysis} disabled={analysisRunning}
+                  sx={{fontSize:11,bgcolor:PURPLE,borderRadius:"6px",textTransform:"none",boxShadow:"none","&:hover":{bgcolor:"#6D28D9",boxShadow:"none"}}}>
+                  {analysisRunning ? <><CircularProgress size={12} sx={{color:"#fff",mr:0.75}}/> Running…</> : "🔍 Run Analysis"}
                 </Button>
               )}
             </Box>
-          </Card>
-
-          <Card>
-            <CardHead title="Candidate Info" />
-            <Box sx={{p:1.75,display:"flex",flexDirection:"column",gap:1.25}}>
-              {[
-                {label:"Email",       val:workflow.email,       link:true},
-                {label:"LinkedIn",    val:workflow.linkedinUrl, link:true},
-                {label:"Applied For", val:workflow.jobTitle},
-                {label:"Stage",       val:null},
-                {label:"Match Score", val:null},
-              ].map(item => (
-                <Box key={item.label}>
-                  <Typography sx={{fontSize:10,color:MUTED,textTransform:"uppercase",letterSpacing:".5px",fontWeight:600}}>
-                    {item.label}
-                  </Typography>
-                  {item.label === "Stage" ? (
-                    <Box sx={{mt:"3px"}}><Badge label={workflow.stage} variant="accent" /></Box>
-                  ) : item.label === "Match Score" ? (
-                    <Typography sx={{fontSize:16,fontWeight:700,mt:"3px",
-                      color:workflow.capabilityScore>=80?SUCCESS:workflow.capabilityScore>=60?WARN:DANGER}}>
-                      {workflow.capabilityScore != null ? `${workflow.capabilityScore}%` : "—"}
-                    </Typography>
-                  ) : (
-                    <Typography sx={{fontSize:12,mt:"2px",color:item.link?ACCENT:TEXT,
-                      overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                      {item.val || "—"}
-                    </Typography>
-                  )}
-                </Box>
-              ))}
-            </Box>
-          </Card>
-
-          <Card>
-            <CardHead title="Recruiter Notes" />
-            <Box sx={{p:1.75}}>
-              <TextField multiline rows={3} fullWidth value={newNote}
-                onChange={e => setNewNote(e.target.value)}
-                placeholder="Add a note…" disabled={addingNote}
-                sx={{"& .MuiOutlinedInput-root":{borderRadius:"8px",fontSize:12}}} />
-              <Button fullWidth variant="outlined" size="small" onClick={handleAddNote}
-                disabled={addingNote || !newNote.trim()}
-                sx={{mt:1,fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
-                {addingNote ? <CircularProgress size={12} /> : "Add Note"}
-              </Button>
-              {noteError && (
-                <Typography sx={{fontSize:11,color:DANGER,mt:0.75}}>{noteError}</Typography>
-              )}
-              {notesLoading ? (
-                <Typography sx={{fontSize:11,color:MUTED,mt:1.25}}>Loading notes…</Typography>
-              ) : notes.length === 0 ? (
-                <Typography sx={{fontSize:11,color:MUTED,mt:1.25}}>No notes yet.</Typography>
-              ) : (
-                <Box sx={{mt:1.25}}>
-                  {notes.map((n,i) => (
-                    <Box key={n.id} sx={{py:1,borderTop:i>0?`1px solid #F0F2F6`:"none"}}>
-                      <Typography sx={{fontSize:12,color:TEXT,whiteSpace:"pre-wrap"}}>{n.note}</Typography>
-                      <Typography sx={{fontSize:10,color:MUTED,mt:0.25}}>
-                        {n.createdAt ? new Date(n.createdAt).toLocaleString("en-GB") : ""}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Box>
-              )}
-            </Box>
-          </Card>
-
-          {/* CV / Resume Text */}
-          {workflow.cvText && (
-            <Card>
-              <CardHead title="CV / Resume" />
-              <Box sx={{p:1.75}}>
-                <Box sx={{
-                  bgcolor:"#F7F8FA", border:`1px solid ${BORDER}`, borderRadius:"8px",
-                  p:1.5, maxHeight:300, overflowY:"auto",
-                  fontSize:11.5, color:TEXT, lineHeight:1.7,
-                  fontFamily:"monospace", whiteSpace:"pre-wrap", wordBreak:"break-word"
-                }}>
-                  {workflow.cvText}
-                </Box>
+            {candidate.cvText ? (
+              <Box sx={{
+                bgcolor:"#F7F8FA", border:`1px solid ${BORDER}`, borderRadius:"8px",
+                p:1.5, maxHeight:500, overflowY:"auto",
+                fontSize:11.5, color:TEXT, lineHeight:1.7,
+                fontFamily:"monospace", whiteSpace:"pre-wrap", wordBreak:"break-word"
+              }}>
+                {candidate.cvText}
               </Box>
-            </Card>
-          )}
-        </Box>
-      </Box>
+            ) : (
+              <TabEmptyState icon="📄" title="No CV Uploaded" />
+            )}
+          </Box>
+        )}
+
+        {tab === "email" && (
+          <Box>
+            <Box sx={{ display:"flex", justifyContent:"flex-end", mb:1.5 }}>
+              <Button variant="outlined" size="small"
+                onClick={() => nav("/email", { state: { candidateId, candidateName: candidate.name, toAddress: candidate.email || "" } })}
+                sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
+                ✉ Send Email
+              </Button>
+            </Box>
+            {emailsLoading ? (
+              <Box sx={{ display:"flex", justifyContent:"center", py:3 }}><CircularProgress size={20} /></Box>
+            ) : emails.length === 0 ? (
+              <TabEmptyState icon="✉️" title="No Emails Found" />
+            ) : (
+              emails.map((e,i) => (
+                <Box key={e.id} sx={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+                  py:"10px", borderBottom: i < emails.length-1 ? `1px solid ${BORDER}` : "none" }}>
+                  <Box>
+                    <Typography sx={{fontSize:13,fontWeight:600,color:TEXT}}>{e.subject || "(no subject)"}</Typography>
+                    <Typography sx={{fontSize:11,color:MUTED,mt:"2px"}}>
+                      To: {e.toAddress} · {e.sentAt ? new Date(e.sentAt).toLocaleString("en-GB") : ""}
+                    </Typography>
+                  </Box>
+                  <Badge label={e.status} variant={e.status === "Sent" ? "success" : "danger"} />
+                </Box>
+              ))
+            )}
+          </Box>
+        )}
+
+        {tab === "files" && (
+          <Box>
+            <Box sx={{ display:"flex", justifyContent:"flex-end", mb:1.5 }}>
+              <Button component="label" size="small" variant="outlined" disabled={fileUploading}
+                sx={{fontSize:11,textTransform:"none",borderRadius:"8px",borderColor:BORDER,color:TEXT}}>
+                {fileUploading ? "Uploading…" : "⬆ Upload File"}
+                <input type="file" hidden onChange={handleFileUpload} />
+              </Button>
+            </Box>
+            {fileError && <Alert severity="error" sx={{mb:1.5}}>{fileError}</Alert>}
+            {filesLoading ? (
+              <Box sx={{ display:"flex", justifyContent:"center", py:3 }}><CircularProgress size={20} /></Box>
+            ) : files.length === 0 ? (
+              <TabEmptyState icon="📄" title="No Files Found" desc="Files uploaded for this candidate will appear here." />
+            ) : (
+              files.map((f,i) => (
+                <Box key={f.id} sx={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+                  py:"10px", borderBottom: i < files.length-1 ? `1px solid ${BORDER}` : "none" }}>
+                  <Box>
+                    <Typography sx={{fontSize:13,fontWeight:600,color:TEXT}}>{f.fileName}</Typography>
+                    <Typography sx={{fontSize:11,color:MUTED,mt:"2px"}}>{formatBytes(f.sizeBytes)}</Typography>
+                  </Box>
+                  <Box sx={{ display:"flex", gap:"4px" }}>
+                    <Tooltip title="Download">
+                      <IconButton size="small" onClick={() => handleFileDownload(f)} sx={{color:MUTED,"&:hover":{color:ACCENT}}}>⬇</IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete">
+                      <IconButton size="small" onClick={() => handleFileDelete(f.id)} sx={{color:MUTED,"&:hover":{color:DANGER}}}>✕</IconButton>
+                    </Tooltip>
+                  </Box>
+                </Box>
+              ))
+            )}
+          </Box>
+        )}
+
+        {tab === "meetings" && (
+          <Box>
+            <Box sx={{ display:"flex", justifyContent:"flex-end", mb:1.5 }}>
+              <Button variant="contained" size="small" onClick={() => nav("/scheduler", { state: { candidateId } })}
+                sx={{fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>
+                📅 Schedule Interview
+              </Button>
+            </Box>
+            {meetingsLoading ? (
+              <Box sx={{ display:"flex", justifyContent:"center", py:3 }}><CircularProgress size={20} /></Box>
+            ) : meetings.length === 0 ? (
+              <TabEmptyState icon="📅" title="No Meetings Scheduled" />
+            ) : (
+              meetings.map((m,i) => (
+                <Box key={m.id} sx={{ display:"flex", justifyContent:"space-between", alignItems:"center",
+                  py:"10px", borderBottom: i < meetings.length-1 ? `1px solid ${BORDER}` : "none" }}>
+                  <Box>
+                    <Typography sx={{fontSize:13,fontWeight:600,color:TEXT}}>
+                      {m.interviewType || "Interview"} — {m.jobTitle || ""}
+                    </Typography>
+                    <Typography sx={{fontSize:11,color:MUTED,mt:"2px"}}>
+                      {m.scheduledAt ? new Date(m.scheduledAt).toLocaleString("en-GB") : ""} · {m.interviewer || "Unassigned"}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display:"flex", alignItems:"center", gap:1 }}>
+                    <Badge label={m.status} variant={
+                      m.status === "Cancelled" ? "danger" : m.status === "Completed" ? "success" : "accent"} />
+                    {m.status === "Scheduled" && (
+                      <Button size="small" onClick={() => handleCancelMeeting(m.id)}
+                        sx={{fontSize:11,textTransform:"none",color:DANGER}}>Cancel</Button>
+                    )}
+                  </Box>
+                </Box>
+              ))
+            )}
+          </Box>
+        )}
+      </Paper>
 
       {/* ── Suggestive Questions Dialog ──────────────────────────────────── */}
       <Dialog open={questionsOpen} onClose={() => setQuestionsOpen(false)}
@@ -834,7 +1114,7 @@ export default function CandidateWorkflowPage() {
           <Box>
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Typography sx={{ fontSize: 14, fontWeight: 700, color: TEXT }}>
-                💡 Suggestive Interview Questions
+                💡 Suggestive Interview Questions {questionsApp ? `— ${questionsApp.jobTitle}` : ""}
               </Typography>
               <NewTag />
             </Box>
@@ -873,14 +1153,13 @@ export default function CandidateWorkflowPage() {
                 borderRadius: "8px" }}>
                 <Typography sx={{ fontSize: 12, color: ACCENT }}>
                   Click <strong>Generate Questions</strong> to get AI-suggested interview questions tailored
-                  to this candidate's CV and the job description.
+                  to this candidate's CV and this job's description.
                 </Typography>
               </Box>
             </Box>
           ) : (
             <Box sx={{ p: 2.5, display: "flex", flexDirection: "column", gap: 2 }}>
 
-              {/* ── Summary strip ─────────────────────────────────────────── */}
               <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 1.5 }}>
                 {[
                   { label: "Skills Required", items: questionsData.skillsRequired, color: ACCENT, bg: ACCENT_BG, border: ACCENT_BR },
@@ -902,7 +1181,6 @@ export default function CandidateWorkflowPage() {
                 ))}
               </Box>
 
-              {/* ── Question sections ──────────────────────────────────────── */}
               {[
                 { key: "coreSkills",          label: "A. Core Skill Validation",        color: ACCENT,  count: "5–7" },
                 { key: "gapBased",            label: "B. Gap & Risk-Based",             color: DANGER,  count: "3–5" },
@@ -910,7 +1188,7 @@ export default function CandidateWorkflowPage() {
                 { key: "behavioural",         label: "D. Behavioural & Situational",    color: WARN,    count: "3–4" },
                 { key: "authenticityCheck",   label: "E. Authenticity Check",           color: SUCCESS, count: "2–3" },
                 { key: "communicationCultural", label: "F. Communication & Cultural Fit", color: "#0891B2", count: "5–7" },
-              ].map(({ key, label, color, count }) => {
+              ].map(({ key, label, color }) => {
                 const qs = (questionsData.questions?.[key] ?? []);
                 const open = expandedSections[key] !== false;
                 return (
@@ -1064,7 +1342,6 @@ export default function CandidateWorkflowPage() {
             <Typography sx={{ fontSize: 12, color: DANGER, mt: 1.25, fontWeight: 500 }}>⚠ {formatCvError}</Typography>
           )}
 
-          {/* Add a new template */}
           <Box sx={{ mt: 2, pt: 2, borderTop: `1px solid ${BORDER}` }}>
             <Typography sx={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: 0.5, mb: 1 }}>
               Add a New Template

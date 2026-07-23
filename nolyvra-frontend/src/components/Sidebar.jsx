@@ -222,6 +222,7 @@ export default function Sidebar() {
 
         <Section label="Clients" collapsed={collapsed}>
           <NavItem to="/clients" icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>} label="Client Tracker" isNew collapsed={collapsed} />
+          <NavItem to="/contacts" icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M15 8h4M15 12h4M6 16h6"/></svg>} label="Client Contact" isNew collapsed={collapsed} />
         </Section>
 
         <Section label="Candidates" collapsed={collapsed}>

@@ -31,6 +31,8 @@ const FIELD_SX = {
 const empty = {
   companyName: "", industry: "", companySize: "", location: "",
   contactPerson: "", contactEmail: "", contactTitle: "", contactPhone: "", linkedinUrl: "",
+  facebookUrl: "", twitterUrl: "", website: "", aboutCompany: "",
+  fullAddress: "", locality: "", state: "", country: "",
   secondaryContacts: [], note: "",
 };
 
@@ -46,6 +48,14 @@ function toForm(data) {
     contactTitle:  data.contactTitle  || "",
     contactPhone:  data.contactPhone  || "",
     linkedinUrl:   data.linkedinUrl   || "",
+    facebookUrl:   data.facebookUrl   || "",
+    twitterUrl:    data.twitterUrl    || "",
+    website:       data.website       || "",
+    aboutCompany:  data.aboutCompany  || "",
+    fullAddress:   data.fullAddress   || "",
+    locality:      data.locality      || "",
+    state:         data.state         || "",
+    country:       data.country       || "",
     secondaryContacts: data.secondaryContacts || [],
     // Notes are an add-only timestamped log now — this field is always blank on
     // open; typing here and saving appends a new entry, it doesn't edit history.
@@ -53,7 +63,7 @@ function toForm(data) {
   };
 }
 
-export default function AddClientDialog({ open, onClose, onSaved, initialData = null, clientId = null }) {
+export default function AddClientDialog({ open, onClose, onSaved, initialData = null, clientId = null, fromLead = false }) {
   const loginId = localStorage.getItem("loginId") || "";
   const isEdit  = clientId != null;
 
@@ -101,8 +111,14 @@ export default function AddClientDialog({ open, onClose, onSaved, initialData = 
     setSaving(true);
     setError("");
     try {
+      // "Add to Clients" from a Potential Client goes through convert-lead so a
+      // LEAD-status company row already created via a "Client Contact" button
+      // gets upgraded in place instead of duplicated — the plain Add/Edit Client
+      // flows below are untouched.
       const url = isEdit
         ? `${API}/api/clients/${clientId}?loginId=${encodeURIComponent(loginId)}`
+        : fromLead
+        ? `${API}/api/clients/convert-lead?loginId=${encodeURIComponent(loginId)}`
         : `${API}/api/clients?loginId=${encodeURIComponent(loginId)}`;
       const r = await fetch(url, {
         method: isEdit ? "PUT" : "POST",
@@ -168,8 +184,35 @@ export default function AddClientDialog({ open, onClose, onSaved, initialData = 
               fullWidth sx={FIELD_SX} size="small" />
 
             <TextField label="LinkedIn URL" value={form.linkedinUrl} onChange={set("linkedinUrl")}
-              fullWidth sx={{ ...FIELD_SX, gridColumn: "1 / -1" }} size="small"
+              fullWidth sx={FIELD_SX} size="small"
               placeholder="https://linkedin.com/company/…" />
+
+            <TextField label="Website" value={form.website} onChange={set("website")}
+              fullWidth sx={FIELD_SX} size="small"
+              placeholder="https://…" />
+
+            <TextField label="Facebook URL" value={form.facebookUrl} onChange={set("facebookUrl")}
+              fullWidth sx={FIELD_SX} size="small"
+              placeholder="https://facebook.com/…" />
+
+            <TextField label="Twitter / X URL" value={form.twitterUrl} onChange={set("twitterUrl")}
+              fullWidth sx={FIELD_SX} size="small"
+              placeholder="https://x.com/…" />
+
+            <TextField label="About Company" value={form.aboutCompany} onChange={set("aboutCompany")}
+              fullWidth multiline rows={2} sx={{ ...FIELD_SX, gridColumn: "1 / -1" }} size="small" />
+
+            <TextField label="Full Address" value={form.fullAddress} onChange={set("fullAddress")}
+              fullWidth sx={{ ...FIELD_SX, gridColumn: "1 / -1" }} size="small" />
+
+            <TextField label="Locality" value={form.locality} onChange={set("locality")}
+              fullWidth sx={FIELD_SX} size="small" />
+
+            <TextField label="State" value={form.state} onChange={set("state")}
+              fullWidth sx={FIELD_SX} size="small" />
+
+            <TextField label="Country" value={form.country} onChange={set("country")}
+              fullWidth sx={FIELD_SX} size="small" />
           </Box>
 
           <Box sx={{ mt: "18px" }}>

@@ -228,7 +228,10 @@ public class CandidateImportService {
     // neither email nor phone): name + current_company + state + current_title,
     // and only when all three of those are present on the row.
 
-    private String findExistingCandidateId(String loginId, String name, String email, String phone,
+    // Made public — reused by CandidateService.addCandidate to find-or-create
+    // the right person when adding an application for a new job (Candidate <->
+    // Job Application split, see additional/sql/V56__job_applications.sql).
+    public String findExistingCandidateId(String loginId, String name, String email, String phone,
                                             String currentCompany, String state, String currentTitle) {
         if (email != null) {
             return jdbc.query(

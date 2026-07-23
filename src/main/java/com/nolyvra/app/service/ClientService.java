@@ -5,10 +5,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.nolyvra.app.model.ClientCandidateResponse;
 import com.nolyvra.app.model.ClientContact;
+import com.nolyvra.app.model.ClientFileResponse;
+import com.nolyvra.app.model.ClientInvoiceResponse;
 import com.nolyvra.app.model.ClientNoteResponse;
 import com.nolyvra.app.model.ClientRequest;
 import com.nolyvra.app.model.ClientResponse;
+import com.nolyvra.app.model.EmailHistoryResponse;
 import com.nolyvra.app.model.OutreachRequest;
 import com.nolyvra.app.model.PotentialClientResponse;
 import com.openai.client.OpenAIClient;
@@ -69,15 +73,16 @@ public class ClientService {
         String sql = """
                 SELECT c.id, c.login_id, c.company_name, c.industry, c.company_size, c.location,
                        c.contact_person, c.contact_email, c.contact_title, c.contact_phone,
-                       c.linkedin_url, c.secondary_contacts,
-                       c.last_funding_event, c.last_funding_amount, c.created_at,
+                       c.linkedin_url, c.facebook_url, c.twitter_url, c.website, c.about_company,
+                       c.full_address, c.locality, c.state, c.country, c.secondary_contacts,
+                       c.last_funding_event, c.last_funding_amount, c.created_at, c.status,
                        COUNT(DISTINCT j.id) FILTER (WHERE lower(j.status) = 'active') AS active_job_count,
                        COUNT(DISTINCT cand.id) FILTER (WHERE cand.stage = 'Selected') AS filled_job_count,
                        COUNT(DISTINCT j.id) AS total_job_count
                 FROM clients c
                 LEFT JOIN jobs j ON lower(j.company) = lower(c.company_name) AND j.login_id = c.login_id
                 LEFT JOIN candidates cand ON cand.job_id = j.id
-                WHERE c.login_id = ?
+                WHERE c.login_id = ? AND c.status = 'CLIENT'
                 GROUP BY c.id
                 ORDER BY c.created_at DESC
                 """;
@@ -100,6 +105,14 @@ public class ClientService {
                     rs.getString("contact_title"),
                     rs.getString("contact_phone"),
                     rs.getString("linkedin_url"),
+                    rs.getString("facebook_url"),
+                    rs.getString("twitter_url"),
+                    rs.getString("website"),
+                    rs.getString("about_company"),
+                    rs.getString("full_address"),
+                    rs.getString("locality"),
+                    rs.getString("state"),
+                    rs.getString("country"),
                     parseSecondaryContacts(rs.getString("secondary_contacts")),
                     getLatestNote(clientId, loginId),
                     rs.getString("last_funding_event"),
@@ -109,7 +122,8 @@ public class ClientService {
                     rs.getInt("filled_job_count"),
                     rs.getInt("total_job_count"),
                     recentJobs,
-                    totalFee);
+                    totalFee,
+                    rs.getString("status"));
         }, loginId);
     }
 
@@ -117,8 +131,9 @@ public class ClientService {
         return jdbc.query("""
                 SELECT id, login_id, company_name, industry, company_size, location,
                        contact_person, contact_email, contact_title, contact_phone,
-                       linkedin_url, secondary_contacts,
-                       last_funding_event, last_funding_amount, created_at
+                       linkedin_url, facebook_url, twitter_url, website, about_company,
+                       full_address, locality, state, country, secondary_contacts,
+                       last_funding_event, last_funding_amount, created_at, status
                 FROM clients
                 WHERE id = ? AND login_id = ?
                 """, (rs, i) -> {
@@ -129,10 +144,14 @@ public class ClientService {
                     rs.getString("industry"), rs.getString("company_size"), rs.getString("location"),
                     rs.getString("contact_person"), rs.getString("contact_email"),
                     rs.getString("contact_title"), rs.getString("contact_phone"), rs.getString("linkedin_url"),
+                    rs.getString("facebook_url"), rs.getString("twitter_url"), rs.getString("website"),
+                    rs.getString("about_company"), rs.getString("full_address"), rs.getString("locality"),
+                    rs.getString("state"), rs.getString("country"),
                     parseSecondaryContacts(rs.getString("secondary_contacts")),
                     getLatestNote(clientId, loginId),
                     rs.getString("last_funding_event"), rs.getString("last_funding_amount"),
-                    ts != null ? ts.toInstant() : null, 0, 0, 0, List.of(), List.of());
+                    ts != null ? ts.toInstant() : null, 0, 0, 0, List.of(), List.of(),
+                    rs.getString("status"));
         }, id, loginId).stream().findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found"));
     }
@@ -223,13 +242,18 @@ public class ClientService {
                 UPDATE clients SET
                     company_name = ?, industry = ?, company_size = ?,
                     location = ?, contact_person = ?, contact_email = ?,
-                    contact_title = ?, contact_phone = ?, linkedin_url = ?, secondary_contacts = CAST(? AS jsonb),
+                    contact_title = ?, contact_phone = ?, linkedin_url = ?,
+                    facebook_url = ?, twitter_url = ?, website = ?, about_company = ?,
+                    full_address = ?, locality = ?, state = ?, country = ?,
+                    secondary_contacts = CAST(? AS jsonb),
                     updated_at = now()
                 WHERE id = ? AND login_id = ?
                 """,
                 req.companyName(), req.industry(), req.companySize(), req.location(),
                 req.contactPerson(), req.contactEmail(), req.contactTitle(), req.contactPhone(),
-                req.linkedinUrl(), serializeSecondaryContacts(req.secondaryContacts()), id, loginId);
+                req.linkedinUrl(), req.facebookUrl(), req.twitterUrl(), req.website(), req.aboutCompany(),
+                req.fullAddress(), req.locality(), req.state(), req.country(),
+                serializeSecondaryContacts(req.secondaryContacts()), id, loginId);
         if (updated == 0)
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found");
 
@@ -237,11 +261,16 @@ public class ClientService {
             jdbc.update("INSERT INTO client_notes (client_id, login_id, note) VALUES (?, ?, ?)",
                     id, loginId, req.note().trim());
 
+        return fetchClientResponse(id, loginId);
+    }
+
+    private ClientResponse fetchClientResponse(Long id, String loginId) {
         String sql = """
                 SELECT c.id, c.login_id, c.company_name, c.industry, c.company_size, c.location,
                        c.contact_person, c.contact_email, c.contact_title, c.contact_phone,
-                       c.linkedin_url, c.secondary_contacts,
-                       c.last_funding_event, c.last_funding_amount, c.created_at,
+                       c.linkedin_url, c.facebook_url, c.twitter_url, c.website, c.about_company,
+                       c.full_address, c.locality, c.state, c.country, c.secondary_contacts,
+                       c.last_funding_event, c.last_funding_amount, c.created_at, c.status,
                        COUNT(DISTINCT j.id) FILTER (WHERE lower(j.status) = 'active') AS active_job_count,
                        COUNT(DISTINCT cand.id) FILTER (WHERE cand.stage = 'Selected') AS filled_job_count,
                        COUNT(DISTINCT j.id) AS total_job_count
@@ -262,12 +291,15 @@ public class ClientService {
                     rs.getString("industry"), rs.getString("company_size"), rs.getString("location"),
                     rs.getString("contact_person"), rs.getString("contact_email"), rs.getString("contact_title"),
                     rs.getString("contact_phone"), rs.getString("linkedin_url"),
+                    rs.getString("facebook_url"), rs.getString("twitter_url"), rs.getString("website"),
+                    rs.getString("about_company"), rs.getString("full_address"), rs.getString("locality"),
+                    rs.getString("state"), rs.getString("country"),
                     parseSecondaryContacts(rs.getString("secondary_contacts")),
                     getLatestNote(clientId, loginId),
                     rs.getString("last_funding_event"), rs.getString("last_funding_amount"),
                     ts != null ? ts.toInstant() : null,
                     rs.getInt("active_job_count"), rs.getInt("filled_job_count"), rs.getInt("total_job_count"),
-                    recentJobs, totalFee);
+                    recentJobs, totalFee, rs.getString("status"));
         }, id, loginId).stream().findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found"));
     }
@@ -277,14 +309,18 @@ public class ClientService {
     public ClientResponse createClient(ClientRequest req, String loginId) {
         Long id = jdbc.queryForObject("""
                 INSERT INTO clients (login_id, company_name, industry, company_size, location,
-                    contact_person, contact_email, contact_title, contact_phone, linkedin_url, secondary_contacts)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb))
+                    contact_person, contact_email, contact_title, contact_phone, linkedin_url,
+                    facebook_url, twitter_url, website, about_company, full_address, locality, state, country,
+                    secondary_contacts)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb))
                 RETURNING id
                 """,
                 Long.class,
                 loginId, req.companyName(), req.industry(), req.companySize(), req.location(),
                 req.contactPerson(), req.contactEmail(), req.contactTitle(), req.contactPhone(),
-                req.linkedinUrl(), serializeSecondaryContacts(req.secondaryContacts()));
+                req.linkedinUrl(), req.facebookUrl(), req.twitterUrl(), req.website(), req.aboutCompany(),
+                req.fullAddress(), req.locality(), req.state(), req.country(),
+                serializeSecondaryContacts(req.secondaryContacts()));
 
         String latestNote = null;
         if (req.note() != null && !req.note().isBlank()) {
@@ -297,8 +333,53 @@ public class ClientService {
                 id != null ? id : 0L, loginId, req.companyName(), req.industry(),
                 req.companySize(), req.location(), req.contactPerson(), req.contactEmail(),
                 req.contactTitle(), req.contactPhone(), req.linkedinUrl(),
+                req.facebookUrl(), req.twitterUrl(), req.website(), req.aboutCompany(),
+                req.fullAddress(), req.locality(), req.state(), req.country(),
                 req.secondaryContacts() != null ? req.secondaryContacts() : List.of(), latestNote,
-                null, null, Instant.now(), 0, 0, 0, List.of(), List.of());
+                null, null, Instant.now(), 0, 0, 0, List.of(), List.of(), "CLIENT");
+    }
+
+    // ─── POST /api/clients/convert-lead ────────────────────────────────────────
+    // "Add to Clients" from a Potential Client. If a Contact was already added
+    // for this company (creating a LEAD-status clients row — see
+    // ContactService.createContactFromLead), reuse and upgrade that same row to
+    // CLIENT instead of inserting a duplicate. Separate from createClient/
+    // updateClient so the plain "Add Client" button's behavior never changes.
+
+    public ClientResponse convertLeadToClient(ClientRequest req, String loginId) {
+        List<Long> existing = jdbc.query(
+                "SELECT id FROM clients WHERE login_id = ? AND lower(company_name) = lower(?)",
+                (rs, i) -> rs.getLong("id"), loginId, req.companyName());
+
+        Long id;
+        if (!existing.isEmpty()) {
+            id = existing.get(0);
+            jdbc.update("""
+                    UPDATE clients SET
+                        company_name = ?, industry = ?, company_size = ?,
+                        location = ?, contact_person = ?, contact_email = ?,
+                        contact_title = ?, contact_phone = ?, linkedin_url = ?,
+                        facebook_url = ?, twitter_url = ?, website = ?, about_company = ?,
+                        full_address = ?, locality = ?, state = ?, country = ?,
+                        secondary_contacts = CAST(? AS jsonb),
+                        status = 'CLIENT',
+                        updated_at = now()
+                    WHERE id = ? AND login_id = ?
+                    """,
+                    req.companyName(), req.industry(), req.companySize(), req.location(),
+                    req.contactPerson(), req.contactEmail(), req.contactTitle(), req.contactPhone(),
+                    req.linkedinUrl(), req.facebookUrl(), req.twitterUrl(), req.website(), req.aboutCompany(),
+                    req.fullAddress(), req.locality(), req.state(), req.country(),
+                    serializeSecondaryContacts(req.secondaryContacts()), id, loginId);
+
+            if (req.note() != null && !req.note().isBlank())
+                jdbc.update("INSERT INTO client_notes (client_id, login_id, note) VALUES (?, ?, ?)",
+                        id, loginId, req.note().trim());
+
+            return fetchClientResponse(id, loginId);
+        }
+
+        return createClient(req, loginId);
     }
 
     // ─── Secondary contacts JSONB helpers ─────────────────────────────────────
@@ -369,6 +450,182 @@ public class ClientService {
                 .stream().findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found"));
         return getAllClientJobs(companyName, loginId);
+    }
+
+    // ─── Candidates Pitched / Employed ─────────────────────────────────────────
+    // Pitched: every candidate linked to any job belonging to this client.
+    // Employed: same population, filtered to stage = 'Selected' — same
+    // definition already used for filledJobCount above.
+
+    private String requireCompanyName(Long clientId, String loginId) {
+        return jdbc.query(
+                "SELECT company_name FROM clients WHERE id = ? AND login_id = ?",
+                (rs, i) -> rs.getString("company_name"), clientId, loginId)
+                .stream().findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found"));
+    }
+
+    public List<ClientCandidateResponse> getClientCandidatesPitched(Long clientId, String loginId) {
+        String companyName = requireCompanyName(clientId, loginId);
+        return jdbc.query("""
+                SELECT cand.id, cand.name, cand.email, cand.stage, j.title, cand.created_at
+                FROM candidates cand
+                JOIN jobs j ON j.id = cand.job_id
+                WHERE j.login_id = ? AND lower(j.company) = lower(?)
+                ORDER BY cand.created_at DESC
+                """,
+                (rs, i) -> {
+                    var ts = rs.getTimestamp("created_at");
+                    return new ClientCandidateResponse(
+                            rs.getString("id"), rs.getString("name"), rs.getString("email"),
+                            rs.getString("stage"), rs.getString("title"),
+                            ts != null ? ts.toInstant() : null);
+                }, loginId, companyName);
+    }
+
+    public List<ClientCandidateResponse> getClientCandidatesEmployed(Long clientId, String loginId) {
+        String companyName = requireCompanyName(clientId, loginId);
+        return jdbc.query("""
+                SELECT cand.id, cand.name, cand.email, cand.stage, j.title, cand.created_at
+                FROM candidates cand
+                JOIN jobs j ON j.id = cand.job_id
+                WHERE j.login_id = ? AND lower(j.company) = lower(?) AND cand.stage = 'Selected'
+                ORDER BY cand.created_at DESC
+                """,
+                (rs, i) -> {
+                    var ts = rs.getTimestamp("created_at");
+                    return new ClientCandidateResponse(
+                            rs.getString("id"), rs.getString("name"), rs.getString("email"),
+                            rs.getString("stage"), rs.getString("title"),
+                            ts != null ? ts.toInstant() : null);
+                }, loginId, companyName);
+    }
+
+    // ─── Related Emails ─────────────────────────────────────────────────────
+    // Matches email_history rows by recipient address against every known
+    // email for this client (primary contact + secondary contacts) — there's
+    // no FK, same "match by known identifier" approach as the jobs/company-name
+    // relationship above.
+
+    private record ClientEmailFields(String contactEmail, String secondaryContacts) {}
+
+    public List<EmailHistoryResponse> getClientEmails(Long clientId, String loginId) {
+        ClientEmailFields row = jdbc.query(
+                "SELECT contact_email, secondary_contacts FROM clients WHERE id = ? AND login_id = ?",
+                (rs, i) -> new ClientEmailFields(rs.getString("contact_email"), rs.getString("secondary_contacts")),
+                clientId, loginId)
+                .stream().findFirst()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found"));
+
+        java.util.LinkedHashSet<String> emails = new java.util.LinkedHashSet<>();
+        String primaryEmail = row.contactEmail();
+        if (primaryEmail != null && !primaryEmail.isBlank()) emails.add(primaryEmail.trim().toLowerCase());
+        for (ClientContact c : parseSecondaryContacts(row.secondaryContacts())) {
+            if (c.email() != null && !c.email().isBlank()) emails.add(c.email().trim().toLowerCase());
+        }
+
+        // Match two ways: emails explicitly linked to this client at send time
+        // (client_id — reliable, set when sent via this client's "Send Email"
+        // button regardless of what address was typed) OR emails whose
+        // recipient happens to match one of this client's known contact
+        // addresses (catches emails sent from elsewhere, e.g. the main Email
+        // Centre, to a saved contact).
+        StringBuilder sql = new StringBuilder("""
+                SELECT id, candidate_id, to_address, subject, body, template_type, status, sent_at, client_id
+                FROM email_history
+                WHERE login_id = ? AND (client_id = ?
+                """);
+        List<Object> params = new java.util.ArrayList<>();
+        params.add(loginId);
+        params.add(clientId);
+        if (!emails.isEmpty()) {
+            sql.append(" OR lower(to_address) IN (");
+            sql.append(String.join(",", java.util.Collections.nCopies(emails.size(), "?")));
+            sql.append(")");
+            params.addAll(emails);
+        }
+        sql.append(") ORDER BY sent_at DESC");
+
+        return jdbc.query(sql.toString(), (rs, i) -> {
+            var ts = rs.getTimestamp("sent_at");
+            return new EmailHistoryResponse(
+                    rs.getLong("id"), rs.getString("candidate_id"), rs.getString("to_address"),
+                    rs.getString("subject"), rs.getString("body"), rs.getString("template_type"),
+                    rs.getString("status"), ts != null ? ts.toInstant() : null,
+                    (Long) rs.getObject("client_id"));
+        }, params.toArray());
+    }
+
+    // ─── Invoices (read-only list; creation stays in XeroInvoiceService) ──────
+
+    public List<ClientInvoiceResponse> getClientInvoices(Long clientId, String loginId) {
+        requireCompanyName(clientId, loginId); // 404s if the client doesn't belong to this tenant
+        return jdbc.query("""
+                SELECT id, xero_invoice_number, status, currency, total, created_at
+                FROM xero_invoice
+                WHERE login_id = ? AND client_id = ?
+                ORDER BY created_at DESC
+                """,
+                (rs, i) -> {
+                    var ts = rs.getTimestamp("created_at");
+                    return new ClientInvoiceResponse(
+                            rs.getLong("id"), rs.getString("xero_invoice_number"),
+                            rs.getString("status"), rs.getString("currency"),
+                            rs.getBigDecimal("total"), ts != null ? ts.toInstant() : null);
+                }, loginId, clientId);
+    }
+
+    // ─── Files ──────────────────────────────────────────────────────────────
+
+    public List<ClientFileResponse> getClientFiles(Long clientId, String loginId) {
+        requireCompanyName(clientId, loginId);
+        return jdbc.query("""
+                SELECT id, file_name, content_type, length(file_data) AS size_bytes, uploaded_at
+                FROM client_files
+                WHERE login_id = ? AND client_id = ?
+                ORDER BY uploaded_at DESC
+                """,
+                (rs, i) -> {
+                    var ts = rs.getTimestamp("uploaded_at");
+                    return new ClientFileResponse(
+                            rs.getLong("id"), rs.getString("file_name"), rs.getString("content_type"),
+                            rs.getLong("size_bytes"), ts != null ? ts.toInstant() : null);
+                }, loginId, clientId);
+    }
+
+    public ClientFileResponse uploadClientFile(Long clientId, String loginId, org.springframework.web.multipart.MultipartFile file) {
+        requireCompanyName(clientId, loginId);
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A file is required");
+        }
+        byte[] data;
+        try { data = file.getBytes(); }
+        catch (java.io.IOException e) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Could not read file"); }
+
+        Long id = jdbc.queryForObject("""
+                INSERT INTO client_files (login_id, client_id, file_name, content_type, file_data)
+                VALUES (?, ?, ?, ?, ?)
+                RETURNING id
+                """, Long.class,
+                loginId, clientId, file.getOriginalFilename(), file.getContentType(), data);
+
+        return new ClientFileResponse(id, file.getOriginalFilename(), file.getContentType(),
+                data.length, Instant.now());
+    }
+
+    public Map<String, Object> getClientFileRaw(Long clientId, Long fileId, String loginId) {
+        var rows = jdbc.queryForList(
+                "SELECT file_name, content_type, file_data FROM client_files WHERE id = ? AND client_id = ? AND login_id = ?",
+                fileId, clientId, loginId);
+        if (rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "File not found");
+        return rows.get(0);
+    }
+
+    public void deleteClientFile(Long clientId, Long fileId, String loginId) {
+        int deleted = jdbc.update(
+                "DELETE FROM client_files WHERE id = ? AND client_id = ? AND login_id = ?",
+                fileId, clientId, loginId);
+        if (deleted == 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "File not found");
     }
 
     private static final int LEAD_BATCH_SIZE = 5;

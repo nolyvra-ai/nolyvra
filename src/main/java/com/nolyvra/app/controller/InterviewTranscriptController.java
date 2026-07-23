@@ -37,12 +37,15 @@ public class InterviewTranscriptController {
         return ResponseEntity.ok(result);
     }
 
-    // GET — all interview analyses for this candidate (latest first)
+    // GET — all interview analyses for this candidate (latest first).
+    // jobId is optional — pass it from the Jobs Applied tab to scope results
+    // to that one job; omit it for the old candidate-wide behavior.
     @GetMapping
     public ResponseEntity<List<InterviewTranscriptResponse>> getAll(
             @PathVariable String candidateId,
-            @RequestParam String loginId) {
+            @RequestParam String loginId,
+            @RequestParam(required = false) String jobId) {
 
-        return ResponseEntity.ok(service.getAllForCandidate(candidateId, loginId));
+        return ResponseEntity.ok(service.getAllForCandidate(candidateId, loginId, jobId));
     }
 }

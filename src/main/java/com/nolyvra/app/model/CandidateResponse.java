@@ -25,5 +25,6 @@ public record CandidateResponse(
     String salaryCurrency,
     Integer noticePeriodWeeks,
     String workRights,
-    Boolean remoteFlexible
+    Boolean remoteFlexible,
+    Boolean isClient
 ) {}

@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Box, Typography, TextField, MenuItem, Alert, CircularProgress } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const SURFACE="#FFFFFF", BORDER="#E8ECF2", MUTED="#9AA3B4", TEXT="#0F1623";
@@ -376,8 +376,9 @@ function ScheduleModal({ form, updateForm, handleCandidateChange, candidates, sa
 
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function SchedulerPage() {
-  const nav     = useNavigate();
-  const loginId = localStorage.getItem("loginId") || "";
+  const nav      = useNavigate();
+  const location = useLocation();
+  const loginId  = localStorage.getItem("loginId") || "";
 
   const [candidates,       setCandidates]       = useState([]);
   const [scheduled,        setScheduled]        = useState([]);
@@ -411,6 +412,18 @@ export default function SchedulerPage() {
     setForm(p => ({ ...p, candidateId: candId, jobId: cand?.jobId || "" }));
     setConflictWarning(null);
   }
+
+  // Arriving from a candidate's page ("Schedule Interview" button) — pre-select
+  // that candidate and open the schedule form directly, once candidates are loaded.
+  const prefillHandled = useRef(false);
+  useEffect(() => {
+    if (prefillHandled.current || candidates.length === 0) return;
+    const candidateId = location.state?.candidateId;
+    if (!candidateId) return;
+    prefillHandled.current = true;
+    handleCandidateChange(candidateId);
+    setShowModal(true);
+  }, [candidates, location.state]);
 
   const checkConflict = useCallback(async (candidateId, scheduledAt, durationMinutes) => {
     if (!candidateId || !scheduledAt) { setConflictWarning(null); return; }

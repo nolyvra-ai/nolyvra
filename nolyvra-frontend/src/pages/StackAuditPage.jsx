@@ -63,9 +63,9 @@ const SEC_TITLE = {
 // below this point is scoped exclusively to those boxes.
 const SECTION_LIGHT = {
   background:"#fff",
-  border:"1px solid #e5e9f0",
-  boxShadow:"0 1px 3px rgba(15,22,35,.06)",
-  borderRadius:14, padding:"28px 28px 24px", marginBottom:20,
+  border:"1px solid rgba(0,0,0,.08)",
+  boxShadow:"0 0 0 1px rgba(0,0,0,.04), 0 2px 5px rgba(15,22,35,.06)",
+  borderRadius:10, padding:"20px 22px", marginBottom:16,
 };
 const LT_TEXT="#0f1623", LT_MUTED="#6b7480", LT_MUTED2="#98a1ad", LT_ERROR="#dc2626";
 
@@ -230,21 +230,21 @@ export default function StackAuditPage() {
         @keyframes saSweep { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
         .sa-back{display:inline-flex;align-items:center;gap:8px;background:transparent;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);padding:8px 16px;border-radius:8px;font-size:13px;font-family:inherit;cursor:pointer;transition:all .2s;}
         .sa-back:hover{border-color:rgba(255,255,255,.35);color:#fff;}
-        .sa-toggle{padding:9px 16px;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:1px solid #dde2ea;background:#f7f8fa;color:#4b5563;transition:all .2s;}
-        .sa-toggle.on{background:rgba(74,144,217,.12);border-color:rgba(74,144,217,.5);color:#2d6fb3;}
-        .sa-yn{padding:10px 28px;border-radius:8px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid #dde2ea;background:#f7f8fa;color:#4b5563;transition:all .2s;}
-        .sa-yn.on{background:rgba(74,144,217,.12);border-color:rgba(74,144,217,.5);color:#2d6fb3;}
-        .sa-rm{padding:6px 12px;border-radius:6px;font-size:12px;font-family:inherit;cursor:pointer;border:1px solid rgba(220,38,38,.25);background:rgba(220,38,38,.05);color:#dc2626;transition:all .2s;}
+        .sa-toggle{padding:8px 18px;border-radius:999px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid #dde2ea;background:#f7f8fa;color:#4b5563;transition:all .2s;}
+        .sa-toggle.on{background:rgba(74,144,217,.12);border-color:#4a90d9;color:#2d6fb3;}
+        .sa-yn{padding:9px 30px;border-radius:999px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid #dde2ea;background:#f7f8fa;color:#4b5563;transition:all .2s;}
+        .sa-yn.on{background:rgba(74,144,217,.12);border-color:#4a90d9;color:#2d6fb3;}
+        .sa-rm{padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid rgba(220,38,38,.25);background:rgba(220,38,38,.05);color:#dc2626;transition:all .2s;}
         .sa-rm:hover{background:rgba(220,38,38,.12);color:#b91c1c;}
-        .sa-add{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;border:1px dashed rgba(74,144,217,.35);background:transparent;color:#4a90d9;transition:all .2s;}
+        .sa-add{display:inline-flex;align-items:center;gap:7px;padding:8px 18px;border-radius:999px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:1px dashed rgba(74,144,217,.4);background:transparent;color:#4a90d9;transition:all .2s;}
         .sa-add:hover{background:rgba(74,144,217,.08);border-style:solid;}
-        .sa-submit{width:100%;padding:15px;border-radius:10px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;border:none;background:linear-gradient(135deg,#4a90d9,#2d6fb3);color:#fff;transition:all .2s;}
+        .sa-submit{width:100%;padding:14px;border-radius:999px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;border:none;background:linear-gradient(135deg,#4a90d9,#2d6fb3);color:#fff;transition:all .2s;}
         .sa-submit:hover:not(:disabled){background:linear-gradient(135deg,#5aa0e9,#3d7fc3);transform:translateY(-1px);}
         .sa-submit:disabled{opacity:.5;cursor:not-allowed;transform:none;}
-        .sa-pdf{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid rgba(74,144,217,.4);background:rgba(74,144,217,.1);color:#a8d4ff;transition:all .2s;}
+        .sa-pdf{display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border-radius:999px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;border:1px solid rgba(74,144,217,.4);background:rgba(74,144,217,.1);color:#a8d4ff;transition:all .2s;}
         .sa-pdf:hover:not(:disabled){background:rgba(74,144,217,.2);}
         .sa-pdf:disabled{opacity:.45;cursor:not-allowed;}
-        .sa-cta{padding:12px 26px;border-radius:10px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;border:none;background:linear-gradient(135deg,#4a90d9,#2d6fb3);color:#fff;transition:all .2s;}
+        .sa-cta{padding:11px 28px;border-radius:999px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;border:none;background:linear-gradient(135deg,#4a90d9,#2d6fb3);color:#fff;transition:all .2s;}
         .sa-cta:hover{background:linear-gradient(135deg,#5aa0e9,#3d7fc3);}
         .sa-grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
         .sa-chart-scroll{overflow-x:auto;}
@@ -296,7 +296,7 @@ export default function StackAuditPage() {
 
             {/* § 1 — About you */}
             <div style={SECTION_LIGHT}>
-              <div style={SEC_TITLE}>① About You</div>
+              <CardHeader n={1} title="About You" subtitle="Your contact details" />
               <div className="sa-grid2">
                 {[
                   ["fullName","Full name","text"],
@@ -315,7 +315,7 @@ export default function StackAuditPage() {
 
             {/* § 2 — Candidate sourcing */}
             <div style={SECTION_LIGHT}>
-              <div style={SEC_TITLE}>② Candidate Sourcing</div>
+              <CardHeader n={2} title="Candidate Sourcing" subtitle="Where you find candidates" />
               {errors.candidateToggles && <div style={{ color:LT_ERROR, fontSize:12, marginBottom:12 }}>{errors.candidateToggles}</div>}
               <div style={{ display:"flex", flexWrap:"wrap", gap:10, marginBottom:20 }}>
                 {["LinkedIn","Seek","Indeed","Other"].map(tool => (
@@ -350,7 +350,7 @@ export default function StackAuditPage() {
 
             {/* § 3 — ATS */}
             <div style={SECTION_LIGHT}>
-              <div style={SEC_TITLE}>③ Applicant Tracking System (ATS)</div>
+              <CardHeader n={3} title="Applicant Tracking System (ATS)" subtitle="Your current ATS setup" />
               <Autocomplete
                 options={ATS_TOOLS}
                 value={form.atsTool || null}
@@ -384,7 +384,7 @@ export default function StackAuditPage() {
 
             {/* § 4 — CRM */}
             <div style={SECTION_LIGHT}>
-              <div style={SEC_TITLE}>④ Internal HR / CRM</div>
+              <CardHeader n={4} title="Internal HR / CRM" subtitle="Your CRM / HRIS setup" />
               <Autocomplete
                 options={CRM_TOOLS}
                 value={form.crmTool || null}
@@ -418,8 +418,8 @@ export default function StackAuditPage() {
 
             {/* § 5 — AI tools */}
             <div style={SECTION_LIGHT}>
-              <div style={SEC_TITLE}>⑤ AI Tools</div>
-              <p style={{ fontSize:13, color:LT_MUTED, marginTop:-12, marginBottom:20 }}>
+              <CardHeader n={5} title="AI Tools" subtitle="Standalone AI subscriptions" />
+              <p style={{ fontSize:13, color:LT_MUTED, marginTop:-4, marginBottom:20 }}>
                 Add any standalone AI tools your team pays for (e.g. ChatGPT Plus, Jasper, Otter.ai, Roi.ai, sapia.ai). Leave empty if none.
               </p>
               {form.aiTools.map((tool,i) => (
@@ -447,7 +447,7 @@ export default function StackAuditPage() {
 
             {/* § 6 — Integration layer */}
             <div style={SECTION_LIGHT}>
-              <div style={SEC_TITLE}>⑥ Integration Layer</div>
+              <CardHeader n={6} title="Integration Layer" subtitle="Connecting your tools together" />
               <p style={{ fontSize:14, color:LT_TEXT, opacity:.85, marginBottom:8, lineHeight:1.55 }}>
                 Are you using an AI agent or integration platform to connect these layers?
               </p>
@@ -799,6 +799,23 @@ function SliderRow({ label, value, onChange }) {
         onChange={(_,v) => onChange(v)}
         sx={{ color:"#4a90d9", "& .MuiSlider-thumb":{ width:16, height:16 }, "& .MuiSlider-rail":{ opacity:1, bgcolor:"#e5e9f0" } }}
       />
+    </div>
+  );
+}
+
+function CardHeader({ n, title, subtitle }) {
+  return (
+    <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16, paddingBottom:16, borderBottom:"1px solid rgba(0,0,0,.08)" }}>
+      <div style={{
+        width:40, height:40, borderRadius:"50%", flexShrink:0,
+        background:"linear-gradient(135deg,#4a90d9,#2d6fb3)",
+        display:"flex", alignItems:"center", justifyContent:"center",
+        color:"#fff", fontSize:15, fontWeight:700,
+      }}>{n}</div>
+      <div>
+        <div style={{ fontSize:15, fontWeight:700, color:LT_TEXT, lineHeight:1.3 }}>{title}</div>
+        {subtitle && <div style={{ fontSize:12.5, color:LT_MUTED, marginTop:2 }}>{subtitle}</div>}
+      </div>
     </div>
   );
 }

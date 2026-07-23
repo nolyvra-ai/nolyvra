@@ -37,6 +37,7 @@ public class WorkflowService {
                     select consistency_score, capability_score, risk_level
                     from analyses
                     where candidate_id = c.id
+                      and (job_id = c.job_id or c.job_id is null)
                     order by analyzed_at desc limit 1
                 ) a on true
                 where c.id = ? and c.login_id = ?
@@ -124,12 +125,20 @@ public class WorkflowService {
 
     public void recordEvent(String candidateId, String loginId,
             String eventType, String note, Object eventData) {
+        recordEvent(candidateId, loginId, eventType, note, eventData, null);
+    }
+
+    // jobId is optional — lets a person's unified activity feed eventually
+    // distinguish "Applied to Job A" from "Applied to Job B". Callers that
+    // don't know it yet just leave it null, same as before this param existed.
+    public void recordEvent(String candidateId, String loginId,
+            String eventType, String note, Object eventData, String jobId) {
         try {
             String dataJson = eventData != null ? objectMapper.writeValueAsString(eventData) : null;
             jdbc.update("""
-                    insert into activity_timeline (candidate_id, login_id, event_type, note, event_data)
-                    values (?, ?, ?, ?, ?::jsonb)
-                    """, candidateId, loginId, eventType, note, dataJson);
+                    insert into activity_timeline (candidate_id, login_id, event_type, note, event_data, job_id)
+                    values (?, ?, ?, ?, ?::jsonb, ?)
+                    """, candidateId, loginId, eventType, note, dataJson, jobId);
         } catch (Exception e) {
             // Non-critical — log but don't fail the main operation
             System.err.println("Failed to record timeline event: " + e.getMessage());

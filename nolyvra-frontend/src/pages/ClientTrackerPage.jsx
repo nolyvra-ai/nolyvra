@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Box, CircularProgress, Dialog, DialogContent, DialogActions,
   TextField, MenuItem, Checkbox, Button, Alert, IconButton, Tooltip,
+  Tabs, Tab,
 } from "@mui/material";
 import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -379,16 +380,180 @@ function formatNoteTimestamp(iso) {
   });
 }
 
-function ClientDetailDialog({ client, onClose }) {
+function authHeader() {
+  return { Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` };
+}
+
+function initials(name) {
+  if (!name) return "?";
+  return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
+}
+
+function InfoField({ label, value, span }) {
+  return (
+    <Box sx={{ gridColumn: span ? "1 / -1" : "auto" }}>
+      <Box sx={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".4px", mb: "3px" }}>
+        {label}
+      </Box>
+      <Box sx={{ fontSize: 13, color: value ? TEXT : "#C7CDD6", whiteSpace: value ? "pre-wrap" : "normal" }}>
+        {value || "Not available"}
+      </Box>
+    </Box>
+  );
+}
+
+function SocialIcon({ href, title, svg }) {
+  const enabled = !!href;
+  const body = (
+    <Box sx={{
+      width: 28, height: 28, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
+      bgcolor: enabled ? ACCENT_L : "#F1F3F7", color: enabled ? ACCENT : "#C7CDD6",
+      cursor: enabled ? "pointer" : "default", flexShrink: 0,
+    }}>
+      {svg}
+    </Box>
+  );
+  return (
+    <Tooltip title={enabled ? title : `${title} — Not available`}>
+      {enabled
+        ? <Box component="a" href={href} target="_blank" rel="noopener noreferrer">{body}</Box>
+        : body}
+    </Tooltip>
+  );
+}
+
+const LinkedInSvg = <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.02-3.03-1.85-3.03-1.85 0-2.14 1.45-2.14 2.94v5.66H9.36V9h3.41v1.56h.05c.47-.9 1.63-1.85 3.36-1.85 3.6 0 4.27 2.37 4.27 5.45v6.29zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.56V9h3.56v11.45z"/></svg>;
+const FacebookSvg = <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12a10 10 0 1 0-11.56 9.88v-6.99H7.9V12h2.54V9.8c0-2.5 1.49-3.89 3.78-3.89 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56V12h2.78l-.44 2.89h-2.34v6.99A10 10 0 0 0 22 12z"/></svg>;
+const TwitterSvg = <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-7.6 8.7L23 22h-6.9l-5.4-6.9L4.4 22H1.3l8.1-9.3L1 2h7l4.9 6.4L18.9 2zm-1.2 18h1.9L7.4 4H5.4L17.7 20z"/></svg>;
+const WebsiteSvg = <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>;
+const PinSvg = <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>;
+const IndustrySvg = <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 21h18M5 21V7l6-4 6 4v14M9 9h1M9 13h1M14 9h1M14 13h1"/></svg>;
+const ChevronSvg = ({ open }) => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+    style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform .15s" }}>
+    <polyline points="6 9 12 15 18 9"/>
+  </svg>
+);
+const UploadSvg = <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
+const DownloadSvg = <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
+const TrashSvg = <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>;
+
+// ─── Empty state (shared across tabs with no data) ────────────────────────────
+function TabEmptyState({ icon, title, desc }) {
+  return (
+    <Box sx={{ py: "48px", textAlign: "center" }}>
+      <Box sx={{ fontSize: 40, mb: "12px", color: "#C7CDD6" }}>{icon}</Box>
+      <Box sx={{ fontSize: 14, fontWeight: 700, color: TEXT, mb: "4px" }}>{title}</Box>
+      {desc && <Box sx={{ fontSize: 12, color: MUTED }}>{desc}</Box>}
+    </Box>
+  );
+}
+
+const CLIENT_TABS = [
+  { key: "jobs",     label: "Jobs" },
+  { key: "emails",   label: "Related Emails" },
+  { key: "pitched",  label: "Candidates Pitched" },
+  { key: "employed", label: "Candidates Employed" },
+  { key: "files",    label: "Files" },
+  { key: "invoices", label: "Invoices" },
+  { key: "notes",    label: "Notes" },
+  { key: "contacts", label: "Contacts" },
+];
+
+function CandidateList({ loading, candidates, emptyTitle }) {
+  if (loading) {
+    return <Box sx={{ display: "flex", justifyContent: "center", py: "32px" }}><CircularProgress size={20} sx={{ color: ACCENT }} /></Box>;
+  }
+  if (candidates.length === 0) {
+    return <TabEmptyState icon="👤" title={emptyTitle} />;
+  }
+  return (
+    <Box>
+      {candidates.map((c, i) => (
+        <Box key={c.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+          py: "10px", borderBottom: i < candidates.length - 1 ? `1px solid ${BORDER}` : "none" }}>
+          <Box>
+            <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{c.name || "—"}</Box>
+            <Box sx={{ fontSize: 11, color: MUTED, mt: "2px" }}>
+              {[c.email, c.jobTitle].filter(Boolean).join(" · ") || "—"}
+            </Box>
+          </Box>
+          <Tag color={ACCENT} bg={ACCENT_L}>{c.stage || "—"}</Tag>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+function ClientDetailDialog({ client, onClose, onEdit }) {
+  const nav = useNavigate();
+
   const [jobs, setJobs]       = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr]         = useState("");
+
+  const [emails, setEmails]             = useState([]);
+  const [emailsLoading, setEmailsLoading] = useState(true);
 
   const [notes, setNotes]               = useState([]);
   const [notesLoading, setNotesLoading] = useState(true);
   const [newNote, setNewNote]           = useState("");
   const [addingNote, setAddingNote]     = useState(false);
   const [noteError, setNoteError]       = useState("");
+
+  const [pitched, setPitched]           = useState([]);
+  const [pitchedLoading, setPitchedLoading] = useState(true);
+  const [employed, setEmployed]         = useState([]);
+  const [employedLoading, setEmployedLoading] = useState(true);
+
+  const [invoices, setInvoices]         = useState([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(true);
+  const [showInvoiceDialog, setShowInvoiceDialog] = useState(false);
+
+  const [files, setFiles]               = useState([]);
+  const [filesLoading, setFilesLoading] = useState(true);
+  const [uploading, setUploading]       = useState(false);
+  const [fileError, setFileError]       = useState("");
+
+  const [overviewOpen, setOverviewOpen] = useState(true);
+  const [showMore, setShowMore]         = useState(false);
+  const [tab, setTab]                   = useState("jobs");
+
+  const [addingContactFor, setAddingContactFor] = useState(null); // "primary" | secondary index
+  const [contactAddError, setContactAddError] = useState("");
+
+  async function addAsClientContact(person, key) {
+    if (!person.name?.trim()) return;
+    setAddingContactFor(key);
+    setContactAddError("");
+    try {
+      const created = await apiPostJson("/api/contacts", {
+        clientId: client.id,
+        name: person.name, title: person.title, email: person.email, phone: person.phone,
+      });
+      nav(`/contacts/${created.id}`);
+    } catch (e) {
+      setContactAddError(e.message || "Failed to add contact.");
+    } finally {
+      setAddingContact(false);
+    }
+  }
+
+  function loadInvoices() {
+    setInvoicesLoading(true);
+    apiGet(`/api/clients/${client.id}/invoices`)
+      .then(data => setInvoices(data || []))
+      .catch(() => {})
+      .finally(() => setInvoicesLoading(false));
+  }
+
+  function loadFiles() {
+    setFilesLoading(true);
+    apiGet(`/api/clients/${client.id}/files`)
+      .then(data => setFiles(data || []))
+      .catch(() => {})
+      .finally(() => setFilesLoading(false));
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -403,6 +568,27 @@ function ClientDetailDialog({ client, onClose }) {
       .then(data => { if (!cancelled) setNotes(data || []); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setNotesLoading(false); });
+
+    setEmailsLoading(true);
+    apiGet(`/api/clients/${client.id}/emails`)
+      .then(data => { if (!cancelled) setEmails(data || []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setEmailsLoading(false); });
+
+    setPitchedLoading(true);
+    apiGet(`/api/clients/${client.id}/candidates-pitched`)
+      .then(data => { if (!cancelled) setPitched(data || []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setPitchedLoading(false); });
+
+    setEmployedLoading(true);
+    apiGet(`/api/clients/${client.id}/candidates-employed`)
+      .then(data => { if (!cancelled) setEmployed(data || []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setEmployedLoading(false); });
+
+    loadInvoices();
+    loadFiles();
 
     return () => { cancelled = true; };
   }, [client.id]);
@@ -422,158 +608,486 @@ function ClientDetailDialog({ client, onClose }) {
     }
   }
 
+  async function handleFileUpload(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    setFileError("");
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const r = await fetch(`${API}/api/clients/${client.id}/files?loginId=${encodeURIComponent(loginId())}`, {
+        method: "POST", headers: authHeader(), body: form,
+      });
+      if (!r.ok) throw await apiError(r);
+      loadFiles();
+    } catch (e) {
+      setFileError(e.message || "Failed to upload file.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleFileDelete(fileId) {
+    if (!window.confirm("Delete this file?")) return;
+    try {
+      const r = await fetch(`${API}/api/clients/${client.id}/files/${fileId}?loginId=${encodeURIComponent(loginId())}`, {
+        method: "DELETE", headers: authHeader(),
+      });
+      if (!r.ok) throw await apiError(r);
+      setFiles(prev => prev.filter(f => f.id !== fileId));
+    } catch (e) {
+      setFileError(e.message || "Failed to delete file.");
+    }
+  }
+
+  function handleFileDownload(f) {
+    const url = `${API}/api/clients/${client.id}/files/${f.id}?loginId=${encodeURIComponent(loginId())}`;
+    fetch(url, { headers: authHeader() })
+      .then(r => r.blob())
+      .then(blob => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = f.fileName;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      })
+      .catch(() => setFileError("Failed to download file."));
+  }
+
+  function formatBytes(n) {
+    if (n < 1024) return `${n} B`;
+    if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+    return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
   const totalLabel = formatFeeTotals(client.totalFee);
   const secondaryContacts = client.secondaryContacts || [];
+  const locationLine = [client.locality, client.state, client.country].filter(Boolean).join(", ");
 
   return (
-    <Dialog open onClose={onClose} maxWidth="sm" fullWidth
+    <Dialog open onClose={onClose} maxWidth="xl" fullWidth
       PaperProps={{ sx: { borderRadius: "16px", overflow: "hidden", m: "24px" } }}>
       <DialogContent sx={{ p: 0 }}>
-        <Box sx={{ px: "24px", pt: "20px", pb: "14px", borderBottom: `1px solid ${BORDER}`,
-          display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <Box>
-            <Box sx={{ fontSize: 17, fontWeight: 700, color: TEXT }}>{client.companyName}</Box>
-            <Box sx={{ fontSize: 12, color: MUTED, mt: "4px" }}>
-              {[client.industry, client.location].filter(Boolean).join(" • ") || "No details set"}
+
+        {/* ── Header ── */}
+        <Box sx={{ px: "24px", pt: "20px", pb: "16px", borderBottom: `1px solid ${BORDER}` }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: "14px" }}>
+              <Box sx={{ width: 52, height: 52, borderRadius: "50%", bgcolor: ACCENT, color: "#fff",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 16, fontWeight: 700, flexShrink: 0 }}>
+                {initials(client.companyName)}
+              </Box>
+              <Box>
+                <Box sx={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <Box sx={{ fontSize: 18, fontWeight: 700, color: TEXT }}>{client.companyName}</Box>
+                  <Tag color={MUTED} bg="#F1F3F7">ID-{client.id}</Tag>
+                </Box>
+                <Box sx={{ display: "flex", alignItems: "center", gap: "6px", mt: "8px" }}>
+                  <SocialIcon href={client.linkedinUrl} title="LinkedIn" svg={LinkedInSvg} />
+                  <SocialIcon href={client.facebookUrl} title="Facebook" svg={FacebookSvg} />
+                  <SocialIcon href={client.twitterUrl} title="Twitter / X" svg={TwitterSvg} />
+                </Box>
+              </Box>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              {onEdit && (
+                <IconButton size="small" onClick={() => onEdit(client)} sx={{ color: MUTED, "&:hover": { color: ACCENT } }}>
+                  <EditIcon />
+                </IconButton>
+              )}
+              <Box onClick={onClose} sx={{ cursor: "pointer", color: MUTED, lineHeight: 0,
+                "&:hover": { color: TEXT }, transition: "color .12s" }}>
+                <CloseIcon />
+              </Box>
             </Box>
           </Box>
-          <Box onClick={onClose} sx={{ cursor: "pointer", color: MUTED, lineHeight: 0,
-            "&:hover": { color: TEXT }, transition: "color .12s" }}>
-            <CloseIcon />
+
+          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 32px", mt: "16px" }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: "8px", color: client.website ? TEXT : "#C7CDD6", fontSize: 12.5 }}>
+              <Box sx={{ color: MUTED, display: "flex" }}>{WebsiteSvg}</Box>
+              {client.website
+                ? <Box component="a" href={client.website} target="_blank" rel="noopener noreferrer" sx={{ color: ACCENT, "&:hover": { textDecoration: "underline" } }}>{client.website}</Box>
+                : "Not available"}
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: "8px", color: client.industry ? TEXT : "#C7CDD6", fontSize: 12.5 }}>
+              <Box sx={{ color: MUTED, display: "flex" }}>{IndustrySvg}</Box>
+              {client.industry || "Not available"}
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: "8px", color: client.fullAddress ? TEXT : "#C7CDD6", fontSize: 12.5 }}>
+              <Box sx={{ color: MUTED, display: "flex" }}>{PinSvg}</Box>
+              {client.fullAddress || "Not available"}
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: "8px", color: locationLine ? TEXT : "#C7CDD6", fontSize: 12.5 }}>
+              <Box sx={{ color: MUTED, display: "flex" }}>{PinSvg}</Box>
+              {locationLine || "Not available"}
+            </Box>
           </Box>
         </Box>
 
-        <Box sx={{ px: "24px", py: "16px", maxHeight: "70vh", overflowY: "auto" }}>
-
-          <Box sx={{ ...CARD_BASE, p: "14px 16px", mb: "16px" }}>
-            <SectionLabel>Company Details</SectionLabel>
-            <DetailRow label="Industry" value={client.industry} />
-            <DetailRow label="Company Size" value={client.companySize} />
-            <DetailRow label="Location" value={client.location} />
-            {client.linkedinUrl && (
-              <DetailRow label="LinkedIn" value={
-                <Box component="a" href={client.linkedinUrl} target="_blank" rel="noopener noreferrer"
-                  sx={{ color: ACCENT, "&:hover": { textDecoration: "underline" } }}>
-                  View Profile
-                </Box>
-              } />
-            )}
-          </Box>
-
-          <Box sx={{ ...CARD_BASE, p: "14px 16px", mb: "16px" }}>
-            <SectionLabel>Contacts</SectionLabel>
+        {/* ── Contacts row ── */}
+        <Box sx={{ px: "24px", py: "14px", borderBottom: `1px solid ${BORDER}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <Box sx={{ fontSize: 13, fontWeight: 700, color: TEXT }}>Contacts</Box>
             {client.contactPerson ? (
-              <Box sx={{ mb: secondaryContacts.length > 0 ? "10px" : 0 }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{client.contactPerson}</Box>
-                  <Tag color={ACCENT} bg={ACCENT_L}>Primary</Tag>
+              <Box sx={{ fontSize: 12.5, color: TEXT }}>
+                {client.contactPerson}
+                <Box component="span" sx={{ color: MUTED }}>
+                  {[client.contactTitle, client.contactEmail, client.contactPhone].filter(Boolean).length > 0
+                    ? ` — ${[client.contactTitle, client.contactEmail, client.contactPhone].filter(Boolean).join(" · ")}`
+                    : ""}
                 </Box>
-                <Box sx={{ fontSize: 11, color: MUTED, mt: "2px" }}>
-                  {[client.contactTitle, client.contactEmail, client.contactPhone].filter(Boolean).join(" · ") || "—"}
-                </Box>
+                {secondaryContacts.length > 0 && (
+                  <Box component="span" sx={{ color: MUTED }}> · +{secondaryContacts.length} more</Box>
+                )}
               </Box>
             ) : (
-              <Box sx={{ fontSize: 12, color: MUTED }}>No primary contact set</Box>
+              <Box sx={{ fontSize: 12.5, color: "#C7CDD6" }}>Not available</Box>
             )}
-            {secondaryContacts.map((c, i) => (
-              <Box key={i} sx={{ mt: "10px", pt: "10px", borderTop: `1px solid ${BORDER}` }}>
-                <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{c.name || "—"}</Box>
-                <Box sx={{ fontSize: 11, color: MUTED, mt: "2px" }}>
-                  {[c.title, c.email, c.phone].filter(Boolean).join(" · ") || "—"}
-                </Box>
-              </Box>
-            ))}
           </Box>
+          {onEdit && (
+            <Button size="small" variant="contained" onClick={() => onEdit(client)}
+              sx={{ fontSize: 12, fontWeight: 600, textTransform: "none", borderRadius: "8px", boxShadow: "none",
+                bgcolor: ACCENT, "&:hover": { bgcolor: "#1558C0", boxShadow: "none" } }}>
+              Edit
+            </Button>
+          )}
+        </Box>
 
-          <Box sx={{ ...CARD_BASE, p: "14px 16px", mb: "16px" }}>
-            <SectionLabel>Notes</SectionLabel>
-            <Box sx={{ display: "flex", gap: "8px", mb: "12px", alignItems: "flex-start" }}>
-              <TextField value={newNote} onChange={e => setNewNote(e.target.value)}
-                placeholder="Add a note…" size="small" fullWidth multiline maxRows={4} sx={FIELD_SX}
-                disabled={addingNote} />
-              <Button onClick={handleAddNote} disabled={addingNote || !newNote.trim()} variant="contained"
-                sx={{ borderRadius: "8px", textTransform: "none", fontSize: 12, fontWeight: 600,
-                  bgcolor: ACCENT, boxShadow: "none", flexShrink: 0,
-                  "&:hover": { bgcolor: "#1558C0", boxShadow: "none" } }}>
-                {addingNote ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Add"}
-              </Button>
+        <Box sx={{ px: "24px", py: "16px", maxHeight: "62vh", overflowY: "auto" }}>
+
+          {/* ── Information Overview ── */}
+          <Box sx={{ ...CARD_BASE, p: "16px 18px", mb: "18px" }}>
+            <Box onClick={() => setOverviewOpen(o => !o)} sx={{
+              display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none",
+              mb: overviewOpen ? "16px" : 0,
+            }}>
+              <Box sx={{ color: MUTED, display: "flex" }}><ChevronSvg open={overviewOpen} /></Box>
+              <Box sx={{ fontSize: 14, fontWeight: 700, color: TEXT }}>Information Overview</Box>
+              <Tag color={MUTED} bg="#F1F3F7">{showMore ? 9 : 7}</Tag>
             </Box>
-            {noteError && (
-              <Box sx={{ fontSize: 11, color: "#DC2626", mb: "8px" }}>{noteError}</Box>
+
+            {overviewOpen && (
+              <>
+                <Box sx={{ mb: "18px" }}>
+                  <InfoField label="About Company" value={client.aboutCompany} span />
+                </Box>
+                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "18px 24px" }}>
+                  <InfoField label="Website" value={client.website} />
+                  <InfoField label="Full Address" value={client.fullAddress} />
+                  <InfoField label="Industry" value={client.industry} />
+                  <InfoField label="Locality" value={client.locality} />
+                  <InfoField label="State" value={client.state} />
+                  <InfoField label="Country" value={client.country} />
+                  {showMore && (
+                    <>
+                      <InfoField label="Company Size" value={client.companySize} />
+                      <InfoField label="LinkedIn" value={client.linkedinUrl} />
+                    </>
+                  )}
+                </Box>
+                <Box sx={{ textAlign: "center", mt: "14px" }}>
+                  <Box component="span" onClick={() => setShowMore(s => !s)}
+                    sx={{ fontSize: 12.5, color: ACCENT, cursor: "pointer", fontWeight: 600, "&:hover": { textDecoration: "underline" } }}>
+                    {showMore ? "Show Less" : "Show More"}
+                  </Box>
+                </Box>
+              </>
             )}
-            {notesLoading && (
-              <Box sx={{ display: "flex", justifyContent: "center", py: "12px" }}>
-                <CircularProgress size={18} sx={{ color: ACCENT }} />
-              </Box>
-            )}
-            {!notesLoading && notes.length === 0 && (
-              <Box sx={{ fontSize: 12, color: MUTED, textAlign: "center", py: "8px" }}>
-                No notes yet.
-              </Box>
-            )}
-            {!notesLoading && notes.map((n, i) => (
-              <Box key={n.id} sx={{ py: "8px", borderTop: i > 0 ? `1px solid ${BORDER}` : "none" }}>
-                <Box sx={{ fontSize: 13, color: TEXT, whiteSpace: "pre-wrap" }}>{n.note}</Box>
-                <Box sx={{ fontSize: 10, color: MUTED, mt: "3px" }}>{formatNoteTimestamp(n.createdAt)}</Box>
-              </Box>
-            ))}
           </Box>
 
-          <Box sx={{ ...CARD_BASE, p: "14px 16px" }}>
-            <SectionLabel>Jobs</SectionLabel>
-            <Box sx={{ fontSize: 12, color: MUTED, mb: "10px" }}>
-              {jobs.length} job{jobs.length !== 1 ? "s" : ""}
-              {totalLabel && (
-                <>
-                  {" · "}Total Fee (Active/Fulfilling):{" "}
-                  <Box component="span" sx={{ color: SUCCESS, fontWeight: 700 }}>{totalLabel}</Box>
-                </>
+          {/* ── Tabs ── */}
+          <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{
+            mb: "16px", borderBottom: `1px solid ${BORDER}`,
+            "& .MuiTab-root": { fontSize: 12.5, fontWeight: 600, textTransform: "none", minHeight: 40, color: MUTED },
+            "& .Mui-selected": { color: ACCENT },
+            "& .MuiTabs-indicator": { bgcolor: ACCENT },
+          }}>
+            {CLIENT_TABS.map(t => {
+              const badge =
+                t.key === "jobs"     ? jobs.length :
+                t.key === "emails"   ? emails.length :
+                t.key === "pitched"  ? pitched.length :
+                t.key === "employed" ? employed.length :
+                t.key === "files"    ? files.length :
+                t.key === "invoices" ? invoices.length :
+                t.key === "contacts" ? secondaryContacts.length + (client.contactPerson ? 1 : 0) : null;
+              return (
+                <Tab key={t.key} value={t.key} label={
+                  <Box sx={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    {t.label}
+                    {badge !== null && (
+                      <Box sx={{ fontSize: 10, fontWeight: 700, color: MUTED, bgcolor: "#F1F3F7",
+                        borderRadius: "10px", px: "6px", py: "1px" }}>{badge}</Box>
+                    )}
+                  </Box>
+                } />
+              );
+            })}
+          </Tabs>
+
+          {tab === "emails" && (
+            <Box>
+              <Box sx={{ display: "flex", justifyContent: "flex-end", mb: "12px" }}>
+                <Button size="small" variant="contained"
+                  onClick={() => nav("/email", { state: { toAddress: client.contactEmail || "", clientId: client.id } })}
+                  sx={{ fontSize: 12, textTransform: "none", borderRadius: "8px", boxShadow: "none",
+                    bgcolor: ACCENT, "&:hover": { bgcolor: "#1558C0", boxShadow: "none" } }}>
+                  Send Email
+                </Button>
+              </Box>
+              {emailsLoading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: "32px" }}><CircularProgress size={20} sx={{ color: ACCENT }} /></Box>
+              ) : emails.length === 0 ? (
+                <TabEmptyState icon="✉️" title="No Related Emails Found"
+                  desc="Emails sent to this company from the Email Centre will appear here." />
+              ) : (
+                emails.map((e, i) => (
+                  <Box key={e.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                    py: "10px", borderBottom: i < emails.length - 1 ? `1px solid ${BORDER}` : "none" }}>
+                    <Box>
+                      <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{e.subject || "(no subject)"}</Box>
+                      <Box sx={{ fontSize: 11, color: MUTED, mt: "2px" }}>
+                        To: {e.toAddress} · {formatNoteTimestamp(e.sentAt)}
+                      </Box>
+                    </Box>
+                    <Tag color={e.status === "Sent" ? SUCCESS : "#DC2626"} bg={e.status === "Sent" ? SUCCESS_L : "rgba(220,38,38,0.08)"}>
+                      {e.status}
+                    </Tag>
+                  </Box>
+                ))
               )}
             </Box>
-            {loading && (
-              <Box sx={{ display: "flex", justifyContent: "center", py: "24px" }}>
-                <CircularProgress size={20} sx={{ color: ACCENT }} />
+          )}
+
+          {tab === "pitched" && (
+            <CandidateList loading={pitchedLoading} candidates={pitched} emptyTitle="No Candidates Pitched Yet" />
+          )}
+
+          {tab === "employed" && (
+            <CandidateList loading={employedLoading} candidates={employed} emptyTitle="No Candidates Employed Yet" />
+          )}
+
+          {tab === "files" && (
+            <Box>
+              <Box sx={{ display: "flex", justifyContent: "flex-end", mb: "12px" }}>
+                <Button component="label" size="small" variant="outlined" disabled={uploading}
+                  startIcon={UploadSvg}
+                  sx={{ fontSize: 12, textTransform: "none", borderRadius: "8px", borderColor: BORDER, color: TEXT }}>
+                  {uploading ? "Uploading…" : "Upload File"}
+                  <input type="file" hidden onChange={handleFileUpload} />
+                </Button>
               </Box>
-            )}
-            {!loading && err && (
-              <Box sx={{ fontSize: 12, color: "#DC2626" }}>{err}</Box>
-            )}
-            {!loading && !err && jobs.length === 0 && (
-              <Box sx={{ fontSize: 12, color: MUTED, textAlign: "center", py: "12px" }}>
-                No jobs for this client yet.
+              {fileError && <Alert severity="error" sx={{ mb: "10px", fontSize: 12, borderRadius: "8px" }}>{fileError}</Alert>}
+              {filesLoading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: "32px" }}><CircularProgress size={20} sx={{ color: ACCENT }} /></Box>
+              ) : files.length === 0 ? (
+                <TabEmptyState icon="📄" title="No Files Found" desc="Files uploaded for this company will appear here." />
+              ) : (
+                files.map((f, i) => (
+                  <Box key={f.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                    py: "10px", borderBottom: i < files.length - 1 ? `1px solid ${BORDER}` : "none" }}>
+                    <Box>
+                      <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{f.fileName}</Box>
+                      <Box sx={{ fontSize: 11, color: MUTED, mt: "2px" }}>{formatBytes(f.sizeBytes)}</Box>
+                    </Box>
+                    <Box sx={{ display: "flex", gap: "4px" }}>
+                      <Tooltip title="Download">
+                        <IconButton size="small" onClick={() => handleFileDownload(f)} sx={{ color: MUTED, "&:hover": { color: ACCENT } }}>
+                          {DownloadSvg}
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete">
+                        <IconButton size="small" onClick={() => handleFileDelete(f.id)} sx={{ color: MUTED, "&:hover": { color: "#DC2626" } }}>
+                          {TrashSvg}
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </Box>
+                ))
+              )}
+            </Box>
+          )}
+
+          {tab === "invoices" && (
+            <Box>
+              <Box sx={{ display: "flex", justifyContent: "flex-end", mb: "12px" }}>
+                <Button size="small" variant="contained" onClick={() => setShowInvoiceDialog(true)}
+                  startIcon={<InvoiceIcon />}
+                  sx={{ fontSize: 12, textTransform: "none", borderRadius: "8px", boxShadow: "none",
+                    bgcolor: ACCENT, "&:hover": { bgcolor: "#1558C0", boxShadow: "none" } }}>
+                  Create Invoice
+                </Button>
               </Box>
-            )}
-            {!loading && !err && jobs.map((job, i) => (
-              <Box key={i} sx={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                py: "10px", borderBottom: i < jobs.length - 1 ? `1px solid ${BORDER}` : "none",
-              }}>
-                <Box>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{job.title}</Box>
-                    <JobStatusTag status={job.status} />
+              {invoicesLoading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: "32px" }}><CircularProgress size={20} sx={{ color: ACCENT }} /></Box>
+              ) : invoices.length === 0 ? (
+                <TabEmptyState icon="🧾" title="No Invoices Found" desc="Invoices associated with this company will appear here." />
+              ) : (
+                invoices.map((inv, i) => (
+                  <Box key={inv.id} sx={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                    py: "10px", borderBottom: i < invoices.length - 1 ? `1px solid ${BORDER}` : "none" }}>
+                    <Box>
+                      <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{inv.xeroInvoiceNumber || `Invoice #${inv.id}`}</Box>
+                      <Box sx={{ fontSize: 11, color: MUTED, mt: "2px" }}>{formatNoteTimestamp(inv.createdAt)}</Box>
+                    </Box>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <Tag color={SUCCESS} bg={SUCCESS_L}>{inv.status}</Tag>
+                      <Box sx={{ fontSize: 13, fontWeight: 700, color: TEXT }}>
+                        {inv.currency} {Number(inv.total).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      </Box>
+                    </Box>
                   </Box>
-                  <Box sx={{ fontSize: 11, color: MUTED, mt: "2px" }}>
-                    {job.salary != null ? `${job.currency} ${Number(job.salary).toLocaleString()}` : "No salary set"}
-                    {job.feeType === "FIXED"
-                      ? " · Fixed fee"
-                      : job.feePercentage != null ? ` · ${job.feePercentage}% fee` : ""}
-                    {` · ${job.daysOld}d`}
+                ))
+              )}
+            </Box>
+          )}
+
+          {tab === "notes" && (
+            <Box>
+              <Box sx={{ display: "flex", gap: "8px", mb: "12px", alignItems: "flex-start" }}>
+                <TextField value={newNote} onChange={e => setNewNote(e.target.value)}
+                  placeholder="Add a note…" size="small" fullWidth multiline maxRows={4} sx={FIELD_SX}
+                  disabled={addingNote} />
+                <Button onClick={handleAddNote} disabled={addingNote || !newNote.trim()} variant="contained"
+                  sx={{ borderRadius: "8px", textTransform: "none", fontSize: 12, fontWeight: 600,
+                    bgcolor: ACCENT, boxShadow: "none", flexShrink: 0,
+                    "&:hover": { bgcolor: "#1558C0", boxShadow: "none" } }}>
+                  {addingNote ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Add"}
+                </Button>
+              </Box>
+              {noteError && <Box sx={{ fontSize: 11, color: "#DC2626", mb: "8px" }}>{noteError}</Box>}
+              {notesLoading ? (
+                <Box sx={{ display: "flex", justifyContent: "center", py: "12px" }}><CircularProgress size={18} sx={{ color: ACCENT }} /></Box>
+              ) : notes.length === 0 ? (
+                <TabEmptyState icon="📝" title="No Notes Yet" />
+              ) : (
+                notes.map((n, i) => (
+                  <Box key={n.id} sx={{ py: "8px", borderTop: i > 0 ? `1px solid ${BORDER}` : "none" }}>
+                    <Box sx={{ fontSize: 13, color: TEXT, whiteSpace: "pre-wrap" }}>{n.note}</Box>
+                    <Box sx={{ fontSize: 10, color: MUTED, mt: "3px" }}>{formatNoteTimestamp(n.createdAt)}</Box>
                   </Box>
+                ))
+              )}
+            </Box>
+          )}
+
+          {tab === "jobs" && (
+            <Box>
+              <Box sx={{ fontSize: 12, color: MUTED, mb: "10px" }}>
+                {jobs.length} job{jobs.length !== 1 ? "s" : ""}
+                {totalLabel && (
+                  <>
+                    {" · "}Total Fee (Active/Fulfilling):{" "}
+                    <Box component="span" sx={{ color: SUCCESS, fontWeight: 700 }}>{totalLabel}</Box>
+                  </>
+                )}
+              </Box>
+              {loading && (
+                <Box sx={{ display: "flex", justifyContent: "center", py: "32px" }}>
+                  <CircularProgress size={20} sx={{ color: ACCENT }} />
                 </Box>
-                <Box sx={{
-                  fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
-                  color: job.estimatedFee != null ? SUCCESS : MUTED,
+              )}
+              {!loading && err && (
+                <Box sx={{ fontSize: 12, color: "#DC2626" }}>{err}</Box>
+              )}
+              {!loading && !err && jobs.length === 0 && (
+                <TabEmptyState icon="💼" title="No Jobs Found" desc="Jobs for this client will appear here." />
+              )}
+              {!loading && !err && jobs.map((job, i) => (
+                <Box key={i} sx={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  py: "10px", borderBottom: i < jobs.length - 1 ? `1px solid ${BORDER}` : "none",
                 }}>
-                  {job.estimatedFee != null
-                    ? `${job.currency} ${Number(job.estimatedFee).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-                    : "—"}
+                  <Box>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{job.title}</Box>
+                      <JobStatusTag status={job.status} />
+                    </Box>
+                    <Box sx={{ fontSize: 11, color: MUTED, mt: "2px" }}>
+                      {job.salary != null ? `${job.currency} ${Number(job.salary).toLocaleString()}` : "No salary set"}
+                      {job.feeType === "FIXED"
+                        ? " · Fixed fee"
+                        : job.feePercentage != null ? ` · ${job.feePercentage}% fee` : ""}
+                      {` · ${job.daysOld}d`}
+                    </Box>
+                  </Box>
+                  <Box sx={{
+                    fontSize: 13, fontWeight: 700, whiteSpace: "nowrap",
+                    color: job.estimatedFee != null ? SUCCESS : MUTED,
+                  }}>
+                    {job.estimatedFee != null
+                      ? `${job.currency} ${Number(job.estimatedFee).toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                      : "—"}
+                  </Box>
                 </Box>
-              </Box>
-            ))}
-          </Box>
+              ))}
+            </Box>
+          )}
+
+          {tab === "contacts" && (
+            <Box>
+              {contactAddError && <Alert severity="error" sx={{ mb: "10px", fontSize: 12, borderRadius: "8px" }}>{contactAddError}</Alert>}
+              {client.contactPerson ? (
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                  pb: secondaryContacts.length > 0 ? "12px" : 0, mb: secondaryContacts.length > 0 ? "12px" : 0,
+                  borderBottom: secondaryContacts.length > 0 ? `1px solid ${BORDER}` : "none" }}>
+                  <Box>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{client.contactPerson}</Box>
+                      <Tag color={ACCENT} bg={ACCENT_L}>Primary</Tag>
+                    </Box>
+                    <Box sx={{ fontSize: 12, color: MUTED, mt: "3px" }}>
+                      {[client.contactTitle, client.contactEmail, client.contactPhone].filter(Boolean).join(" · ") || "—"}
+                    </Box>
+                  </Box>
+                  <Button size="small" variant="outlined"
+                    onClick={() => addAsClientContact({
+                      name: client.contactPerson, title: client.contactTitle,
+                      email: client.contactEmail, phone: client.contactPhone,
+                    }, "primary")}
+                    disabled={addingContactFor === "primary"}
+                    sx={{ fontSize: 11, textTransform: "none", borderRadius: "7px", borderColor: BORDER, color: TEXT,
+                      flexShrink: 0, "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
+                    {addingContactFor === "primary" ? <CircularProgress size={12} /> : "Add Client Contact"}
+                  </Button>
+                </Box>
+              ) : secondaryContacts.length === 0 ? (
+                <TabEmptyState icon="👥" title="No Contacts Found" desc="Contacts for this client will appear here." />
+              ) : null}
+              {secondaryContacts.map((c, i) => (
+                <Box key={i} sx={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                  py: "10px", borderBottom: i < secondaryContacts.length - 1 ? `1px solid ${BORDER}` : "none" }}>
+                  <Box>
+                    <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{c.name || "—"}</Box>
+                    <Box sx={{ fontSize: 12, color: MUTED, mt: "3px" }}>
+                      {[c.title, c.email, c.phone].filter(Boolean).join(" · ") || "—"}
+                    </Box>
+                  </Box>
+                  <Button size="small" variant="outlined"
+                    onClick={() => addAsClientContact(c, i)}
+                    disabled={addingContactFor === i}
+                    sx={{ fontSize: 11, textTransform: "none", borderRadius: "7px", borderColor: BORDER, color: TEXT,
+                      flexShrink: 0, "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
+                    {addingContactFor === i ? <CircularProgress size={12} /> : "Add Client Contact"}
+                  </Button>
+                </Box>
+              ))}
+            </Box>
+          )}
         </Box>
       </DialogContent>
+
+      {showInvoiceDialog && (
+        <InvoiceDialog
+          client={client}
+          onClose={() => setShowInvoiceDialog(false)}
+          onInvoiced={() => { setShowInvoiceDialog(false); loadInvoices(); }}
+        />
+      )}
     </Dialog>
   );
 }
@@ -1060,6 +1574,27 @@ function PotentialDetailModal({ pc, onClose, onAddToClients, searchPlace, search
   const [outreachMsg, setMsg]   = useState("");
   const [generating, setGen]    = useState(false);
   const [genError, setGenError] = useState("");
+  const [creatingContact, setCreatingContact] = useState(null); // index of decision maker being saved
+  const [contactError, setContactError]       = useState("");
+
+  async function addAsClientContact(dm, index) {
+    setCreatingContact(index);
+    setContactError("");
+    try {
+      const created = await apiPostJson("/api/contacts/from-lead", {
+        companyName: pc.companyName,
+        industry: pc.industry,
+        location: [pc.hqCity, pc.hqCountry].filter(Boolean).join(", ") || pc.location || "",
+        linkedinUrl: pc.linkedinUrl || "",
+        name: dm.name,
+        title: dm.title,
+      });
+      nav(`/contacts/${created.id}`);
+    } catch (e) {
+      setContactError(e.message || "Failed to create contact.");
+      setCreatingContact(null);
+    }
+  }
 
   const scoreColor = pc.matchScore >= 80 ? SUCCESS : pc.matchScore >= 60 ? WARN : MUTED;
   const scoreBg    = pc.matchScore >= 80 ? SUCCESS_L : pc.matchScore >= 60 ? WARN_L : "rgba(138,148,166,0.08)";
@@ -1196,6 +1731,9 @@ function PotentialDetailModal({ pc, onClose, onAddToClients, searchPlace, search
           {pc.decisionMakers?.length > 0 && (
             <Box sx={{ mb: "20px" }}>
               <SectionLabel>Key Executives</SectionLabel>
+              {contactError && (
+                <Box sx={{ fontSize: 11, color: "#DC2626", mb: "8px" }}>{contactError}</Box>
+              )}
               <Box sx={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {pc.decisionMakers.map((dm, i) => (
                   <Box key={i} sx={{ display: "flex", alignItems: "center", gap: "10px",
@@ -1205,9 +1743,20 @@ function PotentialDetailModal({ pc, onClose, onAddToClients, searchPlace, search
                       display: "flex", alignItems: "center", justifyContent: "center" }}>
                       {dm.name?.[0]?.toUpperCase() || "?"}
                     </Box>
-                    <Box>
+                    <Box sx={{ flex: 1 }}>
                       <Box sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>{dm.name}</Box>
                       <Box sx={{ fontSize: 11, color: MUTED }}>{dm.title}</Box>
+                    </Box>
+                    <Box onClick={creatingContact === i ? undefined : () => addAsClientContact(dm, i)} sx={{
+                      display: "inline-flex", alignItems: "center", gap: "5px",
+                      px: "10px", py: "5px", borderRadius: "7px", fontSize: 11, fontWeight: 600,
+                      border: `1px solid ${ACCENT}`, color: ACCENT, flexShrink: 0,
+                      cursor: creatingContact === i ? "default" : "pointer",
+                      "&:hover": creatingContact === i ? {} : { bgcolor: ACCENT_L }, transition: "all .12s",
+                    }}>
+                      {creatingContact === i
+                        ? <CircularProgress size={11} sx={{ color: ACCENT }} />
+                        : "Client Contact"}
                     </Box>
                   </Box>
                 ))}
@@ -1959,9 +2508,11 @@ export default function ClientTrackerPage() {
         onClose={() => setAddFromPotential(null)}
         onSaved={(saved) => { handleSaved(saved); setAddFromPotential(null); }}
         initialData={addFromPotential}
+        fromLead
       />
       {selectedClient && (
-        <ClientDetailDialog client={selectedClient} onClose={() => setSelectedClient(null)} />
+        <ClientDetailDialog client={selectedClient} onClose={() => setSelectedClient(null)}
+          onEdit={c => { setSelectedClient(null); setEditingClient(c); }} />
       )}
       {invoicingClient && (
         <InvoiceDialog

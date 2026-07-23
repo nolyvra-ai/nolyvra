@@ -12,6 +12,14 @@ public record ClientRequest(
     String contactTitle,
     String contactPhone,
     String linkedinUrl,
+    String facebookUrl,
+    String twitterUrl,
+    String website,
+    String aboutCompany,
+    String fullAddress,
+    String locality,
+    String state,
+    String country,
     List<ClientContact> secondaryContacts,
     String note
 ) {}

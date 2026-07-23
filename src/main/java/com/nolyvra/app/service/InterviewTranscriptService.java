@@ -55,7 +55,7 @@ public class InterviewTranscriptService {
         if (!tokenService.deductToken(loginId))
             throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
 
-        String cvAnalysisContext = loadCvAnalysisSummary(candidateId);
+        String cvAnalysisContext = loadCvAnalysisSummary(candidateId, loadInterviewJobId(interviewId));
         String candidateName     = loadCandidateName(candidateId);
         InterviewMeta meta       = loadInterviewMeta(interviewId);
 
@@ -144,13 +144,22 @@ public class InterviewTranscriptService {
     // ─── GET existing analyses ────────────────────────────────────────────────
 
     public List<InterviewTranscriptResponse> getAllForCandidate(String candidateId, String loginId) {
+        return getAllForCandidate(candidateId, loginId, null);
+    }
+
+    // jobId is optional — when given (Jobs Applied tab), only analyses tied
+    // to an interview for that job are returned (via interviews.job_id).
+    // Transcripts with no linked interview have no job context and are
+    // excluded when a jobId filter is applied.
+    public List<InterviewTranscriptResponse> getAllForCandidate(String candidateId, String loginId, String jobId) {
         return jdbc.query("""
                 select it.*, i.interview_type, i.interviewer, i.scheduled_at, i.meeting_link
                 from interview_transcripts it
                 left join interviews i on i.id = it.interview_id
                 where it.candidate_id = ? and it.login_id = ?
+                  and (? is null or i.job_id = ?)
                 order by it.analyzed_at desc nulls last
-                """, (rs, n) -> mapRow(rs), candidateId, loginId);
+                """, (rs, n) -> mapRow(rs), candidateId, loginId, jobId, jobId);
     }
 
     // ─── Private helpers ──────────────────────────────────────────────────────
@@ -203,11 +212,20 @@ public class InterviewTranscriptService {
         try { return rs.getString(col); } catch (Exception e) { return null; }
     }
 
-    private String loadCvAnalysisSummary(String candidateId) {
+    // A person can have applications (and analyses) for more than one job —
+    // scope to the job this interview belongs to (via interviews.job_id) so
+    // an interview for Job A doesn't get context from a Job B analysis.
+    private String loadInterviewJobId(String interviewId) {
+        if (interviewId == null) return null;
+        return jdbc.query("select job_id from interviews where id = ?",
+                rs -> rs.next() ? rs.getString("job_id") : null, interviewId);
+    }
+
+    private String loadCvAnalysisSummary(String candidateId, String jobId) {
         return jdbc.query("""
                 select consistency_score, capability_score, risk_level, ai_summary_json
                 from analyses
-                where candidate_id = ?
+                where candidate_id = ? and (job_id = ? or ? is null)
                 order by analyzed_at desc nulls last
                 limit 1
                 """, rs -> {
@@ -231,7 +249,7 @@ public class InterviewTranscriptService {
             } catch (Exception e) {
                 return "CV analysis available but could not be parsed.";
             }
-        }, candidateId);
+        }, candidateId, jobId, jobId);
     }
 
     private String loadCandidateName(String candidateId) {
