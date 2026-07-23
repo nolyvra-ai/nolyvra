@@ -7,6 +7,7 @@ import com.nolyvra.app.model.ContactUpdateRequest;
 import com.nolyvra.app.service.ContactService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -54,6 +55,14 @@ public class ContactController {
             @PathVariable Long id,
             @RequestParam String loginId) {
         return contactService.getContact(id, loginId);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteContact(
+            @PathVariable Long id,
+            @RequestParam String loginId) {
+        contactService.deleteContact(id, loginId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/link-candidate")

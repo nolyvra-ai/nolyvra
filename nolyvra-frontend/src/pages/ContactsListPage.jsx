@@ -18,6 +18,7 @@ const SUCCESS   = "#16A34A";
 const SUCCESS_L = "rgba(22,163,74,0.08)";
 const WARN      = "#D97706";
 const WARN_L    = "rgba(217,119,6,0.08)";
+const DANGER    = "#DC2626";
 
 const CARD = { bgcolor: SURFACE, border: `1px solid ${BORDER}`, borderRadius: "12px", boxShadow: "0 1px 4px rgba(15,22,35,0.05)" };
 const FIELD_SX = {
@@ -48,6 +49,7 @@ export default function ContactsListPage() {
 
   const [search, setSearch]         = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [removingId, setRemovingId] = useState(null);
 
   useEffect(() => {
     setLoading(true); setError("");
@@ -57,6 +59,23 @@ export default function ContactsListPage() {
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  async function handleRemoveContact(e, contact) {
+    e.stopPropagation();
+    if (!window.confirm(`Remove ${contact.name} from contacts?`)) return;
+    setRemovingId(contact.id);
+    try {
+      const r = await fetch(`${API}/api/contacts/${contact.id}?loginId=${encodeURIComponent(loginId())}`, {
+        method: "DELETE", headers: hdrs(),
+      });
+      if (!r.ok) throw new Error(`Failed to remove contact (${r.status})`);
+      setContacts(prev => prev.filter(c => c.id !== contact.id));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setRemovingId(null);
+    }
+  }
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -119,10 +138,11 @@ export default function ContactsListPage() {
                 <TableCell sx={thSx}>Email</TableCell>
                 <TableCell sx={thSx}>Phone</TableCell>
                 <TableCell sx={thSx}>Status</TableCell>
+                <TableCell sx={thSx}></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {filtered.map((c, i) => (
+              {filtered.map((c) => (
                 <TableRow key={c.id} onClick={() => nav(`/contacts/${c.id}`)}
                   sx={{ cursor: "pointer", "&:hover": { bgcolor: "#F8FAFC" }, "&:last-child td": { borderBottom: 0 } }}>
                   <TableCell sx={{ py: 1.5, px: 2, fontSize: 12.5, fontWeight: 600, color: ACCENT, borderBottom: `1px solid ${BORDER}` }}>
@@ -144,6 +164,14 @@ export default function ContactsListPage() {
                     <Tag color={c.clientStatus === "CLIENT" ? SUCCESS : WARN} bg={c.clientStatus === "CLIENT" ? SUCCESS_L : WARN_L}>
                       {c.clientStatus === "CLIENT" ? "Client" : "Lead"}
                     </Tag>
+                  </TableCell>
+                  <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}`, textAlign: "right" }}>
+                    <Box onClick={e => handleRemoveContact(e, c)}
+                      sx={{ display: "inline-block", fontSize: 11.5, fontWeight: 600, color: DANGER, cursor: "pointer",
+                        opacity: removingId === c.id ? 0.5 : 1, pointerEvents: removingId === c.id ? "none" : "auto",
+                        "&:hover": { textDecoration: "underline" } }}>
+                      {removingId === c.id ? "Removing…" : "Remove"}
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}

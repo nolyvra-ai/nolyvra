@@ -521,9 +521,15 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
 
   const [addingContactFor, setAddingContactFor] = useState(null); // "primary" | secondary index
   const [contactAddError, setContactAddError] = useState("");
+  const [existingContacts, setExistingContacts] = useState([]);
+
+  function isAlreadyAddedContact(name) {
+    if (!name?.trim()) return false;
+    return existingContacts.some(c => c.name?.trim().toLowerCase() === name.trim().toLowerCase());
+  }
 
   async function addAsClientContact(person, key) {
-    if (!person.name?.trim()) return;
+    if (!person.name?.trim() || isAlreadyAddedContact(person.name)) return;
     setAddingContactFor(key);
     setContactAddError("");
     try {
@@ -531,11 +537,12 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
         clientId: client.id,
         name: person.name, title: person.title, email: person.email, phone: person.phone,
       });
+      setExistingContacts(prev => [...prev, created]);
       nav(`/contacts/${created.id}`);
     } catch (e) {
       setContactAddError(e.message || "Failed to add contact.");
     } finally {
-      setAddingContact(false);
+      setAddingContactFor(null);
     }
   }
 
@@ -586,6 +593,10 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
       .then(data => { if (!cancelled) setEmployed(data || []); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setEmployedLoading(false); });
+
+    apiGet(`/api/clients/${client.id}/contacts`)
+      .then(data => { if (!cancelled) setExistingContacts(data || []); })
+      .catch(() => {});
 
     loadInvoices();
     loadFiles();
@@ -1044,16 +1055,20 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
                       {[client.contactTitle, client.contactEmail, client.contactPhone].filter(Boolean).join(" · ") || "—"}
                     </Box>
                   </Box>
-                  <Button size="small" variant="outlined"
-                    onClick={() => addAsClientContact({
-                      name: client.contactPerson, title: client.contactTitle,
-                      email: client.contactEmail, phone: client.contactPhone,
-                    }, "primary")}
-                    disabled={addingContactFor === "primary"}
-                    sx={{ fontSize: 11, textTransform: "none", borderRadius: "7px", borderColor: BORDER, color: TEXT,
-                      flexShrink: 0, "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
-                    {addingContactFor === "primary" ? <CircularProgress size={12} /> : "Add Client Contact"}
-                  </Button>
+                  {isAlreadyAddedContact(client.contactPerson) ? (
+                    <Tag color={SUCCESS} bg={SUCCESS_L}>Already Added</Tag>
+                  ) : (
+                    <Button size="small" variant="outlined"
+                      onClick={() => addAsClientContact({
+                        name: client.contactPerson, title: client.contactTitle,
+                        email: client.contactEmail, phone: client.contactPhone,
+                      }, "primary")}
+                      disabled={addingContactFor === "primary"}
+                      sx={{ fontSize: 11, textTransform: "none", borderRadius: "7px", borderColor: BORDER, color: TEXT,
+                        flexShrink: 0, "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
+                      {addingContactFor === "primary" ? <CircularProgress size={12} /> : "Add Client Contact"}
+                    </Button>
+                  )}
                 </Box>
               ) : secondaryContacts.length === 0 ? (
                 <TabEmptyState icon="👥" title="No Contacts Found" desc="Contacts for this client will appear here." />
@@ -1067,13 +1082,17 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
                       {[c.title, c.email, c.phone].filter(Boolean).join(" · ") || "—"}
                     </Box>
                   </Box>
-                  <Button size="small" variant="outlined"
-                    onClick={() => addAsClientContact(c, i)}
-                    disabled={addingContactFor === i}
-                    sx={{ fontSize: 11, textTransform: "none", borderRadius: "7px", borderColor: BORDER, color: TEXT,
-                      flexShrink: 0, "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
-                    {addingContactFor === i ? <CircularProgress size={12} /> : "Add Client Contact"}
-                  </Button>
+                  {isAlreadyAddedContact(c.name) ? (
+                    <Tag color={SUCCESS} bg={SUCCESS_L}>Already Added</Tag>
+                  ) : (
+                    <Button size="small" variant="outlined"
+                      onClick={() => addAsClientContact(c, i)}
+                      disabled={addingContactFor === i}
+                      sx={{ fontSize: 11, textTransform: "none", borderRadius: "7px", borderColor: BORDER, color: TEXT,
+                        flexShrink: 0, "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
+                      {addingContactFor === i ? <CircularProgress size={12} /> : "Add Client Contact"}
+                    </Button>
+                  )}
                 </Box>
               ))}
             </Box>

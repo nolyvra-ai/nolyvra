@@ -128,6 +128,16 @@ public class ContactService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contact not found: " + id));
     }
 
+    // ─── DELETE /api/contacts/{id} ────────────────────────────────────────────
+    // Hard delete — no other table has a FK to contacts.id, and contacts has
+    // no is_active column (unlike candidates/clients), so there's nothing to
+    // soft-delete or repoint.
+
+    public void deleteContact(Long id, String loginId) {
+        int deleted = jdbc.update("DELETE FROM contacts WHERE id = ? AND login_id = ?", id, loginId);
+        if (deleted == 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contact not found: " + id);
+    }
+
     // ─── POST /api/contacts/{id}/link-candidate ──────────────────────────────
     // Creates a candidate record from this contact (via the existing unassigned-
     // candidate flow, no logic duplicated), flags it is_client = true, and links
