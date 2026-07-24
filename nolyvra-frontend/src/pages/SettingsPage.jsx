@@ -25,10 +25,18 @@ function escapeHtmlAttribute(value) {
     .replaceAll(">", "&gt;");
 }
 
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Could not render one of the template images."));
+    reader.readAsDataURL(blob);
+  });
+}
+
 function EmailHtmlTemplateField({ value, onChange, disabled, minRows, placeholder, onError }) {
   const inputRef = useRef(null);
   const fileRef = useRef(null);
-  const previewUrlsRef = useRef([]);
   const [uploading, setUploading] = useState(false);
   const [insertedName, setInsertedName] = useState("");
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -83,13 +91,7 @@ function EmailHtmlTemplateField({ value, onChange, disabled, minRows, placeholde
     }
   }
 
-  function releasePreviewUrls() {
-    previewUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
-    previewUrlsRef.current = [];
-  }
-
   async function openPreview() {
-    releasePreviewUrls();
     setPreviewOpen(true);
     setPreviewLoading(true);
     setPreviewError("");
@@ -105,9 +107,8 @@ function EmailHtmlTemplateField({ value, onChange, disabled, minRows, placeholde
           { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } }
         );
         if (!res.ok) throw new Error("Could not load one of the template images.");
-        const objectUrl = URL.createObjectURL(await res.blob());
-        previewUrlsRef.current.push(objectUrl);
-        rendered = rendered.replaceAll(`cid:template-image-${id}`, objectUrl);
+        const dataUrl = await blobToDataUrl(await res.blob());
+        rendered = rendered.replaceAll(`cid:template-image-${id}`, dataUrl);
       }
       setPreviewHtml(rendered);
     } catch (e) {
@@ -121,10 +122,7 @@ function EmailHtmlTemplateField({ value, onChange, disabled, minRows, placeholde
     setPreviewOpen(false);
     setPreviewHtml("");
     setPreviewError("");
-    releasePreviewUrls();
   }
-
-  useEffect(() => () => releasePreviewUrls(), []);
 
   return (
     <Box>
