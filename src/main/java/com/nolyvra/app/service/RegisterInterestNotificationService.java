@@ -21,16 +21,19 @@ public class RegisterInterestNotificationService {
     private static final long BETWEEN_EMAIL_DELAY_MS = 550L;
 
     private final AdminSettingsService adminSettingsService;
+    private final EmailTemplateImageService emailTemplateImageService;
     private final JdbcTemplate jdbc;
     private final String apiKey;
     private final String fromAddress;
 
     public RegisterInterestNotificationService(
             AdminSettingsService adminSettingsService,
+            EmailTemplateImageService emailTemplateImageService,
             JdbcTemplate jdbc,
             @Value("${resend.api-key:}") String apiKey,
             @Value("${resend.from:Nolyvra <onboarding@resend.dev>}") String fromAddress) {
         this.adminSettingsService = adminSettingsService;
+        this.emailTemplateImageService = emailTemplateImageService;
         this.jdbc = jdbc;
         this.apiKey = apiKey;
         this.fromAddress = fromAddress;
@@ -93,11 +96,14 @@ public class RegisterInterestNotificationService {
             String html,
             String submittedEmail) {
         try {
+            EmailTemplateImageService.PreparedEmail prepared =
+                    emailTemplateImageService.inlineImages(html);
             CreateEmailOptions params = CreateEmailOptions.builder()
                     .from(fromAddress)
                     .to(recipient)
                     .subject(subject)
-                    .html(html)
+                    .html(prepared.html())
+                    .attachments(prepared.attachments())
                     .build();
             CreateEmailResponse response = sendEmailWithRetry(resend, params, recipient);
             System.out.println("Register interest email sent via Resend to "

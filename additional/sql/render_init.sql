@@ -223,6 +223,15 @@ CREATE INDEX IF NOT EXISTS idx_register_interest_notification_log_created_at
 CREATE INDEX IF NOT EXISTS idx_register_interest_notification_log_submitted_email
     ON register_interest_notification_log(submitted_email);
 
+CREATE TABLE IF NOT EXISTS email_template_images (
+    id           UUID        PRIMARY KEY,
+    file_name    TEXT        NOT NULL,
+    content_type TEXT        NOT NULL,
+    image_data   BYTEA       NOT NULL,
+    uploaded_by  TEXT        NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS onboarding_email_log (
     id              BIGSERIAL PRIMARY KEY,
     target_login_id TEXT NOT NULL,
