@@ -1484,17 +1484,13 @@ export default function SettingsPage() {
                 label="Subject"
                 sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
               />
-              <TextField
-                fullWidth
-                multiline
+              <EmailHtmlTemplateField
                 minRows={5}
-                size="small"
                 value={onboardingTemplates.confirmationHtml}
-                onChange={e => updateOnboardingTemplate("confirmationHtml", e.target.value)}
+                onChange={value => updateOnboardingTemplate("confirmationHtml", value)}
                 disabled={onboardingRecipientsLoading}
                 placeholder="<p>Hi {{name}},</p>"
-                label="HTML Body"
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                onError={setOnboardingRecipientsError}
               />
             </Box>
 
@@ -1512,17 +1508,13 @@ export default function SettingsPage() {
                 label="Subject"
                 sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
               />
-              <TextField
-                fullWidth
-                multiline
+              <EmailHtmlTemplateField
                 minRows={6}
-                size="small"
                 value={onboardingTemplates.notificationHtml}
-                onChange={e => updateOnboardingTemplate("notificationHtml", e.target.value)}
+                onChange={value => updateOnboardingTemplate("notificationHtml", value)}
                 disabled={onboardingRecipientsLoading}
                 placeholder="<h2>Registration Approved</h2>"
-                label="HTML Body"
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                onError={setOnboardingRecipientsError}
               />
               <Typography sx={{ fontSize: 11, color: MUTED, mt: -0.5 }}>
                 Available variables: {"{{name}}"}, {"{{email}}"}, {"{{company}}"}, {"{{password}}"}, {"{{adminLoginId}}"}.
