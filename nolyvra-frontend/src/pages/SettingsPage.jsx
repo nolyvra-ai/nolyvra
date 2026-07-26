@@ -1,7 +1,8 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import {
   Box, Paper, Typography, Button, TextField, MenuItem,
-  Alert, CircularProgress, LinearProgress, Slider
+  Alert, CircularProgress, LinearProgress, Slider,
+  Dialog, DialogTitle, DialogContent
 } from "@mui/material";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePlanLimit } from "../hooks/usePlanLimit";
@@ -15,6 +16,185 @@ const DANGER = "#DC2626", DANGER_BG = "#FEF2F2", DANGER_BR = "#FECACA";
 const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
 const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
 const SURFACE = "#FAFBFD";
+
+function escapeHtmlAttribute(value) {
+  return String(value || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Could not render one of the template images."));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function EmailHtmlTemplateField({ value, onChange, disabled, minRows, placeholder, onError }) {
+  const inputRef = useRef(null);
+  const fileRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [insertedName, setInsertedName] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [previewError, setPreviewError] = useState("");
+
+  async function insertImage(file) {
+    if (!file) return;
+    setUploading(true);
+    setInsertedName("");
+    onError?.("");
+    try {
+      const loginId = localStorage.getItem("loginId") || "";
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch(
+        `${API_BASE}/api/auth/admin/email-template-images?loginId=${encodeURIComponent(loginId)}`,
+        {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+          body: form,
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Could not upload the image.");
+
+      const imageName = escapeHtmlAttribute(data.fileName || file.name || "template-image");
+      const imageHtml = `<!-- Template image: ${imageName} -->\n`
+        + `<img src="cid:template-image-${data.id}" alt="${imageName}" `
+        + `style="max-width:100%;height:auto;">`;
+      const textarea = inputRef.current;
+      const position = textarea?.selectionStart ?? value.length;
+      const before = value.slice(0, position);
+      const after = value.slice(position);
+      const prefix = before && !before.endsWith("\n") ? "\n" : "";
+      const suffix = after && !after.startsWith("\n") ? "\n" : "";
+      const nextValue = `${before}${prefix}${imageHtml}${suffix}${after}`;
+      onChange(nextValue);
+      setInsertedName(data.fileName || file.name);
+
+      requestAnimationFrame(() => {
+        const nextPosition = before.length + prefix.length + imageHtml.length;
+        textarea?.focus();
+        textarea?.setSelectionRange(nextPosition, nextPosition);
+      });
+    } catch (e) {
+      onError?.(e.message);
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function openPreview() {
+    setPreviewOpen(true);
+    setPreviewLoading(true);
+    setPreviewError("");
+    try {
+      const ids = [...new Set(
+        [...value.matchAll(/cid:template-image-([0-9a-f-]{36})/gi)].map(match => match[1])
+      )];
+      let rendered = value;
+      const loginId = localStorage.getItem("loginId") || "";
+      for (const id of ids) {
+        const res = await fetch(
+          `${API_BASE}/api/auth/admin/email-template-images/${id}?loginId=${encodeURIComponent(loginId)}`,
+          { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } }
+        );
+        if (!res.ok) throw new Error("Could not load one of the template images.");
+        const dataUrl = await blobToDataUrl(await res.blob());
+        rendered = rendered.replaceAll(`cid:template-image-${id}`, dataUrl);
+      }
+      setPreviewHtml(rendered);
+    } catch (e) {
+      setPreviewError(e.message);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
+  function closePreview() {
+    setPreviewOpen(false);
+    setPreviewHtml("");
+    setPreviewError("");
+  }
+
+  return (
+    <Box>
+      <TextField
+        fullWidth
+        multiline
+        minRows={minRows}
+        size="small"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        disabled={disabled || uploading}
+        placeholder={placeholder}
+        label="HTML Body"
+        inputRef={inputRef}
+        sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+      />
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.75 }}>
+        <Button
+          size="small"
+          variant="outlined"
+          component="label"
+          disabled={disabled || uploading}
+          sx={{ fontSize: 11, borderRadius: "6px", textTransform: "none" }}
+        >
+          {uploading ? <CircularProgress size={13} /> : "Insert Image"}
+          <input
+            ref={fileRef}
+            hidden
+            type="file"
+            accept="image/png,image/jpeg,image/gif"
+            onChange={e => insertImage(e.target.files?.[0])}
+          />
+        </Button>
+        <Button
+          size="small"
+          variant="outlined"
+          disabled={disabled || uploading || !value.trim()}
+          onClick={openPreview}
+          sx={{ fontSize: 11, borderRadius: "6px", textTransform: "none" }}
+        >
+          Preview
+        </Button>
+        <Typography sx={{ fontSize: 10.5, color: insertedName ? SUCCESS : MUTED }}>
+          {insertedName ? `${insertedName} inserted` : "PNG, JPEG or GIF · max 5 MB"}
+        </Typography>
+      </Box>
+      <Dialog open={previewOpen} onClose={closePreview} fullWidth maxWidth="md">
+        <DialogTitle sx={{ fontSize: 15, fontWeight: 700, pb: 1 }}>
+          Email Template Preview
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 0, minHeight: 420 }}>
+          {previewLoading ? (
+            <Box sx={{ minHeight: 420, display: "grid", placeItems: "center" }}>
+              <CircularProgress size={24} />
+            </Box>
+          ) : previewError ? (
+            <Alert severity="error" sx={{ m: 2 }}>{previewError}</Alert>
+          ) : (
+            <Box
+              component="iframe"
+              title="Email template preview"
+              sandbox=""
+              srcDoc={previewHtml}
+              sx={{ width: "100%", minHeight: 500, border: 0, display: "block", bgcolor: "#fff" }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </Box>
+  );
+}
+
 // ── Usage bar component ───────────────────────────────────────────────────────
 function UsageBar({ label, used, max, remainingLabel }) {
   const pct = max > 0 ? Math.min(100, Math.round((used / max) * 100)) : 0;
@@ -1304,17 +1484,13 @@ export default function SettingsPage() {
                 label="Subject"
                 sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
               />
-              <TextField
-                fullWidth
-                multiline
+              <EmailHtmlTemplateField
                 minRows={5}
-                size="small"
                 value={onboardingTemplates.confirmationHtml}
-                onChange={e => updateOnboardingTemplate("confirmationHtml", e.target.value)}
+                onChange={value => updateOnboardingTemplate("confirmationHtml", value)}
                 disabled={onboardingRecipientsLoading}
                 placeholder="<p>Hi {{name}},</p>"
-                label="HTML Body"
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                onError={setOnboardingRecipientsError}
               />
             </Box>
 
@@ -1332,17 +1508,13 @@ export default function SettingsPage() {
                 label="Subject"
                 sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
               />
-              <TextField
-                fullWidth
-                multiline
+              <EmailHtmlTemplateField
                 minRows={6}
-                size="small"
                 value={onboardingTemplates.notificationHtml}
-                onChange={e => updateOnboardingTemplate("notificationHtml", e.target.value)}
+                onChange={value => updateOnboardingTemplate("notificationHtml", value)}
                 disabled={onboardingRecipientsLoading}
                 placeholder="<h2>Registration Approved</h2>"
-                label="HTML Body"
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                onError={setOnboardingRecipientsError}
               />
               <Typography sx={{ fontSize: 11, color: MUTED, mt: -0.5 }}>
                 Available variables: {"{{name}}"}, {"{{email}}"}, {"{{company}}"}, {"{{password}}"}, {"{{adminLoginId}}"}.
@@ -1418,17 +1590,13 @@ export default function SettingsPage() {
                 label="Subject"
                 sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
               />
-              <TextField
-                fullWidth
-                multiline
+              <EmailHtmlTemplateField
                 minRows={5}
-                size="small"
                 value={interestTemplates.confirmationHtml}
-                onChange={e => updateInterestTemplate("confirmationHtml", e.target.value)}
+                onChange={value => updateInterestTemplate("confirmationHtml", value)}
                 disabled={interestRecipientsLoading}
                 placeholder="<p>Hi {{name}},</p>"
-                label="HTML Body"
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                onError={setInterestRecipientsError}
               />
             </Box>
 
@@ -1446,17 +1614,13 @@ export default function SettingsPage() {
                 label="Subject"
                 sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
               />
-              <TextField
-                fullWidth
-                multiline
+              <EmailHtmlTemplateField
                 minRows={6}
-                size="small"
                 value={interestTemplates.notificationHtml}
-                onChange={e => updateInterestTemplate("notificationHtml", e.target.value)}
+                onChange={value => updateInterestTemplate("notificationHtml", value)}
                 disabled={interestRecipientsLoading}
                 placeholder="<h2>New Register Interest Submission</h2>"
-                label="HTML Body"
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
+                onError={setInterestRecipientsError}
               />
               <Typography sx={{ fontSize: 11, color: MUTED, mt: -0.5 }}>
                 Available variables: {"{{name}}"}, {"{{email}}"}, {"{{company}}"}, {"{{phone}}"}.
