@@ -18,6 +18,7 @@ import com.nolyvra.app.service.CandidateService;
 import com.nolyvra.app.service.CvFormatService;
 import com.nolyvra.app.service.InterviewQuestionsService;
 import com.nolyvra.app.service.JobApplicationService;
+import com.nolyvra.app.service.NexusPipelineEventPublisher;
 import com.nolyvra.app.service.TalentSearchService;
 import com.nolyvra.app.service.WorkflowService;
 import jakarta.validation.Valid;
@@ -48,6 +49,7 @@ public class CandidatesController {
     private final CandidateExperienceService candidateExperienceService;
     private final JobApplicationService jobApplicationService;
     private final ObjectMapper objectMapper;
+    private final NexusPipelineEventPublisher nexusPipelineEventPublisher;
 
     public CandidatesController(CandidateService candidateService,
                                 WorkflowService workflowService,
@@ -57,7 +59,8 @@ public class CandidatesController {
                                 CandidateFileService candidateFileService,
                                 CandidateExperienceService candidateExperienceService,
                                 JobApplicationService jobApplicationService,
-                                ObjectMapper objectMapper) {
+                                ObjectMapper objectMapper,
+                                NexusPipelineEventPublisher nexusPipelineEventPublisher) {
         this.candidateService          = candidateService;
         this.workflowService           = workflowService;
         this.interviewQuestionsService = interviewQuestionsService;
@@ -67,6 +70,7 @@ public class CandidatesController {
         this.candidateExperienceService = candidateExperienceService;
         this.jobApplicationService     = jobApplicationService;
         this.objectMapper              = objectMapper;
+        this.nexusPipelineEventPublisher = nexusPipelineEventPublisher;
     }
 
     // CHANGE: wrap with try/catch to return 409 on duplicate
@@ -80,6 +84,7 @@ public class CandidatesController {
             // Record timeline event
             workflowService.recordEvent(candidate.id(), loginId, "CANDIDATE_ADDED",
                     "Added to pipeline for " + jobId, null, jobId);
+            nexusPipelineEventPublisher.publishAddedToPipeline(candidate.id(), loginId);
             return candidate;
         } catch (IllegalStateException e) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, e.getMessage());
@@ -314,6 +319,7 @@ public class CandidatesController {
         }
         workflowService.recordEvent(candidateId, loginId, "STAGE_CHANGED",
                 "Stage updated to: " + req.stage(), null);
+        nexusPipelineEventPublisher.publishStageChanged(candidateId, loginId, req.stage());
         return Map.of("stage", req.stage(), "status", "updated");
     }
 
@@ -333,6 +339,7 @@ public class CandidatesController {
         }
         workflowService.recordEvent(candidateId, loginId, "STAGE_CHANGED",
                 "Stage updated to: " + req.stage(), null);
+        nexusPipelineEventPublisher.publishStageChanged(candidateId, loginId, req.stage());
         return Map.of("stage", req.stage(), "status", "updated");
     }
 

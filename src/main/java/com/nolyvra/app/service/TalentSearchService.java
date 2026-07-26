@@ -72,6 +72,8 @@ public class TalentSearchService {
         List<TalentSearchResult> internalResults = searchInternal(filters, loginId);
 
         // Step 3: Search Bright Data (if API key configured)
+        // Re-enabled 2026-07-26 — Nexus integration is now behind its own feature
+        // toggle (nexus.enabled, application.yml) rather than needing this disabled.
         List<TalentSearchResult> externalResults = brightDataApiKey != null && !brightDataApiKey.isBlank()
                 ? searchExternal(filters, loginId, req.query())
                 : List.of();
@@ -266,6 +268,29 @@ public class TalentSearchService {
             System.err.println("[TalentSearch] extractFilters failed (" + e.getMessage() + "), using empty filters");
             return new SearchFilters(List.of(), null, null, 0, List.of(), null);
         }
+    }
+
+    // Exposes AI-extracted skills + location for reuse by NexusBlendedSearchService —
+    // Nexus's search API requires a non-empty skills list and accepts an optional
+    // location filter. Skills fall back to extracted keywords (role-title words) when
+    // no technical skill is named, since many real recruiter queries ("Delivery Lead
+    // Melbourne") mention none. Reuses the exact same extraction the internal DB
+    // search already does — no duplicated prompt logic — but is a second, separate
+    // OpenAI call (not deduped against the one search() already makes for its own
+    // internal-candidate scoring); no additional token deducted here, the recruiter
+    // already paid once for the overall search action.
+    // 2026-07-26 fix: this used to only return skills and silently discard
+    // filters.location() — since NexusBlendedSearchRequest's own location field is
+    // never populated by the frontend today, the query text's location (e.g.
+    // "Melbourne") never reached Nexus at all. Now returns both from the same call.
+    public record NexusSearchFilters(List<String> skills, String location) {}
+
+    public NexusSearchFilters extractNexusSearchFilters(String query) {
+        SearchFilters filters = extractFilters(query);
+        List<String> skills = filters.skills() != null && !filters.skills().isEmpty()
+                ? filters.skills()
+                : (filters.keywords() != null ? filters.keywords() : List.of());
+        return new NexusSearchFilters(skills, filters.location());
     }
 
     // ─── Step 2: Internal DB search ───────────────────────────────────────────

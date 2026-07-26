@@ -12,6 +12,7 @@ import CandidatesPage         from "../pages/CandidatesPage";
 import AddCandidatePage       from "../pages/AddCandidatePage";
 import AnalysisPage           from "../pages/AnalysisPage";
 import TalentSearchPage       from "../pages/TalentSearchPage";
+import NexusMessagesPage      from "../pages/NexusMessagesPage";
 import CandidateWorkflowPage  from "../pages/CandidateWorkflowPage";
 import SchedulerPage          from "../pages/SchedulerPage";
 import EmailCentrePage        from "../pages/EmailCentrePage";
@@ -68,6 +69,7 @@ export default function AppRoutes() {
       <Route path="/candidates/new"                     element={<AddCandidatePage />} />
       <Route path="/analysis/:candidateId"              element={<AnalysisPage />} />
       <Route path="/talent-search"                      element={<TalentSearchPage />} />
+      <Route path="/nexus-messages"                     element={<NexusMessagesPage />} />
       <Route path="/candidates/:candidateId/workflow"           element={<CandidateWorkflowPage />} />
       <Route path="/candidates/:candidateId/interview-analysis" element={<InterviewAnalysisPage />} />
       <Route path="/scheduler"                          element={<SchedulerPage />} />

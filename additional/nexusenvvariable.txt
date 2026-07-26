@@ -1,0 +1,5 @@
+export NEXUS_BASE_URL=http://localhost:8081
+export NOLYVRA_INTEGRATION_SERVICE_TOKEN=dev-only-shared-secret-change-me-before-any-real-deployment-0000
+export NOLYVRA_WEBHOOK_SIGNING_SECRET=dev-only-webhook-secret-change-me-before-any-real-deployment-0000
+export NOLYVRA_IDENTITY_TOKEN_SECRET=dev-only-identity-secret-change-me-before-any-real-deployment-0000
+export NOLYVRA_WEBHOOK_URL=http://localhost:8080/api/nexus/webhook

@@ -15,6 +15,23 @@ const WARN = "#D97706", WARN_BG = "#FFFBEB", WARN_BR = "#FDE68A";
 const DANGER = "#DC2626", DANGER_BG = "#FEF2F2", DANGER_BR = "#FECACA";
 const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
 const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
+const NEXUS = "#0D9488", NEXUS_BG = "#F0FDFA", NEXUS_BR = "#99F6E4";
+
+function sourceAccent(source) {
+  if (source === "CORESIGNAL") return PURPLE;
+  if (source === "NEXUS" || source === "BOTH") return NEXUS;
+  return ACCENT;
+}
+function sourceAccentHover(source) {
+  if (source === "CORESIGNAL") return "#6D28D9";
+  if (source === "NEXUS" || source === "BOTH") return "#0F766E";
+  return "#1660CC";
+}
+function sourceBorder(source) {
+  if (source === "CORESIGNAL") return PURPLE_BR;
+  if (source === "NEXUS" || source === "BOTH") return NEXUS_BR;
+  return ACCENT_BR;
+}
 
 function Tag({ label, variant = "neutral" }) {
   const s = {
@@ -33,6 +50,7 @@ function Badge({ label, variant = "neutral" }) {
   const s = {
     accent:  { bg: ACCENT_BG,  border: ACCENT_BR,  color: ACCENT  },
     purple:  { bg: PURPLE_BG,  border: PURPLE_BR,  color: PURPLE  },
+    nexus:   { bg: NEXUS_BG,   border: NEXUS_BR,   color: NEXUS   },
     neutral: { bg: "#F1F3F7",  border: BORDER,     color: MUTED   },
   }[variant] ?? { bg: "#F1F3F7", border: BORDER, color: MUTED };
   return (
@@ -80,13 +98,113 @@ function CandidateAvatar({ name, avatarUrl, defaultAvatar, size = 38, fontSize =
   );
 }
 
-function SourceBadge({ source }) {
+function SourceBadge({ source, tier }) {
+  if (source === "NEXUS" || source === "BOTH") {
+    return (
+      <Box sx={{ display: "inline-flex", alignItems: "center", gap: "6px", px: "9px", py: "3px", bgcolor: NEXUS_BG, border: `1px solid ${NEXUS_BR}`, borderRadius: "20px", fontSize: 10.5, fontWeight: 600, color: NEXUS, mb: 1 }}>
+        <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: NEXUS, flexShrink: 0 }} />
+        Nexus Verified{tier ? ` · ${tier.replaceAll("_", " ")}` : ""}
+      </Box>
+    );
+  }
   if (source !== "CORESIGNAL") return null;
   return (
     <Box sx={{ display: "inline-flex", alignItems: "center", gap: "6px", px: "9px", py: "3px", bgcolor: ACCENT_BG, border: `1px solid ${ACCENT_BR}`, borderRadius: "20px", fontSize: 10.5, fontWeight: 600, color: ACCENT, mb: 1 }}>
       <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: ACCENT, flexShrink: 0 }} />
       Source · LinkedIn
     </Box>
+  );
+}
+
+// Matches the "Recruiter interest" panel candidates see on their own Nexus profile —
+// same three counts (pipelines/interviewing/shortlisted). No "Placed" count yet: the
+// search response's pipelineActivity only carries these three fields today (contract
+// v0.6) — would need a Nexus-side addition to show a 4th box here.
+// Always renders once pipelineActivity is present, including all-zero counts — a
+// candidate genuinely never in a pipeline yet is a legitimate, informative state, not
+// something to hide (2026-07-26 fix — the old `!pipelineActivity.pipelines` guard hid
+// the whole panel whenever pipeline count was 0, which is the common case).
+function RecruiterInterestPanel({ pipelineActivity }) {
+  if (!pipelineActivity) return null;
+  const { pipelines = 0, interviewing = 0, shortlisted = 0 } = pipelineActivity;
+  const stats = [
+    { label: "In Pipelines", value: pipelines },
+    { label: "Interview Stage", value: interviewing },
+    { label: "Shortlisted", value: shortlisted },
+  ];
+  return (
+    <Box sx={{ mb: 1.25 }}>
+      <Typography sx={{ fontSize: 9.5, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: 0.5, mb: 0.6 }}>
+        Recruiter Interest
+      </Typography>
+      <Box sx={{ display: "flex", gap: 0.6 }}>
+        {stats.map(s => (
+          <Box key={s.label} sx={{ flex: 1, textAlign: "center", bgcolor: NEXUS_BG, border: `1px solid ${NEXUS_BR}`, borderRadius: "8px", py: 0.65, px: 0.4 }}>
+            <Typography sx={{ fontSize: 15, fontWeight: 700, color: NEXUS, lineHeight: 1.15 }}>{s.value}</Typography>
+            <Typography sx={{ fontSize: 8.5, color: MUTED, lineHeight: 1.2, mt: 0.2 }}>{s.label}</Typography>
+          </Box>
+        ))}
+      </Box>
+      <Typography sx={{ fontSize: 9, color: "#B4BCC9", mt: 0.5, fontStyle: "italic" }}>
+        Company names stay private. You see the activity, not who.
+      </Typography>
+    </Box>
+  );
+}
+
+function CredibilityBlock({ c }) {
+  if (c.source !== "NEXUS" && c.source !== "BOTH") return null;
+  return (
+    <Box sx={{ mb: 1 }}>
+      {c.credibilityScore != null && (
+        <Typography sx={{ fontSize: 10.5, color: MUTED, mb: 0.5 }}>
+          Credibility score: <Box component="span" sx={{ fontWeight: 700, color: NEXUS }}>{c.credibilityScore}</Box>
+        </Typography>
+      )}
+      <RecruiterInterestPanel pipelineActivity={c.pipelineActivity} />
+      {c.topSkills?.length > 0 && (
+        <Box>{c.topSkills.map(s => <Tag key={s.skill} label={s.skill} variant="match" />)}</Box>
+      )}
+    </Box>
+  );
+}
+
+// Phone-consent flow — NEXUS-only. Ephemeral: requested/revealed state lives only in
+// the parent's React state, never persisted (never cached, per the contract). No push
+// notification exists yet (needs Step 6's webhook) — the recruiter manually checks.
+function PhoneConsentBlock({ c, requested, revealedPhone, revealStatus, onRequest, onReveal }) {
+  if (c.source !== "NEXUS" || revealedPhone) return null;
+  if (!requested) {
+    return (
+      <Button size="small" variant="outlined" fullWidth
+        onClick={e => { e.stopPropagation(); onRequest(c); }}
+        sx={{ fontSize: 11, borderColor: NEXUS_BR, color: NEXUS, borderRadius: "6px", textTransform: "none", mb: 1.5 }}>
+        Request via Nexus
+      </Button>
+    );
+  }
+  return (
+    <Box sx={{ mb: 1.5 }}>
+      <Button size="small" variant="outlined" fullWidth disabled={revealStatus?.loading}
+        onClick={e => { e.stopPropagation(); onReveal(c); }}
+        sx={{ fontSize: 11, borderColor: NEXUS_BR, color: NEXUS, borderRadius: "6px", textTransform: "none" }}>
+        {revealStatus?.loading ? <CircularProgress size={12} sx={{ color: NEXUS }} /> : "Check for Phone Number"}
+      </Button>
+      {revealStatus?.message && (
+        <Typography sx={{ fontSize: 10.5, color: MUTED, mt: 0.5 }}>{revealStatus.message}</Typography>
+      )}
+    </Box>
+  );
+}
+
+function MessageCandidateButton({ c, onOpen }) {
+  if (c.source !== "NEXUS" && c.source !== "BOTH") return null;
+  return (
+    <Button size="small" variant="outlined" fullWidth
+      onClick={e => { e.stopPropagation(); onOpen(c); }}
+      sx={{ fontSize: 11, borderColor: NEXUS_BR, color: NEXUS, borderRadius: "6px", textTransform: "none", mb: 1.5, "&:hover": { borderColor: NEXUS, bgcolor: NEXUS_BG } }}>
+      Message Candidate
+    </Button>
   );
 }
 
@@ -131,6 +249,7 @@ export function TalentSearchPage() {
   const [allResults, setAllResults]     = useState([]);
   const [noCvError, setNoCvError]       = useState(false);
   const [externalLoadingMore, setExternalLoadingMore] = useState(false);
+  const [nexusPage, setNexusPage] = useState(0);
 
   // ── Pipeline dialog state (unchanged) ────────────────────────────────────
   const [pipelineDialog,    setPipelineDialog]    = useState(false);
@@ -207,6 +326,82 @@ export function TalentSearchPage() {
   const [csProfile,        setCsProfile]        = useState(null);
   const [csProfileLoading, setCsProfileLoading] = useState(false);
 
+  // ── Message candidate dialog (Nexus-only, send-only — see Step 4 design note) ──
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+  const [messageCandidate,  setMessageCandidate]  = useState(null);
+  const [messageBody,       setMessageBody]       = useState("");
+  const [messageSending,    setMessageSending]    = useState(false);
+  const [messageError,      setMessageError]      = useState("");
+  const [messageSent,       setMessageSent]       = useState(false);
+
+  function openMessageDialog(c) {
+    setMessageCandidate(c); setMessageBody(""); setMessageError(""); setMessageSent(false);
+    setMessageDialogOpen(true);
+  }
+
+  async function handleSendMessage() {
+    if (!messageBody.trim() || !messageCandidate?.nexusCandidateId) return;
+    setMessageSending(true); setMessageError("");
+    try {
+      const url = new URL(`${API_BASE}/api/talent-search/nexus-blend/message`);
+      url.searchParams.set("loginId", loginId);
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+        body: JSON.stringify({ nexusCandidateId: messageCandidate.nexusCandidateId, body: messageBody }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setMessageSent(true);
+    } catch (e) { setMessageError(e.message); }
+    finally { setMessageSending(false); }
+  }
+
+  // ── Phone-consent flow (NEXUS-only, ephemeral — never persisted, see Step 5 note) ──
+  const [consentRequested, setConsentRequested] = useState(new Set());
+  const [revealedPhones,   setRevealedPhones]   = useState({});
+  const [revealStatus,     setRevealStatus]     = useState({});
+
+  async function handleRequestConsent(c) {
+    if (!c.nexusCandidateId) return;
+    try {
+      const url = new URL(`${API_BASE}/api/talent-search/nexus-blend/consent-request`);
+      url.searchParams.set("loginId", loginId);
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+        body: JSON.stringify({ nexusCandidateId: c.nexusCandidateId }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setConsentRequested(prev => new Set(prev).add(c.nexusCandidateId));
+    } catch (e) {
+      setRevealStatus(prev => ({ ...prev, [c.nexusCandidateId]: { loading: false, message: "Request failed: " + e.message } }));
+    }
+  }
+
+  async function handleRevealPhone(c) {
+    if (!c.nexusCandidateId) return;
+    setRevealStatus(prev => ({ ...prev, [c.nexusCandidateId]: { loading: true, message: "" } }));
+    try {
+      const url = new URL(`${API_BASE}/api/talent-search/nexus-blend/phone-reveal`);
+      url.searchParams.set("loginId", loginId);
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+        body: JSON.stringify({ nexusCandidateId: c.nexusCandidateId }),
+      });
+      if (res.status === 403) {
+        setRevealStatus(prev => ({ ...prev, [c.nexusCandidateId]: { loading: false, message: "Not granted yet — check back later." } }));
+        return;
+      }
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setRevealedPhones(prev => ({ ...prev, [c.nexusCandidateId]: data.phone }));
+      setRevealStatus(prev => ({ ...prev, [c.nexusCandidateId]: { loading: false, message: "" } }));
+    } catch (e) {
+      setRevealStatus(prev => ({ ...prev, [c.nexusCandidateId]: { loading: false, message: "Something went wrong: " + e.message } }));
+    }
+  }
+
   // ── Selected candidate (right-side detail panel) ─────────────────────────
   const [selected, setSelected] = useState(null);
 
@@ -228,7 +423,7 @@ export function TalentSearchPage() {
   }
 
   async function fetchResults(searchQuery, page) {
-    const url = new URL(`${API_BASE}/api/talent-search/query`);
+    const url = new URL(`${API_BASE}/api/talent-search/nexus-blend`);
     url.searchParams.set("loginId", loginId);
     const res = await fetch(url.toString(), {
       method: "POST",
@@ -276,27 +471,33 @@ export function TalentSearchPage() {
   async function handleLoadMoreExternal() {
     setExternalLoadingMore(true); setError(null);
     try {
-      const url = new URL(`${API_BASE}/api/talent-search/external/load-more`);
+      const url = new URL(`${API_BASE}/api/talent-search/nexus-blend/load-more`);
       url.searchParams.set("loginId", loginId);
       const res = await fetch(url.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` },
-        body: JSON.stringify({ query: searchedQuery }),
+        body: JSON.stringify({ query: searchedQuery, nexusPage }),
       });
       if (res.status === 402) throw new Error("You have run out of tokens. Please upgrade your plan to continue searching.");
       if (!res.ok) throw new Error(await res.text());
-      const fresh = await res.json();
-      const existingIds = new Set(allResults.filter(c => c.coresignalId).map(c => c.coresignalId));
-      const deduped = (fresh ?? []).filter(c => c.coresignalId && !existingIds.has(c.coresignalId));
+      const fresh = (await res.json()).results ?? [];
+      const existingCsIds = new Set(allResults.filter(c => c.coresignalId).map(c => c.coresignalId));
+      const existingNexusIds = new Set(
+        allResults.filter(c => c.source === "NEXUS" || c.source === "BOTH").map(c => c.candidateId || c.identityToken));
+      const deduped = fresh.filter(c => {
+        if (c.coresignalId) return !existingCsIds.has(c.coresignalId);
+        if (c.source === "NEXUS" || c.source === "BOTH") return !existingNexusIds.has(c.candidateId || c.identityToken);
+        return true;
+      });
       const combined = [...allResults, ...deduped];
       const newResult = result && {
         ...result,
         results: combined,
-        coreSignalCount: (result.coreSignalCount ?? 0) + deduped.length,
         totalFound: (result.totalFound ?? 0) + deduped.length,
       };
       setAllResults(combined);
       setResult(newResult);
+      setNexusPage(p => p + 1);
       saveTalentSearchCache(loginId, { query, searchedQuery, result: newResult, allResults: combined, page });
     } catch (e) { setError(e.message); }
     finally { setExternalLoadingMore(false); }
@@ -360,10 +561,12 @@ export function TalentSearchPage() {
   }
 
   function handleViewFullProfile(c) {
-    if ((c.isDB || c.source === "INTERNAL") && c.candidateId) {
+    if ((c.isDB || c.source === "INTERNAL" || c.source === "BOTH") && c.candidateId) {
       nav(`/candidates/${c.candidateId}/workflow`);
     } else if (c.source === "CORESIGNAL" && c.coresignalId) {
       openCoreSignalProfile(c.coresignalId);
+    } else if (c.source === "NEXUS" && c.nexusProfileUrl) {
+      window.open(c.nexusProfileUrl, "_blank", "noopener,noreferrer");
     }
   }
 
@@ -374,6 +577,12 @@ export function TalentSearchPage() {
   // ── Derived display data ──────────────────────────────────────────────────
   const isLoading   = dbMode ? dbLoading : loading;
   const showSection = dbMode ? true : !!(result || loading);
+
+  // Source-breakdown counts for the header badges — computed client-side since
+  // the blended response no longer carries internalCount/coreSignalCount.
+  const internalCount   = (result?.results ?? []).filter(c => c.source === "INTERNAL").length;
+  const coreSignalCount = (result?.results ?? []).filter(c => c.source === "CORESIGNAL").length;
+  const nexusCount      = (result?.results ?? []).filter(c => c.source === "NEXUS" || c.source === "BOTH").length;
 
   // Normalise DB candidates into the same shape the card/table renders expect
   const displayResults = dbMode
@@ -492,8 +701,9 @@ export function TalentSearchPage() {
               {dbMode
                 ? <Badge label={`● ${dbResults.length} total records`} variant="accent" />
                 : <>
-                    <Badge label={`● Internal DB (${result?.internalCount ?? 0})`} variant="accent" />
-                    <Badge label={`● Active Profiles in Market (${result?.coreSignalCount ?? 0})`} variant="purple" />
+                    <Badge label={`● Internal DB (${internalCount})`} variant="accent" />
+                    <Badge label={`● Active Profiles in Market (${coreSignalCount})`} variant="purple" />
+                    <Badge label={`● Nexus Verified (${nexusCount})`} variant="nexus" />
                   </>}
               {/* Cards / Table toggle */}
               <Box sx={{ display: "inline-flex", p: "2px", bgcolor: "#F1F3F7", border: `1px solid ${BORDER}`, borderRadius: "8px", ml: 0.5 }}>
@@ -539,14 +749,14 @@ export function TalentSearchPage() {
             <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 1.5 }}>
               {displayResults.map((c, i) => {
                 const scoreColor = c.matchScore >= 80 ? SUCCESS : c.matchScore >= 60 ? WARN : DANGER;
-                const isCS = c.source === "CORESIGNAL";
+                const accentColor = sourceAccent(c.source);
                 return (
                   <Paper key={i} elevation={0}
                     onClick={() => setSelected(c)}
                     sx={{
                       minWidth: 0,
-                      border: `1px solid ${isCS ? PURPLE_BR : ACCENT_BR}`,
-                      borderLeft: `3px solid ${isCS ? PURPLE : ACCENT}`,
+                      border: `1px solid ${sourceBorder(c.source)}`,
+                      borderLeft: `3px solid ${accentColor}`,
                       borderRadius: "10px", p: 2, bgcolor: "#fff",
                       boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
                       cursor: "pointer",
@@ -558,7 +768,7 @@ export function TalentSearchPage() {
                     <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1.25, gap: 1 }}>
                       <Box sx={{ display: "flex", gap: 1.25, alignItems: "center", minWidth: 0 }}>
                         <CandidateAvatar name={c.name} avatarUrl={c.avatarUrl} defaultAvatar={c.defaultAvatar}
-                          size={38} fontSize={14} bg={isCS ? PURPLE : ACCENT} />
+                          size={38} fontSize={14} bg={accentColor} />
                         <Box sx={{ minWidth: 0 }}>
                           <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.name}</Typography>
                           <Typography sx={{ fontSize: 11, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.currentTitle}</Typography>
@@ -577,8 +787,8 @@ export function TalentSearchPage() {
                       )}
                     </Box>
 
-                    {/* Source badge (AI / CoreSignal only) */}
-                    {c.isAI && <SourceBadge source={c.source} />}
+                    {/* Source badge (AI / CoreSignal / Nexus) */}
+                    {c.isAI && <SourceBadge source={c.source} tier={c.tier} />}
 
                     {/* Skill tags */}
                     {c.isAI && (
@@ -588,13 +798,22 @@ export function TalentSearchPage() {
                       </Box>
                     )}
 
+                    {/* Nexus credibility signals */}
+                    {c.isAI && <CredibilityBlock c={c} />}
+
                     {/* Company line */}
                     <Typography sx={{ fontSize: 11, color: MUTED, mb: 1.25 }}>
                       {c.currentCompany}{c.yearsExperience ? ` · ${c.yearsExperience} yrs exp` : ""}
                     </Typography>
 
                     {/* Contact block */}
-                    <ContactBlock email={c.email} phone={c.phone} linkedin={c.linkedinUrl} />
+                    <ContactBlock email={c.email} phone={revealedPhones[c.nexusCandidateId] ?? c.phone} linkedin={c.linkedinUrl} />
+                    <PhoneConsentBlock c={c}
+                      requested={consentRequested.has(c.nexusCandidateId)}
+                      revealedPhone={revealedPhones[c.nexusCandidateId]}
+                      revealStatus={revealStatus[c.nexusCandidateId]}
+                      onRequest={handleRequestConsent} onReveal={handleRevealPhone} />
+                    <MessageCandidateButton c={c} onOpen={openMessageDialog} />
 
                     {/* Action buttons */}
                     <Box sx={{ display: "flex", gap: 0.75 }} onClick={e => e.stopPropagation()}>
@@ -604,11 +823,17 @@ export function TalentSearchPage() {
                           sx={{ flex: 1, fontSize: 11, bgcolor: ACCENT, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
                           View Profile
                         </Button>
-                      ) : c.source === "INTERNAL" ? (
+                      ) : (c.source === "INTERNAL" || c.source === "BOTH") ? (
                         <Button size="small" variant="contained"
                           onClick={() => c.candidateId && nav(`/candidates/${c.candidateId}/workflow`)}
                           sx={{ flex: 1, fontSize: 11, bgcolor: ACCENT, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
                           View Profile
+                        </Button>
+                      ) : c.source === "NEXUS" ? (
+                        <Button size="small" variant="contained"
+                          onClick={() => window.open(c.nexusProfileUrl, "_blank", "noopener,noreferrer")}
+                          sx={{ flex: 1, fontSize: 11, bgcolor: NEXUS, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#0F766E", boxShadow: "none" } }}>
+                          View on Nexus
                         </Button>
                       ) : (
                         <Button size="small" variant="contained"
@@ -656,6 +881,7 @@ export function TalentSearchPage() {
                   {displayResults.map((c, i) => {
                     const scoreColor = c.matchScore >= 80 ? SUCCESS : c.matchScore >= 60 ? WARN : DANGER;
                     const isCS = c.source === "CORESIGNAL";
+                    const rowAccent = sourceAccent(c.source);
                     const emptyStyle = { color: "#C2C8D4", fontWeight: 400 };
                     const val = v => v || "—";
                     const valSx = v => v ? { fontSize: 12, fontWeight: 500, color: TEXT } : { fontSize: 12, ...emptyStyle };
@@ -666,7 +892,7 @@ export function TalentSearchPage() {
                         <TableCell sx={{ py: 1.25 }}>
                           <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
                             <CandidateAvatar name={c.name} avatarUrl={c.avatarUrl} defaultAvatar={c.defaultAvatar}
-                              size={30} fontSize={12} bg={isCS ? PURPLE : ACCENT} />
+                              size={30} fontSize={12} bg={rowAccent} />
                             <Box sx={{ minWidth: 0 }}>
                               <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: TEXT, whiteSpace: "nowrap" }}>{c.name}</Typography>
                               <Typography sx={{ fontSize: 10.5, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 160 }}>{c.currentTitle}</Typography>
@@ -687,7 +913,7 @@ export function TalentSearchPage() {
                               {c.statusLabel}
                             </Box>
                           ) : (
-                            <SourceBadge source={c.source} />
+                            <SourceBadge source={c.source} tier={c.tier} />
                           )}
                         </TableCell>
                         <TableCell sx={{ py: 1.25, textAlign: "right", whiteSpace: "nowrap" }}>
@@ -696,10 +922,11 @@ export function TalentSearchPage() {
                             onClick={e => {
                               e.stopPropagation();
                               if (isCS && c.coresignalId) openCoreSignalProfile(c.coresignalId);
+                              else if (c.source === "NEXUS" && c.nexusProfileUrl) window.open(c.nexusProfileUrl, "_blank", "noopener,noreferrer");
                               else if (c.candidateId) nav(`/candidates/${c.candidateId}/workflow`);
                             }}
-                            sx={{ fontSize: 11, bgcolor: isCS ? PURPLE : ACCENT, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: isCS ? "#6D28D9" : "#1660CC", boxShadow: "none" } }}>
-                            {isCS ? "View Details" : "View"}
+                            sx={{ fontSize: 11, bgcolor: rowAccent, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: sourceAccentHover(c.source), boxShadow: "none" } }}>
+                            {isCS ? "View Details" : c.source === "NEXUS" ? "View on Nexus" : "View"}
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -748,16 +975,16 @@ export function TalentSearchPage() {
 
               <Box sx={{ display: "flex", gap: 1.25, alignItems: "center", mb: 1.5 }}>
                 <CandidateAvatar name={selected.name} avatarUrl={selected.avatarUrl} defaultAvatar={selected.defaultAvatar}
-                  size={44} fontSize={16} bg={selected.source === "CORESIGNAL" ? PURPLE : ACCENT} />
+                  size={44} fontSize={16} bg={sourceAccent(selected.source)} />
                 <Box sx={{ minWidth: 0 }}>
                   <Typography sx={{ fontSize: 14, fontWeight: 700, color: TEXT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{selected.name}</Typography>
                   <Typography sx={{ fontSize: 12, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{selected.currentTitle}</Typography>
                 </Box>
               </Box>
 
-              {selected.isAI && <SourceBadge source={selected.source} />}
+              {selected.isAI && <SourceBadge source={selected.source} tier={selected.tier} />}
 
-              {(selected.currentCompany || selected.yearsExperience) && (
+              {(selected.currentCompany || selected.yearsExperience > 0) && (
                 <Typography sx={{ fontSize: 12, color: MUTED, mb: 1.5 }}>
                   {selected.currentCompany}{selected.yearsExperience ? ` · ${selected.yearsExperience} yrs exp` : ""}
                 </Typography>
@@ -772,7 +999,15 @@ export function TalentSearchPage() {
                 </Box>
               )}
 
-              <ContactBlock email={selected.email} phone={selected.phone} linkedin={selected.linkedinUrl} />
+              {selected.isAI && <CredibilityBlock c={selected} />}
+
+              <ContactBlock email={selected.email} phone={revealedPhones[selected.nexusCandidateId] ?? selected.phone} linkedin={selected.linkedinUrl} />
+              <PhoneConsentBlock c={selected}
+                requested={consentRequested.has(selected.nexusCandidateId)}
+                revealedPhone={revealedPhones[selected.nexusCandidateId]}
+                revealStatus={revealStatus[selected.nexusCandidateId]}
+                onRequest={handleRequestConsent} onReveal={handleRevealPhone} />
+              <MessageCandidateButton c={selected} onOpen={openMessageDialog} />
 
               {(selected.matchedSkills?.length > 0 || selected.gapSkills?.length > 0) && (
                 <Box sx={{ mb: 2 }}>
@@ -794,8 +1029,8 @@ export function TalentSearchPage() {
                 <Button variant="contained" fullWidth onClick={() => handleViewFullProfile(selected)}
                   sx={{
                     fontSize: 12, borderRadius: "7px", textTransform: "none", boxShadow: "none",
-                    bgcolor: selected.source === "CORESIGNAL" ? PURPLE : ACCENT,
-                    "&:hover": { bgcolor: selected.source === "CORESIGNAL" ? "#6D28D9" : "#1660CC", boxShadow: "none" },
+                    bgcolor: sourceAccent(selected.source),
+                    "&:hover": { bgcolor: sourceAccentHover(selected.source), boxShadow: "none" },
                   }}>
                   View Full Profile
                 </Button>
@@ -1073,6 +1308,49 @@ export function TalentSearchPage() {
             sx={{ fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none" }}>
             Close
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Message candidate dialog (Nexus-only, send-only) ──────────────── */}
+      <Dialog open={messageDialogOpen} onClose={() => !messageSending && setMessageDialogOpen(false)}
+        maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "12px" } }}>
+        <DialogTitle sx={{ fontSize: 14, fontWeight: 600, color: TEXT, pb: 1 }}>
+          Message {messageCandidate?.name ?? "Candidate"}
+        </DialogTitle>
+        <DialogContent>
+          {messageSent ? (
+            <Alert severity="success">Message sent to {messageCandidate?.name}.</Alert>
+          ) : (
+            <>
+              <Typography sx={{ fontSize: 12, color: MUTED, mb: 1.5 }}>
+                Sent via Nexus messaging. The candidate will see this the next time they check their Nexus inbox.
+              </Typography>
+              <TextField multiline rows={4} fullWidth autoFocus
+                value={messageBody} onChange={e => setMessageBody(e.target.value)}
+                placeholder="Write your message…"
+                sx={{ mb: 1 }} />
+              {messageError && <Alert severity="error" sx={{ mt: 1 }}>{messageError}</Alert>}
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, pt: 1.5, borderTop: `1px solid ${BORDER}` }}>
+          {messageSent ? (
+            <Button variant="contained" size="small" onClick={() => setMessageDialogOpen(false)}
+              sx={{ fontSize: 12, bgcolor: NEXUS, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#0F766E", boxShadow: "none" } }}>
+              Done
+            </Button>
+          ) : (
+            <>
+              <Button variant="outlined" size="small" disabled={messageSending} onClick={() => setMessageDialogOpen(false)}
+                sx={{ fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none" }}>
+                Cancel
+              </Button>
+              <Button variant="contained" size="small" disabled={messageSending || !messageBody.trim()} onClick={handleSendMessage}
+                sx={{ fontSize: 12, bgcolor: NEXUS, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#0F766E", boxShadow: "none" } }}>
+                {messageSending ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Send"}
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
     </Box>
