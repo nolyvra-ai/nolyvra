@@ -49,6 +49,15 @@ public class EmployeeController {
         return employeeService.list(loginId, status, departmentId, managerId);
     }
 
+    // Tenant-only self-service: resolves (creating if needed) the employee
+    // record that represents the Nolyvra account holder, so they can submit
+    // and approve their own timesheet through the normal employee-scoped flow.
+    @GetMapping("/employees/me")
+    public EmployeeResponse getOwnEmployee(@RequestParam String loginId) {
+        entitlementService.checkEntitled(loginId);
+        return employeeService.getOrCreateOwnerEmployee(loginId);
+    }
+
     @GetMapping("/employees/{id}")
     public EmployeeResponse getById(
             @PathVariable String id,

@@ -137,6 +137,7 @@ export default function CrmTimesheetsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [empFilter,    setEmpFilter]    = useState("");
   const [actionDialog, setActionDialog] = useState({ open: false, action: "", timesheetId: "" });
+  const [exporting,    setExporting]    = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -167,6 +168,24 @@ export default function CrmTimesheetsPage() {
       .catch(() => {});
   }
 
+  async function exportExcel() {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({ loginId });
+      if (statusFilter) params.set("status", statusFilter);
+      if (empFilter)    params.set("employeeId", empFilter);
+      const res = await fetch(`${API_BASE}/api/crm/timesheets/export?${params.toString()}`, { headers: authH() });
+      if (!res.ok) { alert(await res.text()); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "timesheets.xlsx";
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) { alert(e.message); }
+    finally { setExporting(false); }
+  }
+
   const filtered = timesheets.filter(t => {
     if (statusFilter && t.status !== statusFilter) return false;
     if (empFilter    && t.employeeId !== empFilter) return false;
@@ -192,6 +211,14 @@ export default function CrmTimesheetsPage() {
             Review and approve employee weekly timesheets
           </Typography>
         </Box>
+        <Button variant="outlined" onClick={exportExcel} disabled={exporting} startIcon={
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        } sx={{
+          fontSize: 12, fontWeight: 600, textTransform: "none", borderRadius: "8px",
+          borderColor: BORDER, color: TEXT, "&:hover": { borderColor: PURPLE, color: PURPLE, bgcolor: "transparent" },
+        }}>
+          {exporting ? "Exporting…" : "Export to Excel"}
+        </Button>
       </Box>
 
       {loading ? (

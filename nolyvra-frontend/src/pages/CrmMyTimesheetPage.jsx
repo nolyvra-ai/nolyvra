@@ -79,20 +79,34 @@ function StatusChip({ status }) {
   );
 }
 
+function blankRow(workDate) {
+  const id = (typeof crypto !== "undefined" && crypto.randomUUID)
+    ? crypto.randomUUID() : `${workDate}-${Math.random().toString(36).slice(2)}`;
+  return { id, workDate, hours: "", note: "" };
+}
+
 function NewTimesheetDialog({ open, onClose, loginId, employeeId, onCreated }) {
   const [anyDay,  setAnyDay]  = useState(toDateStr(new Date()));
-  const [rows,    setRows]    = useState(() => weekDates(toDateStr(mondayOf(toDateStr(new Date())))).map(d => ({ workDate: d, hours: "", note: "" })));
+  const [rows,    setRows]    = useState(() => weekDates(toDateStr(mondayOf(toDateStr(new Date())))).map(blankRow));
   const [saving,  setSaving]  = useState(false);
   const [err,     setErr]     = useState("");
 
   const monday = toDateStr(mondayOf(anyDay));
 
   useEffect(() => {
-    setRows(weekDates(monday).map(d => ({ workDate: d, hours: "", note: "" })));
+    setRows(weekDates(monday).map(blankRow));
   }, [monday]);
 
-  function updateRow(i, field, value) {
-    setRows(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: value } : r));
+  function updateRow(id, field, value) {
+    setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
+  }
+
+  function addRow(workDate) {
+    setRows(prev => [...prev, blankRow(workDate)]);
+  }
+
+  function removeRow(id) {
+    setRows(prev => prev.filter(r => r.id !== id));
   }
 
   const total = rows.reduce((sum, r) => sum + (parseFloat(r.hours) || 0), 0);
@@ -106,18 +120,18 @@ function NewTimesheetDialog({ open, onClose, loginId, employeeId, onCreated }) {
     if (total <= 0) { setErr("Enter at least some hours for the week."); return; }
     setSaving(true);
     try {
+      const days = rows
+        .filter(r => r.hours !== "" || (r.note && r.note.trim()))
+        .map(r => ({
+          workDate: r.workDate,
+          hours: parseFloat(r.hours) || 0,
+          note: r.note || null,
+        }));
       const res = await fetch(
         `${API_BASE}/api/crm/employees/${employeeId}/timesheets?loginId=${loginId}`,
         {
           method: "POST", headers: { ...authH(), "Content-Type": "application/json" },
-          body: JSON.stringify({
-            weekStartDate: monday,
-            days: rows.map(r => ({
-              workDate: r.workDate,
-              hours: parseFloat(r.hours) || 0,
-              note: r.note || null,
-            })),
-          }),
+          body: JSON.stringify({ weekStartDate: monday, days }),
         }
       );
       if (!res.ok) {
@@ -132,6 +146,8 @@ function NewTimesheetDialog({ open, onClose, loginId, employeeId, onCreated }) {
     finally { setSaving(false); }
   }
 
+  const days = weekDates(monday);
+
   return (
     <Dialog open={open} onClose={() => { reset(); onClose(); }} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ fontSize: 15, fontWeight: 700, pb: 1 }}>New Timesheet</DialogTitle>
@@ -143,19 +159,41 @@ function NewTimesheetDialog({ open, onClose, loginId, employeeId, onCreated }) {
           helperText={`Week: ${monday} → ${weekDates(monday)[6]}`} />
 
         <Box>
-          {rows.map((r, i) => (
-            <Box key={r.workDate} sx={{ display: "flex", gap: 1.5, alignItems: "center", mb: 1 }}>
-              <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: TEXT, width: 90, flexShrink: 0 }}>
-                {DAY_LABELS[i]} {r.workDate.slice(5)}
-              </Typography>
-              <TextField size="small" type="number" placeholder="Hours" value={r.hours}
-                onChange={e => updateRow(i, "hours", e.target.value)}
-                sx={{ width: 90, "& .MuiInputBase-input": { fontSize: 12 } }} />
-              <TextField size="small" placeholder="Note (optional)" value={r.note}
-                onChange={e => updateRow(i, "note", e.target.value)} fullWidth
-                sx={{ "& .MuiInputBase-input": { fontSize: 12 } }} />
-            </Box>
-          ))}
+          {days.map((d, i) => {
+            const dayRows = rows.filter(r => r.workDate === d);
+            return (
+              <Box key={d} sx={{ mb: 1 }}>
+                {dayRows.map((r, ri) => (
+                  <Box key={r.id} sx={{ display: "flex", gap: 1.5, alignItems: "center", mb: 0.5 }}>
+                    <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: TEXT, width: 90, flexShrink: 0 }}>
+                      {ri === 0 ? `${DAY_LABELS[i]} ${d.slice(5)}` : ""}
+                    </Typography>
+                    <TextField size="small" type="number" placeholder="Hours" value={r.hours}
+                      onChange={e => updateRow(r.id, "hours", e.target.value)}
+                      sx={{ width: 90, "& .MuiInputBase-input": { fontSize: 12 } }} />
+                    <TextField size="small" placeholder="Note (optional)" value={r.note}
+                      onChange={e => updateRow(r.id, "note", e.target.value)} fullWidth
+                      sx={{ "& .MuiInputBase-input": { fontSize: 12 } }} />
+                    {ri === 0 ? (
+                      <Tooltip title="Add another entry for this day">
+                        <IconButton size="small" onClick={() => addRow(d)}
+                          sx={{ color: MUTED, "&:hover": { color: PURPLE } }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        </IconButton>
+                      </Tooltip>
+                    ) : (
+                      <Tooltip title="Remove this entry">
+                        <IconButton size="small" onClick={() => removeRow(r.id)}
+                          sx={{ color: MUTED, "&:hover": { color: DANGER } }}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Box>
+                ))}
+              </Box>
+            );
+          })}
         </Box>
 
         <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: TEXT, textAlign: "right" }}>
@@ -176,13 +214,28 @@ function NewTimesheetDialog({ open, onClose, loginId, employeeId, onCreated }) {
 }
 
 export default function CrmMyTimesheetPage() {
-  const loginId    = localStorage.getItem("loginId")    || "";
-  const employeeId = localStorage.getItem("employeeId") || "";
+  const loginId = localStorage.getItem("loginId") || "";
+
+  // Employee sessions already have their own employeeId in localStorage.
+  // Tenant (Nolyvra account holder) sessions don't — resolve/create the
+  // owner's own employee record via /employees/me instead.
+  const [employeeId, setEmployeeId] = useState(localStorage.getItem("employeeId") || "");
+  const [resolvingEmployee, setResolvingEmployee] = useState(!employeeId);
 
   const [timesheets, setTimesheets] = useState([]);
   const [loading,     setLoading]   = useState(true);
   const [error,       setError]     = useState(null);
   const [showNew,     setShowNew]   = useState(false);
+
+  useEffect(() => {
+    if (employeeId) return;
+    setResolvingEmployee(true);
+    fetch(`${API_BASE}/api/crm/employees/me?loginId=${loginId}`, { headers: authH() })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(`Employees/me: ${r.status}`)))
+      .then(d => setEmployeeId(d.id))
+      .catch(e => setError(e.message))
+      .finally(() => setResolvingEmployee(false));
+  }, [loginId, employeeId]);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -229,7 +282,7 @@ export default function CrmMyTimesheetPage() {
             Log your weekly hours and track approval
           </Typography>
         </Box>
-        <Button variant="contained" onClick={() => setShowNew(true)} startIcon={
+        <Button variant="contained" onClick={() => setShowNew(true)} disabled={resolvingEmployee} startIcon={
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         } sx={{
           fontSize: 12, fontWeight: 600, textTransform: "none", borderRadius: "8px", boxShadow: "none",

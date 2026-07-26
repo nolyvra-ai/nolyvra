@@ -5,7 +5,10 @@ import com.nolyvra.app.model.*;
 import com.nolyvra.app.service.CrmEntitlementService;
 import com.nolyvra.app.service.TimesheetService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -76,5 +79,19 @@ public class TimesheetController {
     public TimesheetAnalyticsResponse analytics(@RequestParam String loginId) {
         entitlementService.checkEntitled(loginId);
         return timesheetService.getAnalytics(loginId);
+    }
+
+    // Admin only — not reachable by employee sessions (not on the interceptor allowlist).
+    @GetMapping("/timesheets/export")
+    public ResponseEntity<byte[]> export(
+            @RequestParam String loginId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String employeeId) {
+        entitlementService.checkEntitled(loginId);
+        byte[] xlsx = timesheetService.exportToExcel(loginId, status, employeeId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"timesheets.xlsx\"")
+                .body(xlsx);
     }
 }

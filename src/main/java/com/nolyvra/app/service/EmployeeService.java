@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -141,6 +142,41 @@ public class EmployeeService {
                 req.jobTitle(), req.employmentType().name(), status,
                 req.managerId(), req.departmentId(),
                 req.startDate(), req.endDate(), DEFAULT_PASSWORD_HASH);
+        return getById(id, loginId).orElseThrow();
+    }
+
+    // ─── Owner (tenant self-service) employee record ─────────────────────────
+    // Lets the Nolyvra account holder submit/approve their own timesheet
+    // through the existing employee-scoped flow. Created lazily on first use
+    // and linked via login.owner_employee_id so repeat calls are idempotent.
+
+    @Transactional
+    public EmployeeResponse getOrCreateOwnerEmployee(String loginId) {
+        Map<String, Object> login = jdbc.queryForMap(
+                "SELECT name, email, owner_employee_id FROM login WHERE id = ?", loginId);
+
+        String existingId = (String) login.get("owner_employee_id");
+        if (existingId != null) {
+            Optional<EmployeeResponse> existing = getById(existingId, loginId);
+            if (existing.isPresent()) return existing.get();
+        }
+
+        String[] name = splitName((String) login.get("name"));
+        String email = login.get("email") != null ? (String) login.get("email") : loginId;
+
+        String id = "emp-" + UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO employees
+                  (id, login_id, first_name, last_name, email,
+                   job_title, employment_type, status, password_hash)
+                VALUES (?,?,?,?,?,?,?,?,?)
+                """,
+                id, loginId, name[0], name[1], email,
+                "Account Owner", EmploymentType.PERMANENT.name(),
+                EmployeeStatus.ACTIVE.name(), DEFAULT_PASSWORD_HASH);
+
+        jdbc.update("UPDATE login SET owner_employee_id = ? WHERE id = ?", id, loginId);
+
         return getById(id, loginId).orElseThrow();
     }
 

@@ -1,12 +1,20 @@
 package com.nolyvra.app.service;
 
 import com.nolyvra.app.model.*;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.ByteArrayOutputStream;
+import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Timestamp;
@@ -216,5 +224,72 @@ public class TimesheetService {
         BigDecimal totalYear  = byEmployee.stream().map(EmployeeHoursSummary::hoursThisYear).reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return new TimesheetAnalyticsResponse(totalWeek, totalMonth, totalYear, byEmployee);
+    }
+
+    // ─── Excel export ─────────────────────────────────────────────────────────
+    // Tenant-only (see TimesheetController) — one summary row per submitted
+    // week plus a detail sheet with every individual day entry.
+
+    public byte[] exportToExcel(String loginId, String status, String employeeId) {
+        List<TimesheetResponse> timesheets = listAll(loginId, status, employeeId);
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            CellStyle headerStyle = workbook.createCellStyle();
+            headerStyle.setFont(headerFont);
+
+            Sheet summary = workbook.createSheet("Timesheets");
+            String[] summaryHeaders = {
+                    "Employee", "Week Start", "Week End", "Total Hours",
+                    "Status", "Approver Comment", "Actioned At"
+            };
+            writeHeaderRow(summary, headerStyle, summaryHeaders);
+
+            Sheet detail = workbook.createSheet("Daily Entries");
+            String[] detailHeaders = { "Employee", "Date", "Hours", "Note" };
+            writeHeaderRow(detail, headerStyle, detailHeaders);
+
+            int summaryRowNum = 1;
+            int detailRowNum = 1;
+            for (TimesheetResponse ts : timesheets) {
+                String employeeName = ts.employeeFirstName() + " " + ts.employeeLastName();
+
+                Row row = summary.createRow(summaryRowNum++);
+                row.createCell(0).setCellValue(employeeName);
+                row.createCell(1).setCellValue(ts.weekStartDate() != null ? ts.weekStartDate().toString() : "");
+                row.createCell(2).setCellValue(ts.weekStartDate() != null ? ts.weekStartDate().plusDays(6).toString() : "");
+                row.createCell(3).setCellValue(ts.totalHours() != null ? ts.totalHours().doubleValue() : 0);
+                row.createCell(4).setCellValue(ts.status());
+                row.createCell(5).setCellValue(ts.approverComment() != null ? ts.approverComment() : "");
+                row.createCell(6).setCellValue(ts.actionedAt() != null ? ts.actionedAt().toString() : "");
+
+                for (TimesheetDayEntry day : ts.days()) {
+                    Row dRow = detail.createRow(detailRowNum++);
+                    dRow.createCell(0).setCellValue(employeeName);
+                    dRow.createCell(1).setCellValue(day.workDate().toString());
+                    dRow.createCell(2).setCellValue(day.hours() != null ? day.hours().doubleValue() : 0);
+                    dRow.createCell(3).setCellValue(day.note() != null ? day.note() : "");
+                }
+            }
+
+            for (int i = 0; i < summaryHeaders.length; i++) summary.autoSizeColumn(i);
+            for (int i = 0; i < detailHeaders.length; i++) detail.autoSizeColumn(i);
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            workbook.write(out);
+            return out.toByteArray();
+        } catch (java.io.IOException e) {
+            throw new UncheckedIOException("Failed to generate timesheet export", e);
+        }
+    }
+
+    private void writeHeaderRow(Sheet sheet, CellStyle headerStyle, String[] headers) {
+        Row headerRow = sheet.createRow(0);
+        for (int i = 0; i < headers.length; i++) {
+            Cell cell = headerRow.createCell(i);
+            cell.setCellValue(headers[i]);
+            cell.setCellStyle(headerStyle);
+        }
     }
 }
