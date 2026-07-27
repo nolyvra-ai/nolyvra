@@ -116,7 +116,7 @@ public class AuthController {
         boolean ok = userService.registerInterest(firstName, lastName, company, email, phone);
         if (!ok) {
             return ResponseEntity.badRequest()
-                    .body(Map.of("error", "An account with this email already exists."));
+                    .body(Map.of("error", "User already exists. Please proceed to login."));
         }
         registerInterestNotificationService.notifyNewRegistration(firstName, lastName, company, email, phone);
         return ResponseEntity.ok(Map.of("status", "registered"));

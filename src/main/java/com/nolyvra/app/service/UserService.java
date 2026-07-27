@@ -1,5 +1,6 @@
 package com.nolyvra.app.service;
 
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -59,16 +60,23 @@ public class UserService {
 
     public boolean registerInterest(String firstName, String lastName,
                                     String company, String email, String phone) {
+        // Pre-check against email (the column the unique constraint is actually
+        // on) rather than id — id isn't guaranteed to equal email for every row.
         List<String> existing = jdbc.query(
-                "select id from login where id = ?",
+                "select id from login where email = ?",
                 (rs, r) -> rs.getString("id"), email);
         if (!existing.isEmpty()) return false;
 
         String name = (firstName + " " + lastName).trim();
-        jdbc.update("""
-                insert into login (id, name, company, email, password_hash, plan_id, phone_number, created_at)
-                values (?, ?, ?, ?, '', 'registered', ?, now())
-                """, email, name, company, email, phone.isBlank() ? null : phone);
+        try {
+            jdbc.update("""
+                    insert into login (id, name, company, email, password_hash, plan_id, phone_number, created_at)
+                    values (?, ?, ?, ?, '', 'registered', ?, now())
+                    """, email, name, company, email, phone.isBlank() ? null : phone);
+        } catch (DuplicateKeyException e) {
+            // Safety net for a concurrent registration racing the pre-check above.
+            return false;
+        }
 
         return true;
     }
