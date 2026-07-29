@@ -25,6 +25,10 @@ spring:
           starttls:
             enable: true
 
+password-reset:
+  frontend-url: ${PASSWORD_RESET_FRONTEND_URL:http://localhost:5173}
+  token-ttl-minutes: ${PASSWORD_RESET_TOKEN_TTL_MINUTES:30}
+
 coworker:
   analysis-pool-size: ${COWORKER_ANALYSIS_POOL_SIZE:3}
 
