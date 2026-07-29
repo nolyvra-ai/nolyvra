@@ -19,6 +19,11 @@ import java.util.Locale;
 @Service
 public class PasswordResetService {
 
+    public enum AccountType {
+        TENANT,
+        EMPLOYEE
+    }
+
     private static final int TOKEN_BYTES = 32;
     private static final int MIN_PASSWORD_LENGTH = 8;
 
@@ -59,7 +64,17 @@ public class PasswordResetService {
      */
     @Transactional
     public void requestReset(String email) {
+        requestReset(email, AccountType.TENANT);
+    }
+
+    @Transactional
+    public void requestReset(String email, AccountType accountType) {
         String normalizedEmail = normalizeEmail(email);
+        if (accountType == AccountType.EMPLOYEE) {
+            requestEmployeeReset(normalizedEmail);
+            return;
+        }
+
         List<Account> accounts = jdbc.query("""
                 select id, email
                 from login
@@ -79,7 +94,7 @@ public class PasswordResetService {
                 where login_id = ?
                   and used_at is null
                   and created_at > now() - interval '60 seconds'
-                """, Integer.class, account.loginId());
+                """, Integer.class, account.id());
         if (recentRequests != null && recentRequests > 0) {
             return;
         }
@@ -89,7 +104,7 @@ public class PasswordResetService {
                 set used_at = ?
                 where login_id = ?
                   and used_at is null
-                """, OffsetDateTime.now(clock), account.loginId());
+                """, OffsetDateTime.now(clock), account.id());
 
         String rawToken = generateToken();
         OffsetDateTime now = OffsetDateTime.now(clock);
@@ -97,26 +112,32 @@ public class PasswordResetService {
                 insert into password_reset_tokens
                     (token_hash, login_id, created_at, expires_at)
                 values (?, ?, ?, ?)
-                """, hash(rawToken), account.loginId(), now, now.plusMinutes(tokenTtlMinutes));
+                """, hash(rawToken), account.id(), now, now.plusMinutes(tokenTtlMinutes));
 
-        String resetUrl = frontendUrl + "/reset-password?token=" + rawToken;
-        resendEmailService.sendText(
-                account.email(),
-                "Reset your nolyvra password",
-                """
-                We received a request to reset your nolyvra password.
-
-                Use this link within %d minutes:
-                %s
-
-                If you did not request a password reset, you can ignore this email.
-                """.formatted(tokenTtlMinutes, resetUrl));
+        sendResetEmail(account.email(), rawToken, AccountType.TENANT);
     }
 
     public boolean isTokenValid(String rawToken) {
+        return isTokenValid(rawToken, AccountType.TENANT);
+    }
+
+    public boolean isTokenValid(String rawToken, AccountType accountType) {
         if (rawToken == null || rawToken.isBlank()) {
             return false;
         }
+        if (accountType == AccountType.EMPLOYEE) {
+            Integer matches = jdbc.queryForObject("""
+                    select count(*)
+                    from employee_password_reset_tokens prt
+                    join employees e on e.id = prt.employee_id
+                    where prt.token_hash = ?
+                      and prt.used_at is null
+                      and prt.expires_at > now()
+                      and e.is_active = true
+                    """, Integer.class, hash(rawToken));
+            return matches != null && matches > 0;
+        }
+
         Integer matches = jdbc.queryForObject("""
                 select count(*)
                 from password_reset_tokens
@@ -129,9 +150,18 @@ public class PasswordResetService {
 
     @Transactional
     public boolean resetPassword(String rawToken, String newPassword) {
+        return resetPassword(rawToken, newPassword, AccountType.TENANT);
+    }
+
+    @Transactional
+    public boolean resetPassword(String rawToken, String newPassword, AccountType accountType) {
         if (rawToken == null || rawToken.isBlank()
                 || newPassword == null || newPassword.length() < MIN_PASSWORD_LENGTH) {
             return false;
+        }
+
+        if (accountType == AccountType.EMPLOYEE) {
+            return resetEmployeePassword(rawToken, newPassword);
         }
 
         List<String> loginIds = jdbc.query("""
@@ -162,6 +192,98 @@ public class PasswordResetService {
         return true;
     }
 
+    private void requestEmployeeReset(String normalizedEmail) {
+        List<Account> employees = jdbc.query("""
+                select id, email
+                from employees
+                where lower(email) = ?
+                  and is_active = true
+                order by created_at
+                limit 1
+                """,
+                (rs, rowNum) -> new Account(rs.getString("id"), rs.getString("email")),
+                normalizedEmail);
+        if (employees.isEmpty()) {
+            return;
+        }
+
+        Account employee = employees.get(0);
+        Integer recentRequests = jdbc.queryForObject("""
+                select count(*)
+                from employee_password_reset_tokens
+                where employee_id = ?
+                  and used_at is null
+                  and created_at > now() - interval '60 seconds'
+                """, Integer.class, employee.id());
+        if (recentRequests != null && recentRequests > 0) {
+            return;
+        }
+
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        jdbc.update("""
+                update employee_password_reset_tokens
+                set used_at = ?
+                where employee_id = ?
+                  and used_at is null
+                """, now, employee.id());
+
+        String rawToken = generateToken();
+        jdbc.update("""
+                insert into employee_password_reset_tokens
+                    (token_hash, employee_id, created_at, expires_at)
+                values (?, ?, ?, ?)
+                """, hash(rawToken), employee.id(), now, now.plusMinutes(tokenTtlMinutes));
+        sendResetEmail(employee.email(), rawToken, AccountType.EMPLOYEE);
+    }
+
+    private boolean resetEmployeePassword(String rawToken, String newPassword) {
+        List<String> employeeIds = jdbc.query("""
+                update employee_password_reset_tokens prt
+                set used_at = ?
+                from employees e
+                where prt.token_hash = ?
+                  and prt.used_at is null
+                  and prt.expires_at > now()
+                  and e.id = prt.employee_id
+                  and e.is_active = true
+                returning prt.employee_id
+                """,
+                (rs, rowNum) -> rs.getString("employee_id"),
+                OffsetDateTime.now(clock), hash(rawToken));
+        if (employeeIds.isEmpty()) {
+            return false;
+        }
+
+        String employeeId = employeeIds.get(0);
+        jdbc.update("""
+                update employees
+                set password_hash = ?, updated_at = ?
+                where id = ? and is_active = true
+                """, hash(newPassword), OffsetDateTime.now(clock), employeeId);
+        jdbc.update("""
+                update employee_sessions
+                set is_active = false
+                where employee_id = ? and is_active = true
+                """, employeeId);
+        return true;
+    }
+
+    private void sendResetEmail(String email, String rawToken, AccountType accountType) {
+        String accountQuery = accountType == AccountType.EMPLOYEE ? "&type=employee" : "";
+        String resetUrl = frontendUrl + "/reset-password?token=" + rawToken + accountQuery;
+        resendEmailService.sendText(
+                email,
+                "Reset your nolyvra password",
+                """
+                We received a request to reset your nolyvra password.
+
+                Use this link within %d minutes:
+                %s
+
+                If you did not request a password reset, you can ignore this email.
+                """.formatted(tokenTtlMinutes, resetUrl));
+    }
+
     private String generateToken() {
         byte[] bytes = new byte[TOKEN_BYTES];
         secureRandom.nextBytes(bytes);
@@ -182,5 +304,5 @@ public class PasswordResetService {
         }
     }
 
-    private record Account(String loginId, String email) {}
+    private record Account(String id, String email) {}
 }

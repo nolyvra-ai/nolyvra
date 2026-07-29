@@ -84,6 +84,39 @@ class PasswordResetServiceTest {
     }
 
     @Test
+    void employeeResetUsesSeparateTokenTableAndEmployeeLink() {
+        when(jdbc.query(
+                contains("from employees"),
+                any(RowMapper.class),
+                eq("employee@example.com")))
+                .thenAnswer(invocation -> {
+                    RowMapper<?> mapper = invocation.getArgument(1);
+                    var resultSet = mock(java.sql.ResultSet.class);
+                    when(resultSet.getString("id")).thenReturn("employee-1");
+                    when(resultSet.getString("email")).thenReturn("employee@example.com");
+                    return List.of(mapper.mapRow(resultSet, 0));
+                });
+        when(jdbc.queryForObject(
+                contains("from employee_password_reset_tokens"),
+                eq(Integer.class),
+                eq("employee-1")))
+                .thenReturn(0);
+
+        service.requestReset("employee@example.com", PasswordResetService.AccountType.EMPLOYEE);
+
+        verify(jdbc).update(
+                contains("insert into employee_password_reset_tokens"),
+                anyString(),
+                eq("employee-1"),
+                any(),
+                any());
+        verify(resendEmailService).sendText(
+                eq("employee@example.com"),
+                eq("Reset your nolyvra password"),
+                contains("&type=employee"));
+    }
+
+    @Test
     void resetPasswordConsumesTokenUpdatesPasswordAndInvalidatesSessions() {
         when(jdbc.query(
                 contains("returning login_id"),
@@ -109,6 +142,33 @@ class PasswordResetServiceTest {
         assertThat(service.resetPassword("raw-token", "short")).isFalse();
 
         verifyNoInteractions(jdbc);
+    }
+
+    @Test
+    void employeeResetUpdatesEmployeeAndInvalidatesEmployeeSessions() {
+        when(jdbc.query(
+                contains("returning prt.employee_id"),
+                any(RowMapper.class),
+                any(),
+                anyString()))
+                .thenReturn(List.of("employee-1"));
+
+        assertThat(service.resetPassword(
+                "employee-token",
+                "a-secure-password",
+                PasswordResetService.AccountType.EMPLOYEE)).isTrue();
+
+        verify(jdbc).update(
+                contains("update employees"),
+                argThat(hash -> hash instanceof String value && value.matches("[a-f0-9]{64}")),
+                any(),
+                eq("employee-1"));
+        verify(jdbc).update(
+                contains("update employee_sessions"),
+                eq("employee-1"));
+        verify(jdbc, never()).update(
+                contains("update user_sessions"),
+                any(Object[].class));
     }
 
     @Test

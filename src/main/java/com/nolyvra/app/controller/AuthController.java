@@ -50,17 +50,20 @@ public class AuthController {
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> body) {
         String email = body.getOrDefault("email", "").trim();
+        PasswordResetService.AccountType accountType = accountType(body.get("accountType"));
         if (email.isBlank() || !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
             return ResponseEntity.badRequest().body(Map.of("error", "A valid email is required."));
         }
-        passwordResetService.requestReset(email);
+        passwordResetService.requestReset(email, accountType);
         return ResponseEntity.ok(Map.of(
                 "message", "If an account exists for that email, a password reset link has been sent."));
     }
 
     @GetMapping("/reset-password/validate")
-    public ResponseEntity<?> validatePasswordResetToken(@RequestParam String token) {
-        if (!passwordResetService.isTokenValid(token)) {
+    public ResponseEntity<?> validatePasswordResetToken(
+            @RequestParam String token,
+            @RequestParam(defaultValue = "tenant") String accountType) {
+        if (!passwordResetService.isTokenValid(token, accountType(accountType))) {
             return ResponseEntity.badRequest().body(Map.of("error", "This reset link is invalid or has expired."));
         }
         return ResponseEntity.ok(Map.of("valid", true));
@@ -70,13 +73,25 @@ public class AuthController {
     public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> body) {
         String token = body.getOrDefault("token", "");
         String newPassword = body.getOrDefault("newPassword", "");
+        PasswordResetService.AccountType accountType = accountType(body.get("accountType"));
         if (newPassword.length() < 8) {
             return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 8 characters."));
         }
-        if (!passwordResetService.resetPassword(token, newPassword)) {
+        if (!passwordResetService.resetPassword(token, newPassword, accountType)) {
             return ResponseEntity.badRequest().body(Map.of("error", "This reset link is invalid or has expired."));
         }
         return ResponseEntity.ok(Map.of("status", "updated"));
+    }
+
+    private PasswordResetService.AccountType accountType(String raw) {
+        if (raw == null || raw.isBlank() || "tenant".equalsIgnoreCase(raw)) {
+            return PasswordResetService.AccountType.TENANT;
+        }
+        if ("employee".equalsIgnoreCase(raw)) {
+            return PasswordResetService.AccountType.EMPLOYEE;
+        }
+        throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.BAD_REQUEST, "accountType must be tenant or employee.");
     }
 
     // POST /api/auth/change-password?loginId=x
