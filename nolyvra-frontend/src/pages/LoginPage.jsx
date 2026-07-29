@@ -562,23 +562,21 @@ export default function LoginPage() {
                       {pwHint}
                     </div>
                   )}
-                  {loginMode === "tenant" && (
-                    <button
-                      type="button"
-                      onClick={() => nav("/forgot-password")}
-                      style={{
-                        alignSelf: "flex-end",
-                        padding: 0,
-                        border: 0,
-                        background: "transparent",
-                        color: "#72adff",
-                        fontSize: 12,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Forgot password?
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => nav(`/forgot-password?type=${loginMode}`)}
+                    style={{
+                      alignSelf: "flex-end",
+                      padding: 0,
+                      border: 0,
+                      background: "transparent",
+                      color: "#72adff",
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Forgot password?
+                  </button>
                 </div>
               )}
 

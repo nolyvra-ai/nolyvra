@@ -13,6 +13,8 @@ export default function ResetPasswordPage() {
   const nav = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token") || "";
+  const accountType = searchParams.get("type") === "employee" ? "employee" : "tenant";
+  const isEmployee = accountType === "employee";
   const [status, setStatus] = useState("checking");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -24,13 +26,13 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    fetch(`${API_BASE}/api/auth/reset-password/validate?token=${encodeURIComponent(token)}`)
+    fetch(`${API_BASE}/api/auth/reset-password/validate?token=${encodeURIComponent(token)}&accountType=${accountType}`)
       .then((response) => {
         if (!response.ok) throw new Error();
         setStatus("ready");
       })
       .catch(() => setStatus("invalid"));
-  }, [token]);
+  }, [accountType, token]);
 
   async function submit(event) {
     event.preventDefault();
@@ -49,7 +51,7 @@ export default function ResetPasswordPage() {
       const response = await fetch(`${API_BASE}/api/auth/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, newPassword: password }),
+        body: JSON.stringify({ token, newPassword: password, accountType }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to reset password.");
@@ -67,7 +69,7 @@ export default function ResetPasswordPage() {
   if (status === "invalid") {
     return (
       <PasswordResetShell title="Link unavailable" description="This password reset link is invalid, expired, or has already been used.">
-        <button type="button" style={resetButtonStyle} onClick={() => nav("/forgot-password")}>
+        <button type="button" style={resetButtonStyle} onClick={() => nav(`/forgot-password?type=${accountType}`)}>
           Request a new link
         </button>
       </PasswordResetShell>
@@ -91,7 +93,10 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <PasswordResetShell title="Choose a new password" description="Use at least 8 characters and avoid a password you use elsewhere.">
+    <PasswordResetShell
+      title={`Choose a new ${isEmployee ? "employee " : ""}password`}
+      description="Use at least 8 characters and avoid a password you use elsewhere."
+    >
       <form onSubmit={submit} style={{ display: "grid", gap: 14 }}>
         <label style={{ fontSize: 12, fontWeight: 700 }}>
           New password

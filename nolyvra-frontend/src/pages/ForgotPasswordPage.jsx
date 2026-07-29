@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import PasswordResetShell from "../components/PasswordResetShell";
 import {
   resetButtonStyle,
@@ -11,6 +11,9 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
 export default function ForgotPasswordPage() {
   const nav = useNavigate();
+  const [searchParams] = useSearchParams();
+  const accountType = searchParams.get("type") === "employee" ? "employee" : "tenant";
+  const isEmployee = accountType === "employee";
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -26,7 +29,7 @@ export default function ForgotPasswordPage() {
       const response = await fetch(`${API_BASE}/api/auth/forgot-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: email.trim(), accountType }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to request a reset link.");
@@ -41,7 +44,7 @@ export default function ForgotPasswordPage() {
   return (
     <PasswordResetShell
       title="Forgot your password?"
-      description="Enter your account email and we'll send you a secure link to choose a new password."
+      description={`Enter your ${isEmployee ? "employee" : "account"} email and we'll send you a secure link to choose a new password.`}
     >
       {message ? (
         <>
@@ -58,7 +61,7 @@ export default function ForgotPasswordPage() {
       ) : (
         <form onSubmit={submit}>
           <label style={{ display: "block", marginBottom: 7, fontSize: 12, fontWeight: 700 }}>
-            Email address
+            {isEmployee ? "Employee email address" : "Email address"}
           </label>
           <input
             type="email"
