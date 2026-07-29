@@ -5,6 +5,7 @@ import com.nolyvra.app.service.SessionService;
 import com.nolyvra.app.service.AdminSettingsService;
 import com.nolyvra.app.service.CandidateMergeMigrationService;
 import com.nolyvra.app.service.EmployeeService;
+import com.nolyvra.app.service.PasswordResetService;
 import com.nolyvra.app.service.RegisterInterestNotificationService;
 import com.nolyvra.app.service.UserService;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +25,7 @@ public class AuthController {
     private final AdminSettingsService adminSettingsService;
     private final RegisterInterestNotificationService registerInterestNotificationService;
     private final CandidateMergeMigrationService candidateMergeMigrationService;
+    private final PasswordResetService passwordResetService;
 
     public AuthController(
             UserService userService,
@@ -32,7 +34,8 @@ public class AuthController {
             SessionContext sessionContext,
             AdminSettingsService adminSettingsService,
             RegisterInterestNotificationService registerInterestNotificationService,
-            CandidateMergeMigrationService candidateMergeMigrationService) {
+            CandidateMergeMigrationService candidateMergeMigrationService,
+            PasswordResetService passwordResetService) {
         this.userService = userService;
         this.employeeService = employeeService;
         this.sessionService = sessionService;
@@ -40,6 +43,40 @@ public class AuthController {
         this.adminSettingsService = adminSettingsService;
         this.registerInterestNotificationService = registerInterestNotificationService;
         this.candidateMergeMigrationService = candidateMergeMigrationService;
+        this.passwordResetService = passwordResetService;
+    }
+
+    // Always returns the same response for valid input to prevent account discovery.
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> body) {
+        String email = body.getOrDefault("email", "").trim();
+        if (email.isBlank() || !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "A valid email is required."));
+        }
+        passwordResetService.requestReset(email);
+        return ResponseEntity.ok(Map.of(
+                "message", "If an account exists for that email, a password reset link has been sent."));
+    }
+
+    @GetMapping("/reset-password/validate")
+    public ResponseEntity<?> validatePasswordResetToken(@RequestParam String token) {
+        if (!passwordResetService.isTokenValid(token)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "This reset link is invalid or has expired."));
+        }
+        return ResponseEntity.ok(Map.of("valid", true));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> body) {
+        String token = body.getOrDefault("token", "");
+        String newPassword = body.getOrDefault("newPassword", "");
+        if (newPassword.length() < 8) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 8 characters."));
+        }
+        if (!passwordResetService.resetPassword(token, newPassword)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "This reset link is invalid or has expired."));
+        }
+        return ResponseEntity.ok(Map.of("status", "updated"));
     }
 
     // POST /api/auth/change-password?loginId=x
