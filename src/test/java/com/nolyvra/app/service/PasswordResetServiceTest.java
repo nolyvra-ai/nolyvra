@@ -19,7 +19,7 @@ import static org.mockito.Mockito.*;
 class PasswordResetServiceTest {
 
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
-    private final EmailService emailService = mock(EmailService.class);
+    private final ResendEmailService resendEmailService = mock(ResendEmailService.class);
     private final SecureRandom secureRandom = mock(SecureRandom.class);
     private final Clock clock = Clock.fixed(Instant.parse("2026-07-29T08:00:00Z"), ZoneOffset.UTC);
     private PasswordResetService service;
@@ -31,7 +31,7 @@ class PasswordResetServiceTest {
             return null;
         }).when(secureRandom).nextBytes(any(byte[].class));
         service = new PasswordResetService(
-                jdbc, emailService, "https://app.nolyvra.test/", 30, clock, secureRandom);
+                jdbc, resendEmailService, "https://app.nolyvra.test/", 30, clock, secureRandom);
     }
 
     @Test
@@ -44,7 +44,7 @@ class PasswordResetServiceTest {
 
         service.requestReset(" Unknown@Example.com ");
 
-        verifyNoInteractions(emailService);
+        verifyNoInteractions(resendEmailService);
         verify(jdbc, never()).update(anyString(), any(Object[].class));
     }
 
@@ -77,7 +77,7 @@ class PasswordResetServiceTest {
                 eq("login-1"),
                 any(),
                 any());
-        verify(emailService).sendSystemEmail(
+        verify(resendEmailService).sendText(
                 eq("user@example.com"),
                 eq("Reset your nolyvra password"),
                 contains("https://app.nolyvra.test/reset-password?token=BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"));

@@ -23,7 +23,7 @@ public class PasswordResetService {
     private static final int MIN_PASSWORD_LENGTH = 8;
 
     private final JdbcTemplate jdbc;
-    private final EmailService emailService;
+    private final ResendEmailService resendEmailService;
     private final String frontendUrl;
     private final int tokenTtlMinutes;
     private final Clock clock;
@@ -32,21 +32,21 @@ public class PasswordResetService {
     @Autowired
     public PasswordResetService(
             JdbcTemplate jdbc,
-            EmailService emailService,
+            ResendEmailService resendEmailService,
             @Value("${password-reset.frontend-url:http://localhost:5173}") String frontendUrl,
             @Value("${password-reset.token-ttl-minutes:30}") int tokenTtlMinutes) {
-        this(jdbc, emailService, frontendUrl, tokenTtlMinutes, Clock.systemUTC(), new SecureRandom());
+        this(jdbc, resendEmailService, frontendUrl, tokenTtlMinutes, Clock.systemUTC(), new SecureRandom());
     }
 
     PasswordResetService(
             JdbcTemplate jdbc,
-            EmailService emailService,
+            ResendEmailService resendEmailService,
             String frontendUrl,
             int tokenTtlMinutes,
             Clock clock,
             SecureRandom secureRandom) {
         this.jdbc = jdbc;
-        this.emailService = emailService;
+        this.resendEmailService = resendEmailService;
         this.frontendUrl = frontendUrl.replaceAll("/+$", "");
         this.tokenTtlMinutes = tokenTtlMinutes;
         this.clock = clock;
@@ -100,7 +100,7 @@ public class PasswordResetService {
                 """, hash(rawToken), account.loginId(), now, now.plusMinutes(tokenTtlMinutes));
 
         String resetUrl = frontendUrl + "/reset-password?token=" + rawToken;
-        emailService.sendSystemEmail(
+        resendEmailService.sendText(
                 account.email(),
                 "Reset your nolyvra password",
                 """
