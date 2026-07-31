@@ -4,7 +4,7 @@ import {
   Alert, CircularProgress, LinearProgress, Slider,
   Dialog, DialogTitle, DialogContent
 } from "@mui/material";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { usePlanLimit } from "../hooks/usePlanLimit";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -16,6 +16,14 @@ const DANGER = "#DC2626", DANGER_BG = "#FEF2F2", DANGER_BR = "#FECACA";
 const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
 const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
 const SURFACE = "#FAFBFD";
+
+const SETTINGS_SECTIONS = [
+  { key: "account", label: "Account", description: "Password and session" },
+  { key: "billing", label: "Billing", description: "Plan, usage and tokens" },
+  { key: "integrations", label: "Integrations", description: "Connected services" },
+  { key: "email", label: "Email & Notifications", description: "Notification preferences" },
+  { key: "admin", label: "Administration", description: "Users, limits and leads" },
+];
 
 function escapeHtmlAttribute(value) {
   return String(value || "")
@@ -337,13 +345,11 @@ function EmployeeSettingsPanel() {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function SettingsPage() {
-  if (localStorage.getItem("authType") === "EMPLOYEE") {
-    return <EmployeeSettingsPanel />;
-  }
-
+function AdminSettingsPanel() {
   const nav = useNavigate();
+  const { section = "account" } = useParams();
   const [searchParams] = useSearchParams();
+  const activeSection = SETTINGS_SECTIONS.some(item => item.key === section) ? section : null;
   const loginId = localStorage.getItem("loginId") || "";
   const name = localStorage.getItem("name") || "";
 
@@ -528,7 +534,7 @@ export default function SettingsPage() {
   const [showPw, setShowPw] = useState({ current: false, new: false, confirm: false });
 
   // ── Admin panel state ─────────────────────────────────────────────────────
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(null);
   const [adminUsers, setAdminUsers] = useState([]);
   const [onboarding, setOnboarding] = useState(null);
   const [selectedAdminUser, setSelectedAdminUser] = useState("");
@@ -858,26 +864,105 @@ export default function SettingsPage() {
       } else {
         alert(data.error || "Failed to open billing portal.");
       }
-    } catch (e) {
+    } catch {
       alert("Network error. Please try again.");
     } finally {
       setPortalLoading(false);
     }
   }
 
+  if (!activeSection) {
+    return <Navigate to="/settings/account" replace />;
+  }
+  const isProtectedSection = activeSection === "email" || activeSection === "admin";
+  if (isProtectedSection && isAdmin === null) {
+    return <Box sx={{ minHeight: 180, display: "grid", placeItems: "center" }}><CircularProgress size={24} /></Box>;
+  }
+  if (isProtectedSection && !isAdmin) {
+    return <Navigate to="/settings/account" replace />;
+  }
+  const visibleSections = isAdmin
+    ? SETTINGS_SECTIONS
+    : SETTINGS_SECTIONS.filter(item => item.key !== "email" && item.key !== "admin");
+
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, maxWidth: 540 }}>
+    <Box sx={{ maxWidth: 900 }}>
 
       {/* Page header */}
-      <Box>
+      <Box sx={{ mb: 2 }}>
         <Typography sx={{ fontSize: 15, fontWeight: 600, color: TEXT }}>Settings</Typography>
         <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
           Manage your account and preferences
         </Typography>
       </Box>
 
+      <TextField
+        select
+        fullWidth
+        size="small"
+        label="Settings section"
+        value={activeSection}
+        onChange={event => nav(`/settings/${event.target.value}`)}
+        sx={{
+          display: { xs: "block", md: "none" },
+          mb: 2,
+          maxWidth: 540,
+          "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 },
+        }}
+      >
+        {visibleSections.map(item => (
+          <MenuItem key={item.key} value={item.key}>{item.label}</MenuItem>
+        ))}
+      </TextField>
+
+      <Box sx={{ display: "flex", alignItems: "flex-start", gap: 3 }}>
+        <Paper
+          component="nav"
+          aria-label="Settings sections"
+          elevation={0}
+          sx={{
+            display: { xs: "none", md: "flex" },
+            width: 220,
+            flexShrink: 0,
+            flexDirection: "column",
+            gap: 0.5,
+            p: 1,
+            border: `1px solid ${BORDER}`,
+            borderRadius: "10px",
+          }}
+        >
+          {visibleSections.map(item => {
+            const selected = item.key === activeSection;
+            return (
+              <Button
+                key={item.key}
+                onClick={() => nav(`/settings/${item.key}`)}
+                aria-current={selected ? "page" : undefined}
+                sx={{
+                  display: "block",
+                  px: 1.5,
+                  py: 1,
+                  textAlign: "left",
+                  textTransform: "none",
+                  borderRadius: "8px",
+                  color: selected ? ACCENT : TEXT,
+                  bgcolor: selected ? ACCENT_BG : "transparent",
+                  "&:hover": { bgcolor: selected ? ACCENT_BG : SURFACE },
+                }}
+              >
+                <Typography sx={{ fontSize: 12, fontWeight: 700 }}>{item.label}</Typography>
+                <Typography sx={{ fontSize: 10.5, color: selected ? ACCENT : MUTED, mt: 0.25 }}>
+                  {item.description}
+                </Typography>
+              </Button>
+            );
+          })}
+        </Paper>
+
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, width: "100%", minWidth: 0, maxWidth: 640 }}>
+
       {/* ── Stripe upgrade success banner ─────────────────────────────────── */}
-      {upgradeSuccess && (
+      {activeSection === "billing" && upgradeSuccess && (
         <Alert severity="success" onClose={() => setUpgradeSuccess(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           🎉 Your plan has been upgraded successfully! Your new limits are now active.
@@ -885,7 +970,7 @@ export default function SettingsPage() {
       )}
 
       {/* ── Token purchase success banner ─────────────────────────────────── */}
-      {tokensPurchased && (
+      {activeSection === "billing" && tokensPurchased && (
         <Alert severity="success" onClose={() => setTokensPurchased(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           🪙 Tokens added to your account successfully! Your balance has been updated.
@@ -893,49 +978,49 @@ export default function SettingsPage() {
       )}
 
       {/* ── Outlook connection banners ────────────────────────────────────── */}
-      {outlookSuccess && (
+      {activeSection === "integrations" && outlookSuccess && (
         <Alert severity="success" onClose={() => setOutlookSuccess(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           📧 Microsoft Outlook connected successfully! Emails will now be sent via your Outlook account.
         </Alert>
       )}
-      {outlookError && (
+      {activeSection === "integrations" && outlookError && (
         <Alert severity="error" onClose={() => setOutlookError(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           Failed to connect Microsoft Outlook. Please try again.
         </Alert>
       )}
-      {gmailSuccess && (
+      {activeSection === "integrations" && gmailSuccess && (
         <Alert severity="success" onClose={() => setGmailSuccess(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           Gmail connected successfully. Emails will now be sent via your Gmail account.
         </Alert>
       )}
-      {gmailError && (
+      {activeSection === "integrations" && gmailError && (
         <Alert severity="error" onClose={() => setGmailError(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           Failed to connect Gmail. Please try again.
         </Alert>
       )}
-      {xeroSuccess && (
+      {activeSection === "integrations" && xeroSuccess && (
         <Alert severity="success" onClose={() => setXeroSuccess(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           Xero connected successfully.
         </Alert>
       )}
-      {xeroError && (
+      {activeSection === "integrations" && xeroError && (
         <Alert severity="error" onClose={() => setXeroError(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           Failed to connect Xero. Please try again.
         </Alert>
       )}
-      {hubSpotSuccess && (
+      {activeSection === "integrations" && hubSpotSuccess && (
         <Alert severity="success" onClose={() => setHubSpotSuccess(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           HubSpot connected successfully.
         </Alert>
       )}
-      {hubSpotError && (
+      {activeSection === "integrations" && hubSpotError && (
         <Alert severity="error" onClose={() => setHubSpotError(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           Failed to connect HubSpot. Please try again.
@@ -943,7 +1028,7 @@ export default function SettingsPage() {
       )}
 
       {/* ── Subscription Plan ─────────────────────────────────────────────── */}
-      <Paper elevation={0} sx={{
+      {activeSection === "billing" && <Paper elevation={0} sx={{
         border: `1px solid ${BORDER}`, borderRadius: "10px",
         overflow: "hidden", bgcolor: "#fff"
       }}>
@@ -1064,10 +1149,10 @@ export default function SettingsPage() {
             </Typography>
           )}
         </Box>
-      </Paper>
+      </Paper>}
 
       {/* ── Buy Tokens ────────────────────────────────────────────────────── */}
-      <Paper elevation={0} sx={{
+      {activeSection === "billing" && <Paper elevation={0} sx={{
         border: `1px solid ${BORDER}`, borderRadius: "10px",
         overflow: "hidden", bgcolor: "#fff"
       }}>
@@ -1133,10 +1218,10 @@ export default function SettingsPage() {
             {buyLoading ? <CircularProgress size={16} sx={{ color: "#fff" }} /> : "Checkout →"}
           </Button>
         </Box>
-      </Paper>
+      </Paper>}
 
       {/* ── Recruitment Targets ──────────────────────────────────────────── */}
-      <Paper elevation={0} sx={{
+      {activeSection === "account" && <Paper elevation={0} sx={{
         border: `1px solid ${BORDER}`, borderRadius: "10px",
         overflow: "hidden", bgcolor: "#fff"
       }}>
@@ -1196,10 +1281,10 @@ export default function SettingsPage() {
             {targetSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Save Target"}
           </Button>
         </Box>
-      </Paper>
+      </Paper>}
 
       {/* ── Update Password ────────────────────────────────────────────────── */}
-      <Paper elevation={0} sx={{
+      {activeSection === "account" && <Paper elevation={0} sx={{
         border: `1px solid ${BORDER}`, borderRadius: "10px",
         overflow: "hidden", bgcolor: "#fff"
       }}>
@@ -1288,10 +1373,10 @@ export default function SettingsPage() {
               : "Update Password"}
           </Button>
         </Box>
-      </Paper>
+      </Paper>}
 
       {/* ── Admin Panel — only visible to admin users ─────────────────────── */}
-      {isAdmin && (
+      {activeSection === "admin" && isAdmin && (
         <Paper elevation={0} sx={{
           border: `1px solid ${WARN_BR}`, borderRadius: "10px",
           overflow: "hidden", bgcolor: "#fff"
@@ -1370,7 +1455,7 @@ export default function SettingsPage() {
       )}
 
       {/* ── Admin: Additional Limits ──────────────────────────────────────── */}
-      {isAdmin && (
+      {activeSection === "admin" && isAdmin && (
         <Paper elevation={0} sx={{ border: `1px solid ${WARN_BR}`, borderRadius: "10px", overflow: "hidden", bgcolor: "#fff" }}>
           <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`, bgcolor: WARN_BG }}>
             <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#92400E" }}>
@@ -1425,7 +1510,7 @@ export default function SettingsPage() {
       )}
 
       {/* ── Admin: Onboarding Email Notifications ──────────────────────── */}
-      {isAdmin && (
+      {activeSection === "email" && isAdmin && (
         <Paper elevation={0} sx={{ border: `1px solid ${WARN_BR}`, borderRadius: "10px", overflow: "hidden", bgcolor: "#fff" }}>
           <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`, bgcolor: WARN_BG }}>
             <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#92400E" }}>
@@ -1531,7 +1616,7 @@ export default function SettingsPage() {
       )}
 
       {/* ── Admin: Register Interest Notifications ───────────────────────── */}
-      {isAdmin && (
+      {activeSection === "email" && isAdmin && (
         <Paper elevation={0} sx={{ border: `1px solid ${WARN_BR}`, borderRadius: "10px", overflow: "hidden", bgcolor: "#fff" }}>
           <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`, bgcolor: WARN_BG }}>
             <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#92400E" }}>
@@ -1637,7 +1722,7 @@ export default function SettingsPage() {
       )}
 
       {/* ── Connected Accounts ───────────────────────────────────────────── */}
-      <Paper elevation={0} sx={{
+      {activeSection === "integrations" && <Paper elevation={0} sx={{
         border: `1px solid ${BORDER}`, borderRadius: "10px",
         overflow: "hidden", bgcolor: "#fff"
       }}>
@@ -1897,10 +1982,10 @@ export default function SettingsPage() {
             )}
           </Box>
         </Box>
-      </Paper>
+      </Paper>}
 
       {/* ── Form Leads (Stack Audit submissions) — admin only ────────────── */}
-      {isAdmin && <Paper elevation={0} sx={{ border: `1px solid ${BORDER}`, borderRadius: "10px", overflow: "hidden", bgcolor: "#fff" }}>
+      {activeSection === "admin" && isAdmin && <Paper elevation={0} sx={{ border: `1px solid ${BORDER}`, borderRadius: "10px", overflow: "hidden", bgcolor: "#fff" }}>
         <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <Box>
             <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>Form Leads</Typography>
@@ -1986,7 +2071,7 @@ export default function SettingsPage() {
       </Paper>}
 
       {/* ── Session / Logout ──────────────────────────────────────────────── */}
-      <Paper elevation={0} sx={{
+      {activeSection === "account" && <Paper elevation={0} sx={{
         border: `1px solid ${BORDER}`, borderRadius: "10px",
         overflow: "hidden", bgcolor: "#fff"
       }}>
@@ -2009,8 +2094,16 @@ export default function SettingsPage() {
             ⎋ Logout
           </Button>
         </Box>
-      </Paper>
+      </Paper>}
 
+        </Box>
+      </Box>
     </Box>
   );
+}
+
+export default function SettingsPage() {
+  return localStorage.getItem("authType") === "EMPLOYEE"
+    ? <EmployeeSettingsPanel />
+    : <AdminSettingsPanel />;
 }

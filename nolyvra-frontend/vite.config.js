@@ -7,4 +7,7 @@ export default defineConfig({
   optimizeDeps: {
     include: ['react-quill', 'quill'],
   },
+  test: {
+    environment: 'jsdom',
+  },
 })
