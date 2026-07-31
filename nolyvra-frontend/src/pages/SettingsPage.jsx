@@ -6,6 +6,7 @@ import {
 } from "@mui/material";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { usePlanLimit } from "../hooks/usePlanLimit";
+import SystemEmailTemplatesPanel from "../components/SystemEmailTemplatesPanel";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -347,11 +348,17 @@ function EmployeeSettingsPanel() {
 // ─── Main component ───────────────────────────────────────────────────────────
 function AdminSettingsPanel() {
   const nav = useNavigate();
-  const { section = "account" } = useParams();
+  const { section = "account", templateKey } = useParams();
   const [searchParams] = useSearchParams();
   const activeSection = SETTINGS_SECTIONS.some(item => item.key === section) ? section : null;
   const loginId = localStorage.getItem("loginId") || "";
   const name = localStorage.getItem("name") || "";
+  const [emailEditorDirty, setEmailEditorDirty] = useState(false);
+
+  function navigateSettings(nextSection) {
+    if (emailEditorDirty && !window.confirm("Discard unsaved template changes?")) return;
+    nav(`/settings/${nextSection}`);
+  }
 
   // Show success banner if returning from Stripe checkout
   const [upgradeSuccess, setUpgradeSuccess] = useState(
@@ -902,7 +909,7 @@ function AdminSettingsPanel() {
         size="small"
         label="Settings section"
         value={activeSection}
-        onChange={event => nav(`/settings/${event.target.value}`)}
+        onChange={event => navigateSettings(event.target.value)}
         sx={{
           display: { xs: "block", md: "none" },
           mb: 2,
@@ -936,7 +943,7 @@ function AdminSettingsPanel() {
             return (
               <Button
                 key={item.key}
-                onClick={() => nav(`/settings/${item.key}`)}
+                onClick={() => navigateSettings(item.key)}
                 aria-current={selected ? "page" : undefined}
                 sx={{
                   display: "block",
@@ -960,6 +967,10 @@ function AdminSettingsPanel() {
         </Paper>
 
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, width: "100%", minWidth: 0, maxWidth: 640 }}>
+
+      {activeSection === "email" && isAdmin && (
+        <SystemEmailTemplatesPanel selectedKey={templateKey} onDirtyChange={setEmailEditorDirty} />
+      )}
 
       {/* ── Stripe upgrade success banner ─────────────────────────────────── */}
       {activeSection === "billing" && upgradeSuccess && (

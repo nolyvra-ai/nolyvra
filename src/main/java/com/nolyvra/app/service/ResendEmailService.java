@@ -31,6 +31,12 @@ public class ResendEmailService {
         this.sender = sender;
     }
 
+    public boolean isConfigured() {
+        return apiKey != null && !apiKey.isBlank()
+                && !"re_xxxxxxxxx".equals(apiKey.trim())
+                && fromAddress != null && !fromAddress.isBlank();
+    }
+
     public boolean sendText(String toAddress, String subject, String body) {
         if (toAddress == null || toAddress.isBlank()) {
             return false;

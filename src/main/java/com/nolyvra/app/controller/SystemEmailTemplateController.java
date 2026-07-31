@@ -3,6 +3,7 @@ package com.nolyvra.app.controller;
 import com.nolyvra.app.model.SystemEmailTemplateUpdateRequest;
 import com.nolyvra.app.service.SystemEmailTemplateService;
 import com.nolyvra.app.service.UserService;
+import com.nolyvra.app.service.ResendEmailService;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,10 +23,21 @@ public class SystemEmailTemplateController {
 
     private final SystemEmailTemplateService templates;
     private final UserService users;
+    private final ResendEmailService resend;
 
-    public SystemEmailTemplateController(SystemEmailTemplateService templates, UserService users) {
+    public SystemEmailTemplateController(
+            SystemEmailTemplateService templates,
+            UserService users,
+            ResendEmailService resend) {
         this.templates = templates;
         this.users = users;
+        this.resend = resend;
+    }
+
+    @GetMapping("/status")
+    public ResponseEntity<?> status(@RequestParam String loginId) {
+        if (!users.isAdmin(loginId)) return forbidden();
+        return ResponseEntity.ok(Map.of("resendConfigured", resend.isConfigured()));
     }
 
     @GetMapping

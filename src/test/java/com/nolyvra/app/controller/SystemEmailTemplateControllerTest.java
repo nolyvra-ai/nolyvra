@@ -3,6 +3,7 @@ package com.nolyvra.app.controller;
 import com.nolyvra.app.model.SystemEmailTemplateUpdateRequest;
 import com.nolyvra.app.service.SystemEmailTemplateService;
 import com.nolyvra.app.service.UserService;
+import com.nolyvra.app.service.ResendEmailService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;
@@ -20,12 +21,14 @@ class SystemEmailTemplateControllerTest {
     private SystemEmailTemplateService service;
     private UserService users;
     private SystemEmailTemplateController controller;
+    private ResendEmailService resend;
 
     @BeforeEach
     void setUp() {
         service = mock(SystemEmailTemplateService.class);
         users = mock(UserService.class);
-        controller = new SystemEmailTemplateController(service, users);
+        resend = mock(ResendEmailService.class);
+        controller = new SystemEmailTemplateController(service, users, resend);
     }
 
     @Test
@@ -64,5 +67,16 @@ class SystemEmailTemplateControllerTest {
 
         assertEquals(200, controller.update("admin", "password_reset", request).getStatusCode().value());
         verify(service).update("password_reset", request, "admin");
+    }
+
+    @Test
+    void exposesOnlySafeResendConfigurationStatus() {
+        when(users.isAdmin("admin")).thenReturn(true);
+        when(resend.isConfigured()).thenReturn(true);
+
+        ResponseEntity<?> response = controller.status("admin");
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals(java.util.Map.of("resendConfigured", true), response.getBody());
     }
 }

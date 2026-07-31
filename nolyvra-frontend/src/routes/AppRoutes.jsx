@@ -81,6 +81,7 @@ export default function AppRoutes() {
       <Route path="/reminders"                          element={<RemindersPage />} />
       <Route path="/settings"                           element={<Navigate to="/settings/account" replace />} />
       <Route path="/settings/:section"                  element={<SettingsPage />} />
+      <Route path="/settings/:section/:templateKey"     element={<SettingsPage />} />
       <Route path="/coworker"                           element={<CoWorkerPage />} />
       <Route path="/clients"                            element={<ClientTrackerPage />} />
       <Route path="/contacts"                           element={<ContactsListPage />} />
