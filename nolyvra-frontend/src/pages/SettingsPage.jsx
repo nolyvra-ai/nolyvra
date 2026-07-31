@@ -1332,7 +1332,7 @@ function AdminSettingsPanel() {
             )}
             <Box>
               <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT, mb: 0.5 }}>
-                Internal Recipient Emails
+                Recipient Emails
               </Typography>
               <TextField
                 fullWidth
