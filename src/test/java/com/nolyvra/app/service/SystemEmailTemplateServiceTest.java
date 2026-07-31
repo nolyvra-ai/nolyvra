@@ -119,6 +119,17 @@ class SystemEmailTemplateServiceTest {
     }
 
     @Test
+    void userOnboardingTemplateSupportsTheLegacyTemporaryPasswordVariable() {
+        SystemEmailTemplateService.RenderedTemplate rendered = service.render("user_onboarding", Map.of(
+                "name", "Alex",
+                "email", "alex@example.com",
+                "password", "temporary-password"));
+
+        assertTrue(rendered.htmlBody().contains("temporary-password"));
+        assertTrue(rendered.textBody().contains("temporary-password"));
+    }
+
+    @Test
     void restoreDeletesCustomizationAndReturnsDefault() {
         when(jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
         SystemEmailTemplateResponse restored = service.restore("password_reset", 3L);

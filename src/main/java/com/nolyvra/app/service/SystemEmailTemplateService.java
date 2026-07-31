@@ -218,10 +218,10 @@ public class SystemEmailTemplateService {
                 List.of("reset_link", "expiry_minutes", "account_type"),
                 List.of("reset_link", "expiry_minutes")));
         map.put(TemplateType.USER_ONBOARDING, new TemplateDefinition(
-                "User onboarding", "Welcome to Nolyvra",
-                "<p>Hi {{name}},</p><p>Your account is ready. Sign in with {{email}}.</p>",
-                "Hi {{name}}, your Nolyvra account is ready. Sign in with {{email}}.",
-                List.of("name", "email"), List.of("name", "email")));
+                "User onboarding", "Welcome to Nolyvra - registration approved",
+                "<p>Hi {{name}},</p><p>Your account is ready. Sign in with {{email}}.</p><p>Your temporary password is:</p><p><strong>{{password}}</strong></p><p>Please change your password after your first login.</p>",
+                "Hi {{name}}, your Nolyvra account is ready. Sign in with {{email}}. Your temporary password is: {{password}}. Please change it after your first login.",
+                List.of("name", "email", "password"), List.of("name", "password")));
         map.put(TemplateType.REGISTRATION_CONFIRMATION, new TemplateDefinition(
                 "Registration confirmation", "Thanks for your interest in Nolyvra",
                 "<p>Hi {{name}},</p><p>We have received your registration.</p>",
@@ -231,7 +231,7 @@ public class SystemEmailTemplateService {
                 "Internal onboarding notification", "User onboarded: {{name}}",
                 "<p>{{name}} ({{email}}) was onboarded by {{admin_login_id}}.</p>",
                 "{{name}} ({{email}}) was onboarded by {{admin_login_id}}.",
-                List.of("name", "email", "admin_login_id"), List.of("name", "email")));
+                List.of("name", "email", "company", "admin_login_id"), List.of("name", "email")));
         map.put(TemplateType.NEW_REGISTRATION_NOTIFICATION, new TemplateDefinition(
                 "New registration notification", "New registration: {{name}}",
                 "<p>{{name}} registered with {{email}} from {{company}}.</p>",

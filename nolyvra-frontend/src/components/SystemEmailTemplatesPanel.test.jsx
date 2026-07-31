@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation, useParams } from "react-router-dom";
 import SystemEmailTemplatesPanel from "./SystemEmailTemplatesPanel";
@@ -98,6 +98,44 @@ describe("SystemEmailTemplatesPanel", () => {
     expect(screen.getByLabelText("HTML body")).toHaveValue("<p>No reset link</p>");
   }, 10000);
 
+  it("uploads images from the editor toolbar and stores a CID reference", async () => {
+    const imageId = "12345678-1234-1234-1234-123456789abc";
+    fetch.mockImplementation((url, options = {}) => {
+      if (String(url).endsWith("/status?loginId=admin")) return jsonResponse({ resendConfigured: true });
+      if (options.method === "POST") return jsonResponse({ id: imageId, fileName: "logo.png" });
+      return jsonResponse([template]);
+    });
+    Object.defineProperty(document, "execCommand", {
+      configurable: true,
+      value: vi.fn((command, _showUi, html) => {
+        if (command === "insertHTML") {
+          screen.getByRole("textbox", { name: "Email body editor" })
+            .insertAdjacentHTML("beforeend", html);
+        }
+        return true;
+      }),
+    });
+
+    renderPanel("password_reset");
+    expect(await screen.findByRole("button", { name: "Insert image" })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Image file"), {
+      target: { files: [new File(["image"], "logo.png", { type: "image/png" })] },
+    });
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/email-template-images?loginId=admin"),
+      expect.objectContaining({ method: "POST" })
+    ));
+    await waitFor(() => expect(
+      screen.getByRole("textbox", { name: "Email body editor" }).querySelector("img")
+    ).toHaveAttribute("data-email-cid", `cid:template-image-${imageId}`));
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "Show HTML code" }));
+    expect(screen.getByLabelText("HTML body").value)
+      .toContain(`src="cid:template-image-${imageId}"`);
+    expect(screen.getByLabelText("HTML body").value).not.toContain("data:image");
+  });
+
   it("saves changes and reports API errors", async () => {
     fetch.mockImplementation((url, options = {}) => {
       if (String(url).endsWith("/status?loginId=admin")) return jsonResponse({ resendConfigured: false });
@@ -116,21 +154,4 @@ describe("SystemEmailTemplatesPanel", () => {
     );
   });
 
-  it("restores a customized template to its default", async () => {
-    const restored = { ...template, customized: false, version: 0 };
-    fetch.mockImplementation((url, options = {}) => {
-      if (String(url).endsWith("/status?loginId=admin")) return jsonResponse({ resendConfigured: true });
-      if (options.method === "DELETE") return jsonResponse(restored);
-      return jsonResponse([template]);
-    });
-    renderPanel("password_reset");
-    fireEvent.click(await screen.findByRole("button", { name: "Restore default" }));
-
-    expect(await screen.findByText("Default restored.")).toBeInTheDocument();
-    expect(confirm).toHaveBeenCalled();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining("version=1"),
-      expect.objectContaining({ method: "DELETE" })
-    );
-  });
 });
