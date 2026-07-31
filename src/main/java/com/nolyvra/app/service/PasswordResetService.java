@@ -15,6 +15,7 @@ import java.time.OffsetDateTime;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 @Service
 public class PasswordResetService {
@@ -29,6 +30,7 @@ public class PasswordResetService {
 
     private final JdbcTemplate jdbc;
     private final ResendEmailService resendEmailService;
+    private final SystemEmailTemplateService systemEmailTemplateService;
     private final String frontendUrl;
     private final int tokenTtlMinutes;
     private final Clock clock;
@@ -38,20 +40,24 @@ public class PasswordResetService {
     public PasswordResetService(
             JdbcTemplate jdbc,
             ResendEmailService resendEmailService,
+            SystemEmailTemplateService systemEmailTemplateService,
             @Value("${password-reset.frontend-url:http://localhost:5173}") String frontendUrl,
             @Value("${password-reset.token-ttl-minutes:30}") int tokenTtlMinutes) {
-        this(jdbc, resendEmailService, frontendUrl, tokenTtlMinutes, Clock.systemUTC(), new SecureRandom());
+        this(jdbc, resendEmailService, systemEmailTemplateService,
+                frontendUrl, tokenTtlMinutes, Clock.systemUTC(), new SecureRandom());
     }
 
     PasswordResetService(
             JdbcTemplate jdbc,
             ResendEmailService resendEmailService,
+            SystemEmailTemplateService systemEmailTemplateService,
             String frontendUrl,
             int tokenTtlMinutes,
             Clock clock,
             SecureRandom secureRandom) {
         this.jdbc = jdbc;
         this.resendEmailService = resendEmailService;
+        this.systemEmailTemplateService = systemEmailTemplateService;
         this.frontendUrl = frontendUrl.replaceAll("/+$", "");
         this.tokenTtlMinutes = tokenTtlMinutes;
         this.clock = clock;
@@ -271,17 +277,35 @@ public class PasswordResetService {
     private void sendResetEmail(String email, String rawToken, AccountType accountType) {
         String accountQuery = accountType == AccountType.EMPLOYEE ? "&type=employee" : "";
         String resetUrl = frontendUrl + "/reset-password?token=" + rawToken + accountQuery;
+        String subject = "Reset your nolyvra password";
+        String body = defaultResetBody(resetUrl);
+        try {
+            SystemEmailTemplateService.RenderedTemplate rendered = systemEmailTemplateService.render(
+                    "password_reset",
+                    Map.of(
+                            "reset_link", resetUrl,
+                            "expiry_minutes", String.valueOf(tokenTtlMinutes),
+                            "account_type", accountType.name().toLowerCase(Locale.ROOT)));
+            subject = rendered.subject();
+            body = rendered.textBody();
+        } catch (RuntimeException ignored) {
+            // Password reset is essential: database/template failures use the built-in copy.
+        }
         resendEmailService.sendText(
                 email,
-                "Reset your nolyvra password",
-                """
+                subject,
+                body);
+    }
+
+    private String defaultResetBody(String resetUrl) {
+        return """
                 We received a request to reset your nolyvra password.
 
                 Use this link within %d minutes:
                 %s
 
                 If you did not request a password reset, you can ignore this email.
-                """.formatted(tokenTtlMinutes, resetUrl));
+                """.formatted(tokenTtlMinutes, resetUrl);
     }
 
     private String generateToken() {
