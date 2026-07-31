@@ -24,6 +24,7 @@ public class OnboardingEmailService {
     private static final String TEMPORARY_PASSWORD = "Welcome1";
 
     private final AdminSettingsService adminSettingsService;
+    private final SystemEmailTemplateService systemEmailTemplateService;
     private final EmailTemplateImageService emailTemplateImageService;
     private final JdbcTemplate jdbc;
     private final String apiKey;
@@ -31,11 +32,13 @@ public class OnboardingEmailService {
 
     public OnboardingEmailService(
             AdminSettingsService adminSettingsService,
+            SystemEmailTemplateService systemEmailTemplateService,
             EmailTemplateImageService emailTemplateImageService,
             JdbcTemplate jdbc,
             @Value("${resend.api-key:}") String apiKey,
             @Value("${resend.from:Nolyvra <onboarding@resend.dev>}") String fromAddress) {
         this.adminSettingsService = adminSettingsService;
+        this.systemEmailTemplateService = systemEmailTemplateService;
         this.emailTemplateImageService = emailTemplateImageService;
         this.jdbc = jdbc;
         this.apiKey = apiKey;
@@ -85,12 +88,22 @@ public class OnboardingEmailService {
         Resend resend = new Resend(apiKey.trim());
         Map<String, String> values = templateValues(target, adminLoginId);
         Map<String, String> templates = adminSettingsService.getOnboardingEmailTemplates();
+        EmailContent userContent = resolveTemplate(
+                "user_onboarding",
+                templates.get("confirmationSubject"),
+                templates.get("confirmationHtml"),
+                values);
+        EmailContent internalContent = resolveTemplate(
+                "internal_onboarding_notification",
+                templates.get("notificationSubject"),
+                templates.get("notificationHtml"),
+                values);
 
         boolean userEmailSent = sendWithResend(
                 resend,
                 target.email(),
-                renderTemplate(templates.get("confirmationSubject"), values),
-                renderTemplate(templates.get("confirmationHtml"), values),
+                userContent.subject(),
+                userContent.html(),
                 targetLoginId,
                 "User");
 
@@ -112,8 +125,8 @@ public class OnboardingEmailService {
             boolean ok = sendWithResend(
                     resend,
                     recipient,
-                    renderTemplate(templates.get("notificationSubject"), values),
-                    renderTemplate(templates.get("notificationHtml"), values),
+                    internalContent.subject(),
+                    internalContent.html(),
                     targetLoginId,
                     "Internal");
             if (ok) {
@@ -243,19 +256,37 @@ public class OnboardingEmailService {
     private Map<String, String> templateValues(OnboardedUser target, String adminLoginId) {
         String displayName = target.name() == null || target.name().isBlank() ? target.id() : target.name();
         Map<String, String> values = new LinkedHashMap<>();
-        values.put("name", escapeHtml(displayName));
-        values.put("email", escapeHtml(target.email()));
-        values.put("company", escapeHtml(target.company() == null || target.company().isBlank() ? "-" : target.company()));
-        values.put("password", escapeHtml(TEMPORARY_PASSWORD));
-        values.put("adminLoginId", escapeHtml(adminLoginId));
+        values.put("name", displayName);
+        values.put("email", target.email());
+        values.put("company", target.company() == null || target.company().isBlank() ? "-" : target.company());
+        values.put("password", TEMPORARY_PASSWORD);
+        values.put("admin_login_id", adminLoginId);
+        values.put("adminLoginId", adminLoginId);
         return values;
+    }
+
+    EmailContent resolveTemplate(
+            String key,
+            String fallbackSubject,
+            String fallbackHtml,
+            Map<String, String> values) {
+        try {
+            SystemEmailTemplateService.RenderedTemplate rendered =
+                    systemEmailTemplateService.render(key, values);
+            return new EmailContent(rendered.subject(), rendered.htmlBody());
+        } catch (RuntimeException ignored) {
+            return new EmailContent(
+                    renderTemplate(fallbackSubject, values),
+                    renderTemplate(fallbackHtml, values));
+        }
     }
 
     private String renderTemplate(String template, Map<String, String> values) {
         String rendered = template == null ? "" : template;
         for (Map.Entry<String, String> entry : values.entrySet()) {
-            rendered = rendered.replace("{{" + entry.getKey() + "}}", entry.getValue());
-            rendered = rendered.replace("{" + entry.getKey() + "}", entry.getValue());
+            String escaped = escapeHtml(entry.getValue());
+            rendered = rendered.replace("{{" + entry.getKey() + "}}", escaped);
+            rendered = rendered.replace("{" + entry.getKey() + "}", escaped);
         }
         return rendered;
     }
@@ -282,4 +313,6 @@ public class OnboardingEmailService {
             int internalNotificationsSent,
             int internalNotificationsFailed,
             String errorMessage) {}
+
+    record EmailContent(String subject, String html) {}
 }
