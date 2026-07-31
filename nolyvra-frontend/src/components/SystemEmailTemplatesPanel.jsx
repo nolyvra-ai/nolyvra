@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Alert, Box, Button, Chip, CircularProgress, Dialog, DialogContent,
-  DialogTitle, Paper, Switch, TextField, Typography,
+  Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogContent,
+  DialogTitle, FormControlLabel, Paper, Switch, TextField, Tooltip, Typography,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
@@ -27,6 +27,174 @@ function validate(template) {
   return missing ? `Required variable is missing: ${missing}` : "";
 }
 
+function htmlToPlainText(html) {
+  const withBreaks = html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|h[1-6]|li)>/gi, "\n");
+  const documentBody = new DOMParser().parseFromString(withBreaks, "text/html").body;
+  return (documentBody.textContent || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function VisualHtmlEditor({ value, onChange }) {
+  const editorRef = useRef(null);
+  const [fontName, setFontName] = useState("Arial");
+  const [fontSize, setFontSize] = useState("3");
+  const [blockFormat, setBlockFormat] = useState("p");
+
+  useEffect(() => {
+    if (editorRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value;
+    }
+  }, [value]);
+
+  function format(command, commandValue = null) {
+    editorRef.current?.focus();
+    document.execCommand(command, false, commandValue);
+    onChange(editorRef.current?.innerHTML || "");
+  }
+
+  function selectFormat(command, commandValue, setter) {
+    setter(commandValue);
+    format(command, commandValue);
+  }
+
+  const toolButtonSx = {
+    minWidth: 30,
+    width: 30,
+    height: 30,
+    p: 0,
+    color: TEXT,
+    border: `1px solid ${BORDER}`,
+    borderRadius: "5px",
+    fontSize: 13,
+    textTransform: "none",
+  };
+
+  return (
+    <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: "8px", overflow: "hidden" }}>
+      <Box
+        role="toolbar"
+        aria-label="Email formatting"
+        sx={{
+          px: 1.25, py: 1, display: "flex", alignItems: "center", gap: 0.5,
+          bgcolor: "#fff", borderBottom: `1px solid ${BORDER}`, flexWrap: "wrap",
+        }}
+      >
+        <TextField
+          select
+          size="small"
+          value={fontName}
+          onChange={event => selectFormat("fontName", event.target.value, setFontName)}
+          aria-label="Font family"
+          SelectProps={{ native: true }}
+          sx={{ width: 92, "& .MuiInputBase-root": { height: 30, fontSize: 12 } }}
+        >
+          <option value="Arial">Arial</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Tahoma">Tahoma</option>
+          <option value="Verdana">Verdana</option>
+        </TextField>
+        <TextField
+          select
+          size="small"
+          value={fontSize}
+          onChange={event => selectFormat("fontSize", event.target.value, setFontSize)}
+          aria-label="Font size"
+          SelectProps={{ native: true }}
+          sx={{ width: 68, "& .MuiInputBase-root": { height: 30, fontSize: 12 } }}
+        >
+          <option value="2">12</option>
+          <option value="3">14</option>
+          <option value="4">18</option>
+          <option value="5">24</option>
+        </TextField>
+        <Button
+          size="small"
+          aria-label="Bold"
+          onMouseDown={event => event.preventDefault()}
+          onClick={() => format("bold")}
+          sx={{ ...toolButtonSx, fontWeight: 800 }}
+        >
+          B
+        </Button>
+        <Button
+          size="small"
+          aria-label="Italic"
+          onMouseDown={event => event.preventDefault()}
+          onClick={() => format("italic")}
+          sx={{ ...toolButtonSx, fontStyle: "italic", fontFamily: "serif", fontWeight: 700 }}
+        >
+          I
+        </Button>
+        {[
+          { label: "• List", title: "Bulleted list", command: "insertUnorderedList" },
+          { label: "1. List", title: "Numbered list", command: "insertOrderedList" },
+          { label: "Tx", title: "Clear formatting", command: "removeFormat" },
+          { label: "≡", title: "Align left", command: "justifyLeft" },
+          { label: "≣", title: "Align center", command: "justifyCenter" },
+          { label: "≡", title: "Align right", command: "justifyRight" },
+        ].map(tool => (
+          <Tooltip key={tool.title} title={tool.title}>
+          <Button
+            size="small"
+            aria-label={tool.title}
+            onMouseDown={event => event.preventDefault()}
+            onClick={() => format(tool.command)}
+            sx={{
+              ...toolButtonSx,
+              width: tool.title.includes("list") ? 46 : 30,
+              fontSize: tool.title.includes("list") ? 10 : 14,
+              transform: tool.title === "Align right" ? "scaleX(-1)" : "none",
+            }}
+          >
+            {tool.label}
+          </Button>
+          </Tooltip>
+        ))}
+        <TextField
+          select
+          size="small"
+          value={blockFormat}
+          onChange={event => selectFormat("formatBlock", event.target.value, setBlockFormat)}
+          aria-label="Text style"
+          SelectProps={{ native: true }}
+          sx={{ width: 130, ml: 0.5, "& .MuiInputBase-root": { height: 30, fontSize: 12 } }}
+        >
+          <option value="p">Normal text</option>
+          <option value="h2">Heading</option>
+          <option value="h3">Subheading</option>
+        </TextField>
+      </Box>
+      <Box
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        role="textbox"
+        aria-label="Email body editor"
+        aria-multiline="true"
+        onInput={event => onChange(event.currentTarget.innerHTML)}
+        sx={{
+          minHeight: 300,
+          p: 2.5,
+          bgcolor: "#fff",
+          color: "#111827",
+          fontFamily: "Arial, sans-serif",
+          fontSize: 14,
+          lineHeight: 1.6,
+          outline: "none",
+          overflowY: "auto",
+          "&:focus": { boxShadow: `inset 0 0 0 2px ${ACCENT}` },
+          "& img": { maxWidth: "100%", height: "auto" },
+        }}
+      />
+    </Box>
+  );
+}
+
 export default function SystemEmailTemplatesPanel({ selectedKey, onDirtyChange }) {
   const nav = useNavigate();
   const loginId = localStorage.getItem("loginId") || "";
@@ -37,7 +205,9 @@ export default function SystemEmailTemplatesPanel({ selectedKey, onDirtyChange }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [previewOpen, setPreviewOpen] = useState(false);
+  const [showHtml, setShowHtml] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [autoPlainText, setAutoPlainText] = useState(true);
   const [resendConfigured, setResendConfigured] = useState(null);
 
   const dirty = useMemo(
@@ -78,9 +248,12 @@ export default function SystemEmailTemplatesPanel({ selectedKey, onDirtyChange }
     if (selected && draft?.key !== selectedKey) {
       setDraft({ ...selected });
       setOriginal({ ...selected });
+      setShowHtml(false);
+      setAdvancedOpen(false);
+      setAutoPlainText(true);
       setError("");
       setSuccess("");
-    } else if (!loading && templates.length) {
+    } else if (!selected && !loading && templates.length) {
       nav("/settings/email", { replace: true });
     }
   }, [selectedKey, templates, loading, nav, draft?.key]);
@@ -112,6 +285,23 @@ export default function SystemEmailTemplatesPanel({ selectedKey, onDirtyChange }
 
   function update(field, value) {
     setDraft(current => ({ ...current, [field]: value }));
+    setError("");
+    setSuccess("");
+  }
+
+  function updateHtml(value) {
+    setDraft(current => ({
+      ...current,
+      htmlBody: value,
+      textBody: autoPlainText ? htmlToPlainText(value) : current.textBody,
+    }));
+    setError("");
+    setSuccess("");
+  }
+
+  function regeneratePlainText() {
+    setDraft(current => ({ ...current, textBody: htmlToPlainText(current.htmlBody) }));
+    setAutoPlainText(true);
     setError("");
     setSuccess("");
   }
@@ -237,16 +427,83 @@ export default function SystemEmailTemplatesPanel({ selectedKey, onDirtyChange }
                 </Box>
               </Box>
               <TextField label="Subject" value={draft.subject} onChange={event => update("subject", event.target.value)} />
-              <TextField label="HTML body" multiline minRows={8} value={draft.htmlBody}
-                onChange={event => update("htmlBody", event.target.value)} />
-              <TextField label="Plain-text body" multiline minRows={5} value={draft.textBody}
-                onChange={event => update("textBody", event.target.value)} />
+              <Box>
+                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 0.75 }}>
+                  <Typography sx={{ fontSize: 11, fontWeight: 700 }}>
+                    Email body
+                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center" }}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={showHtml}
+                          onChange={event => setShowHtml(event.target.checked)}
+                        />
+                      }
+                      label="Show HTML code"
+                      sx={{ mr: 0, "& .MuiFormControlLabel-label": { fontSize: 12, color: TEXT } }}
+                    />
+                    <Tooltip title="Edit the HTML source used to render this email.">
+                      <Box component="span" aria-label="HTML code information"
+                        sx={{ ml: 0.25, color: TEXT, fontSize: 13, cursor: "help" }}>
+                        ⓘ
+                      </Box>
+                    </Tooltip>
+                  </Box>
+                </Box>
+                {showHtml ? (
+                  <TextField
+                    label="HTML body"
+                    fullWidth
+                    multiline
+                    minRows={12}
+                    value={draft.htmlBody}
+                    onChange={event => updateHtml(event.target.value)}
+                    inputProps={{ style: { fontFamily: "monospace", fontSize: 12 } }}
+                  />
+                ) : (
+                  <VisualHtmlEditor value={draft.htmlBody} onChange={updateHtml} />
+                )}
+              </Box>
+              <Box>
+                <Button
+                  size="small"
+                  onClick={() => setAdvancedOpen(current => !current)}
+                  aria-expanded={advancedOpen}
+                  sx={{ px: 0, fontSize: 11.5, textTransform: "none" }}
+                >
+                  {advancedOpen ? "Hide advanced options" : "Advanced options"}
+                </Button>
+                {advancedOpen && (
+                  <Box sx={{ mt: 1, display: "flex", flexDirection: "column", gap: 0.75 }}>
+                    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 1 }}>
+                      <Typography sx={{ fontSize: 10.5, color: MUTED }}>
+                        Plain-text fallback · {autoPlainText ? "Automatically generated from HTML" : "Manually edited"}
+                      </Typography>
+                      <Button size="small" onClick={regeneratePlainText}
+                        sx={{ fontSize: 10.5, textTransform: "none" }}>
+                        Regenerate from HTML
+                      </Button>
+                    </Box>
+                    <TextField
+                      label="Plain-text body"
+                      multiline
+                      minRows={5}
+                      value={draft.textBody}
+                      onChange={event => {
+                        setAutoPlainText(false);
+                        update("textBody", event.target.value);
+                      }}
+                    />
+                  </Box>
+                )}
+              </Box>
               <Box sx={{ display: "flex", alignItems: "center" }}>
                 <Switch checked={draft.enabled} onChange={event => update("enabled", event.target.checked)} />
                 <Typography sx={{ fontSize: 12 }}>Enabled</Typography>
               </Box>
               <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", flexWrap: "wrap" }}>
-                <Button onClick={() => setPreviewOpen(true)} disabled={!draft.htmlBody.trim()}>Preview</Button>
                 <Button color="warning" onClick={restore} disabled={saving || !draft.customized}>Restore default</Button>
                 <Button variant="contained" onClick={save} disabled={saving || !dirty}>
                   {saving ? <CircularProgress size={16} /> : "Save"}
@@ -257,13 +514,6 @@ export default function SystemEmailTemplatesPanel({ selectedKey, onDirtyChange }
         </>}
       </Dialog>
 
-      <Dialog open={previewOpen} onClose={() => setPreviewOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle sx={{ fontSize: 15, fontWeight: 700 }}>Template Preview</DialogTitle>
-        <DialogContent dividers sx={{ p: 0 }}>
-          <Box component="iframe" title="System email template preview" sandbox="" srcDoc={draft?.htmlBody || ""}
-            sx={{ width: "100%", minHeight: 480, border: 0, display: "block" }} />
-        </DialogContent>
-      </Dialog>
     </Paper>
   );
 }

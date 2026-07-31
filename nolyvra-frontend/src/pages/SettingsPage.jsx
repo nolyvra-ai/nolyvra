@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef, Fragment } from "react";
+import { useState, useEffect, Fragment } from "react";
 import {
   Box, Paper, Typography, Button, TextField, MenuItem,
-  Alert, CircularProgress, LinearProgress, Slider,
-  Dialog, DialogTitle, DialogContent
+  Alert, CircularProgress, LinearProgress, Slider
 } from "@mui/material";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { usePlanLimit } from "../hooks/usePlanLimit";
@@ -25,184 +24,6 @@ const SETTINGS_SECTIONS = [
   { key: "email", label: "Email & Notifications", description: "Notification preferences" },
   { key: "admin", label: "Administration", description: "Users, limits and leads" },
 ];
-
-function escapeHtmlAttribute(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("\"", "&quot;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
-}
-
-function blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error("Could not render one of the template images."));
-    reader.readAsDataURL(blob);
-  });
-}
-
-function EmailHtmlTemplateField({ value, onChange, disabled, minRows, placeholder, onError }) {
-  const inputRef = useRef(null);
-  const fileRef = useRef(null);
-  const [uploading, setUploading] = useState(false);
-  const [insertedName, setInsertedName] = useState("");
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewHtml, setPreviewHtml] = useState("");
-  const [previewError, setPreviewError] = useState("");
-
-  async function insertImage(file) {
-    if (!file) return;
-    setUploading(true);
-    setInsertedName("");
-    onError?.("");
-    try {
-      const loginId = localStorage.getItem("loginId") || "";
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch(
-        `${API_BASE}/api/auth/admin/email-template-images?loginId=${encodeURIComponent(loginId)}`,
-        {
-          method: "POST",
-          headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
-          body: form,
-        }
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Could not upload the image.");
-
-      const imageName = escapeHtmlAttribute(data.fileName || file.name || "template-image");
-      const imageHtml = `<!-- Template image: ${imageName} -->\n`
-        + `<img src="cid:template-image-${data.id}" alt="${imageName}" `
-        + `style="max-width:100%;height:auto;">`;
-      const textarea = inputRef.current;
-      const position = textarea?.selectionStart ?? value.length;
-      const before = value.slice(0, position);
-      const after = value.slice(position);
-      const prefix = before && !before.endsWith("\n") ? "\n" : "";
-      const suffix = after && !after.startsWith("\n") ? "\n" : "";
-      const nextValue = `${before}${prefix}${imageHtml}${suffix}${after}`;
-      onChange(nextValue);
-      setInsertedName(data.fileName || file.name);
-
-      requestAnimationFrame(() => {
-        const nextPosition = before.length + prefix.length + imageHtml.length;
-        textarea?.focus();
-        textarea?.setSelectionRange(nextPosition, nextPosition);
-      });
-    } catch (e) {
-      onError?.(e.message);
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
-
-  async function openPreview() {
-    setPreviewOpen(true);
-    setPreviewLoading(true);
-    setPreviewError("");
-    try {
-      const ids = [...new Set(
-        [...value.matchAll(/cid:template-image-([0-9a-f-]{36})/gi)].map(match => match[1])
-      )];
-      let rendered = value;
-      const loginId = localStorage.getItem("loginId") || "";
-      for (const id of ids) {
-        const res = await fetch(
-          `${API_BASE}/api/auth/admin/email-template-images/${id}?loginId=${encodeURIComponent(loginId)}`,
-          { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } }
-        );
-        if (!res.ok) throw new Error("Could not load one of the template images.");
-        const dataUrl = await blobToDataUrl(await res.blob());
-        rendered = rendered.replaceAll(`cid:template-image-${id}`, dataUrl);
-      }
-      setPreviewHtml(rendered);
-    } catch (e) {
-      setPreviewError(e.message);
-    } finally {
-      setPreviewLoading(false);
-    }
-  }
-
-  function closePreview() {
-    setPreviewOpen(false);
-    setPreviewHtml("");
-    setPreviewError("");
-  }
-
-  return (
-    <Box>
-      <TextField
-        fullWidth
-        multiline
-        minRows={minRows}
-        size="small"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        disabled={disabled || uploading}
-        placeholder={placeholder}
-        label="HTML Body"
-        inputRef={inputRef}
-        sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
-      />
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.75 }}>
-        <Button
-          size="small"
-          variant="outlined"
-          component="label"
-          disabled={disabled || uploading}
-          sx={{ fontSize: 11, borderRadius: "6px", textTransform: "none" }}
-        >
-          {uploading ? <CircularProgress size={13} /> : "Insert Image"}
-          <input
-            ref={fileRef}
-            hidden
-            type="file"
-            accept="image/png,image/jpeg,image/gif"
-            onChange={e => insertImage(e.target.files?.[0])}
-          />
-        </Button>
-        <Button
-          size="small"
-          variant="outlined"
-          disabled={disabled || uploading || !value.trim()}
-          onClick={openPreview}
-          sx={{ fontSize: 11, borderRadius: "6px", textTransform: "none" }}
-        >
-          Preview
-        </Button>
-        <Typography sx={{ fontSize: 10.5, color: insertedName ? SUCCESS : MUTED }}>
-          {insertedName ? `${insertedName} inserted` : "PNG, JPEG or GIF · max 5 MB"}
-        </Typography>
-      </Box>
-      <Dialog open={previewOpen} onClose={closePreview} fullWidth maxWidth="md">
-        <DialogTitle sx={{ fontSize: 15, fontWeight: 700, pb: 1 }}>
-          Email Template Preview
-        </DialogTitle>
-        <DialogContent dividers sx={{ p: 0, minHeight: 420 }}>
-          {previewLoading ? (
-            <Box sx={{ minHeight: 420, display: "grid", placeItems: "center" }}>
-              <CircularProgress size={24} />
-            </Box>
-          ) : previewError ? (
-            <Alert severity="error" sx={{ m: 2 }}>{previewError}</Alert>
-          ) : (
-            <Box
-              component="iframe"
-              title="Email template preview"
-              sandbox=""
-              srcDoc={previewHtml}
-              sx={{ width: "100%", minHeight: 500, border: 0, display: "block", bgcolor: "#fff" }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-    </Box>
-  );
-}
 
 // ── Usage bar component ───────────────────────────────────────────────────────
 function UsageBar({ label, used, max, remainingLabel }) {
@@ -553,30 +374,31 @@ function AdminSettingsPanel() {
   const [interestRecipientsSaving, setInterestRecipientsSaving] = useState(false);
   const [interestRecipientsSaved, setInterestRecipientsSaved] = useState(false);
   const [interestRecipientsError, setInterestRecipientsError] = useState("");
-  const [interestTemplates, setInterestTemplates] = useState({
-    confirmationSubject: "",
-    confirmationHtml: "",
-    notificationSubject: "",
-    notificationHtml: "",
-  });
   const [onboardingRecipients, setOnboardingRecipients] = useState("");
   const [onboardingRecipientsLoading, setOnboardingRecipientsLoading] = useState(false);
   const [onboardingRecipientsSaving, setOnboardingRecipientsSaving] = useState(false);
   const [onboardingRecipientsSaved, setOnboardingRecipientsSaved] = useState(false);
   const [onboardingRecipientsError, setOnboardingRecipientsError] = useState("");
-  const [onboardingTemplates, setOnboardingTemplates] = useState({
-    confirmationSubject: "",
-    confirmationHtml: "",
-    notificationSubject: "",
-    notificationHtml: "",
-  });
 
   useEffect(() => {
     if (!loginId) return;
     fetch(`${API_BASE}/api/auth/admin/users?loginId=${encodeURIComponent(loginId)}`, { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } })
-      .then(r => { if (r.ok) { setIsAdmin(true); return r.json(); } throw new Error(); })
-      .then(d => setAdminUsers(d))
-      .catch(() => setIsAdmin(false));
+      .then(r => {
+        if (r.ok) {
+          setIsAdmin(true);
+          return r.json();
+        }
+        if (r.status === 403) {
+          setIsAdmin(false);
+          return null;
+        }
+        throw new Error("Could not verify administrator access.");
+      })
+      .then(d => {
+        if (d) setAdminUsers(d);
+      })
+      // A stopped or restarting API is not evidence that this is a non-admin.
+      .catch(() => setIsAdmin(null));
   }, [loginId]);
 
   useEffect(() => {
@@ -588,12 +410,6 @@ function AdminSettingsPanel() {
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => {
         setInterestRecipients((d.emails || []).join(", "));
-        setInterestTemplates({
-          confirmationSubject: d.confirmationSubject || "",
-          confirmationHtml: d.confirmationHtml || "",
-          notificationSubject: d.notificationSubject || "",
-          notificationHtml: d.notificationHtml || "",
-        });
       })
       .catch(() => setInterestRecipientsError("Could not load notification recipients."))
       .finally(() => setInterestRecipientsLoading(false));
@@ -608,12 +424,6 @@ function AdminSettingsPanel() {
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => {
         setOnboardingRecipients((d.emails || []).join(", "));
-        setOnboardingTemplates({
-          confirmationSubject: d.confirmationSubject || "",
-          confirmationHtml: d.confirmationHtml || "",
-          notificationSubject: d.notificationSubject || "",
-          notificationHtml: d.notificationHtml || "",
-        });
       })
       .catch(() => setOnboardingRecipientsError("Could not load onboarding notification settings."))
       .finally(() => setOnboardingRecipientsLoading(false));
@@ -692,17 +502,11 @@ function AdminSettingsPanel() {
       const res = await fetch(`${API_BASE}/api/auth/admin/register-interest-notifications?loginId=${encodeURIComponent(loginId)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
-        body: JSON.stringify({ emails: interestRecipients, ...interestTemplates }),
+        body: JSON.stringify({ emails: interestRecipients }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to save notification recipients.");
       setInterestRecipients((data.emails || []).join(", "));
-      setInterestTemplates({
-        confirmationSubject: data.confirmationSubject || "",
-        confirmationHtml: data.confirmationHtml || "",
-        notificationSubject: data.notificationSubject || "",
-        notificationHtml: data.notificationHtml || "",
-      });
       setInterestRecipientsSaved(true);
       setTimeout(() => setInterestRecipientsSaved(false), 2500);
     } catch (e) {
@@ -710,12 +514,6 @@ function AdminSettingsPanel() {
     } finally {
       setInterestRecipientsSaving(false);
     }
-  }
-
-  function updateInterestTemplate(key, value) {
-    setInterestTemplates(p => ({ ...p, [key]: value }));
-    setInterestRecipientsError("");
-    setInterestRecipientsSaved(false);
   }
 
   async function handleSaveOnboardingRecipients() {
@@ -726,17 +524,11 @@ function AdminSettingsPanel() {
       const res = await fetch(`${API_BASE}/api/auth/admin/onboarding-notifications?loginId=${encodeURIComponent(loginId)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
-        body: JSON.stringify({ emails: onboardingRecipients, ...onboardingTemplates }),
+        body: JSON.stringify({ emails: onboardingRecipients }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to save onboarding notification settings.");
       setOnboardingRecipients((data.emails || []).join(", "));
-      setOnboardingTemplates({
-        confirmationSubject: data.confirmationSubject || "",
-        confirmationHtml: data.confirmationHtml || "",
-        notificationSubject: data.notificationSubject || "",
-        notificationHtml: data.notificationHtml || "",
-      });
       setOnboardingRecipientsSaved(true);
       setTimeout(() => setOnboardingRecipientsSaved(false), 2500);
     } catch (e) {
@@ -744,12 +536,6 @@ function AdminSettingsPanel() {
     } finally {
       setOnboardingRecipientsSaving(false);
     }
-  }
-
-  function updateOnboardingTemplate(key, value) {
-    setOnboardingTemplates(p => ({ ...p, [key]: value }));
-    setOnboardingRecipientsError("");
-    setOnboardingRecipientsSaved(false);
   }
 
   function updatePw(k, v) {
@@ -888,9 +674,11 @@ function AdminSettingsPanel() {
   if (isProtectedSection && !isAdmin) {
     return <Navigate to="/settings/account" replace />;
   }
-  const visibleSections = isAdmin
-    ? SETTINGS_SECTIONS
-    : SETTINGS_SECTIONS.filter(item => item.key !== "email" && item.key !== "admin");
+  // Keep the complete navigation stable while the admin check is in flight.
+  // A confirmed non-admin still gets the restricted navigation below.
+  const visibleSections = isAdmin === false
+    ? SETTINGS_SECTIONS.filter(item => item.key !== "email" && item.key !== "admin")
+    : SETTINGS_SECTIONS;
 
   return (
     <Box sx={{ maxWidth: 900 }}>
@@ -1528,7 +1316,7 @@ function AdminSettingsPanel() {
               Onboarding Email Notifications
             </Typography>
             <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
-              Email templates for approved users and internal onboarding alerts
+              Choose who receives internal onboarding alerts
             </Typography>
           </Box>
           <Box sx={{ p: 2.25, display: "flex", flexDirection: "column", gap: 1.5 }}>
@@ -1566,61 +1354,11 @@ function AdminSettingsPanel() {
               </Typography>
             </Box>
 
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, pt: 0.5 }}>
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: TEXT }}>
-                Approved User Email Template
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={onboardingTemplates.confirmationSubject}
-                onChange={e => updateOnboardingTemplate("confirmationSubject", e.target.value)}
-                disabled={onboardingRecipientsLoading}
-                placeholder="Welcome to Nolyvra - registration approved"
-                label="Subject"
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
-              />
-              <EmailHtmlTemplateField
-                minRows={5}
-                value={onboardingTemplates.confirmationHtml}
-                onChange={value => updateOnboardingTemplate("confirmationHtml", value)}
-                disabled={onboardingRecipientsLoading}
-                placeholder="<p>Hi {{name}},</p>"
-                onError={setOnboardingRecipientsError}
-              />
-            </Box>
-
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, pt: 0.5 }}>
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: TEXT }}>
-                Internal Notification Template
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={onboardingTemplates.notificationSubject}
-                onChange={e => updateOnboardingTemplate("notificationSubject", e.target.value)}
-                disabled={onboardingRecipientsLoading}
-                placeholder="Nolyvra registration approved: {{name}}"
-                label="Subject"
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
-              />
-              <EmailHtmlTemplateField
-                minRows={6}
-                value={onboardingTemplates.notificationHtml}
-                onChange={value => updateOnboardingTemplate("notificationHtml", value)}
-                disabled={onboardingRecipientsLoading}
-                placeholder="<h2>Registration Approved</h2>"
-                onError={setOnboardingRecipientsError}
-              />
-              <Typography sx={{ fontSize: 11, color: MUTED, mt: -0.5 }}>
-                Available variables: {"{{name}}"}, {"{{email}}"}, {"{{company}}"}, {"{{password}}"}, {"{{adminLoginId}}"}.
-              </Typography>
-            </Box>
             <Button variant="contained" onClick={handleSaveOnboardingRecipients}
               disabled={onboardingRecipientsSaving || onboardingRecipientsLoading}
               sx={{ alignSelf: "flex-start", fontSize: 12, bgcolor: WARN, borderRadius: "6px",
                 textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#B45309", boxShadow: "none" } }}>
-              {onboardingRecipientsSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Save Onboarding Email Settings"}
+              {onboardingRecipientsSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Save Recipients"}
             </Button>
           </Box>
         </Paper>
@@ -1672,61 +1410,11 @@ function AdminSettingsPanel() {
               </Typography>
             </Box>
 
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, pt: 0.5 }}>
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: TEXT }}>
-                Thank-you Email Template
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={interestTemplates.confirmationSubject}
-                onChange={e => updateInterestTemplate("confirmationSubject", e.target.value)}
-                disabled={interestRecipientsLoading}
-                placeholder="Thanks for your interest in Nolyvra"
-                label="Subject"
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
-              />
-              <EmailHtmlTemplateField
-                minRows={5}
-                value={interestTemplates.confirmationHtml}
-                onChange={value => updateInterestTemplate("confirmationHtml", value)}
-                disabled={interestRecipientsLoading}
-                placeholder="<p>Hi {{name}},</p>"
-                onError={setInterestRecipientsError}
-              />
-            </Box>
-
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, pt: 0.5 }}>
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: TEXT }}>
-                Internal Notification Template
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={interestTemplates.notificationSubject}
-                onChange={e => updateInterestTemplate("notificationSubject", e.target.value)}
-                disabled={interestRecipientsLoading}
-                placeholder="New register interest submission: {{name}}"
-                label="Subject"
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
-              />
-              <EmailHtmlTemplateField
-                minRows={6}
-                value={interestTemplates.notificationHtml}
-                onChange={value => updateInterestTemplate("notificationHtml", value)}
-                disabled={interestRecipientsLoading}
-                placeholder="<h2>New Register Interest Submission</h2>"
-                onError={setInterestRecipientsError}
-              />
-              <Typography sx={{ fontSize: 11, color: MUTED, mt: -0.5 }}>
-                Available variables: {"{{name}}"}, {"{{email}}"}, {"{{company}}"}, {"{{phone}}"}.
-              </Typography>
-            </Box>
             <Button variant="contained" onClick={handleSaveInterestRecipients}
               disabled={interestRecipientsSaving || interestRecipientsLoading}
               sx={{ alignSelf: "flex-start", fontSize: 12, bgcolor: WARN, borderRadius: "6px",
                 textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#B45309", boxShadow: "none" } }}>
-              {interestRecipientsSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Save Notification Settings"}
+              {interestRecipientsSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Save Recipients"}
             </Button>
           </Box>
         </Paper>

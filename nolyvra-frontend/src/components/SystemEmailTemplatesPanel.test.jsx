@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation, useParams } from "react-router-dom";
 import SystemEmailTemplatesPanel from "./SystemEmailTemplatesPanel";
 
 const template = {
@@ -30,6 +30,15 @@ function renderPanel(selectedKey) {
   );
 }
 
+function RoutedPanel() {
+  const { templateKey } = useParams();
+  const location = useLocation();
+  return <>
+    <SystemEmailTemplatesPanel selectedKey={templateKey} />
+    <span data-testid="location">{location.pathname}</span>
+  </>;
+}
+
 describe("SystemEmailTemplatesPanel", () => {
   beforeEach(() => {
     localStorage.clear();
@@ -55,20 +64,39 @@ describe("SystemEmailTemplatesPanel", () => {
     expect(screen.queryByLabelText("Subject")).not.toBeInTheDocument();
   });
 
-  it("edits, validates required variables, and previews in a sandboxed frame", async () => {
-    renderPanel("password_reset");
-    const html = await screen.findByLabelText("HTML body");
+  it("keeps a valid selected template route open after templates load", async () => {
+    render(
+      <MemoryRouter initialEntries={["/settings/email/password_reset"]}>
+        <Routes>
+          <Route path="/settings/email/:templateKey" element={<RoutedPanel />} />
+          <Route path="/settings/email" element={<RoutedPanel />} />
+        </Routes>
+      </MemoryRouter>
+    );
 
-    fireEvent.change(html, { target: { value: "<p>No reset link</p>" } });
+    expect(await screen.findByLabelText("Subject")).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/settings/email/password_reset");
+  });
+
+  it("defaults to visual editing and keeps HTML source in sync", async () => {
+    renderPanel("password_reset");
+    const visualEditor = await screen.findByRole("textbox", { name: "Email body editor" });
+    expect(visualEditor.innerHTML).toContain("{{reset_link}}");
+    expect(screen.getByRole("toolbar", { name: "Email formatting" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Plain-text body")).not.toBeInTheDocument();
+
+    visualEditor.innerHTML = "<p>No reset link</p>";
+    fireEvent.input(visualEditor);
+    fireEvent.click(screen.getByRole("button", { name: "Advanced options" }));
+    expect(screen.getByLabelText("Plain-text body")).toHaveValue("No reset link");
     fireEvent.change(screen.getByLabelText("Plain-text body"), { target: { value: "No variables" } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByText("Required variable is missing: reset_link")).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(2);
 
-    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
-    const frame = await screen.findByTitle("System email template preview");
-    expect(frame).toHaveAttribute("sandbox", "");
-  });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Show HTML code" }));
+    expect(screen.getByLabelText("HTML body")).toHaveValue("<p>No reset link</p>");
+  }, 10000);
 
   it("saves changes and reports API errors", async () => {
     fetch.mockImplementation((url, options = {}) => {

@@ -38,6 +38,27 @@ public class ResendEmailService {
     }
 
     public boolean sendText(String toAddress, String subject, String body) {
+        if (toAddress == null || toAddress.isBlank()) return false;
+        return send(toAddress, CreateEmailOptions.builder()
+                .from(fromAddress == null ? "" : fromAddress.trim())
+                .to(toAddress)
+                .subject(subject)
+                .text(body)
+                .build());
+    }
+
+    public boolean sendHtml(String toAddress, String subject, String textBody, String htmlBody) {
+        if (toAddress == null || toAddress.isBlank()) return false;
+        return send(toAddress, CreateEmailOptions.builder()
+                .from(fromAddress == null ? "" : fromAddress.trim())
+                .to(toAddress)
+                .subject(subject)
+                .text(textBody)
+                .html(htmlBody)
+                .build());
+    }
+
+    private boolean send(String toAddress, CreateEmailOptions options) {
         if (toAddress == null || toAddress.isBlank()) {
             return false;
         }
@@ -49,13 +70,6 @@ public class ResendEmailService {
             System.err.println("Resend email skipped: RESEND_FROM is not configured.");
             return false;
         }
-
-        CreateEmailOptions options = CreateEmailOptions.builder()
-                .from(fromAddress.trim())
-                .to(toAddress)
-                .subject(subject)
-                .text(body)
-                .build();
 
         long backoffMs = INITIAL_BACKOFF_MS;
         for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {

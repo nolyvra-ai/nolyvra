@@ -279,6 +279,7 @@ public class PasswordResetService {
         String resetUrl = frontendUrl + "/reset-password?token=" + rawToken + accountQuery;
         String subject = "Reset your nolyvra password";
         String body = defaultResetBody(resetUrl);
+        String htmlBody = defaultResetHtml(resetUrl);
         try {
             SystemEmailTemplateService.RenderedTemplate rendered = systemEmailTemplateService.render(
                     "password_reset",
@@ -288,13 +289,15 @@ public class PasswordResetService {
                             "account_type", accountType.name().toLowerCase(Locale.ROOT)));
             subject = rendered.subject();
             body = rendered.textBody();
+            htmlBody = rendered.htmlBody();
         } catch (RuntimeException ignored) {
             // Password reset is essential: database/template failures use the built-in copy.
         }
-        resendEmailService.sendText(
+        resendEmailService.sendHtml(
                 email,
                 subject,
-                body);
+                body,
+                htmlBody);
     }
 
     private String defaultResetBody(String resetUrl) {
@@ -306,6 +309,15 @@ public class PasswordResetService {
 
                 If you did not request a password reset, you can ignore this email.
                 """.formatted(tokenTtlMinutes, resetUrl);
+    }
+
+    private String defaultResetHtml(String resetUrl) {
+        return """
+                <p>We received a request to reset your nolyvra password.</p>
+                <p><a href="%s">Reset your password</a></p>
+                <p>This link expires in %d minutes.</p>
+                <p>If you did not request a password reset, you can ignore this email.</p>
+                """.formatted(resetUrl, tokenTtlMinutes);
     }
 
     private String generateToken() {

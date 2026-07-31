@@ -81,9 +81,10 @@ class PasswordResetServiceTest {
                 eq("login-1"),
                 any(),
                 any());
-        verify(resendEmailService).sendText(
+        verify(resendEmailService).sendHtml(
                 eq("user@example.com"),
                 eq("Reset your nolyvra password"),
+                contains("https://app.nolyvra.test/reset-password?token=BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"),
                 contains("https://app.nolyvra.test/reset-password?token=BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"));
     }
 
@@ -112,8 +113,8 @@ class PasswordResetServiceTest {
                 values.get("reset_link").startsWith("https://app.nolyvra.test/reset-password?token=")
                         && values.get("expiry_minutes").equals("30")
                         && values.get("account_type").equals("tenant")));
-        verify(resendEmailService).sendText(
-                "user@example.com", "Managed reset subject", "Managed reset body");
+        verify(resendEmailService).sendHtml(
+                "user@example.com", "Managed reset subject", "Managed reset body", "<p>managed</p>");
     }
 
     @Test
@@ -143,9 +144,10 @@ class PasswordResetServiceTest {
                 eq("employee-1"),
                 any(),
                 any());
-        verify(resendEmailService).sendText(
+        verify(resendEmailService).sendHtml(
                 eq("employee@example.com"),
                 eq("Reset your nolyvra password"),
+                contains("&type=employee"),
                 contains("&type=employee"));
     }
 

@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import SettingsPage from "./SettingsPage";
@@ -22,9 +22,10 @@ function renderSettings(path) {
   );
 }
 
-function response(ok, data = {}) {
+function response(ok, data = {}, status = ok ? 200 : 403) {
   return Promise.resolve({
     ok,
+    status,
     json: () => Promise.resolve(data),
   });
 }
@@ -58,6 +59,23 @@ describe("SettingsPage navigation", () => {
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     expect(screen.queryByRole("button", { name: /Administration/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Email & Notifications/ })).not.toBeInTheDocument();
+  });
+
+  it("keeps protected navigation visible while administrator access is loading", async () => {
+    let finishAdminCheck;
+    fetch.mockImplementation(url => {
+      if (String(url).includes("/api/auth/admin/users")) {
+        return new Promise(resolve => { finishAdminCheck = resolve; });
+      }
+      return response(true);
+    });
+
+    renderSettings("/settings/account");
+
+    expect(screen.getByRole("button", { name: /Administration/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Email & Notifications/ })).toBeInTheDocument();
+
+    await act(async () => finishAdminCheck(await response(true, [])));
   });
 
   it("redirects a non-admin away from protected settings", async () => {
