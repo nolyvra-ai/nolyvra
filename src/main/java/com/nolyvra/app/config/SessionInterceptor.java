@@ -29,6 +29,7 @@ public class SessionInterceptor implements HandlerInterceptor {
             new AllowedRoute("POST",   "/api/crm/employees/*/expenses"),
             new AllowedRoute("DELETE", "/api/crm/expenses/*"),
             new AllowedRoute("GET",    "/api/crm/employees/*/grievances"),
+            new AllowedRoute("GET",    "/api/crm/grievance-entitlement"),
             new AllowedRoute("POST",   "/api/crm/employees/*/grievances"),
             new AllowedRoute("DELETE", "/api/crm/grievances/*"),
             new AllowedRoute("GET",    "/api/crm/timesheets"),
