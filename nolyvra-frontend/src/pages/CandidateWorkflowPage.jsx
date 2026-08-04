@@ -200,6 +200,10 @@ function JobApplicationRow({ application, candidateId, candidateName, candidateE
             application.stage === "Rejected" ? "danger" : "accent"} />
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Button size="small" onClick={(e) => { e.stopPropagation(); nav(`/analysis/${candidateId}`); }}
+            sx={{ fontSize: 11, textTransform: "none", color: ACCENT, minWidth: 0, p: "2px 8px" }}>
+            📊 Analysis
+          </Button>
           <Typography sx={{ fontSize: 11, color: MUTED }}>
             Applied {application.createdAt ? new Date(application.createdAt).toLocaleDateString("en-GB") : ""}
           </Typography>
