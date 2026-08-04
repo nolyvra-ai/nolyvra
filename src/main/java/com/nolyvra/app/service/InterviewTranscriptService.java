@@ -157,7 +157,7 @@ public class InterviewTranscriptService {
                 from interview_transcripts it
                 left join interviews i on i.id = it.interview_id
                 where it.candidate_id = ? and it.login_id = ?
-                  and (? is null or i.job_id = ?)
+                  and (?::text is null or i.job_id = ?::text)
                 order by it.analyzed_at desc nulls last
                 """, (rs, n) -> mapRow(rs), candidateId, loginId, jobId, jobId);
     }
