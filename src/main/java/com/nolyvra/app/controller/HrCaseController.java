@@ -146,11 +146,19 @@ public class HrCaseController {
     // Grievances
     // ═══════════════════════════════════════════════════════════════════════════
 
+    // Non-throwing check so the frontend can decide whether to show the Grievances
+    // nav item at all, before hitting any of the throwing endpoints below.
+    @GetMapping("/grievance-entitlement")
+    public Map<String, Boolean> getGrievanceEntitlement(@RequestParam String loginId) {
+        return Map.of("grievanceEnabled", entitlementService.isGrievanceEntitled(loginId));
+    }
+
     @GetMapping("/grievances")
     public List<GrievanceResponse> listAllGrievances(
             @RequestParam String loginId,
             @RequestParam(required = false) String status) {
         entitlementService.checkEntitled(loginId);
+        entitlementService.checkGrievanceEntitled(loginId);
         return grievanceService.listAll(loginId, status);
     }
 
@@ -158,6 +166,7 @@ public class HrCaseController {
     public List<GrievanceResponse> listEmployeeGrievances(
             @PathVariable String employeeId, @RequestParam String loginId) {
         entitlementService.checkEntitled(loginId);
+        entitlementService.checkGrievanceEntitled(loginId);
         requireOwnEmployee(employeeId);
         return grievanceService.listByEmployee(employeeId, loginId);
     }
@@ -171,6 +180,7 @@ public class HrCaseController {
             @RequestParam(required = false) String description,
             @RequestParam(required = false) MultipartFile complaint) {
         entitlementService.checkEntitled(loginId);
+        entitlementService.checkGrievanceEntitled(loginId);
         requireOwnEmployee(employeeId);
         return grievanceService.create(employeeId,
                 new GrievanceCreateRequest(title, description),
@@ -182,6 +192,7 @@ public class HrCaseController {
             @PathVariable String id, @RequestParam String loginId,
             @RequestBody WorkflowStepRequest req) {
         entitlementService.checkEntitled(loginId);
+        entitlementService.checkGrievanceEntitled(loginId);
         return grievanceService.updateStep(id, req, loginId);
     }
 
@@ -190,6 +201,7 @@ public class HrCaseController {
             @PathVariable String id, @RequestParam String loginId,
             @RequestParam(required = false) String resolutionNotes) {
         entitlementService.checkEntitled(loginId);
+        entitlementService.checkGrievanceEntitled(loginId);
         return grievanceService.resolve(id, resolutionNotes, loginId);
     }
 
@@ -197,6 +209,7 @@ public class HrCaseController {
     public GrievanceResponse rejectGrievance(
             @PathVariable String id, @RequestParam String loginId) {
         entitlementService.checkEntitled(loginId);
+        entitlementService.checkGrievanceEntitled(loginId);
         return grievanceService.reject(id, loginId);
     }
 
@@ -204,6 +217,7 @@ public class HrCaseController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void cancelGrievance(@PathVariable String id, @RequestParam String loginId) {
         entitlementService.checkEntitled(loginId);
+        entitlementService.checkGrievanceEntitled(loginId);
         grievanceService.cancel(id, loginId, sessionContext.isEmployee() ? sessionContext.employeeId() : null);
     }
 
@@ -211,6 +225,7 @@ public class HrCaseController {
     public ResponseEntity<byte[]> downloadComplaint(
             @PathVariable String id, @RequestParam String loginId) {
         entitlementService.checkEntitled(loginId);
+        entitlementService.checkGrievanceEntitled(loginId);
         Map<String, Object> raw = grievanceService.getComplaintRaw(id, loginId);
         byte[] data = (byte[]) raw.get("complaint_data");
         String name = (String) raw.get("complaint_name");

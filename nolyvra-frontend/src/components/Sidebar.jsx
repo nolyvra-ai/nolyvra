@@ -105,6 +105,7 @@ export default function Sidebar() {
   const [collapsed,      setCollapsed]      = useState(true);
   const [jobCount,       setJobCount]       = useState(null);
   const [candidateCount, setCandidateCount] = useState(null);
+  const [grievanceEnabled, setGrievanceEnabled] = useState(true);
 
   const { mode } = useAppMode();
   const W = collapsed ? W_COLLAPSED : W_FULL;
@@ -120,6 +121,16 @@ export default function Sidebar() {
     fetch(`${API_BASE}/api/candidates/count?loginId=${encodeURIComponent(loginIdVal)}`, { headers: authHeader })
       .then(r => r.ok ? r.json() : null)
       .then(d => setCandidateCount(typeof d?.count === "number" ? d.count : null))
+      .catch(() => {});
+  }, [loginIdVal]);
+
+  useEffect(() => {
+    if (!loginIdVal) return;
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+    const authHeader = { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` };
+    fetch(`${API_BASE}/api/crm/grievance-entitlement?loginId=${encodeURIComponent(loginIdVal)}`, { headers: authHeader })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (typeof d?.grievanceEnabled === "boolean") setGrievanceEnabled(d.grievanceEnabled); })
       .catch(() => {});
   }, [loginIdVal]);
 
@@ -184,7 +195,9 @@ export default function Sidebar() {
           <Section label="My CRM" collapsed={collapsed}>
             <NavItem to="/crm/my-leave"      icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>} label="Leave / WFH" collapsed={collapsed} />
             <NavItem to="/crm/my-expenses"   icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>} label="Expenses" collapsed={collapsed} />
-            <NavItem to="/crm/my-grievances" icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>} label="Grievances" collapsed={collapsed} />
+            {grievanceEnabled && (
+              <NavItem to="/crm/my-grievances" icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>} label="Grievances" collapsed={collapsed} />
+            )}
             <NavItem to="/crm/my-timesheet"  icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>} label="Timesheet" collapsed={collapsed} />
             <NavItem to="/settings"          icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>} label="Settings" collapsed={collapsed} />
           </Section>
@@ -198,7 +211,9 @@ export default function Sidebar() {
               <NavItem to="/crm/leave"                icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="8" y2="18"/><line x1="12" y1="18" x2="12" y2="18"/></svg>} label="Leave / WFH" collapsed={collapsed} />
               <NavItem to="/crm/workflows"            icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><line x1="7" y1="11.5" x2="17" y2="6.5"/><line x1="7" y1="12.5" x2="17" y2="17.5"/></svg>} label="Workflows" collapsed={collapsed} />
               <NavItem to="/crm/expenses"             icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>} label="Expenses" collapsed={collapsed} />
-              <NavItem to="/crm/grievances"           icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>} label="Grievances" collapsed={collapsed} />
+              {grievanceEnabled && (
+                <NavItem to="/crm/grievances"         icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>} label="Grievances" collapsed={collapsed} />
+              )}
               <NavItem to="/crm/timesheets"           icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>} label="Timesheets" collapsed={collapsed} />
               <NavItem to="/crm/my-timesheet"         icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>} label="My Timesheet" collapsed={collapsed} />
               <NavItem to="/crm/disciplinary"         icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>} label="Disciplinary" collapsed={collapsed} />
