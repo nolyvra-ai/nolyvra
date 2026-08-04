@@ -2,6 +2,8 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import LandingPage            from "../pages/LandingPage";
 import PricingPage            from "../pages/PricingPage";
 import LoginPage              from "../pages/LoginPage";
+import ForgotPasswordPage     from "../pages/ForgotPasswordPage";
+import ResetPasswordPage      from "../pages/ResetPasswordPage";
 import DashboardPage          from "../pages/DashboardPage";
 import JobsPage               from "../pages/JobsPage";
 import CreateJobPage          from "../pages/CreateJobPage";
@@ -51,6 +53,8 @@ export default function AppRoutes() {
       <Route path="/"                                   element={<LandingPage />} />
       <Route path="/pricing"                            element={<PricingPage />} />
       <Route path="/login"                              element={<LoginPage />} />
+      <Route path="/forgot-password"                    element={<ForgotPasswordPage />} />
+      <Route path="/reset-password"                     element={<ResetPasswordPage />} />
       <Route path="/ai-in-recruitment"                  element={<AgentEconomyPage />} />
       <Route path="/stack-audit"                        element={<StackAuditPage />} />
       <Route path="/privacy"                            element={<PrivacyPage />} />

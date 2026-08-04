@@ -4,7 +4,7 @@ import AppRoutes from "./routes/AppRoutes";
 import { AppModeProvider } from "./context/AppModeContext";
 
 // Routes that are fully public — no auth check, no AppShell
-const PUBLIC_ROUTES = ["/", "/pricing", "/login", "/ai-in-recruitment", "/stack-audit", "/privacy", "/terms"];
+const PUBLIC_ROUTES = ["/", "/pricing", "/login", "/forgot-password", "/reset-password", "/ai-in-recruitment", "/stack-audit", "/privacy", "/terms"];
 
 // Employee sessions may only ever reach these — everything else (RecruitIQ,
 // tenant-admin CRM screens) redirects back. Mirrors the server-side allowlist
