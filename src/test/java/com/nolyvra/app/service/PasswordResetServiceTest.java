@@ -20,6 +20,7 @@ class PasswordResetServiceTest {
 
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
     private final ResendEmailService resendEmailService = mock(ResendEmailService.class);
+    private final SystemEmailTemplateService systemEmailTemplateService = mock(SystemEmailTemplateService.class);
     private final SecureRandom secureRandom = mock(SecureRandom.class);
     private final Clock clock = Clock.fixed(Instant.parse("2026-07-29T08:00:00Z"), ZoneOffset.UTC);
     private PasswordResetService service;
@@ -31,7 +32,10 @@ class PasswordResetServiceTest {
             return null;
         }).when(secureRandom).nextBytes(any(byte[].class));
         service = new PasswordResetService(
-                jdbc, resendEmailService, "https://app.nolyvra.test/", 30, clock, secureRandom);
+                jdbc, resendEmailService, systemEmailTemplateService,
+                "https://app.nolyvra.test/", 30, clock, secureRandom);
+        when(systemEmailTemplateService.render(eq("password_reset"), anyMap()))
+                .thenThrow(new IllegalStateException("use fallback by default"));
     }
 
     @Test
@@ -77,10 +81,40 @@ class PasswordResetServiceTest {
                 eq("login-1"),
                 any(),
                 any());
-        verify(resendEmailService).sendText(
+        verify(resendEmailService).sendHtml(
                 eq("user@example.com"),
                 eq("Reset your nolyvra password"),
+                contains("https://app.nolyvra.test/reset-password?token=BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"),
                 contains("https://app.nolyvra.test/reset-password?token=BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc"));
+    }
+
+    @Test
+    void requestResetUsesManagedSubjectAndVariables() {
+        when(jdbc.query(
+                contains("where lower(email) = ?"),
+                any(RowMapper.class),
+                eq("user@example.com")))
+                .thenAnswer(invocation -> {
+                    RowMapper<?> mapper = invocation.getArgument(1);
+                    var resultSet = mock(java.sql.ResultSet.class);
+                    when(resultSet.getString("id")).thenReturn("login-1");
+                    when(resultSet.getString("email")).thenReturn("user@example.com");
+                    return List.of(mapper.mapRow(resultSet, 0));
+                });
+        when(jdbc.queryForObject(contains("created_at > now()"), eq(Integer.class), eq("login-1")))
+                .thenReturn(0);
+        when(systemEmailTemplateService.render(eq("password_reset"), anyMap()))
+                .thenReturn(new SystemEmailTemplateService.RenderedTemplate(
+                        "Managed reset subject", "<p>managed</p>", "Managed reset body"));
+
+        service.requestReset("user@example.com");
+
+        verify(systemEmailTemplateService).render(eq("password_reset"), argThat(values ->
+                values.get("reset_link").startsWith("https://app.nolyvra.test/reset-password?token=")
+                        && values.get("expiry_minutes").equals("30")
+                        && values.get("account_type").equals("tenant")));
+        verify(resendEmailService).sendHtml(
+                "user@example.com", "Managed reset subject", "Managed reset body", "<p>managed</p>");
     }
 
     @Test
@@ -110,9 +144,10 @@ class PasswordResetServiceTest {
                 eq("employee-1"),
                 any(),
                 any());
-        verify(resendEmailService).sendText(
+        verify(resendEmailService).sendHtml(
                 eq("employee@example.com"),
                 eq("Reset your nolyvra password"),
+                contains("&type=employee"),
                 contains("&type=employee"));
     }
 

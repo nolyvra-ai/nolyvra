@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef, Fragment } from "react";
+import { useState, useEffect, Fragment } from "react";
 import {
   Box, Paper, Typography, Button, TextField, MenuItem,
-  Alert, CircularProgress, LinearProgress, Slider,
-  Dialog, DialogTitle, DialogContent
+  Alert, CircularProgress, LinearProgress, Slider
 } from "@mui/material";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { usePlanLimit } from "../hooks/usePlanLimit";
+import SystemEmailTemplatesPanel from "../components/SystemEmailTemplatesPanel";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -17,183 +17,13 @@ const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
 const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
 const SURFACE = "#FAFBFD";
 
-function escapeHtmlAttribute(value) {
-  return String(value || "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("\"", "&quot;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
-}
-
-function blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error("Could not render one of the template images."));
-    reader.readAsDataURL(blob);
-  });
-}
-
-function EmailHtmlTemplateField({ value, onChange, disabled, minRows, placeholder, onError }) {
-  const inputRef = useRef(null);
-  const fileRef = useRef(null);
-  const [uploading, setUploading] = useState(false);
-  const [insertedName, setInsertedName] = useState("");
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [previewHtml, setPreviewHtml] = useState("");
-  const [previewError, setPreviewError] = useState("");
-
-  async function insertImage(file) {
-    if (!file) return;
-    setUploading(true);
-    setInsertedName("");
-    onError?.("");
-    try {
-      const loginId = localStorage.getItem("loginId") || "";
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch(
-        `${API_BASE}/api/auth/admin/email-template-images?loginId=${encodeURIComponent(loginId)}`,
-        {
-          method: "POST",
-          headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
-          body: form,
-        }
-      );
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Could not upload the image.");
-
-      const imageName = escapeHtmlAttribute(data.fileName || file.name || "template-image");
-      const imageHtml = `<!-- Template image: ${imageName} -->\n`
-        + `<img src="cid:template-image-${data.id}" alt="${imageName}" `
-        + `style="max-width:100%;height:auto;">`;
-      const textarea = inputRef.current;
-      const position = textarea?.selectionStart ?? value.length;
-      const before = value.slice(0, position);
-      const after = value.slice(position);
-      const prefix = before && !before.endsWith("\n") ? "\n" : "";
-      const suffix = after && !after.startsWith("\n") ? "\n" : "";
-      const nextValue = `${before}${prefix}${imageHtml}${suffix}${after}`;
-      onChange(nextValue);
-      setInsertedName(data.fileName || file.name);
-
-      requestAnimationFrame(() => {
-        const nextPosition = before.length + prefix.length + imageHtml.length;
-        textarea?.focus();
-        textarea?.setSelectionRange(nextPosition, nextPosition);
-      });
-    } catch (e) {
-      onError?.(e.message);
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
-
-  async function openPreview() {
-    setPreviewOpen(true);
-    setPreviewLoading(true);
-    setPreviewError("");
-    try {
-      const ids = [...new Set(
-        [...value.matchAll(/cid:template-image-([0-9a-f-]{36})/gi)].map(match => match[1])
-      )];
-      let rendered = value;
-      const loginId = localStorage.getItem("loginId") || "";
-      for (const id of ids) {
-        const res = await fetch(
-          `${API_BASE}/api/auth/admin/email-template-images/${id}?loginId=${encodeURIComponent(loginId)}`,
-          { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } }
-        );
-        if (!res.ok) throw new Error("Could not load one of the template images.");
-        const dataUrl = await blobToDataUrl(await res.blob());
-        rendered = rendered.replaceAll(`cid:template-image-${id}`, dataUrl);
-      }
-      setPreviewHtml(rendered);
-    } catch (e) {
-      setPreviewError(e.message);
-    } finally {
-      setPreviewLoading(false);
-    }
-  }
-
-  function closePreview() {
-    setPreviewOpen(false);
-    setPreviewHtml("");
-    setPreviewError("");
-  }
-
-  return (
-    <Box>
-      <TextField
-        fullWidth
-        multiline
-        minRows={minRows}
-        size="small"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        disabled={disabled || uploading}
-        placeholder={placeholder}
-        label="HTML Body"
-        inputRef={inputRef}
-        sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
-      />
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1, mt: 0.75 }}>
-        <Button
-          size="small"
-          variant="outlined"
-          component="label"
-          disabled={disabled || uploading}
-          sx={{ fontSize: 11, borderRadius: "6px", textTransform: "none" }}
-        >
-          {uploading ? <CircularProgress size={13} /> : "Insert Image"}
-          <input
-            ref={fileRef}
-            hidden
-            type="file"
-            accept="image/png,image/jpeg,image/gif"
-            onChange={e => insertImage(e.target.files?.[0])}
-          />
-        </Button>
-        <Button
-          size="small"
-          variant="outlined"
-          disabled={disabled || uploading || !value.trim()}
-          onClick={openPreview}
-          sx={{ fontSize: 11, borderRadius: "6px", textTransform: "none" }}
-        >
-          Preview
-        </Button>
-        <Typography sx={{ fontSize: 10.5, color: insertedName ? SUCCESS : MUTED }}>
-          {insertedName ? `${insertedName} inserted` : "PNG, JPEG or GIF · max 5 MB"}
-        </Typography>
-      </Box>
-      <Dialog open={previewOpen} onClose={closePreview} fullWidth maxWidth="md">
-        <DialogTitle sx={{ fontSize: 15, fontWeight: 700, pb: 1 }}>
-          Email Template Preview
-        </DialogTitle>
-        <DialogContent dividers sx={{ p: 0, minHeight: 420 }}>
-          {previewLoading ? (
-            <Box sx={{ minHeight: 420, display: "grid", placeItems: "center" }}>
-              <CircularProgress size={24} />
-            </Box>
-          ) : previewError ? (
-            <Alert severity="error" sx={{ m: 2 }}>{previewError}</Alert>
-          ) : (
-            <Box
-              component="iframe"
-              title="Email template preview"
-              sandbox=""
-              srcDoc={previewHtml}
-              sx={{ width: "100%", minHeight: 500, border: 0, display: "block", bgcolor: "#fff" }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
-    </Box>
-  );
-}
+const SETTINGS_SECTIONS = [
+  { key: "account", label: "Account", description: "Password and session" },
+  { key: "billing", label: "Billing", description: "Plan, usage and tokens" },
+  { key: "integrations", label: "Integrations", description: "Connected services" },
+  { key: "email", label: "Email & Notifications", description: "Notification preferences" },
+  { key: "admin", label: "Administration", description: "Users, limits and leads" },
+];
 
 // ── Usage bar component ───────────────────────────────────────────────────────
 function UsageBar({ label, used, max, remainingLabel }) {
@@ -337,15 +167,19 @@ function EmployeeSettingsPanel() {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function SettingsPage() {
-  if (localStorage.getItem("authType") === "EMPLOYEE") {
-    return <EmployeeSettingsPanel />;
-  }
-
+function AdminSettingsPanel() {
   const nav = useNavigate();
+  const { section = "account", templateKey } = useParams();
   const [searchParams] = useSearchParams();
+  const activeSection = SETTINGS_SECTIONS.some(item => item.key === section) ? section : null;
   const loginId = localStorage.getItem("loginId") || "";
   const name = localStorage.getItem("name") || "";
+  const [emailEditorDirty, setEmailEditorDirty] = useState(false);
+
+  function navigateSettings(nextSection) {
+    if (emailEditorDirty && !window.confirm("Discard unsaved template changes?")) return;
+    nav(`/settings/${nextSection}`);
+  }
 
   // Show success banner if returning from Stripe checkout
   const [upgradeSuccess, setUpgradeSuccess] = useState(
@@ -528,7 +362,7 @@ export default function SettingsPage() {
   const [showPw, setShowPw] = useState({ current: false, new: false, confirm: false });
 
   // ── Admin panel state ─────────────────────────────────────────────────────
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(null);
   const [adminUsers, setAdminUsers] = useState([]);
   const [onboarding, setOnboarding] = useState(null);
   const [selectedAdminUser, setSelectedAdminUser] = useState("");
@@ -540,30 +374,31 @@ export default function SettingsPage() {
   const [interestRecipientsSaving, setInterestRecipientsSaving] = useState(false);
   const [interestRecipientsSaved, setInterestRecipientsSaved] = useState(false);
   const [interestRecipientsError, setInterestRecipientsError] = useState("");
-  const [interestTemplates, setInterestTemplates] = useState({
-    confirmationSubject: "",
-    confirmationHtml: "",
-    notificationSubject: "",
-    notificationHtml: "",
-  });
   const [onboardingRecipients, setOnboardingRecipients] = useState("");
   const [onboardingRecipientsLoading, setOnboardingRecipientsLoading] = useState(false);
   const [onboardingRecipientsSaving, setOnboardingRecipientsSaving] = useState(false);
   const [onboardingRecipientsSaved, setOnboardingRecipientsSaved] = useState(false);
   const [onboardingRecipientsError, setOnboardingRecipientsError] = useState("");
-  const [onboardingTemplates, setOnboardingTemplates] = useState({
-    confirmationSubject: "",
-    confirmationHtml: "",
-    notificationSubject: "",
-    notificationHtml: "",
-  });
 
   useEffect(() => {
     if (!loginId) return;
     fetch(`${API_BASE}/api/auth/admin/users?loginId=${encodeURIComponent(loginId)}`, { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } })
-      .then(r => { if (r.ok) { setIsAdmin(true); return r.json(); } throw new Error(); })
-      .then(d => setAdminUsers(d))
-      .catch(() => setIsAdmin(false));
+      .then(r => {
+        if (r.ok) {
+          setIsAdmin(true);
+          return r.json();
+        }
+        if (r.status === 403) {
+          setIsAdmin(false);
+          return null;
+        }
+        throw new Error("Could not verify administrator access.");
+      })
+      .then(d => {
+        if (d) setAdminUsers(d);
+      })
+      // A stopped or restarting API is not evidence that this is a non-admin.
+      .catch(() => setIsAdmin(null));
   }, [loginId]);
 
   useEffect(() => {
@@ -575,12 +410,6 @@ export default function SettingsPage() {
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => {
         setInterestRecipients((d.emails || []).join(", "));
-        setInterestTemplates({
-          confirmationSubject: d.confirmationSubject || "",
-          confirmationHtml: d.confirmationHtml || "",
-          notificationSubject: d.notificationSubject || "",
-          notificationHtml: d.notificationHtml || "",
-        });
       })
       .catch(() => setInterestRecipientsError("Could not load notification recipients."))
       .finally(() => setInterestRecipientsLoading(false));
@@ -595,12 +424,6 @@ export default function SettingsPage() {
       .then(r => r.ok ? r.json() : Promise.reject())
       .then(d => {
         setOnboardingRecipients((d.emails || []).join(", "));
-        setOnboardingTemplates({
-          confirmationSubject: d.confirmationSubject || "",
-          confirmationHtml: d.confirmationHtml || "",
-          notificationSubject: d.notificationSubject || "",
-          notificationHtml: d.notificationHtml || "",
-        });
       })
       .catch(() => setOnboardingRecipientsError("Could not load onboarding notification settings."))
       .finally(() => setOnboardingRecipientsLoading(false));
@@ -679,17 +502,11 @@ export default function SettingsPage() {
       const res = await fetch(`${API_BASE}/api/auth/admin/register-interest-notifications?loginId=${encodeURIComponent(loginId)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
-        body: JSON.stringify({ emails: interestRecipients, ...interestTemplates }),
+        body: JSON.stringify({ emails: interestRecipients }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to save notification recipients.");
       setInterestRecipients((data.emails || []).join(", "));
-      setInterestTemplates({
-        confirmationSubject: data.confirmationSubject || "",
-        confirmationHtml: data.confirmationHtml || "",
-        notificationSubject: data.notificationSubject || "",
-        notificationHtml: data.notificationHtml || "",
-      });
       setInterestRecipientsSaved(true);
       setTimeout(() => setInterestRecipientsSaved(false), 2500);
     } catch (e) {
@@ -697,12 +514,6 @@ export default function SettingsPage() {
     } finally {
       setInterestRecipientsSaving(false);
     }
-  }
-
-  function updateInterestTemplate(key, value) {
-    setInterestTemplates(p => ({ ...p, [key]: value }));
-    setInterestRecipientsError("");
-    setInterestRecipientsSaved(false);
   }
 
   async function handleSaveOnboardingRecipients() {
@@ -713,17 +524,11 @@ export default function SettingsPage() {
       const res = await fetch(`${API_BASE}/api/auth/admin/onboarding-notifications?loginId=${encodeURIComponent(loginId)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
-        body: JSON.stringify({ emails: onboardingRecipients, ...onboardingTemplates }),
+        body: JSON.stringify({ emails: onboardingRecipients }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Failed to save onboarding notification settings.");
       setOnboardingRecipients((data.emails || []).join(", "));
-      setOnboardingTemplates({
-        confirmationSubject: data.confirmationSubject || "",
-        confirmationHtml: data.confirmationHtml || "",
-        notificationSubject: data.notificationSubject || "",
-        notificationHtml: data.notificationHtml || "",
-      });
       setOnboardingRecipientsSaved(true);
       setTimeout(() => setOnboardingRecipientsSaved(false), 2500);
     } catch (e) {
@@ -731,12 +536,6 @@ export default function SettingsPage() {
     } finally {
       setOnboardingRecipientsSaving(false);
     }
-  }
-
-  function updateOnboardingTemplate(key, value) {
-    setOnboardingTemplates(p => ({ ...p, [key]: value }));
-    setOnboardingRecipientsError("");
-    setOnboardingRecipientsSaved(false);
   }
 
   function updatePw(k, v) {
@@ -858,26 +657,111 @@ export default function SettingsPage() {
       } else {
         alert(data.error || "Failed to open billing portal.");
       }
-    } catch (e) {
+    } catch {
       alert("Network error. Please try again.");
     } finally {
       setPortalLoading(false);
     }
   }
 
+  if (!activeSection) {
+    return <Navigate to="/settings/account" replace />;
+  }
+  const isProtectedSection = activeSection === "email" || activeSection === "admin";
+  if (isProtectedSection && isAdmin === null) {
+    return <Box sx={{ minHeight: 180, display: "grid", placeItems: "center" }}><CircularProgress size={24} /></Box>;
+  }
+  if (isProtectedSection && !isAdmin) {
+    return <Navigate to="/settings/account" replace />;
+  }
+  // Keep the complete navigation stable while the admin check is in flight.
+  // A confirmed non-admin still gets the restricted navigation below.
+  const visibleSections = isAdmin === false
+    ? SETTINGS_SECTIONS.filter(item => item.key !== "email" && item.key !== "admin")
+    : SETTINGS_SECTIONS;
+
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, maxWidth: 540 }}>
+    <Box sx={{ maxWidth: 900 }}>
 
       {/* Page header */}
-      <Box>
+      <Box sx={{ mb: 2 }}>
         <Typography sx={{ fontSize: 15, fontWeight: 600, color: TEXT }}>Settings</Typography>
         <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
           Manage your account and preferences
         </Typography>
       </Box>
 
+      <TextField
+        select
+        fullWidth
+        size="small"
+        label="Settings section"
+        value={activeSection}
+        onChange={event => navigateSettings(event.target.value)}
+        sx={{
+          display: { xs: "block", md: "none" },
+          mb: 2,
+          maxWidth: 540,
+          "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 },
+        }}
+      >
+        {visibleSections.map(item => (
+          <MenuItem key={item.key} value={item.key}>{item.label}</MenuItem>
+        ))}
+      </TextField>
+
+      <Box sx={{ display: "flex", alignItems: "flex-start", gap: 3 }}>
+        <Paper
+          component="nav"
+          aria-label="Settings sections"
+          elevation={0}
+          sx={{
+            display: { xs: "none", md: "flex" },
+            width: 220,
+            flexShrink: 0,
+            flexDirection: "column",
+            gap: 0.5,
+            p: 1,
+            border: `1px solid ${BORDER}`,
+            borderRadius: "10px",
+          }}
+        >
+          {visibleSections.map(item => {
+            const selected = item.key === activeSection;
+            return (
+              <Button
+                key={item.key}
+                onClick={() => navigateSettings(item.key)}
+                aria-current={selected ? "page" : undefined}
+                sx={{
+                  display: "block",
+                  px: 1.5,
+                  py: 1,
+                  textAlign: "left",
+                  textTransform: "none",
+                  borderRadius: "8px",
+                  color: selected ? ACCENT : TEXT,
+                  bgcolor: selected ? ACCENT_BG : "transparent",
+                  "&:hover": { bgcolor: selected ? ACCENT_BG : SURFACE },
+                }}
+              >
+                <Typography sx={{ fontSize: 12, fontWeight: 700 }}>{item.label}</Typography>
+                <Typography sx={{ fontSize: 10.5, color: selected ? ACCENT : MUTED, mt: 0.25 }}>
+                  {item.description}
+                </Typography>
+              </Button>
+            );
+          })}
+        </Paper>
+
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 2, width: "100%", minWidth: 0, maxWidth: 640 }}>
+
+      {activeSection === "email" && isAdmin && (
+        <SystemEmailTemplatesPanel selectedKey={templateKey} onDirtyChange={setEmailEditorDirty} />
+      )}
+
       {/* ── Stripe upgrade success banner ─────────────────────────────────── */}
-      {upgradeSuccess && (
+      {activeSection === "billing" && upgradeSuccess && (
         <Alert severity="success" onClose={() => setUpgradeSuccess(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           🎉 Your plan has been upgraded successfully! Your new limits are now active.
@@ -885,7 +769,7 @@ export default function SettingsPage() {
       )}
 
       {/* ── Token purchase success banner ─────────────────────────────────── */}
-      {tokensPurchased && (
+      {activeSection === "billing" && tokensPurchased && (
         <Alert severity="success" onClose={() => setTokensPurchased(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           🪙 Tokens added to your account successfully! Your balance has been updated.
@@ -893,49 +777,49 @@ export default function SettingsPage() {
       )}
 
       {/* ── Outlook connection banners ────────────────────────────────────── */}
-      {outlookSuccess && (
+      {activeSection === "integrations" && outlookSuccess && (
         <Alert severity="success" onClose={() => setOutlookSuccess(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           📧 Microsoft Outlook connected successfully! Emails will now be sent via your Outlook account.
         </Alert>
       )}
-      {outlookError && (
+      {activeSection === "integrations" && outlookError && (
         <Alert severity="error" onClose={() => setOutlookError(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           Failed to connect Microsoft Outlook. Please try again.
         </Alert>
       )}
-      {gmailSuccess && (
+      {activeSection === "integrations" && gmailSuccess && (
         <Alert severity="success" onClose={() => setGmailSuccess(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           Gmail connected successfully. Emails will now be sent via your Gmail account.
         </Alert>
       )}
-      {gmailError && (
+      {activeSection === "integrations" && gmailError && (
         <Alert severity="error" onClose={() => setGmailError(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           Failed to connect Gmail. Please try again.
         </Alert>
       )}
-      {xeroSuccess && (
+      {activeSection === "integrations" && xeroSuccess && (
         <Alert severity="success" onClose={() => setXeroSuccess(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           Xero connected successfully.
         </Alert>
       )}
-      {xeroError && (
+      {activeSection === "integrations" && xeroError && (
         <Alert severity="error" onClose={() => setXeroError(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           Failed to connect Xero. Please try again.
         </Alert>
       )}
-      {hubSpotSuccess && (
+      {activeSection === "integrations" && hubSpotSuccess && (
         <Alert severity="success" onClose={() => setHubSpotSuccess(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           HubSpot connected successfully.
         </Alert>
       )}
-      {hubSpotError && (
+      {activeSection === "integrations" && hubSpotError && (
         <Alert severity="error" onClose={() => setHubSpotError(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
           Failed to connect HubSpot. Please try again.
@@ -943,7 +827,7 @@ export default function SettingsPage() {
       )}
 
       {/* ── Subscription Plan ─────────────────────────────────────────────── */}
-      <Paper elevation={0} sx={{
+      {activeSection === "billing" && <Paper elevation={0} sx={{
         border: `1px solid ${BORDER}`, borderRadius: "10px",
         overflow: "hidden", bgcolor: "#fff"
       }}>
@@ -1064,10 +948,10 @@ export default function SettingsPage() {
             </Typography>
           )}
         </Box>
-      </Paper>
+      </Paper>}
 
       {/* ── Buy Tokens ────────────────────────────────────────────────────── */}
-      <Paper elevation={0} sx={{
+      {activeSection === "billing" && <Paper elevation={0} sx={{
         border: `1px solid ${BORDER}`, borderRadius: "10px",
         overflow: "hidden", bgcolor: "#fff"
       }}>
@@ -1133,10 +1017,10 @@ export default function SettingsPage() {
             {buyLoading ? <CircularProgress size={16} sx={{ color: "#fff" }} /> : "Checkout →"}
           </Button>
         </Box>
-      </Paper>
+      </Paper>}
 
       {/* ── Recruitment Targets ──────────────────────────────────────────── */}
-      <Paper elevation={0} sx={{
+      {activeSection === "account" && <Paper elevation={0} sx={{
         border: `1px solid ${BORDER}`, borderRadius: "10px",
         overflow: "hidden", bgcolor: "#fff"
       }}>
@@ -1196,10 +1080,10 @@ export default function SettingsPage() {
             {targetSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Save Target"}
           </Button>
         </Box>
-      </Paper>
+      </Paper>}
 
       {/* ── Update Password ────────────────────────────────────────────────── */}
-      <Paper elevation={0} sx={{
+      {activeSection === "account" && <Paper elevation={0} sx={{
         border: `1px solid ${BORDER}`, borderRadius: "10px",
         overflow: "hidden", bgcolor: "#fff"
       }}>
@@ -1288,10 +1172,10 @@ export default function SettingsPage() {
               : "Update Password"}
           </Button>
         </Box>
-      </Paper>
+      </Paper>}
 
       {/* ── Admin Panel — only visible to admin users ─────────────────────── */}
-      {isAdmin && (
+      {activeSection === "admin" && isAdmin && (
         <Paper elevation={0} sx={{
           border: `1px solid ${WARN_BR}`, borderRadius: "10px",
           overflow: "hidden", bgcolor: "#fff"
@@ -1370,7 +1254,7 @@ export default function SettingsPage() {
       )}
 
       {/* ── Admin: Additional Limits ──────────────────────────────────────── */}
-      {isAdmin && (
+      {activeSection === "admin" && isAdmin && (
         <Paper elevation={0} sx={{ border: `1px solid ${WARN_BR}`, borderRadius: "10px", overflow: "hidden", bgcolor: "#fff" }}>
           <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`, bgcolor: WARN_BG }}>
             <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#92400E" }}>
@@ -1425,14 +1309,14 @@ export default function SettingsPage() {
       )}
 
       {/* ── Admin: Onboarding Email Notifications ──────────────────────── */}
-      {isAdmin && (
+      {activeSection === "email" && isAdmin && (
         <Paper elevation={0} sx={{ border: `1px solid ${WARN_BR}`, borderRadius: "10px", overflow: "hidden", bgcolor: "#fff" }}>
           <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`, bgcolor: WARN_BG }}>
             <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#92400E" }}>
               Onboarding Email Notifications
             </Typography>
             <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
-              Email templates for approved users and internal onboarding alerts
+              Choose who receives internal onboarding alerts
             </Typography>
           </Box>
           <Box sx={{ p: 2.25, display: "flex", flexDirection: "column", gap: 1.5 }}>
@@ -1448,7 +1332,7 @@ export default function SettingsPage() {
             )}
             <Box>
               <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT, mb: 0.5 }}>
-                Internal Recipient Emails
+                Recipient Emails
               </Typography>
               <TextField
                 fullWidth
@@ -1470,68 +1354,18 @@ export default function SettingsPage() {
               </Typography>
             </Box>
 
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, pt: 0.5 }}>
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: TEXT }}>
-                Approved User Email Template
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={onboardingTemplates.confirmationSubject}
-                onChange={e => updateOnboardingTemplate("confirmationSubject", e.target.value)}
-                disabled={onboardingRecipientsLoading}
-                placeholder="Welcome to Nolyvra - registration approved"
-                label="Subject"
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
-              />
-              <EmailHtmlTemplateField
-                minRows={5}
-                value={onboardingTemplates.confirmationHtml}
-                onChange={value => updateOnboardingTemplate("confirmationHtml", value)}
-                disabled={onboardingRecipientsLoading}
-                placeholder="<p>Hi {{name}},</p>"
-                onError={setOnboardingRecipientsError}
-              />
-            </Box>
-
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, pt: 0.5 }}>
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: TEXT }}>
-                Internal Notification Template
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={onboardingTemplates.notificationSubject}
-                onChange={e => updateOnboardingTemplate("notificationSubject", e.target.value)}
-                disabled={onboardingRecipientsLoading}
-                placeholder="Nolyvra registration approved: {{name}}"
-                label="Subject"
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
-              />
-              <EmailHtmlTemplateField
-                minRows={6}
-                value={onboardingTemplates.notificationHtml}
-                onChange={value => updateOnboardingTemplate("notificationHtml", value)}
-                disabled={onboardingRecipientsLoading}
-                placeholder="<h2>Registration Approved</h2>"
-                onError={setOnboardingRecipientsError}
-              />
-              <Typography sx={{ fontSize: 11, color: MUTED, mt: -0.5 }}>
-                Available variables: {"{{name}}"}, {"{{email}}"}, {"{{company}}"}, {"{{password}}"}, {"{{adminLoginId}}"}.
-              </Typography>
-            </Box>
             <Button variant="contained" onClick={handleSaveOnboardingRecipients}
               disabled={onboardingRecipientsSaving || onboardingRecipientsLoading}
               sx={{ alignSelf: "flex-start", fontSize: 12, bgcolor: WARN, borderRadius: "6px",
                 textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#B45309", boxShadow: "none" } }}>
-              {onboardingRecipientsSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Save Onboarding Email Settings"}
+              {onboardingRecipientsSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Save Recipients"}
             </Button>
           </Box>
         </Paper>
       )}
 
       {/* ── Admin: Register Interest Notifications ───────────────────────── */}
-      {isAdmin && (
+      {activeSection === "email" && isAdmin && (
         <Paper elevation={0} sx={{ border: `1px solid ${WARN_BR}`, borderRadius: "10px", overflow: "hidden", bgcolor: "#fff" }}>
           <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`, bgcolor: WARN_BG }}>
             <Typography sx={{ fontSize: 13, fontWeight: 600, color: "#92400E" }}>
@@ -1576,68 +1410,18 @@ export default function SettingsPage() {
               </Typography>
             </Box>
 
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, pt: 0.5 }}>
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: TEXT }}>
-                Thank-you Email Template
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={interestTemplates.confirmationSubject}
-                onChange={e => updateInterestTemplate("confirmationSubject", e.target.value)}
-                disabled={interestRecipientsLoading}
-                placeholder="Thanks for your interest in Nolyvra"
-                label="Subject"
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
-              />
-              <EmailHtmlTemplateField
-                minRows={5}
-                value={interestTemplates.confirmationHtml}
-                onChange={value => updateInterestTemplate("confirmationHtml", value)}
-                disabled={interestRecipientsLoading}
-                placeholder="<p>Hi {{name}},</p>"
-                onError={setInterestRecipientsError}
-              />
-            </Box>
-
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25, pt: 0.5 }}>
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: TEXT }}>
-                Internal Notification Template
-              </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                value={interestTemplates.notificationSubject}
-                onChange={e => updateInterestTemplate("notificationSubject", e.target.value)}
-                disabled={interestRecipientsLoading}
-                placeholder="New register interest submission: {{name}}"
-                label="Subject"
-                sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12 } }}
-              />
-              <EmailHtmlTemplateField
-                minRows={6}
-                value={interestTemplates.notificationHtml}
-                onChange={value => updateInterestTemplate("notificationHtml", value)}
-                disabled={interestRecipientsLoading}
-                placeholder="<h2>New Register Interest Submission</h2>"
-                onError={setInterestRecipientsError}
-              />
-              <Typography sx={{ fontSize: 11, color: MUTED, mt: -0.5 }}>
-                Available variables: {"{{name}}"}, {"{{email}}"}, {"{{company}}"}, {"{{phone}}"}.
-              </Typography>
-            </Box>
             <Button variant="contained" onClick={handleSaveInterestRecipients}
               disabled={interestRecipientsSaving || interestRecipientsLoading}
               sx={{ alignSelf: "flex-start", fontSize: 12, bgcolor: WARN, borderRadius: "6px",
                 textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#B45309", boxShadow: "none" } }}>
-              {interestRecipientsSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Save Notification Settings"}
+              {interestRecipientsSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Save Recipients"}
             </Button>
           </Box>
         </Paper>
       )}
 
       {/* ── Connected Accounts ───────────────────────────────────────────── */}
-      <Paper elevation={0} sx={{
+      {activeSection === "integrations" && <Paper elevation={0} sx={{
         border: `1px solid ${BORDER}`, borderRadius: "10px",
         overflow: "hidden", bgcolor: "#fff"
       }}>
@@ -1897,10 +1681,10 @@ export default function SettingsPage() {
             )}
           </Box>
         </Box>
-      </Paper>
+      </Paper>}
 
       {/* ── Form Leads (Stack Audit submissions) — admin only ────────────── */}
-      {isAdmin && <Paper elevation={0} sx={{ border: `1px solid ${BORDER}`, borderRadius: "10px", overflow: "hidden", bgcolor: "#fff" }}>
+      {activeSection === "admin" && isAdmin && <Paper elevation={0} sx={{ border: `1px solid ${BORDER}`, borderRadius: "10px", overflow: "hidden", bgcolor: "#fff" }}>
         <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <Box>
             <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>Form Leads</Typography>
@@ -1986,7 +1770,7 @@ export default function SettingsPage() {
       </Paper>}
 
       {/* ── Session / Logout ──────────────────────────────────────────────── */}
-      <Paper elevation={0} sx={{
+      {activeSection === "account" && <Paper elevation={0} sx={{
         border: `1px solid ${BORDER}`, borderRadius: "10px",
         overflow: "hidden", bgcolor: "#fff"
       }}>
@@ -2009,8 +1793,16 @@ export default function SettingsPage() {
             ⎋ Logout
           </Button>
         </Box>
-      </Paper>
+      </Paper>}
 
+        </Box>
+      </Box>
     </Box>
   );
+}
+
+export default function SettingsPage() {
+  return localStorage.getItem("authType") === "EMPLOYEE"
+    ? <EmployeeSettingsPanel />
+    : <AdminSettingsPanel />;
 }

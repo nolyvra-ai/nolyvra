@@ -287,7 +287,6 @@ public class AuthController {
         }
         Map<String, Object> response = new java.util.LinkedHashMap<>();
         response.put("emails", adminSettingsService.getRegisterInterestNotificationEmails());
-        response.putAll(adminSettingsService.getRegisterInterestEmailTemplates());
         return ResponseEntity.ok(response);
     }
 
@@ -312,16 +311,10 @@ public class AuthController {
 
         try {
             List<String> emails = adminSettingsService.saveRegisterInterestNotificationEmails(emailText);
-            Map<String, String> templates = adminSettingsService.saveRegisterInterestEmailTemplates(
-                    stringValue(body.get("confirmationSubject")),
-                    stringValue(body.get("confirmationHtml")),
-                    stringValue(body.get("notificationSubject")),
-                    stringValue(body.get("notificationHtml")));
 
             Map<String, Object> response = new java.util.LinkedHashMap<>();
             response.put("status", "saved");
             response.put("emails", emails);
-            response.putAll(templates);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -337,12 +330,11 @@ public class AuthController {
         }
         Map<String, Object> response = new java.util.LinkedHashMap<>();
         response.put("emails", adminSettingsService.getOnboardingNotificationEmails());
-        response.putAll(adminSettingsService.getOnboardingEmailTemplates());
         return ResponseEntity.ok(response);
     }
 
     // PUT /api/auth/admin/onboarding-notifications?loginId=x
-    // Admin only — saves onboarding email recipients and templates
+    // Admin only — saves onboarding email recipients
     @PutMapping("/admin/onboarding-notifications")
     public ResponseEntity<?> saveOnboardingNotifications(
             @RequestParam String loginId,
@@ -362,16 +354,10 @@ public class AuthController {
 
         try {
             List<String> emails = adminSettingsService.saveOnboardingNotificationEmails(emailText);
-            Map<String, String> templates = adminSettingsService.saveOnboardingEmailTemplates(
-                    stringValue(body.get("confirmationSubject")),
-                    stringValue(body.get("confirmationHtml")),
-                    stringValue(body.get("notificationSubject")),
-                    stringValue(body.get("notificationHtml")));
 
             Map<String, Object> response = new java.util.LinkedHashMap<>();
             response.put("status", "saved");
             response.put("emails", emails);
-            response.putAll(templates);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

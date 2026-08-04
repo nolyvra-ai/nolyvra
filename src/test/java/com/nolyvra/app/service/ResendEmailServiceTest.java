@@ -38,6 +38,23 @@ class ResendEmailServiceTest {
     }
 
     @Test
+    void sendsHtmlWithPlainTextFallback() {
+        AtomicReference<CreateEmailOptions> sentOptions = new AtomicReference<>();
+        ResendEmailService service = new ResendEmailService(
+                "re_test_key",
+                "Nolyvra <info@nolyvra.com>",
+                (apiKey, options) -> {
+                    sentOptions.set(options);
+                    return new CreateEmailResponse("email-2");
+                });
+
+        assertThat(service.sendHtml(
+                "user@example.com", "Reset", "Plain reset link", "<p><b>Reset</b></p>")).isTrue();
+        assertThat(sentOptions.get().getText()).isEqualTo("Plain reset link");
+        assertThat(sentOptions.get().getHtml()).isEqualTo("<p><b>Reset</b></p>");
+    }
+
+    @Test
     void failsClosedWhenApiKeyIsMissing() {
         ResendEmailService service = new ResendEmailService(
                 "",

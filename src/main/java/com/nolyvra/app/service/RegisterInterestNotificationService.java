@@ -21,6 +21,7 @@ public class RegisterInterestNotificationService {
     private static final long BETWEEN_EMAIL_DELAY_MS = 550L;
 
     private final AdminSettingsService adminSettingsService;
+    private final SystemEmailTemplateService systemEmailTemplateService;
     private final EmailTemplateImageService emailTemplateImageService;
     private final JdbcTemplate jdbc;
     private final String apiKey;
@@ -28,11 +29,13 @@ public class RegisterInterestNotificationService {
 
     public RegisterInterestNotificationService(
             AdminSettingsService adminSettingsService,
+            SystemEmailTemplateService systemEmailTemplateService,
             EmailTemplateImageService emailTemplateImageService,
             JdbcTemplate jdbc,
             @Value("${resend.api-key:}") String apiKey,
             @Value("${resend.from:Nolyvra <onboarding@resend.dev>}") String fromAddress) {
         this.adminSettingsService = adminSettingsService;
+        this.systemEmailTemplateService = systemEmailTemplateService;
         this.emailTemplateImageService = emailTemplateImageService;
         this.jdbc = jdbc;
         this.apiKey = apiKey;
@@ -64,13 +67,23 @@ public class RegisterInterestNotificationService {
         String fullName = (safe(firstName) + " " + safe(lastName)).trim();
         Map<String, String> values = templateValues(fullName, company, email, phone);
         Map<String, String> templates = adminSettingsService.getRegisterInterestEmailTemplates();
+        EmailContent confirmation = resolveTemplate(
+                "registration_confirmation",
+                templates.get("confirmationSubject"),
+                templates.get("confirmationHtml"),
+                values);
+        EmailContent notification = resolveTemplate(
+                "new_registration_notification",
+                templates.get("notificationSubject"),
+                templates.get("notificationHtml"),
+                values);
 
         Resend resend = new Resend(apiKey.trim());
         sendWithResend(
                 resend,
                 email,
-                renderTemplate(templates.get("confirmationSubject"), values),
-                renderTemplate(templates.get("confirmationHtml"), values),
+                confirmation.subject(),
+                confirmation.html(),
                 email);
 
         List<String> recipients = adminSettingsService.getRegisterInterestNotificationEmails();
@@ -83,8 +96,8 @@ public class RegisterInterestNotificationService {
             sendWithResend(
                     resend,
                     recipient,
-                    renderTemplate(templates.get("notificationSubject"), values),
-                    renderTemplate(templates.get("notificationHtml"), values),
+                    notification.subject(),
+                    notification.html(),
                     email);
         }
     }
@@ -193,18 +206,36 @@ public class RegisterInterestNotificationService {
 
     private Map<String, String> templateValues(String fullName, String company, String email, String phone) {
         Map<String, String> values = new LinkedHashMap<>();
-        values.put("name", escapeHtml(fullName.isBlank() ? "there" : fullName));
-        values.put("email", escapeHtml(email));
-        values.put("company", escapeHtml(company == null || company.isBlank() ? "-" : company));
-        values.put("phone", escapeHtml(phone == null || phone.isBlank() ? "-" : phone));
+        values.put("name", fullName.isBlank() ? "there" : fullName);
+        values.put("email", safe(email));
+        values.put("company", company == null || company.isBlank() ? "-" : company);
+        values.put("phone", phone == null || phone.isBlank() ? "-" : phone);
         return values;
     }
 
     private String renderTemplate(String template, Map<String, String> values) {
         String rendered = template == null ? "" : template;
         for (Map.Entry<String, String> entry : values.entrySet()) {
-            rendered = rendered.replace("{{" + entry.getKey() + "}}", entry.getValue());
+            rendered = rendered.replace("{{" + entry.getKey() + "}}", escapeHtml(entry.getValue()));
         }
         return rendered;
     }
+
+    EmailContent resolveTemplate(
+            String key,
+            String fallbackSubject,
+            String fallbackHtml,
+            Map<String, String> values) {
+        try {
+            SystemEmailTemplateService.RenderedTemplate rendered =
+                    systemEmailTemplateService.render(key, values);
+            return new EmailContent(rendered.subject(), rendered.htmlBody());
+        } catch (RuntimeException ignored) {
+            return new EmailContent(
+                    renderTemplate(fallbackSubject, values),
+                    renderTemplate(fallbackHtml, values));
+        }
+    }
+
+    record EmailContent(String subject, String html) {}
 }
