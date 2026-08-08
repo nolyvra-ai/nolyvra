@@ -20,6 +20,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,14 +31,22 @@ public class TalentSearchService {
     private static final int CACHE_DAYS_VALID   = 30;
     private static final int EXTERNAL_BATCH_SIZE = 5;   // 5 random-cached + 5 fresh from Bright Data, every call
 
+    // Real CoreSignal API — kept to exactly 3 results per search (each is a billed
+    // CoreSignal API call: 1 search + up to 3 profile collects). Additive to the
+    // Bright Data batch above, not a replacement for any of it.
+    private static final int CORESIGNAL_API_MAX_RESULTS = 3;
+
     private final JdbcTemplate jdbc;
     private final OpenAIClient openAI;
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate;
+    private final ExecutorService coreSignalApiExecutor;
     private final String model;
     private final String brightDataApiKey;
     private final String brightDataDatasetId;
     private final String brightDataBaseUrl;
+    private final String coreSignalApiKey;
+    private final String coreSignalApiBaseUrl;
     private final TokenService tokenService;
 
     public TalentSearchService(
@@ -46,16 +57,21 @@ public class TalentSearchService {
             @Value("${openai.model:gpt-4o-mini}") String model,
             @Value("${brightdata.api-key:}") String brightDataApiKey,
             @Value("${brightdata.dataset-id:gd_l1viktl72bvl7bjuj0}") String brightDataDatasetId,
-            @Value("${brightdata.base-url:https://api.brightdata.com}") String brightDataBaseUrl) {
+            @Value("${brightdata.base-url:https://api.brightdata.com}") String brightDataBaseUrl,
+            @Value("${coresignal.api-key:}") String coreSignalApiKey,
+            @Value("${coresignal.base-url:https://api.coresignal.com/cdapi/v2}") String coreSignalApiBaseUrl) {
         this.jdbc = jdbc;
         this.openAI = openAIClient;
         this.objectMapper = objectMapper;
         this.tokenService = tokenService;
         this.restTemplate = new RestTemplate();
+        this.coreSignalApiExecutor = Executors.newFixedThreadPool(CORESIGNAL_API_MAX_RESULTS);
         this.model = model;
         this.brightDataApiKey = brightDataApiKey;
         this.brightDataDatasetId = brightDataDatasetId;
         this.brightDataBaseUrl = brightDataBaseUrl;
+        this.coreSignalApiKey = coreSignalApiKey;
+        this.coreSignalApiBaseUrl = coreSignalApiBaseUrl;
     }
 
     // ─── POST /api/talent-search/query ───────────────────────────────────────
@@ -74,9 +90,16 @@ public class TalentSearchService {
         // Step 3: Search Bright Data (if API key configured)
         // Re-enabled 2026-07-26 — Nexus integration is now behind its own feature
         // toggle (nexus.enabled, application.yml) rather than needing this disabled.
-        List<TalentSearchResult> externalResults = brightDataApiKey != null && !brightDataApiKey.isBlank()
-                ? searchExternal(filters, loginId, req.query())
-                : List.of();
+        List<TalentSearchResult> externalResults = new ArrayList<>(
+                brightDataApiKey != null && !brightDataApiKey.isBlank()
+                        ? searchExternal(filters, loginId, req.query())
+                        : List.of());
+
+        // Step 3b: Search the real CoreSignal API (if API key configured) — additive
+        // to the Bright Data batch above, capped to CORESIGNAL_API_MAX_RESULTS.
+        if (coreSignalApiKey != null && !coreSignalApiKey.isBlank()) {
+            externalResults.addAll(searchCoreSignalApi(filters, loginId, req.query()));
+        }
 
         // Step 4: Paginate internal results separately; always surface CoreSignal on page 0
         // Sort via stream (not in-place .sort()) since these lists may be the immutable List.of()
@@ -162,6 +185,295 @@ public class TalentSearchService {
             }
         }
         return profile;
+    }
+
+    // ─── GET /api/talent-search/coresignal-api/{id} — real CoreSignal API ────
+    // Separate cache table (coresignal_api_cache) from Bright Data's
+    // coresignal_cache — CoreSignal's own numeric IDs, not Bright Data's string
+    // slugs. No lazy skill generation needed here: CoreSignal returns skills
+    // directly, unlike Bright Data.
+
+    public CoreSignalProfileResponse getCoreSignalApiProfile(Long coreSignalApiId) {
+        return jdbc.query("""
+                select coresignal_id, full_name, job_title, current_company,
+                       location_city, location_country, linkedin_url,
+                       years_experience, management_level, description,
+                       skills, raw_json
+                from coresignal_api_cache
+                where coresignal_id = ?
+                """,
+                (rs, rowNum) -> {
+                    List<String> skills = new ArrayList<>();
+                    try {
+                        JsonNode node = objectMapper.readTree(
+                                rs.getString("skills") != null ? rs.getString("skills") : "[]");
+                        if (node.isArray()) node.forEach(s -> skills.add(s.asText()));
+                    } catch (Exception ignored) {}
+                    return new CoreSignalProfileResponse(
+                            String.valueOf(rs.getLong("coresignal_id")),
+                            rs.getString("full_name"),
+                            rs.getString("job_title"),
+                            rs.getString("current_company"),
+                            rs.getString("location_city"),
+                            rs.getString("location_country"),
+                            rs.getString("linkedin_url"),
+                            rs.getObject("years_experience") != null ? rs.getInt("years_experience") : null,
+                            rs.getString("management_level"),
+                            rs.getString("description"),
+                            skills,
+                            null, null,
+                            rs.getString("raw_json"));
+                }, coreSignalApiId)
+                .stream().findFirst()
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Profile not found in cache: " + coreSignalApiId));
+    }
+
+    // ─── Step 3b: real CoreSignal API search — two-call pattern, cache-first ──
+    // Cache checked first; live API only called when the cache has fewer than
+    // CORESIGNAL_API_MAX_RESULTS hits. Always capped to CORESIGNAL_API_MAX_RESULTS
+    // (cache and live alike) — each live result is a billed CoreSignal API call
+    // (1 search + up to 3 profile collects).
+
+    private List<TalentSearchResult> searchCoreSignalApi(SearchFilters filters, String loginId,
+                                                           String originalQuery) {
+        List<TalentSearchResult> cached = searchCoreSignalApiCache(filters).stream()
+                .limit(CORESIGNAL_API_MAX_RESULTS)
+                .collect(Collectors.toList());
+        if (cached.size() >= CORESIGNAL_API_MAX_RESULTS) {
+            return applyAiScoring(cached, originalQuery, loginId);
+        }
+
+        List<TalentSearchResult> live = fetchCoreSignalApiLive(filters);
+        if (live.isEmpty()) return cached.isEmpty() ? List.of() : applyAiScoring(cached, originalQuery, loginId);
+
+        return applyAiScoring(live, originalQuery, loginId);
+    }
+
+    private List<TalentSearchResult> fetchCoreSignalApiLive(SearchFilters filters) {
+        try {
+            HttpHeaders searchHeaders = new HttpHeaders();
+            searchHeaders.set("apikey", coreSignalApiKey);
+            searchHeaders.setContentType(MediaType.APPLICATION_JSON);
+
+            Map<String, Object> esDslQuery = buildEsDslQuery(filters);
+            HttpEntity<Map<String, Object>> searchEntity = new HttpEntity<>(esDslQuery, searchHeaders);
+
+            ResponseEntity<String> searchResp = restTemplate.exchange(
+                    coreSignalApiBaseUrl + "/employee_clean/search/es_dsl",
+                    HttpMethod.POST, searchEntity, String.class);
+
+            String searchBody = searchResp.getBody();
+            if (!searchResp.getStatusCode().is2xxSuccessful() || searchBody == null) {
+                System.err.println("[CoreSignal] search returned HTTP " + searchResp.getStatusCode());
+                return List.of();
+            }
+
+            // Response is a plain integer array: [44067891, 69356050, ...]
+            JsonNode idsNode = objectMapper.readTree(searchBody);
+            if (!idsNode.isArray()) {
+                System.err.println("[CoreSignal] unexpected search response (not an array)");
+                return List.of();
+            }
+
+            List<Long> ids = new ArrayList<>();
+            for (int i = 0; i < Math.min(CORESIGNAL_API_MAX_RESULTS, idsNode.size()); i++) {
+                ids.add(idsNode.get(i).asLong());
+            }
+            if (ids.isEmpty()) return List.of();
+
+            List<CompletableFuture<TalentSearchResult>> futures = ids.stream()
+                    .map(id -> CompletableFuture.supplyAsync(
+                            () -> fetchCoreSignalApiProfile(id, filters), coreSignalApiExecutor))
+                    .collect(Collectors.toList());
+
+            return futures.stream()
+                    .map(CompletableFuture::join)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+
+        } catch (org.springframework.web.client.HttpClientErrorException | org.springframework.web.client.HttpServerErrorException e) {
+            System.err.println("[CoreSignal] HTTP " + e.getStatusCode() + " – " + e.getResponseBodyAsString());
+            return List.of();
+        } catch (Exception e) {
+            System.err.println("[CoreSignal] search failed: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            return List.of();
+        }
+    }
+
+    // ES DSL query built the same way as Bright Data's title/location filter —
+    // matches on job title (seniority + keywords) and location.
+    private Map<String, Object> buildEsDslQuery(SearchFilters filters) {
+        List<Map<String, Object>> must = new ArrayList<>();
+
+        String titleQuery = buildTitleQuery(filters);
+        if (titleQuery != null && !titleQuery.isBlank()) {
+            must.add(Map.of("match", Map.of("active_experience_title", titleQuery)));
+        }
+        if (filters.location() != null && !filters.location().isBlank()) {
+            must.add(Map.of("match", Map.of("location_country", filters.location())));
+        }
+        if (must.isEmpty()) {
+            must.add(Map.of("match_all", Map.of()));
+        }
+
+        return Map.of("query", Map.of("bool", Map.of("must", must)));
+    }
+
+    private TalentSearchResult fetchCoreSignalApiProfile(long id, SearchFilters filters) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("apikey", coreSignalApiKey);
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+            ResponseEntity<String> resp = restTemplate.exchange(
+                    coreSignalApiBaseUrl + "/employee_clean/collect/" + id,
+                    HttpMethod.GET, entity, String.class);
+
+            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) return null;
+
+            JsonNode profile = objectMapper.readTree(resp.getBody());
+
+            String name        = profile.path("full_name").asText("Unknown");
+            String title       = profile.path("job_title").asText("");
+            String linkedinUrl = profile.path("websites_linkedin").asText("");
+            int yearsExp       = profile.path("total_experience_duration_months").asInt(0) / 12;
+
+            String company = "";
+            JsonNode experience = profile.path("experience");
+            if (experience.isArray() && experience.size() > 0) {
+                company = experience.get(0).path("company_name").asText("");
+            }
+
+            List<String> profileSkills = new ArrayList<>();
+            JsonNode skillsNode = profile.path("skills");
+            if (skillsNode.isArray()) {
+                for (JsonNode s : skillsNode) profileSkills.add(s.asText());
+            }
+
+            List<String> matched = extractMatchedSkills(String.join(" ", profileSkills), filters.skills());
+            List<String> gaps = filters.skills().stream()
+                    .filter(s -> !matched.contains(s))
+                    .collect(Collectors.toList());
+            int score = Math.min(50 + (matched.size() * 5), 99);
+
+            try {
+                String skillsJson = objectMapper.writeValueAsString(profileSkills);
+                jdbc.update("""
+                    insert into coresignal_api_cache
+                        (coresignal_id, full_name, job_title, current_company,
+                         location_city, location_country, linkedin_url, skills,
+                         years_experience, management_level, description, raw_json)
+                    values (?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), ?, ?, ?, CAST(? AS jsonb))
+                    on conflict (coresignal_id) do update set
+                        full_name        = excluded.full_name,
+                        job_title        = excluded.job_title,
+                        current_company  = excluded.current_company,
+                        location_city    = excluded.location_city,
+                        location_country = excluded.location_country,
+                        linkedin_url     = excluded.linkedin_url,
+                        skills           = excluded.skills,
+                        years_experience = excluded.years_experience,
+                        management_level = excluded.management_level,
+                        description      = excluded.description,
+                        raw_json         = excluded.raw_json,
+                        cached_at        = now(),
+                        last_searched_at = now()
+                    """,
+                    id, name, title, company,
+                    profile.path("location_city").asText(null),
+                    profile.path("location_country").asText(null),
+                    linkedinUrl, skillsJson, yearsExp,
+                    profile.path("management_level").asText(null),
+                    profile.path("description").asText(null),
+                    resp.getBody());
+            } catch (Exception e) {
+                System.err.println("[CoreSignal] cache save failed for id " + id + ": " + e.getMessage());
+            }
+
+            return new TalentSearchResult(
+                    null, name, title, company, linkedinUrl, null, null,
+                    matched, gaps, score, yearsExp,
+                    "CORESIGNAL", false, null, null, null, id);
+
+        } catch (org.springframework.web.client.HttpClientErrorException | org.springframework.web.client.HttpServerErrorException e) {
+            System.err.println("[CoreSignal] profile " + id + " HTTP " + e.getStatusCode() + " – " + e.getResponseBodyAsString());
+            return null;
+        } catch (Exception e) {
+            System.err.println("[CoreSignal] profile " + id + " failed: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    private List<TalentSearchResult> searchCoreSignalApiCache(SearchFilters filters) {
+        try {
+            StringBuilder sql = new StringBuilder(
+                    "select coresignal_id, full_name, job_title, current_company," +
+                    " linkedin_url, skills, years_experience" +
+                    " from coresignal_api_cache" +
+                    " where cached_at > now() - interval '" + CACHE_DAYS_VALID + " days'");
+
+            List<Object> args = new ArrayList<>();
+
+            String titleQuery = buildTitleQuery(filters);
+            if (titleQuery != null && !titleQuery.isBlank()) {
+                sql.append(" and lower(job_title) like lower(?) ");
+                args.add("%" + titleQuery + "%");
+            }
+
+            if (filters.location() != null && !filters.location().isBlank()) {
+                sql.append(" and (lower(location_city) like lower(?) or lower(location_country) like lower(?)) ");
+                args.add("%" + filters.location() + "%");
+                args.add("%" + filters.location() + "%");
+            }
+
+            if (filters.skills() != null && !filters.skills().isEmpty()) {
+                List<String> orClauses = new ArrayList<>();
+                for (String skill : filters.skills()) {
+                    orClauses.add("skills::text ilike ?");
+                    args.add("%" + skill + "%");
+                }
+                sql.append(" and (").append(String.join(" or ", orClauses)).append(") ");
+            }
+
+            sql.append(" order by last_searched_at desc limit ").append(CORESIGNAL_API_MAX_RESULTS);
+
+            return jdbc.query(sql.toString(), (rs, rowNum) -> {
+                List<String> skills = new ArrayList<>();
+                try {
+                    JsonNode skillsNode = objectMapper.readTree(
+                        rs.getString("skills") != null ? rs.getString("skills") : "[]");
+                    if (skillsNode.isArray()) {
+                        for (JsonNode s : skillsNode) skills.add(s.asText());
+                    }
+                } catch (Exception ignored) {}
+
+                List<String> matched = extractMatchedSkills(
+                    String.join(" ", skills), filters.skills());
+                List<String> gaps = filters.skills().stream()
+                    .filter(s -> !matched.contains(s))
+                    .collect(Collectors.toList());
+                int score = Math.min(50 + (matched.size() * 5), 99);
+
+                long id = rs.getLong("coresignal_id");
+                jdbc.update("update coresignal_api_cache set last_searched_at = now() where coresignal_id = ?", id);
+
+                return new TalentSearchResult(
+                    null,
+                    rs.getString("full_name"),
+                    rs.getString("job_title"),
+                    rs.getString("current_company"),
+                    rs.getString("linkedin_url"),
+                    null, null,
+                    matched, gaps, score,
+                    rs.getInt("years_experience"),
+                    "CORESIGNAL", false, null, null, null, id);
+            }, args.toArray());
+
+        } catch (Exception e) {
+            System.err.println("[CoreSignal] cache query failed: " + e.getMessage());
+            return List.of();
+        }
     }
 
     // ─── Lazy skills generation (about + experience text -> skills) ──────────
@@ -332,7 +644,7 @@ public class TalentSearchService {
                             rs.getString("email"),
                             rs.getString("phone_number"),
                             matched, gaps, score, 0,
-                            "INTERNAL", true, null, null, null);
+                            "INTERNAL", true, null, null, null, null);
                 }, loginId);
     }
 
@@ -370,7 +682,7 @@ public class TalentSearchService {
                     p.linkedinUrl(), p.email(), p.phone(),
                     p.matchedSkills(), p.gapSkills(),
                     aiScores.get(i), p.yearsExperience(), p.source(), p.alreadyInPipeline(),
-                    p.coresignalId(), p.avatarUrl(), p.defaultAvatar()));
+                    p.coresignalId(), p.avatarUrl(), p.defaultAvatar(), p.coreSignalApiId()));
         }
         return scored;
     }
@@ -573,7 +885,7 @@ public class TalentSearchService {
             return new TalentSearchResult(
                     null, name, position, currentCompany, linkedinUrl, null, null,
                     matched, gaps, score, 0,
-                    "CORESIGNAL", false, id, avatarUrl, defaultAvatar);
+                    "CORESIGNAL", false, id, avatarUrl, defaultAvatar, null);
         } catch (Exception e) {
             System.err.println("[BrightData] upsert/map failed for id " + id + ": " + e.getMessage());
             return null;
@@ -671,7 +983,7 @@ public class TalentSearchService {
                     matched, gaps, score,
                     rs.getInt("years_experience"),
                     "CORESIGNAL", false, rs.getString("coresignal_id"),
-                    rs.getString("avatar_url"), (Boolean) rs.getObject("default_avatar"));
+                    rs.getString("avatar_url"), (Boolean) rs.getObject("default_avatar"), null);
             }, args.toArray());
 
         } catch (Exception e) {

@@ -18,5 +18,7 @@ public record TalentSearchResult(
     boolean alreadyInPipeline,
     String coresignalId,        // set for CORESIGNAL results (Bright Data string id); null for INTERNAL
     String avatarUrl,
-    Boolean defaultAvatar
+    Boolean defaultAvatar,
+    Long coreSignalApiId        // set for CORESIGNAL results sourced from the real CoreSignal API
+                                 // (distinct from coresignalId/Bright Data); null otherwise
 ) {}

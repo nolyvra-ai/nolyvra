@@ -35,6 +35,13 @@ public class TalentSearchController {
         return talentSearchService.getCoreSignalProfile(coresignalId);
     }
 
+    @GetMapping("/coresignal-api/{coreSignalApiId}")
+    public CoreSignalProfileResponse getCoreSignalApiProfile(
+            @PathVariable Long coreSignalApiId,
+            @RequestParam String loginId) {
+        return talentSearchService.getCoreSignalApiProfile(coreSignalApiId);
+    }
+
     // ── "Load more external candidates" (Talent Search page) ─────────────────
     @PostMapping("/external/load-more")
     public List<TalentSearchResult> loadMoreExternal(

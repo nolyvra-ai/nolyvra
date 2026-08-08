@@ -542,10 +542,10 @@ export function TalentSearchPage() {
     finally { setPipelineSaving(false); }
   }
 
-  async function openCoreSignalProfile(coresignalId) {
+  async function fetchCoreSignalProfile(path) {
     setCsProfile(null); setCsProfileLoading(true); setCsProfileOpen(true);
     try {
-      const url = new URL(`${API_BASE}/api/talent-search/coresignal/${coresignalId}`);
+      const url = new URL(`${API_BASE}${path}`);
       url.searchParams.set("loginId", loginId);
       const res = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` },
@@ -560,11 +560,21 @@ export function TalentSearchPage() {
     }
   }
 
+  function openCoreSignalProfile(coresignalId) {
+    fetchCoreSignalProfile(`/api/talent-search/coresignal/${coresignalId}`);
+  }
+
+  function openCoreSignalApiProfile(coreSignalApiId) {
+    fetchCoreSignalProfile(`/api/talent-search/coresignal-api/${coreSignalApiId}`);
+  }
+
   function handleViewFullProfile(c) {
     if ((c.isDB || c.source === "INTERNAL" || c.source === "BOTH") && c.candidateId) {
       nav(`/candidates/${c.candidateId}/workflow`);
     } else if (c.source === "CORESIGNAL" && c.coresignalId) {
       openCoreSignalProfile(c.coresignalId);
+    } else if (c.source === "CORESIGNAL" && c.coreSignalApiId) {
+      openCoreSignalApiProfile(c.coreSignalApiId);
     } else if (c.source === "NEXUS" && c.nexusProfileUrl) {
       window.open(c.nexusProfileUrl, "_blank", "noopener,noreferrer");
     }
@@ -923,6 +933,7 @@ export function TalentSearchPage() {
                             onClick={e => {
                               e.stopPropagation();
                               if (isCS && c.coresignalId) openCoreSignalProfile(c.coresignalId);
+                              else if (isCS && c.coreSignalApiId) openCoreSignalApiProfile(c.coreSignalApiId);
                               else if (c.source === "NEXUS" && c.nexusProfileUrl) window.open(c.nexusProfileUrl, "_blank", "noopener,noreferrer");
                               else if (c.candidateId) nav(`/candidates/${c.candidateId}/workflow`);
                             }}

@@ -35,5 +35,7 @@ public record NexusBlendedSearchResult(
     List<NexusSearchResponse.TopSkill> topSkills,
     List<String> employerPreferences,
     NexusSearchResponse.PipelineActivity pipelineActivity,
-    String nexusProfileUrl
+    String nexusProfileUrl,
+    String coresignalId,          // set for CORESIGNAL/Bright Data results; null otherwise
+    Long coreSignalApiId          // set for CORESIGNAL results from the real CoreSignal API; null otherwise
 ) {}

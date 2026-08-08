@@ -89,6 +89,9 @@ public class NexusBlendedSearchService {
                 : fetchNexusResults(new NexusSearchRequest(
                         req.query(), nexusInputs.skills(), req.minVerificationTier(), nexusLocation,
                         req.remunerationBudget(), req.employerType(), loginId, req.page(), req.pageSize()));
+        System.out.println("[NexusBlendedSearch] search: nexusConfigured=" + nexusClient.isConfigured()
+                + " skillsSent=" + nexusInputs.skills() + " locationSent=" + nexusLocation
+                + " nexusResultCount=" + nexusResponse.results().size());
 
         // Only INTERNAL results carry a real email — CORESIGNAL never exposes one,
         // so it can never be deduped against a Nexus identityToken. Skip computing
@@ -132,6 +135,13 @@ public class NexusBlendedSearchService {
         }
 
         blended.sort(Comparator.comparingInt(this::rankingScore).reversed());
+
+        long nexusOnlyCount = blended.stream().filter(b -> "NEXUS".equals(b.source())).count();
+        long bothCount = blended.stream().filter(b -> "BOTH".equals(b.source())).count();
+        System.out.println("[NexusBlendedSearch] search: blend complete — total=" + blended.size()
+                + " nexusOnly=" + nexusOnlyCount + " both=" + bothCount
+                + " atsOnly=" + (blended.size() - nexusOnlyCount - bothCount)
+                + " (nexusMatched/merged=" + mergedTokens.size() + " of " + nexusResponse.results().size() + " Nexus results)");
 
         return new NexusBlendedSearchResponse(req.query(), blended.size(), blended);
     }
@@ -199,6 +209,9 @@ public class NexusBlendedSearchService {
         for (NexusSearchResponse.Result nr : nexusResponse.results()) {
             combined.add(toBlended(nr, null));
         }
+        System.out.println("[NexusBlendedSearch] loadMoreExternal: nexusConfigured=" + nexusClient.isConfigured()
+                + " skillsSent=" + nexusInputs.skills() + " coreSignalFresh=" + coreSignalFresh.size()
+                + " nexusResultCount=" + nexusResponse.results().size() + " combined=" + combined.size());
         return new NexusBlendedLoadMoreResponse(combined);
     }
 
@@ -233,7 +246,8 @@ public class NexusBlendedSearchService {
                 nr.topSkills(),
                 nr.employerPreferences(),
                 nr.pipelineActivity(),
-                nr.nexusProfileUrl());
+                nr.nexusProfileUrl(),
+                null, null);
     }
 
     // ─── ATS-only result, no Nexus match (source = ATS) ──────────────────────
@@ -256,6 +270,7 @@ public class NexusBlendedSearchService {
                 r.defaultAvatar(),
                 r.source(),
                 r.alreadyInPipeline(),
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null,
+                r.coresignalId(), r.coreSignalApiId());
     }
 }
