@@ -788,6 +788,14 @@ export default function CandidateWorkflowPage() {
             sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
             ✉ Send Email
           </Button>
+          <Tooltip title="Available on paid subscriptions">
+            <span>
+              <Button variant="outlined" size="small" disabled
+                sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
+                💬 Send SMS (available on paid subscriptions)
+              </Button>
+            </span>
+          </Tooltip>
           <Button variant="contained" size="small"
             onClick={() => nav("/scheduler", { state: { candidateId } })}
             sx={{fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>

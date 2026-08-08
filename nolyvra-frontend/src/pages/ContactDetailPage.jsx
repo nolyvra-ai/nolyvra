@@ -107,6 +107,7 @@ const PhoneSvg = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" str
 const MailSvg = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>;
 const EditSvg = <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
 const LinkSvg = <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>;
+const SmsSvg = <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
 
 function TabEmptyState({ icon, title, desc }) {
   return (
@@ -351,6 +352,14 @@ export default function ContactDetailPage() {
               sx={{ fontSize: 12, textTransform: "none", borderRadius: "8px", boxShadow: "none", bgcolor: ACCENT, "&:hover": { bgcolor: "#1558C0", boxShadow: "none" } }}>
               Email
             </Button>
+            <Tooltip title="Available on paid subscriptions">
+              <span>
+                <Button size="small" variant="outlined" startIcon={SmsSvg} disabled
+                  sx={{ fontSize: 12, textTransform: "none", borderRadius: "8px", borderColor: BORDER, color: TEXT }}>
+                  Send SMS (available on paid subscriptions)
+                </Button>
+              </span>
+            </Tooltip>
             {contact.candidateId ? (
               <Button size="small" variant="outlined" startIcon={LinkSvg}
                 onClick={() => nav(`/candidates/${contact.candidateId}/workflow`)}

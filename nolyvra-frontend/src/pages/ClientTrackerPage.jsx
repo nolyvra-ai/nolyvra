@@ -849,6 +849,15 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
                     bgcolor: ACCENT, "&:hover": { bgcolor: "#1558C0", boxShadow: "none" } }}>
                   Send Email
                 </Button>
+                <Tooltip title="Available on paid subscriptions">
+                  <span>
+                    <Button size="small" variant="outlined" disabled
+                      sx={{ fontSize: 12, textTransform: "none", borderRadius: "8px", ml: "8px",
+                        borderColor: BORDER, color: TEXT }}>
+                      Send SMS (available on paid subscriptions)
+                    </Button>
+                  </span>
+                </Tooltip>
               </Box>
               {emailsLoading ? (
                 <Box sx={{ display: "flex", justifyContent: "center", py: "32px" }}><CircularProgress size={20} sx={{ color: ACCENT }} /></Box>

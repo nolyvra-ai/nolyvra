@@ -665,6 +665,7 @@ export function TalentSearchPage() {
           onKeyDown={e => e.key === "Enter" && !e.shiftKey && (e.preventDefault(), handleSearch())}
           placeholder="e.g. Find me a Senior Java engineer with fintech experience who worked at a Series B startup"
           sx={{ mb: 1.5, "& .MuiOutlinedInput-root": { bgcolor: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.15)", borderRadius: "8px", fontSize: 14, color: "#fff", "& fieldset": { border: "none" } }, "& .MuiInputBase-input::placeholder": { color: "rgba(255,255,255,0.4)" } }} />
+        <Typography sx={{ fontSize: 11, color: "rgba(255,255,255,0.4)", mb: 1.5 }}>Get more enriched data from multi-source platforms with our paid subscription.</Typography>
         <Box sx={{ display: "flex", gap: 1.25, alignItems: "center", flexWrap: "wrap" }}>
           <Button variant="contained" onClick={() => handleSearch()} disabled={loading || !query.trim()}
             sx={{ fontSize: 13, py: "9px", px: "20px", bgcolor: PURPLE, borderRadius: "8px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#6D28D9", boxShadow: "none" } }}>
