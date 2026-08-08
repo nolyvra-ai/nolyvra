@@ -51,6 +51,25 @@ coresignal:
   api-key: ${CORESIGNAL_API_KEY:}
   base-url: ${CORESIGNAL_BASE_URL:https://api.coresignal.com/cdapi/v2}
 
+nexus:
+  # Master feature toggle (2026-07-26) — off by default. NexusClient.isConfigured()
+  # folds this in, which is already the single gate every Nexus-touching code path
+  # checks before calling out (blended search, outbox dispatcher). Flip to true (or
+  # set NEXUS_ENABLED=true) to re-enable the whole integration.
+  enabled: ${NEXUS_ENABLED:false}
+  # Local-dev defaults (2026-07-24) — the three secrets below must be set to the
+  # exact same values in the local Nexus instance's own env config, or calls will
+  # fail auth / dedup will silently stop matching. Set real env vars to override
+  # these for any non-local environment.
+  base-url: ${NEXUS_BASE_URL:http://localhost:8081}
+  service-token: ${NOLYVRA_INTEGRATION_SERVICE_TOKEN:dev-only-shared-secret-change-me-before-any-real-deployment-0000}
+  webhook-signing-secret: ${NOLYVRA_WEBHOOK_SIGNING_SECRET:dev-only-webhook-secret-change-me-before-any-real-deployment-0000}
+  identity-token-secret: ${NOLYVRA_IDENTITY_TOKEN_SECRET:dev-only-identity-secret-change-me-before-any-real-deployment-0000}
+  webhook-url: ${NOLYVRA_WEBHOOK_URL:http://localhost:8080/api/nexus/webhook}
+  outbox:
+    dispatch-delay-ms: ${NEXUS_OUTBOX_DISPATCH_DELAY_MS:15000}
+  frontend-url: ${NEXUS_FRONTEND_URL:http://localhost:5174}
+
 microsoft:
   client-id: ${MICROSOFT_CLIENT_ID:}
   client-secret: ${MICROSOFT_CLIENT_SECRET:}
