@@ -319,7 +319,7 @@ class NexusBlendedSearchServiceTest {
                 candidateId, "Name", "Engineer", "Acme", "https://linkedin.com/x",
                 email, "+61 400 000 000",
                 List.of("Java"), List.of(), matchScore, 5,
-                "INTERNAL", true, null, null, null);
+                "INTERNAL", true, null, null, null, null);
     }
 
     private TalentSearchResult coresignalResult(int matchScore) {
@@ -327,7 +327,7 @@ class NexusBlendedSearchServiceTest {
                 null, "External Name", "Engineer", "Other Co", "https://linkedin.com/y",
                 null, null,
                 List.of("Java"), List.of(), matchScore, 3,
-                "CORESIGNAL", false, "cs-1", "https://avatar", false);
+                "CORESIGNAL", false, "cs-1", "https://avatar", false, null);
     }
 
     private NexusSearchResponse.Result nexusResult(String identityToken, int credibilityScore) {
