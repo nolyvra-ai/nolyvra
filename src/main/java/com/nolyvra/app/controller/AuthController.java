@@ -207,6 +207,20 @@ public class AuthController {
                         .body(Map.of("error", "Invalid credentials.")));
     }
 
+    // GET /api/auth/admin/access
+    // Session-backed admin check for protected frontend tools. Unlike the legacy
+    // admin endpoints below, identity is taken from the authenticated request.
+    @GetMapping("/admin/access")
+    public ResponseEntity<?> getAdminAccess() {
+        String authenticatedLoginId = sessionContext.loginId();
+        if (sessionContext.isEmployee()
+                || authenticatedLoginId == null
+                || !userService.isAdmin(authenticatedLoginId)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied."));
+        }
+        return ResponseEntity.ok(Map.of("admin", true));
+    }
+
     // GET /api/auth/admin/users?loginId=x
     // Admin only — returns all users with their plan info
     @GetMapping("/admin/users")

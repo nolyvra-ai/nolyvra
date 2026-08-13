@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import SettingsPage from "./SettingsPage";
@@ -104,5 +104,9 @@ describe("SettingsPage navigation", () => {
     expect(await screen.findByRole("button", { name: /Administration Users, limits and leads/ }))
       .toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("button", { name: /Email & Notifications/ })).toBeInTheDocument();
+    const toolsButton = screen.getByRole("button", { name: /Tools Internal admin utilities/ });
+    expect(toolsButton).toBeInTheDocument();
+    fireEvent.click(toolsButton);
+    expect(await screen.findByRole("button", { name: "Open tool" })).toBeInTheDocument();
   });
 });

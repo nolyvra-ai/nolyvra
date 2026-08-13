@@ -45,6 +45,7 @@ import CrmMyExpensePage           from "../pages/CrmMyExpensePage";
 import CrmMyGrievancePage         from "../pages/CrmMyGrievancePage";
 import CrmTimesheetsPage          from "../pages/CrmTimesheetsPage";
 import CrmMyTimesheetPage         from "../pages/CrmMyTimesheetPage";
+import AdminContactListBuilderPage from "../pages/AdminContactListBuilderPage";
 
 export default function AppRoutes() {
   return (
@@ -80,6 +81,7 @@ export default function AppRoutes() {
       <Route path="/email"                              element={<EmailCentrePage />} />
       <Route path="/reminders"                          element={<RemindersPage />} />
       <Route path="/settings"                           element={<Navigate to="/settings/account" replace />} />
+      <Route path="/settings/tools/contact-list-builder" element={<AdminContactListBuilderPage />} />
       <Route path="/settings/:section"                  element={<SettingsPage />} />
       <Route path="/settings/:section/:templateKey"     element={<SettingsPage />} />
       <Route path="/coworker"                           element={<CoWorkerPage />} />
