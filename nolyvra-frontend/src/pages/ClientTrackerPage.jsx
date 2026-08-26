@@ -743,7 +743,19 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <Box sx={{ fontSize: 13, fontWeight: 700, color: TEXT }}>Contacts</Box>
-            {client.contactPerson ? (
+            {existingContacts.length > 0 ? (
+              <Box sx={{ fontSize: 12.5, color: TEXT }}>
+                {existingContacts[0].name}
+                <Box component="span" sx={{ color: MUTED }}>
+                  {[existingContacts[0].title, existingContacts[0].email, existingContacts[0].phone].filter(Boolean).length > 0
+                    ? ` — ${[existingContacts[0].title, existingContacts[0].email, existingContacts[0].phone].filter(Boolean).join(" · ")}`
+                    : ""}
+                </Box>
+                {existingContacts.length > 1 && (
+                  <Box component="span" sx={{ color: MUTED }}> · +{existingContacts.length - 1} more</Box>
+                )}
+              </Box>
+            ) : client.contactPerson ? (
               <Box sx={{ fontSize: 12.5, color: TEXT }}>
                 {client.contactPerson}
                 <Box component="span" sx={{ color: MUTED }}>
@@ -826,7 +838,7 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
                 t.key === "employed" ? employed.length :
                 t.key === "files"    ? files.length :
                 t.key === "invoices" ? invoices.length :
-                t.key === "contacts" ? secondaryContacts.length + (client.contactPerson ? 1 : 0) : null;
+                t.key === "contacts" ? existingContacts.length + secondaryContacts.length + (client.contactPerson ? 1 : 0) : null;
               return (
                 <Tab key={t.key} value={t.key} label={
                   <Box sx={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -1052,6 +1064,24 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
           {tab === "contacts" && (
             <Box>
               {contactAddError && <Alert severity="error" sx={{ mb: "10px", fontSize: 12, borderRadius: "8px" }}>{contactAddError}</Alert>}
+              {existingContacts.length > 0 && (
+                <Box sx={{ mb: "16px", pb: "12px", borderBottom: `1px solid ${BORDER}` }}>
+                  {existingContacts.map((c, i) => (
+                    <Box key={c.id} onClick={() => nav(`/contacts/${c.id}`)}
+                      sx={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                        py: "10px", cursor: "pointer",
+                        borderBottom: i < existingContacts.length - 1 ? `1px solid ${BORDER}` : "none",
+                        "&:hover": { bgcolor: "#FAFBFD" } }}>
+                      <Box>
+                        <Box sx={{ fontSize: 13, fontWeight: 600, color: ACCENT }}>{c.name || "—"}</Box>
+                        <Box sx={{ fontSize: 12, color: MUTED, mt: "3px" }}>
+                          {[c.title, c.email, c.phone].filter(Boolean).join(" · ") || "—"}
+                        </Box>
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              )}
               {client.contactPerson ? (
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between",
                   pb: secondaryContacts.length > 0 ? "12px" : 0, mb: secondaryContacts.length > 0 ? "12px" : 0,
@@ -1080,7 +1110,7 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
                     </Button>
                   )}
                 </Box>
-              ) : secondaryContacts.length === 0 ? (
+              ) : secondaryContacts.length === 0 && existingContacts.length === 0 ? (
                 <TabEmptyState icon="👥" title="No Contacts Found" desc="Contacts for this client will appear here." />
               ) : null}
               {secondaryContacts.map((c, i) => (
@@ -1903,6 +1933,8 @@ export default function ClientTrackerPage() {
   const [loading,           setLoading]           = useState(true);
   const [error,             setError]             = useState("");
   const [search,            setSearch]            = useState("");
+  const [serverSearchResults, setServerSearchResults] = useState(null);
+  const [serverSearching,     setServerSearching]     = useState(false);
   const [showAdd,           setShowAdd]           = useState(false);
   const [editingClient,     setEditingClient]     = useState(null);
   const [potentialLoading,  setPotentialLoading]  = useState(false);
@@ -2097,12 +2129,36 @@ export default function ClientTrackerPage() {
     });
   }
 
-  const filtered = clients.filter(c =>
+  // Search-as-you-type first checks what's already loaded in the browser (no
+  // network call). Only when that comes up empty — meaning the match might be
+  // sitting in one of the not-yet-loaded pages — do we fall back to a DB
+  // query, debounced so it doesn't fire on every keystroke.
+  const localMatches = clients.filter(c =>
     !search ||
     c.companyName?.toLowerCase().includes(search.toLowerCase()) ||
     c.industry?.toLowerCase().includes(search.toLowerCase()) ||
     c.contactPerson?.toLowerCase().includes(search.toLowerCase())
   );
+  const filtered = search && localMatches.length === 0 && serverSearchResults
+    ? serverSearchResults
+    : localMatches;
+
+  useEffect(() => {
+    if (!search.trim() || localMatches.length > 0) {
+      setServerSearchResults(null);
+      setServerSearching(false);
+      return;
+    }
+    setServerSearching(true);
+    const timer = setTimeout(() => {
+      apiGet(`/api/clients?limit=${PAGE_SIZE}&offset=0&search=${encodeURIComponent(search.trim())}`)
+        .then(setServerSearchResults)
+        .catch(() => setServerSearchResults([]))
+        .finally(() => setServerSearching(false));
+    }, 350);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, clients.length]);
 
   // KPI numbers come from /api/clients/stats — fast aggregate queries across
   // the whole client set, independent of how many rows are currently paged
@@ -2350,9 +2406,13 @@ export default function ClientTrackerPage() {
 
             {filtered.length === 0 ? (
               <Box sx={{ py: "48px", textAlign: "center" }}>
-                <Box sx={{ fontSize: 13, color: MUTED }}>
-                  {search ? "No clients match your search." : "No clients yet. Add your first client to get started."}
-                </Box>
+                {serverSearching ? (
+                  <CircularProgress size={20} sx={{ color: ACCENT }} />
+                ) : (
+                  <Box sx={{ fontSize: 13, color: MUTED }}>
+                    {search ? "No clients match your search." : "No clients yet. Add your first client to get started."}
+                  </Box>
+                )}
               </Box>
             ) : (
               filtered.map(c => (

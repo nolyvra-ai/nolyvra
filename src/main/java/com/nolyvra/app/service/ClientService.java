@@ -75,7 +75,8 @@ public class ClientService {
     // pagination-independent KPI numbers (total clients, active mandates, etc.)
     // the list page should show instead of reducing over the loaded page.
 
-    public List<ClientResponse> getClients(String loginId, int limit, int offset) {
+    public List<ClientResponse> getClients(String loginId, int limit, int offset, String search) {
+        boolean hasSearch = search != null && !search.isBlank();
         String sql = """
                 SELECT c.id, c.login_id, c.company_name, c.industry, c.company_size, c.location,
                        c.contact_person, c.contact_email, c.contact_title, c.contact_phone,
@@ -89,10 +90,26 @@ public class ClientService {
                 LEFT JOIN jobs j ON lower(j.company) = lower(c.company_name) AND j.login_id = c.login_id
                 LEFT JOIN candidates cand ON cand.job_id = j.id
                 WHERE c.login_id = ? AND c.status = 'CLIENT'
+                """
+                + (hasSearch ? """
+                AND (lower(c.company_name) LIKE ? OR lower(c.industry) LIKE ? OR lower(c.contact_person) LIKE ?)
+                """ : "")
+                + """
                 GROUP BY c.id
                 ORDER BY c.created_at DESC
                 LIMIT ? OFFSET ?
                 """;
+
+        List<Object> params = new java.util.ArrayList<>();
+        params.add(loginId);
+        if (hasSearch) {
+            String like = "%" + search.trim().toLowerCase() + "%";
+            params.add(like);
+            params.add(like);
+            params.add(like);
+        }
+        params.add(limit);
+        params.add(offset);
 
         return jdbc.query(sql, (rs, i) -> {
             String companyName = rs.getString("company_name");
@@ -132,7 +149,7 @@ public class ClientService {
                     recentJobs,
                     totalFee,
                     rs.getString("status"));
-        }, loginId, limit, offset);
+        }, params.toArray());
     }
 
     // ─── GET /api/clients/stats ─────────────────────────────────────────────
