@@ -161,6 +161,9 @@ function EditContactDialog({ open, onClose, contact, onSaved }) {
         email: contact.email || "", phone: contact.phone || "",
         linkedinUrl: contact.linkedinUrl || "", facebookUrl: contact.facebookUrl || "",
         twitterUrl: contact.twitterUrl || "",
+        personalEmail: contact.personalEmail || "", workEmail: contact.workEmail || "", otherEmail: contact.otherEmail || "",
+        personalPhone: contact.personalPhone || "", workPhone: contact.workPhone || "", mobilePhone: contact.mobilePhone || "",
+        meetupUrl: contact.meetupUrl || "", githubUrl: contact.githubUrl || "", instagramUrl: contact.instagramUrl || "",
       });
       setError("");
     }
@@ -195,6 +198,15 @@ function EditContactDialog({ open, onClose, contact, onSaved }) {
           <TextField label="LinkedIn URL" value={form.linkedinUrl} onChange={set("linkedinUrl")} size="small" fullWidth sx={FIELD_SX} />
           <TextField label="Facebook URL" value={form.facebookUrl} onChange={set("facebookUrl")} size="small" fullWidth sx={FIELD_SX} />
           <TextField label="Twitter / X URL" value={form.twitterUrl} onChange={set("twitterUrl")} size="small" fullWidth sx={FIELD_SX} />
+          <TextField label="Personal Email" value={form.personalEmail} onChange={set("personalEmail")} size="small" fullWidth sx={FIELD_SX} />
+          <TextField label="Work Email" value={form.workEmail} onChange={set("workEmail")} size="small" fullWidth sx={FIELD_SX} />
+          <TextField label="Other Email" value={form.otherEmail} onChange={set("otherEmail")} size="small" fullWidth sx={FIELD_SX} />
+          <TextField label="Personal Phone" value={form.personalPhone} onChange={set("personalPhone")} size="small" fullWidth sx={FIELD_SX} />
+          <TextField label="Work Phone" value={form.workPhone} onChange={set("workPhone")} size="small" fullWidth sx={FIELD_SX} />
+          <TextField label="Mobile Phone" value={form.mobilePhone} onChange={set("mobilePhone")} size="small" fullWidth sx={FIELD_SX} />
+          <TextField label="MeetUp URL" value={form.meetupUrl} onChange={set("meetupUrl")} size="small" fullWidth sx={FIELD_SX} />
+          <TextField label="GitHub URL" value={form.githubUrl} onChange={set("githubUrl")} size="small" fullWidth sx={FIELD_SX} />
+          <TextField label="Instagram URL" value={form.instagramUrl} onChange={set("instagramUrl")} size="small" fullWidth sx={FIELD_SX} />
         </Box>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>
@@ -385,6 +397,21 @@ export default function ContactDetailPage() {
           <InfoField label="Phone" value={contact.phone} />
           <InfoField label="Company" value={contact.clientCompanyName} />
           <InfoField label="Industry" value={contact.clientIndustry} />
+        </Box>
+      </Paper>
+
+      <Paper elevation={0} sx={{ ...CARD, p: "18px", mb: "18px" }}>
+        <Box sx={{ fontSize: 13, fontWeight: 700, color: TEXT, mb: "14px" }}>Additional Details</Box>
+        <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "16px" }}>
+          <InfoField label="Personal Email" value={contact.personalEmail} />
+          <InfoField label="Work Email" value={contact.workEmail} />
+          <InfoField label="Other Email" value={contact.otherEmail} />
+          <InfoField label="Personal Phone" value={contact.personalPhone} />
+          <InfoField label="Work Phone" value={contact.workPhone} />
+          <InfoField label="Mobile Phone" value={contact.mobilePhone} />
+          <InfoField label="MeetUp" value={contact.meetupUrl} />
+          <InfoField label="GitHub" value={contact.githubUrl} />
+          <InfoField label="Instagram" value={contact.instagramUrl} />
         </Box>
       </Paper>
 

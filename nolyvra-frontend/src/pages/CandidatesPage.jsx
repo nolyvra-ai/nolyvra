@@ -2,7 +2,7 @@
 // Structured filter search over internal candidates, rule-based match scoring
 // (no AI call, no token cost). Replaces the old plain analysed-candidate table;
 // consistency/capability/risk/status now live in the right-side detail panel.
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   Box, Paper, Typography, Button, TextField, MenuItem, Switch, Slider,
   CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions,
@@ -161,6 +161,7 @@ export default function CandidatesPage() {
   const [workRights, setWorkRights] = useState("");
 
   // ── Results state ────────────────────────────────────────────────────────
+  const [nameEmailSearch, setNameEmailSearch] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -294,8 +295,14 @@ export default function CandidatesPage() {
     }
   }
 
-  const quality = matchQuality(results);
-  const tierCounts = results.reduce((acc, r) => {
+  const visibleResults = useMemo(() => {
+    const q = nameEmailSearch.trim().toLowerCase();
+    if (!q) return results;
+    return results.filter(c => [c.name, c.email].filter(Boolean).some(v => v.toLowerCase().includes(q)));
+  }, [results, nameEmailSearch]);
+
+  const quality = matchQuality(visibleResults);
+  const tierCounts = visibleResults.reduce((acc, r) => {
     acc[r.matchTier] = (acc[r.matchTier] ?? 0) + 1;
     return acc;
   }, {});
@@ -450,15 +457,20 @@ export default function CandidatesPage() {
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 1.5, flexWrap: "wrap" }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexWrap: "wrap" }}>
           <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
-            {results.length} candidate{results.length !== 1 ? "s" : ""} found
+            {visibleResults.length} candidate{visibleResults.length !== 1 ? "s" : ""} found
           </Typography>
           {["Strong Match", "Hidden Gem", "Needs Review", "Not Recommended"].map(t => (
             tierCounts[t] ? <Box key={t} sx={{ fontSize: 11, color: TIER_STYLE[t].color, fontWeight: 600 }}>{tierCounts[t]} {t}</Box> : null
           ))}
         </Box>
-        <Box sx={{ display: "inline-flex", p: "2px", bgcolor: "#F1F3F7", border: `1px solid ${BORDER}`, borderRadius: "8px" }}>
-          <Box component="button" onClick={() => setViewMode("list")} sx={toggleBtn(viewMode === "list")}>List</Box>
-          <Box component="button" onClick={() => setViewMode("grid")} sx={toggleBtn(viewMode === "grid")}>Grid</Box>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+          <TextField size="small" placeholder="Search by name or email…"
+            value={nameEmailSearch} onChange={e => setNameEmailSearch(e.target.value)}
+            sx={{ minWidth: 220, "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 12.5, "& fieldset": { borderColor: BORDER } } }} />
+          <Box sx={{ display: "inline-flex", p: "2px", bgcolor: "#F1F3F7", border: `1px solid ${BORDER}`, borderRadius: "8px" }}>
+            <Box component="button" onClick={() => setViewMode("list")} sx={toggleBtn(viewMode === "list")}>List</Box>
+            <Box component="button" onClick={() => setViewMode("grid")} sx={toggleBtn(viewMode === "grid")}>Grid</Box>
+          </Box>
         </Box>
       </Box>
 
@@ -471,12 +483,12 @@ export default function CandidatesPage() {
             </Box>
           )}
 
-          {!loading && results.length === 0 && (
+          {!loading && visibleResults.length === 0 && (
             <Box sx={{ textAlign: "center", py: 6, color: MUTED, fontSize: 13 }}>No candidates found.</Box>
           )}
 
           {/* ── Table view ──────────────────────────────────────────────── */}
-          {!loading && results.length > 0 && viewMode === "list" && (
+          {!loading && visibleResults.length > 0 && viewMode === "list" && (
             <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: "10px", overflow: "auto", bgcolor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
               <Table size="small">
                 <TableHead>
@@ -487,7 +499,7 @@ export default function CandidatesPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {results.map(c => {
+                  {visibleResults.map(c => {
                     const isSelected = selected?.candidateId === c.candidateId;
                     return (
                       <TableRow key={c.candidateId} onClick={() => setSelected(c)}
@@ -541,9 +553,9 @@ export default function CandidatesPage() {
           )}
 
           {/* ── Grid (card) view ────────────────────────────────────────── */}
-          {!loading && results.length > 0 && viewMode === "grid" && (
+          {!loading && visibleResults.length > 0 && viewMode === "grid" && (
             <Box sx={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 1.25 }}>
-              {results.map(c => {
+              {visibleResults.map(c => {
                 const isSelected = selected?.candidateId === c.candidateId;
                 return (
                   <Paper key={c.candidateId} elevation={0} onClick={() => setSelected(c)}

@@ -51,3 +51,10 @@ build/
 /src/main/resources/application-local.yml
 .env
 .env.*
+additional/sql/V66__ross_recruitment_candidate_import.sql
+additional/sql/V67__ross_recruitment_candidate_import_david.sql
+additional/sql/V68__ross_recruitment_activity_timeline_christopher.sql
+.gitignore
+additional/sql/V69__ross_recruitment_activity_timeline_david.sql
+additional/sql/V71__ross_recruitment_client_contact_import.sql
+additional/sql/V72__ross_recruitment_client_contact_import_david.sql

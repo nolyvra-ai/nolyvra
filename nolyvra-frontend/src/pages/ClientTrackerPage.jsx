@@ -289,10 +289,12 @@ function ClientRow({ client, onEdit, onSelect, onInvoice, hubSpotStatus }) {
         </Box>
       </Box>
       <Box>
-        {client.contactPerson
-          ? <Box sx={{ fontSize: 13, color: TEXT }}>{client.contactPerson}</Box>
+        {client.contactPerson || client.primaryContactName
+          ? <Box sx={{ fontSize: 13, color: TEXT }}>{client.contactPerson || client.primaryContactName}</Box>
           : <Box sx={{ fontSize: 12, color: MUTED }}>—</Box>}
-        {client.contactEmail && <Box sx={{ fontSize: 11, color: MUTED, mt: "1px" }}>{client.contactEmail}</Box>}
+        {(client.contactEmail || client.primaryContactEmail) && (
+          <Box sx={{ fontSize: 11, color: MUTED, mt: "1px" }}>{client.contactEmail || client.primaryContactEmail}</Box>
+        )}
         {hubSpotStatus?.contactState === "success" && (
           <Box sx={{ fontSize: 10, color: HUBSPOT, fontWeight: 600, mt: "2px" }}>Contact synced</Box>
         )}
@@ -743,7 +745,19 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
           display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <Box sx={{ fontSize: 13, fontWeight: 700, color: TEXT }}>Contacts</Box>
-            {client.contactPerson ? (
+            {existingContacts.length > 0 ? (
+              <Box sx={{ fontSize: 12.5, color: TEXT }}>
+                {existingContacts[0].name}
+                <Box component="span" sx={{ color: MUTED }}>
+                  {[existingContacts[0].title, existingContacts[0].email, existingContacts[0].phone].filter(Boolean).length > 0
+                    ? ` — ${[existingContacts[0].title, existingContacts[0].email, existingContacts[0].phone].filter(Boolean).join(" · ")}`
+                    : ""}
+                </Box>
+                {existingContacts.length > 1 && (
+                  <Box component="span" sx={{ color: MUTED }}> · +{existingContacts.length - 1} more</Box>
+                )}
+              </Box>
+            ) : client.contactPerson ? (
               <Box sx={{ fontSize: 12.5, color: TEXT }}>
                 {client.contactPerson}
                 <Box component="span" sx={{ color: MUTED }}>
@@ -778,7 +792,7 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
             }}>
               <Box sx={{ color: MUTED, display: "flex" }}><ChevronSvg open={overviewOpen} /></Box>
               <Box sx={{ fontSize: 14, fontWeight: 700, color: TEXT }}>Information Overview</Box>
-              <Tag color={MUTED} bg="#F1F3F7">{showMore ? 9 : 7}</Tag>
+              <Tag color={MUTED} bg="#F1F3F7">{showMore ? 10 : 7}</Tag>
             </Box>
 
             {overviewOpen && (
@@ -797,6 +811,7 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
                     <>
                       <InfoField label="Company Size" value={client.companySize} />
                       <InfoField label="LinkedIn" value={client.linkedinUrl} />
+                      <InfoField label="Zip / Postcode" value={client.zip} />
                     </>
                   )}
                 </Box>
@@ -825,7 +840,7 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
                 t.key === "employed" ? employed.length :
                 t.key === "files"    ? files.length :
                 t.key === "invoices" ? invoices.length :
-                t.key === "contacts" ? secondaryContacts.length + (client.contactPerson ? 1 : 0) : null;
+                t.key === "contacts" ? existingContacts.length + secondaryContacts.length + (client.contactPerson ? 1 : 0) : null;
               return (
                 <Tab key={t.key} value={t.key} label={
                   <Box sx={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -1051,6 +1066,24 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
           {tab === "contacts" && (
             <Box>
               {contactAddError && <Alert severity="error" sx={{ mb: "10px", fontSize: 12, borderRadius: "8px" }}>{contactAddError}</Alert>}
+              {existingContacts.length > 0 && (
+                <Box sx={{ mb: "16px", pb: "12px", borderBottom: `1px solid ${BORDER}` }}>
+                  {existingContacts.map((c, i) => (
+                    <Box key={c.id} onClick={() => nav(`/contacts/${c.id}`)}
+                      sx={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+                        py: "10px", cursor: "pointer",
+                        borderBottom: i < existingContacts.length - 1 ? `1px solid ${BORDER}` : "none",
+                        "&:hover": { bgcolor: "#FAFBFD" } }}>
+                      <Box>
+                        <Box sx={{ fontSize: 13, fontWeight: 600, color: ACCENT }}>{c.name || "—"}</Box>
+                        <Box sx={{ fontSize: 12, color: MUTED, mt: "3px" }}>
+                          {[c.title, c.email, c.phone].filter(Boolean).join(" · ") || "—"}
+                        </Box>
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              )}
               {client.contactPerson ? (
                 <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between",
                   pb: secondaryContacts.length > 0 ? "12px" : 0, mb: secondaryContacts.length > 0 ? "12px" : 0,
@@ -1079,7 +1112,7 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
                     </Button>
                   )}
                 </Box>
-              ) : secondaryContacts.length === 0 ? (
+              ) : secondaryContacts.length === 0 && existingContacts.length === 0 ? (
                 <TabEmptyState icon="👥" title="No Contacts Found" desc="Contacts for this client will appear here." />
               ) : null}
               {secondaryContacts.map((c, i) => (
@@ -1892,11 +1925,18 @@ function PotentialDetailModal({ pc, onClose, onAddToClients, searchPlace, search
 export default function ClientTrackerPage() {
   const nav = useNavigate();
 
+  const PAGE_SIZE = 10;
   const [clients,           setClients]           = useState([]);
+  const [stats,             setStats]             = useState(null);
+  const [offset,            setOffset]            = useState(0);
+  const [hasMore,           setHasMore]           = useState(true);
+  const [loadingMore,       setLoadingMore]       = useState(false);
   const [potential,         setPotential]         = useState([]);
   const [loading,           setLoading]           = useState(true);
   const [error,             setError]             = useState("");
   const [search,            setSearch]            = useState("");
+  const [serverSearchResults, setServerSearchResults] = useState(null);
+  const [serverSearching,     setServerSearching]     = useState(false);
   const [showAdd,           setShowAdd]           = useState(false);
   const [editingClient,     setEditingClient]     = useState(null);
   const [potentialLoading,  setPotentialLoading]  = useState(false);
@@ -1919,11 +1959,13 @@ export default function ClientTrackerPage() {
     const results = await Promise.allSettled(
       clientList.map(client => apiGet(`/api/clients/${client.id}/hubspot/status`))
     );
-    const statuses = {};
-    results.forEach((result, index) => {
-      if (result.status === "fulfilled") statuses[clientList[index].id] = result.value;
+    setHubSpotStatuses(prev => {
+      const next = { ...prev };
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") next[clientList[index].id] = result.value;
+      });
+      return next;
     });
-    setHubSpotStatuses(statuses);
   }
 
   // ── Bulk outreach (Potential Clients multi-select) ─────────────────────────
@@ -1977,9 +2019,11 @@ export default function ClientTrackerPage() {
   async function loadClients() {
     setLoading(true);
     try {
-      const c = await apiGet("/api/clients?");
+      const c = await apiGet(`/api/clients?limit=${PAGE_SIZE}&offset=0`);
       setClients(c);
-      await loadHubSpotStatuses(c);
+      setOffset(c.length);
+      setHasMore(c.length === PAGE_SIZE);
+      loadHubSpotStatuses(c);
     } catch (e) {
       setError(e.message || "Failed to load clients.");
     } finally {
@@ -1987,8 +2031,30 @@ export default function ClientTrackerPage() {
     }
   }
 
+  async function loadMoreClients() {
+    setLoadingMore(true);
+    try {
+      const c = await apiGet(`/api/clients?limit=${PAGE_SIZE}&offset=${offset}`);
+      setClients(prev => [...prev, ...c]);
+      setOffset(prev => prev + c.length);
+      setHasMore(c.length === PAGE_SIZE);
+      loadHubSpotStatuses(c);
+    } catch (e) {
+      setError(e.message || "Failed to load more clients.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  function loadStats() {
+    apiGet("/api/clients/stats")
+      .then(setStats)
+      .catch(() => {});
+  }
+
   useEffect(() => {
     loadClients();
+    loadStats();
   }, []);
 
   // Restore the last Potential Clients search (filters + results) on page
@@ -2065,28 +2131,45 @@ export default function ClientTrackerPage() {
     });
   }
 
-  const filtered = clients.filter(c =>
+  // Search-as-you-type first checks what's already loaded in the browser (no
+  // network call). Only when that comes up empty — meaning the match might be
+  // sitting in one of the not-yet-loaded pages — do we fall back to a DB
+  // query, debounced so it doesn't fire on every keystroke.
+  const localMatches = clients.filter(c =>
     !search ||
     c.companyName?.toLowerCase().includes(search.toLowerCase()) ||
     c.industry?.toLowerCase().includes(search.toLowerCase()) ||
     c.contactPerson?.toLowerCase().includes(search.toLowerCase())
   );
+  const filtered = search && localMatches.length === 0 && serverSearchResults
+    ? serverSearchResults
+    : localMatches;
 
-  const totalActive = clients.reduce((s, c) => s + c.activeJobCount, 0);
-  const totalFilled = clients.reduce((s, c) => s + c.filledJobCount, 0);
+  useEffect(() => {
+    if (!search.trim() || localMatches.length > 0) {
+      setServerSearchResults(null);
+      setServerSearching(false);
+      return;
+    }
+    setServerSearching(true);
+    const timer = setTimeout(() => {
+      apiGet(`/api/clients?limit=${PAGE_SIZE}&offset=0&search=${encodeURIComponent(search.trim())}`)
+        .then(setServerSearchResults)
+        .catch(() => setServerSearchResults([]))
+        .finally(() => setServerSearching(false));
+    }, 350);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, clients.length]);
+
+  // KPI numbers come from /api/clients/stats — fast aggregate queries across
+  // the whole client set, independent of how many rows are currently paged
+  // into `clients`. Reducing over `clients` here would only reflect the
+  // loaded page once pagination is in play.
+  const totalActive = stats?.activeMandates ?? 0;
+  const totalFilled = stats?.placements ?? 0;
+  const totalFeeLabel = formatFeeTotals(stats?.totalFee);
   const hasFilters  = searchIndustry || searchPlace || searchSize || searchKeyword;
-
-  // Total fee across all clients (Active/Fulfilling jobs only), grouped by currency —
-  // amounts in different currencies cannot be added together meaningfully.
-  const totalFeeByCurrency = clients.reduce((acc, c) => {
-    (c.totalFee || []).forEach(({ currency, amount }) => {
-      acc[currency] = (acc[currency] || 0) + Number(amount);
-    });
-    return acc;
-  }, {});
-  const totalFeeLabel = formatFeeTotals(
-    Object.entries(totalFeeByCurrency).map(([currency, amount]) => ({ currency, amount }))
-  );
 
   function handleSaved(savedClient) {
     setClients(prev => {
@@ -2249,7 +2332,7 @@ export default function ClientTrackerPage() {
 
       {/* KPI strip */}
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "14px", mb: "20px" }}>
-        <KpiCard label="Total Clients" value={clients.length} color={ACCENT} bg={ACCENT_L}
+        <KpiCard label="Total Clients" value={stats?.totalClients ?? "—"} color={ACCENT} bg={ACCENT_L}
           icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>} />
         <KpiCard label="Active Mandates" value={totalActive} color={SUCCESS} bg={SUCCESS_L}
           icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>} />
@@ -2289,7 +2372,7 @@ export default function ClientTrackerPage() {
               <Box sx={{ fontSize: 14, fontWeight: 600, color: TEXT }}>
                 Your Clients
                 <Box component="span" sx={{ ml: "8px", fontSize: 12, color: MUTED, fontWeight: 400 }}>
-                  ({filtered.length})
+                  ({filtered.length} loaded{stats?.totalClients != null ? ` of ${stats.totalClients}` : ""})
                 </Box>
               </Box>
               <Box sx={{ position: "relative", width: 240 }}>
@@ -2325,9 +2408,13 @@ export default function ClientTrackerPage() {
 
             {filtered.length === 0 ? (
               <Box sx={{ py: "48px", textAlign: "center" }}>
-                <Box sx={{ fontSize: 13, color: MUTED }}>
-                  {search ? "No clients match your search." : "No clients yet. Add your first client to get started."}
-                </Box>
+                {serverSearching ? (
+                  <CircularProgress size={20} sx={{ color: ACCENT }} />
+                ) : (
+                  <Box sx={{ fontSize: 13, color: MUTED }}>
+                    {search ? "No clients match your search." : "No clients yet. Add your first client to get started."}
+                  </Box>
+                )}
               </Box>
             ) : (
               filtered.map(c => (
@@ -2336,6 +2423,15 @@ export default function ClientTrackerPage() {
                   hubSpotStatus={hubSpotStatuses[c.id]}
                   />
               ))
+            )}
+            {!search && hasMore && (
+              <Box sx={{ display: "flex", justifyContent: "center", py: "14px", borderTop: `1px solid ${BORDER}` }}>
+                <Button variant="outlined" onClick={loadMoreClients} disabled={loadingMore}
+                  sx={{ borderRadius: "8px", textTransform: "none", fontSize: 13, fontWeight: 600,
+                    borderColor: BORDER, color: TEXT, "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
+                  {loadingMore ? <CircularProgress size={16} sx={{ color: ACCENT }} /> : "Load More"}
+                </Button>
+              </Box>
             )}
           </Box>
 
