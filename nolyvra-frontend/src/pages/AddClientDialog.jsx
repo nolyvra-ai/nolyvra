@@ -32,7 +32,7 @@ const empty = {
   companyName: "", industry: "", companySize: "", location: "",
   contactPerson: "", contactEmail: "", contactTitle: "", contactPhone: "", linkedinUrl: "",
   facebookUrl: "", twitterUrl: "", website: "", aboutCompany: "",
-  fullAddress: "", locality: "", state: "", country: "",
+  fullAddress: "", locality: "", state: "", country: "", zip: "",
   secondaryContacts: [], note: "",
 };
 
@@ -56,6 +56,7 @@ function toForm(data) {
     locality:      data.locality      || "",
     state:         data.state         || "",
     country:       data.country       || "",
+    zip:           data.zip           || "",
     secondaryContacts: data.secondaryContacts || [],
     // Notes are an add-only timestamped log now — this field is always blank on
     // open; typing here and saving appends a new entry, it doesn't edit history.
@@ -212,6 +213,9 @@ export default function AddClientDialog({ open, onClose, onSaved, initialData = 
               fullWidth sx={FIELD_SX} size="small" />
 
             <TextField label="Country" value={form.country} onChange={set("country")}
+              fullWidth sx={FIELD_SX} size="small" />
+
+            <TextField label="Zip / Postcode" value={form.zip} onChange={set("zip")}
               fullWidth sx={FIELD_SX} size="small" />
           </Box>
 

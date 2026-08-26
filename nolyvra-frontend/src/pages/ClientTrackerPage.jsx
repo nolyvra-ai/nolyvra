@@ -778,7 +778,7 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
             }}>
               <Box sx={{ color: MUTED, display: "flex" }}><ChevronSvg open={overviewOpen} /></Box>
               <Box sx={{ fontSize: 14, fontWeight: 700, color: TEXT }}>Information Overview</Box>
-              <Tag color={MUTED} bg="#F1F3F7">{showMore ? 9 : 7}</Tag>
+              <Tag color={MUTED} bg="#F1F3F7">{showMore ? 10 : 7}</Tag>
             </Box>
 
             {overviewOpen && (
@@ -797,6 +797,7 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
                     <>
                       <InfoField label="Company Size" value={client.companySize} />
                       <InfoField label="LinkedIn" value={client.linkedinUrl} />
+                      <InfoField label="Zip / Postcode" value={client.zip} />
                     </>
                   )}
                 </Box>

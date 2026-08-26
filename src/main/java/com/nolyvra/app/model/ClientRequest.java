@@ -20,6 +20,7 @@ public record ClientRequest(
     String locality,
     String state,
     String country,
+    String zip,
     List<ClientContact> secondaryContacts,
     String note
 ) {}
