@@ -29,6 +29,7 @@ import ContactDetailPage       from "../pages/ContactDetailPage";
 import ContactsListPage        from "../pages/ContactsListPage";
 import PrivacyPage             from "../pages/PrivacyPage";
 import TermsPage               from "../pages/TermsPage";
+import RecruitmentUnitedPage    from "../pages/RecruitmentUnitedPage";
 import CrmEmployeesPage        from "../pages/CrmEmployeesPage";
 import CrmEmployeeDetailPage   from "../pages/CrmEmployeeDetailPage";
 import CrmDepartmentsPage      from "../pages/CrmDepartmentsPage";
@@ -59,6 +60,7 @@ export default function AppRoutes() {
       <Route path="/stack-audit"                        element={<StackAuditPage />} />
       <Route path="/privacy"                            element={<PrivacyPage />} />
       <Route path="/terms"                              element={<TermsPage />} />
+      <Route path="/recruitment-united"                 element={<RecruitmentUnitedPage />} />
 
       {/* App pages */}
       <Route path="/dashboard"                          element={<DashboardPage />} />
