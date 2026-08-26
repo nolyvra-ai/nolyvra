@@ -68,8 +68,14 @@ public class ClientService {
     }
 
     // ─── GET /api/clients ─────────────────────────────────────────────────────
+    // Paginated — each row still costs 3 extra queries (getClientJobs,
+    // getClientFeeTotals, getLatestNote) via the row mapper below, which is fine
+    // at page size 10 but was the reason this endpoint fell over once the
+    // client list grew past ~1,000 rows. See getClientStats for the fast,
+    // pagination-independent KPI numbers (total clients, active mandates, etc.)
+    // the list page should show instead of reducing over the loaded page.
 
-    public List<ClientResponse> getClients(String loginId) {
+    public List<ClientResponse> getClients(String loginId, int limit, int offset) {
         String sql = """
                 SELECT c.id, c.login_id, c.company_name, c.industry, c.company_size, c.location,
                        c.contact_person, c.contact_email, c.contact_title, c.contact_phone,
@@ -85,6 +91,7 @@ public class ClientService {
                 WHERE c.login_id = ? AND c.status = 'CLIENT'
                 GROUP BY c.id
                 ORDER BY c.created_at DESC
+                LIMIT ? OFFSET ?
                 """;
 
         return jdbc.query(sql, (rs, i) -> {
@@ -125,7 +132,58 @@ public class ClientService {
                     recentJobs,
                     totalFee,
                     rs.getString("status"));
-        }, loginId);
+        }, loginId, limit, offset);
+    }
+
+    // ─── GET /api/clients/stats ─────────────────────────────────────────────
+    // Fast, pagination-independent KPI numbers for the list page header — a
+    // handful of aggregate queries across the whole client set instead of the
+    // per-row job/fee/note lookups getClients does for the (paginated) rows
+    // it actually renders.
+
+    public record ClientStats(long totalClients, long activeMandates, long placements,
+                               List<ClientResponse.FeeTotal> totalFee) {}
+
+    public ClientStats getClientStats(String loginId) {
+        long totalClients = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM clients WHERE login_id = ? AND status = 'CLIENT'",
+                Long.class, loginId);
+
+        Map<String, Long> counts = jdbc.query("""
+                SELECT COUNT(DISTINCT j.id) FILTER (WHERE lower(j.status) = 'active') AS active_mandates,
+                       COUNT(DISTINCT cand.id) FILTER (WHERE cand.stage = 'Selected') AS placements
+                FROM clients c
+                LEFT JOIN jobs j ON lower(j.company) = lower(c.company_name) AND j.login_id = c.login_id
+                LEFT JOIN candidates cand ON cand.job_id = j.id
+                WHERE c.login_id = ? AND c.status = 'CLIENT'
+                """,
+                (rs, i) -> Map.of(
+                        "activeMandates", rs.getLong("active_mandates"),
+                        "placements", rs.getLong("placements")),
+                loginId).stream().findFirst().orElse(Map.of("activeMandates", 0L, "placements", 0L));
+
+        List<ClientResponse.FeeTotal> totalFee = jdbc.query("""
+                SELECT j.currency, SUM(
+                           CASE WHEN j.fee_type = 'FIXED' THEN j.fixed_fee
+                                ELSE j.salary * j.fee_percentage / 100
+                           END
+                       ) AS total
+                FROM jobs j
+                JOIN clients c ON lower(j.company) = lower(c.company_name) AND j.login_id = c.login_id
+                WHERE j.login_id = ? AND c.status = 'CLIENT' AND lower(j.status) IN ('active', 'fulfilling')
+                  AND (
+                    (j.fee_type = 'FIXED' AND j.fixed_fee IS NOT NULL)
+                    OR (j.fee_type <> 'FIXED' AND j.salary IS NOT NULL AND j.fee_percentage IS NOT NULL)
+                  )
+                GROUP BY j.currency
+                ORDER BY j.currency
+                """,
+                (rs, i) -> new ClientResponse.FeeTotal(
+                        rs.getString("currency"),
+                        rs.getBigDecimal("total").setScale(2, RoundingMode.HALF_UP)),
+                loginId);
+
+        return new ClientStats(totalClients, counts.get("activeMandates"), counts.get("placements"), totalFee);
     }
 
     public ClientResponse getClientForHubSpot(Long id, String loginId) {
