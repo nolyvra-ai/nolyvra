@@ -47,8 +47,16 @@ public class ClientController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ClientResponse>> getClients(@RequestParam String loginId) {
-        return ResponseEntity.ok(clientService.getClients(loginId));
+    public ResponseEntity<List<ClientResponse>> getClients(
+            @RequestParam String loginId,
+            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(defaultValue = "0") int offset) {
+        return ResponseEntity.ok(clientService.getClients(loginId, limit, offset));
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<ClientService.ClientStats> getClientStats(@RequestParam String loginId) {
+        return ResponseEntity.ok(clientService.getClientStats(loginId));
     }
 
     @PostMapping

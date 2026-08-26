@@ -1893,7 +1893,12 @@ function PotentialDetailModal({ pc, onClose, onAddToClients, searchPlace, search
 export default function ClientTrackerPage() {
   const nav = useNavigate();
 
+  const PAGE_SIZE = 10;
   const [clients,           setClients]           = useState([]);
+  const [stats,             setStats]             = useState(null);
+  const [offset,            setOffset]            = useState(0);
+  const [hasMore,           setHasMore]           = useState(true);
+  const [loadingMore,       setLoadingMore]       = useState(false);
   const [potential,         setPotential]         = useState([]);
   const [loading,           setLoading]           = useState(true);
   const [error,             setError]             = useState("");
@@ -1920,11 +1925,13 @@ export default function ClientTrackerPage() {
     const results = await Promise.allSettled(
       clientList.map(client => apiGet(`/api/clients/${client.id}/hubspot/status`))
     );
-    const statuses = {};
-    results.forEach((result, index) => {
-      if (result.status === "fulfilled") statuses[clientList[index].id] = result.value;
+    setHubSpotStatuses(prev => {
+      const next = { ...prev };
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") next[clientList[index].id] = result.value;
+      });
+      return next;
     });
-    setHubSpotStatuses(statuses);
   }
 
   // ── Bulk outreach (Potential Clients multi-select) ─────────────────────────
@@ -1978,9 +1985,11 @@ export default function ClientTrackerPage() {
   async function loadClients() {
     setLoading(true);
     try {
-      const c = await apiGet("/api/clients?");
+      const c = await apiGet(`/api/clients?limit=${PAGE_SIZE}&offset=0`);
       setClients(c);
-      await loadHubSpotStatuses(c);
+      setOffset(c.length);
+      setHasMore(c.length === PAGE_SIZE);
+      loadHubSpotStatuses(c);
     } catch (e) {
       setError(e.message || "Failed to load clients.");
     } finally {
@@ -1988,8 +1997,30 @@ export default function ClientTrackerPage() {
     }
   }
 
+  async function loadMoreClients() {
+    setLoadingMore(true);
+    try {
+      const c = await apiGet(`/api/clients?limit=${PAGE_SIZE}&offset=${offset}`);
+      setClients(prev => [...prev, ...c]);
+      setOffset(prev => prev + c.length);
+      setHasMore(c.length === PAGE_SIZE);
+      loadHubSpotStatuses(c);
+    } catch (e) {
+      setError(e.message || "Failed to load more clients.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  function loadStats() {
+    apiGet("/api/clients/stats")
+      .then(setStats)
+      .catch(() => {});
+  }
+
   useEffect(() => {
     loadClients();
+    loadStats();
   }, []);
 
   // Restore the last Potential Clients search (filters + results) on page
@@ -2073,21 +2104,14 @@ export default function ClientTrackerPage() {
     c.contactPerson?.toLowerCase().includes(search.toLowerCase())
   );
 
-  const totalActive = clients.reduce((s, c) => s + c.activeJobCount, 0);
-  const totalFilled = clients.reduce((s, c) => s + c.filledJobCount, 0);
+  // KPI numbers come from /api/clients/stats — fast aggregate queries across
+  // the whole client set, independent of how many rows are currently paged
+  // into `clients`. Reducing over `clients` here would only reflect the
+  // loaded page once pagination is in play.
+  const totalActive = stats?.activeMandates ?? 0;
+  const totalFilled = stats?.placements ?? 0;
+  const totalFeeLabel = formatFeeTotals(stats?.totalFee);
   const hasFilters  = searchIndustry || searchPlace || searchSize || searchKeyword;
-
-  // Total fee across all clients (Active/Fulfilling jobs only), grouped by currency —
-  // amounts in different currencies cannot be added together meaningfully.
-  const totalFeeByCurrency = clients.reduce((acc, c) => {
-    (c.totalFee || []).forEach(({ currency, amount }) => {
-      acc[currency] = (acc[currency] || 0) + Number(amount);
-    });
-    return acc;
-  }, {});
-  const totalFeeLabel = formatFeeTotals(
-    Object.entries(totalFeeByCurrency).map(([currency, amount]) => ({ currency, amount }))
-  );
 
   function handleSaved(savedClient) {
     setClients(prev => {
@@ -2250,7 +2274,7 @@ export default function ClientTrackerPage() {
 
       {/* KPI strip */}
       <Box sx={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "14px", mb: "20px" }}>
-        <KpiCard label="Total Clients" value={clients.length} color={ACCENT} bg={ACCENT_L}
+        <KpiCard label="Total Clients" value={stats?.totalClients ?? "—"} color={ACCENT} bg={ACCENT_L}
           icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/></svg>} />
         <KpiCard label="Active Mandates" value={totalActive} color={SUCCESS} bg={SUCCESS_L}
           icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>} />
@@ -2290,7 +2314,7 @@ export default function ClientTrackerPage() {
               <Box sx={{ fontSize: 14, fontWeight: 600, color: TEXT }}>
                 Your Clients
                 <Box component="span" sx={{ ml: "8px", fontSize: 12, color: MUTED, fontWeight: 400 }}>
-                  ({filtered.length})
+                  ({filtered.length} loaded{stats?.totalClients != null ? ` of ${stats.totalClients}` : ""})
                 </Box>
               </Box>
               <Box sx={{ position: "relative", width: 240 }}>
@@ -2337,6 +2361,15 @@ export default function ClientTrackerPage() {
                   hubSpotStatus={hubSpotStatuses[c.id]}
                   />
               ))
+            )}
+            {!search && hasMore && (
+              <Box sx={{ display: "flex", justifyContent: "center", py: "14px", borderTop: `1px solid ${BORDER}` }}>
+                <Button variant="outlined" onClick={loadMoreClients} disabled={loadingMore}
+                  sx={{ borderRadius: "8px", textTransform: "none", fontSize: 13, fontWeight: 600,
+                    borderColor: BORDER, color: TEXT, "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
+                  {loadingMore ? <CircularProgress size={16} sx={{ color: ACCENT }} /> : "Load More"}
+                </Button>
+              </Box>
             )}
           </Box>
 
