@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  Box, Paper, Typography, TextField, MenuItem, CircularProgress, Alert,
+  Box, Paper, Typography, TextField, MenuItem, Button, CircularProgress, Alert,
   Table, TableHead, TableRow, TableCell, TableBody,
 } from "@mui/material";
+import AddContactDialog from "./AddContactDialog";
 
 const API     = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const loginId = () => localStorage.getItem("loginId") || "";
@@ -50,6 +51,7 @@ export default function ContactsListPage() {
   const [search, setSearch]         = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [removingId, setRemovingId] = useState(null);
+  const [addOpen, setAddOpen]       = useState(false);
 
   useEffect(() => {
     setLoading(true); setError("");
@@ -90,11 +92,18 @@ export default function ContactsListPage() {
 
   return (
     <Box sx={{ p: 3 }}>
-      <Box sx={{ mb: 2.5 }}>
-        <Typography sx={{ fontSize: 20, fontWeight: 800, color: TEXT }}>Client Contacts</Typography>
-        <Typography sx={{ fontSize: 12.5, color: MUTED, mt: 0.25 }}>
-          Every contact captured from clients and leads, in one place
-        </Typography>
+      <Box sx={{ mb: 2.5, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 2 }}>
+        <Box>
+          <Typography sx={{ fontSize: 20, fontWeight: 800, color: TEXT }}>Client Contacts</Typography>
+          <Typography sx={{ fontSize: 12.5, color: MUTED, mt: 0.25 }}>
+            Every contact captured from clients and leads, in one place
+          </Typography>
+        </Box>
+        <Button variant="contained" onClick={() => setAddOpen(true)}
+          sx={{ borderRadius: "8px", textTransform: "none", bgcolor: ACCENT, px: 2.5, fontSize: 13, fontWeight: 600,
+            boxShadow: "none", flexShrink: 0, "&:hover": { bgcolor: "#1558C0", boxShadow: "none" } }}>
+          + Add Contact
+        </Button>
       </Box>
 
       <Box sx={{ display: "flex", gap: 1.5, mb: 2, flexWrap: "wrap" }}>
@@ -179,6 +188,9 @@ export default function ContactsListPage() {
           </Table>
         </Paper>
       )}
+
+      <AddContactDialog open={addOpen} onClose={() => setAddOpen(false)}
+        onSaved={saved => { setContacts(prev => [saved, ...prev]); nav(`/contacts/${saved.id}`); }} />
     </Box>
   );
 }

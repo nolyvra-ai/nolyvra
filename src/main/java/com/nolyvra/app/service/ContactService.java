@@ -28,7 +28,11 @@ public class ContactService {
 
     private static final String SELECT_COLS = """
             SELECT ct.id, ct.client_id, ct.name, ct.title, ct.email, ct.phone,
-                   ct.linkedin_url, ct.facebook_url, ct.twitter_url, ct.created_at, ct.candidate_id,
+                   ct.linkedin_url, ct.facebook_url, ct.twitter_url,
+                   ct.personal_email, ct.work_email, ct.other_email,
+                   ct.personal_phone, ct.work_phone, ct.mobile_phone,
+                   ct.meetup_url, ct.github_url, ct.instagram_url,
+                   ct.created_at, ct.candidate_id,
                    cl.company_name, cl.status, cl.industry, cl.location
             FROM contacts ct
             JOIN clients cl ON cl.id = ct.client_id
@@ -50,6 +54,15 @@ public class ContactService {
                 rs.getString("linkedin_url"),
                 rs.getString("facebook_url"),
                 rs.getString("twitter_url"),
+                rs.getString("personal_email"),
+                rs.getString("work_email"),
+                rs.getString("other_email"),
+                rs.getString("personal_phone"),
+                rs.getString("work_phone"),
+                rs.getString("mobile_phone"),
+                rs.getString("meetup_url"),
+                rs.getString("github_url"),
+                rs.getString("instagram_url"),
                 ts != null ? ts.toInstant() : null,
                 rs.getString("candidate_id"));
     };
@@ -61,12 +74,18 @@ public class ContactService {
 
         Long id = jdbc.queryForObject("""
                 INSERT INTO contacts (login_id, client_id, name, title, email, phone,
-                    linkedin_url, facebook_url, twitter_url)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    linkedin_url, facebook_url, twitter_url,
+                    personal_email, work_email, other_email,
+                    personal_phone, work_phone, mobile_phone,
+                    meetup_url, github_url, instagram_url)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 RETURNING id
                 """, Long.class,
                 loginId, req.clientId(), req.name().trim(), req.title(), req.email(), req.phone(),
-                req.linkedinUrl(), req.facebookUrl(), req.twitterUrl());
+                req.linkedinUrl(), req.facebookUrl(), req.twitterUrl(),
+                req.personalEmail(), req.workEmail(), req.otherEmail(),
+                req.personalPhone(), req.workPhone(), req.mobilePhone(),
+                req.meetupUrl(), req.githubUrl(), req.instagramUrl());
 
         return getContact(id, loginId);
     }
@@ -111,11 +130,17 @@ public class ContactService {
                 UPDATE contacts SET
                     name = ?, title = ?, email = ?, phone = ?,
                     linkedin_url = ?, facebook_url = ?, twitter_url = ?,
+                    personal_email = ?, work_email = ?, other_email = ?,
+                    personal_phone = ?, work_phone = ?, mobile_phone = ?,
+                    meetup_url = ?, github_url = ?, instagram_url = ?,
                     updated_at = now()
                 WHERE id = ? AND login_id = ?
                 """,
                 req.name().trim(), req.title(), req.email(), req.phone(),
-                req.linkedinUrl(), req.facebookUrl(), req.twitterUrl(), id, loginId);
+                req.linkedinUrl(), req.facebookUrl(), req.twitterUrl(),
+                req.personalEmail(), req.workEmail(), req.otherEmail(),
+                req.personalPhone(), req.workPhone(), req.mobilePhone(),
+                req.meetupUrl(), req.githubUrl(), req.instagramUrl(), id, loginId);
         if (updated == 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Contact not found: " + id);
         return getContact(id, loginId);
     }

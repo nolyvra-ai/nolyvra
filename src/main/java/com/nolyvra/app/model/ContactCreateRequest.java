@@ -11,5 +11,14 @@ public record ContactCreateRequest(
         String phone,
         String linkedinUrl,
         String facebookUrl,
-        String twitterUrl
+        String twitterUrl,
+        String personalEmail,
+        String workEmail,
+        String otherEmail,
+        String personalPhone,
+        String workPhone,
+        String mobilePhone,
+        String meetupUrl,
+        String githubUrl,
+        String instagramUrl
 ) {}

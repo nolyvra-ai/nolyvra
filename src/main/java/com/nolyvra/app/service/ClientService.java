@@ -74,7 +74,7 @@ public class ClientService {
                 SELECT c.id, c.login_id, c.company_name, c.industry, c.company_size, c.location,
                        c.contact_person, c.contact_email, c.contact_title, c.contact_phone,
                        c.linkedin_url, c.facebook_url, c.twitter_url, c.website, c.about_company,
-                       c.full_address, c.locality, c.state, c.country, c.secondary_contacts,
+                       c.full_address, c.locality, c.state, c.country, c.zip, c.secondary_contacts,
                        c.last_funding_event, c.last_funding_amount, c.created_at, c.status,
                        COUNT(DISTINCT j.id) FILTER (WHERE lower(j.status) = 'active') AS active_job_count,
                        COUNT(DISTINCT cand.id) FILTER (WHERE cand.stage = 'Selected') AS filled_job_count,
@@ -113,6 +113,7 @@ public class ClientService {
                     rs.getString("locality"),
                     rs.getString("state"),
                     rs.getString("country"),
+                    rs.getString("zip"),
                     parseSecondaryContacts(rs.getString("secondary_contacts")),
                     getLatestNote(clientId, loginId),
                     rs.getString("last_funding_event"),
@@ -132,7 +133,7 @@ public class ClientService {
                 SELECT id, login_id, company_name, industry, company_size, location,
                        contact_person, contact_email, contact_title, contact_phone,
                        linkedin_url, facebook_url, twitter_url, website, about_company,
-                       full_address, locality, state, country, secondary_contacts,
+                       full_address, locality, state, country, zip, secondary_contacts,
                        last_funding_event, last_funding_amount, created_at, status
                 FROM clients
                 WHERE id = ? AND login_id = ?
@@ -146,7 +147,7 @@ public class ClientService {
                     rs.getString("contact_title"), rs.getString("contact_phone"), rs.getString("linkedin_url"),
                     rs.getString("facebook_url"), rs.getString("twitter_url"), rs.getString("website"),
                     rs.getString("about_company"), rs.getString("full_address"), rs.getString("locality"),
-                    rs.getString("state"), rs.getString("country"),
+                    rs.getString("state"), rs.getString("country"), rs.getString("zip"),
                     parseSecondaryContacts(rs.getString("secondary_contacts")),
                     getLatestNote(clientId, loginId),
                     rs.getString("last_funding_event"), rs.getString("last_funding_amount"),
@@ -244,7 +245,7 @@ public class ClientService {
                     location = ?, contact_person = ?, contact_email = ?,
                     contact_title = ?, contact_phone = ?, linkedin_url = ?,
                     facebook_url = ?, twitter_url = ?, website = ?, about_company = ?,
-                    full_address = ?, locality = ?, state = ?, country = ?,
+                    full_address = ?, locality = ?, state = ?, country = ?, zip = ?,
                     secondary_contacts = CAST(? AS jsonb),
                     updated_at = now()
                 WHERE id = ? AND login_id = ?
@@ -252,7 +253,7 @@ public class ClientService {
                 req.companyName(), req.industry(), req.companySize(), req.location(),
                 req.contactPerson(), req.contactEmail(), req.contactTitle(), req.contactPhone(),
                 req.linkedinUrl(), req.facebookUrl(), req.twitterUrl(), req.website(), req.aboutCompany(),
-                req.fullAddress(), req.locality(), req.state(), req.country(),
+                req.fullAddress(), req.locality(), req.state(), req.country(), req.zip(),
                 serializeSecondaryContacts(req.secondaryContacts()), id, loginId);
         if (updated == 0)
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found");
@@ -269,7 +270,7 @@ public class ClientService {
                 SELECT c.id, c.login_id, c.company_name, c.industry, c.company_size, c.location,
                        c.contact_person, c.contact_email, c.contact_title, c.contact_phone,
                        c.linkedin_url, c.facebook_url, c.twitter_url, c.website, c.about_company,
-                       c.full_address, c.locality, c.state, c.country, c.secondary_contacts,
+                       c.full_address, c.locality, c.state, c.country, c.zip, c.secondary_contacts,
                        c.last_funding_event, c.last_funding_amount, c.created_at, c.status,
                        COUNT(DISTINCT j.id) FILTER (WHERE lower(j.status) = 'active') AS active_job_count,
                        COUNT(DISTINCT cand.id) FILTER (WHERE cand.stage = 'Selected') AS filled_job_count,
@@ -293,7 +294,7 @@ public class ClientService {
                     rs.getString("contact_phone"), rs.getString("linkedin_url"),
                     rs.getString("facebook_url"), rs.getString("twitter_url"), rs.getString("website"),
                     rs.getString("about_company"), rs.getString("full_address"), rs.getString("locality"),
-                    rs.getString("state"), rs.getString("country"),
+                    rs.getString("state"), rs.getString("country"), rs.getString("zip"),
                     parseSecondaryContacts(rs.getString("secondary_contacts")),
                     getLatestNote(clientId, loginId),
                     rs.getString("last_funding_event"), rs.getString("last_funding_amount"),
@@ -310,16 +311,16 @@ public class ClientService {
         Long id = jdbc.queryForObject("""
                 INSERT INTO clients (login_id, company_name, industry, company_size, location,
                     contact_person, contact_email, contact_title, contact_phone, linkedin_url,
-                    facebook_url, twitter_url, website, about_company, full_address, locality, state, country,
+                    facebook_url, twitter_url, website, about_company, full_address, locality, state, country, zip,
                     secondary_contacts)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb))
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb))
                 RETURNING id
                 """,
                 Long.class,
                 loginId, req.companyName(), req.industry(), req.companySize(), req.location(),
                 req.contactPerson(), req.contactEmail(), req.contactTitle(), req.contactPhone(),
                 req.linkedinUrl(), req.facebookUrl(), req.twitterUrl(), req.website(), req.aboutCompany(),
-                req.fullAddress(), req.locality(), req.state(), req.country(),
+                req.fullAddress(), req.locality(), req.state(), req.country(), req.zip(),
                 serializeSecondaryContacts(req.secondaryContacts()));
 
         String latestNote = null;
@@ -334,7 +335,7 @@ public class ClientService {
                 req.companySize(), req.location(), req.contactPerson(), req.contactEmail(),
                 req.contactTitle(), req.contactPhone(), req.linkedinUrl(),
                 req.facebookUrl(), req.twitterUrl(), req.website(), req.aboutCompany(),
-                req.fullAddress(), req.locality(), req.state(), req.country(),
+                req.fullAddress(), req.locality(), req.state(), req.country(), req.zip(),
                 req.secondaryContacts() != null ? req.secondaryContacts() : List.of(), latestNote,
                 null, null, Instant.now(), 0, 0, 0, List.of(), List.of(), "CLIENT");
     }
@@ -360,7 +361,7 @@ public class ClientService {
                         location = ?, contact_person = ?, contact_email = ?,
                         contact_title = ?, contact_phone = ?, linkedin_url = ?,
                         facebook_url = ?, twitter_url = ?, website = ?, about_company = ?,
-                        full_address = ?, locality = ?, state = ?, country = ?,
+                        full_address = ?, locality = ?, state = ?, country = ?, zip = ?,
                         secondary_contacts = CAST(? AS jsonb),
                         status = 'CLIENT',
                         updated_at = now()
@@ -369,7 +370,7 @@ public class ClientService {
                     req.companyName(), req.industry(), req.companySize(), req.location(),
                     req.contactPerson(), req.contactEmail(), req.contactTitle(), req.contactPhone(),
                     req.linkedinUrl(), req.facebookUrl(), req.twitterUrl(), req.website(), req.aboutCompany(),
-                    req.fullAddress(), req.locality(), req.state(), req.country(),
+                    req.fullAddress(), req.locality(), req.state(), req.country(), req.zip(),
                     serializeSecondaryContacts(req.secondaryContacts()), id, loginId);
 
             if (req.note() != null && !req.note().isBlank())

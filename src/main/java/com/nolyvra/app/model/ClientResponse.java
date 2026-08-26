@@ -24,6 +24,7 @@ public record ClientResponse(
     String locality,
     String state,
     String country,
+    String zip,
     List<ClientContact> secondaryContacts,
     String latestNote,
     String lastFundingEvent,
