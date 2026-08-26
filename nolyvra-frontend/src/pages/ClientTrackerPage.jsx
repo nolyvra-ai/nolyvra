@@ -289,10 +289,12 @@ function ClientRow({ client, onEdit, onSelect, onInvoice, hubSpotStatus }) {
         </Box>
       </Box>
       <Box>
-        {client.contactPerson
-          ? <Box sx={{ fontSize: 13, color: TEXT }}>{client.contactPerson}</Box>
+        {client.contactPerson || client.primaryContactName
+          ? <Box sx={{ fontSize: 13, color: TEXT }}>{client.contactPerson || client.primaryContactName}</Box>
           : <Box sx={{ fontSize: 12, color: MUTED }}>—</Box>}
-        {client.contactEmail && <Box sx={{ fontSize: 11, color: MUTED, mt: "1px" }}>{client.contactEmail}</Box>}
+        {(client.contactEmail || client.primaryContactEmail) && (
+          <Box sx={{ fontSize: 11, color: MUTED, mt: "1px" }}>{client.contactEmail || client.primaryContactEmail}</Box>
+        )}
         {hubSpotStatus?.contactState === "success" && (
           <Box sx={{ fontSize: 10, color: HUBSPOT, fontWeight: 600, mt: "2px" }}>Contact synced</Box>
         )}

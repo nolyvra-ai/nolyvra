@@ -83,19 +83,25 @@ public class ClientService {
                        c.linkedin_url, c.facebook_url, c.twitter_url, c.website, c.about_company,
                        c.full_address, c.locality, c.state, c.country, c.zip, c.secondary_contacts,
                        c.last_funding_event, c.last_funding_amount, c.created_at, c.status,
+                       pc.name AS primary_contact_name, pc.email AS primary_contact_email,
+                       pc.phone AS primary_contact_phone,
                        COUNT(DISTINCT j.id) FILTER (WHERE lower(j.status) = 'active') AS active_job_count,
                        COUNT(DISTINCT cand.id) FILTER (WHERE cand.stage = 'Selected') AS filled_job_count,
                        COUNT(DISTINCT j.id) AS total_job_count
                 FROM clients c
                 LEFT JOIN jobs j ON lower(j.company) = lower(c.company_name) AND j.login_id = c.login_id
                 LEFT JOIN candidates cand ON cand.job_id = j.id
+                LEFT JOIN LATERAL (
+                    SELECT name, email, phone FROM contacts
+                    WHERE client_id = c.id ORDER BY created_at ASC LIMIT 1
+                ) pc ON true
                 WHERE c.login_id = ? AND c.status = 'CLIENT'
                 """
                 + (hasSearch ? """
                 AND (lower(c.company_name) LIKE ? OR lower(c.industry) LIKE ? OR lower(c.contact_person) LIKE ?)
                 """ : "")
                 + """
-                GROUP BY c.id
+                GROUP BY c.id, pc.name, pc.email, pc.phone
                 ORDER BY c.created_at DESC
                 LIMIT ? OFFSET ?
                 """;
@@ -148,7 +154,10 @@ public class ClientService {
                     rs.getInt("total_job_count"),
                     recentJobs,
                     totalFee,
-                    rs.getString("status"));
+                    rs.getString("status"),
+                    rs.getString("primary_contact_name"),
+                    rs.getString("primary_contact_email"),
+                    rs.getString("primary_contact_phone"));
         }, params.toArray());
     }
 
@@ -227,7 +236,7 @@ public class ClientService {
                     getLatestNote(clientId, loginId),
                     rs.getString("last_funding_event"), rs.getString("last_funding_amount"),
                     ts != null ? ts.toInstant() : null, 0, 0, 0, List.of(), List.of(),
-                    rs.getString("status"));
+                    rs.getString("status"), null, null, null);
         }, id, loginId).stream().findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found"));
     }
@@ -347,14 +356,20 @@ public class ClientService {
                        c.linkedin_url, c.facebook_url, c.twitter_url, c.website, c.about_company,
                        c.full_address, c.locality, c.state, c.country, c.zip, c.secondary_contacts,
                        c.last_funding_event, c.last_funding_amount, c.created_at, c.status,
+                       pc.name AS primary_contact_name, pc.email AS primary_contact_email,
+                       pc.phone AS primary_contact_phone,
                        COUNT(DISTINCT j.id) FILTER (WHERE lower(j.status) = 'active') AS active_job_count,
                        COUNT(DISTINCT cand.id) FILTER (WHERE cand.stage = 'Selected') AS filled_job_count,
                        COUNT(DISTINCT j.id) AS total_job_count
                 FROM clients c
                 LEFT JOIN jobs j ON lower(j.company) = lower(c.company_name) AND j.login_id = c.login_id
                 LEFT JOIN candidates cand ON cand.job_id = j.id
+                LEFT JOIN LATERAL (
+                    SELECT name, email, phone FROM contacts
+                    WHERE client_id = c.id ORDER BY created_at ASC LIMIT 1
+                ) pc ON true
                 WHERE c.id = ? AND c.login_id = ?
-                GROUP BY c.id
+                GROUP BY c.id, pc.name, pc.email, pc.phone
                 """;
         return jdbc.query(sql, (rs, i) -> {
             String companyName = rs.getString("company_name");
@@ -375,7 +390,9 @@ public class ClientService {
                     rs.getString("last_funding_event"), rs.getString("last_funding_amount"),
                     ts != null ? ts.toInstant() : null,
                     rs.getInt("active_job_count"), rs.getInt("filled_job_count"), rs.getInt("total_job_count"),
-                    recentJobs, totalFee, rs.getString("status"));
+                    recentJobs, totalFee, rs.getString("status"),
+                    rs.getString("primary_contact_name"), rs.getString("primary_contact_email"),
+                    rs.getString("primary_contact_phone"));
         }, id, loginId).stream().findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Client not found"));
     }
@@ -412,7 +429,8 @@ public class ClientService {
                 req.facebookUrl(), req.twitterUrl(), req.website(), req.aboutCompany(),
                 req.fullAddress(), req.locality(), req.state(), req.country(), req.zip(),
                 req.secondaryContacts() != null ? req.secondaryContacts() : List.of(), latestNote,
-                null, null, Instant.now(), 0, 0, 0, List.of(), List.of(), "CLIENT");
+                null, null, Instant.now(), 0, 0, 0, List.of(), List.of(), "CLIENT",
+                null, null, null);
     }
 
     // ─── POST /api/clients/convert-lead ────────────────────────────────────────

@@ -52,7 +52,7 @@ class HubSpotContactMapperTest {
                 name, email, title, phone, null,
                 null, null, null, null, null, null, null, null, null,
                 List.of(), null, null, null,
-                Instant.now(), 0, 0, 0, List.of(), List.of(), "CLIENT");
+                Instant.now(), 0, 0, 0, List.of(), List.of(), "CLIENT", null, null, null);
     }
 
     private EmployeeResponse employee() {
