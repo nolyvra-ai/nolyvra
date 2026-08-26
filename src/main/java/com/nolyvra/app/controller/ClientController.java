@@ -50,8 +50,9 @@ public class ClientController {
     public ResponseEntity<List<ClientResponse>> getClients(
             @RequestParam String loginId,
             @RequestParam(defaultValue = "10") int limit,
-            @RequestParam(defaultValue = "0") int offset) {
-        return ResponseEntity.ok(clientService.getClients(loginId, limit, offset));
+            @RequestParam(defaultValue = "0") int offset,
+            @RequestParam(required = false) String search) {
+        return ResponseEntity.ok(clientService.getClients(loginId, limit, offset, search));
     }
 
     @GetMapping("/stats")

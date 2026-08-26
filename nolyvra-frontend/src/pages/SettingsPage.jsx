@@ -23,6 +23,7 @@ const SETTINGS_SECTIONS = [
   { key: "integrations", label: "Integrations", description: "Connected services" },
   { key: "email", label: "Email & Notifications", description: "Notification preferences" },
   { key: "admin", label: "Administration", description: "Users, limits and leads" },
+  { key: "tools", label: "Tools", description: "Internal admin utilities" },
 ];
 
 // ── Usage bar component ───────────────────────────────────────────────────────
@@ -667,7 +668,7 @@ function AdminSettingsPanel() {
   if (!activeSection) {
     return <Navigate to="/settings/account" replace />;
   }
-  const isProtectedSection = activeSection === "email" || activeSection === "admin";
+  const isProtectedSection = activeSection === "email" || activeSection === "admin" || activeSection === "tools";
   if (isProtectedSection && isAdmin === null) {
     return <Box sx={{ minHeight: 180, display: "grid", placeItems: "center" }}><CircularProgress size={24} /></Box>;
   }
@@ -677,7 +678,7 @@ function AdminSettingsPanel() {
   // Keep the complete navigation stable while the admin check is in flight.
   // A confirmed non-admin still gets the restricted navigation below.
   const visibleSections = isAdmin === false
-    ? SETTINGS_SECTIONS.filter(item => item.key !== "email" && item.key !== "admin")
+    ? SETTINGS_SECTIONS.filter(item => item.key !== "email" && item.key !== "admin" && item.key !== "tools")
     : SETTINGS_SECTIONS;
 
   return (
@@ -755,6 +756,43 @@ function AdminSettingsPanel() {
         </Paper>
 
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2, width: "100%", minWidth: 0, maxWidth: 640 }}>
+
+      {activeSection === "tools" && isAdmin && (
+        <Paper elevation={0} sx={{ border: `1px solid ${BORDER}`, borderRadius: "10px", overflow: "hidden", bgcolor: "#fff" }}>
+          <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`, bgcolor: SURFACE }}>
+            <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>Internal Tools</Typography>
+            <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
+              Utilities available to Nolyvra administrators
+            </Typography>
+          </Box>
+          <Box sx={{ p: 2.25 }}>
+            <Box sx={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2,
+              p: 2, border: `1px solid ${BORDER}`, borderRadius: "9px", bgcolor: SURFACE,
+            }}>
+              <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, minWidth: 0 }}>
+                <Box sx={{
+                  width: 38, height: 38, borderRadius: "9px", bgcolor: ACCENT_BG, color: ACCENT,
+                  display: "grid", placeItems: "center", fontSize: 20, flexShrink: 0,
+                }}>📋</Box>
+                <Box>
+                  <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: TEXT }}>Contact List Builder</Typography>
+                  <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.35, lineHeight: 1.5 }}>
+                    Clean, classify and export communication lists from a Master Tracker CSV.
+                  </Typography>
+                </Box>
+              </Box>
+              <Button
+                variant="contained"
+                onClick={() => nav("/settings/tools/contact-list-builder")}
+                sx={{ flexShrink: 0, textTransform: "none", borderRadius: "7px", fontSize: 11.5, boxShadow: "none" }}
+              >
+                Open tool
+              </Button>
+            </Box>
+          </Box>
+        </Paper>
+      )}
 
       {activeSection === "email" && isAdmin && (
         <SystemEmailTemplatesPanel selectedKey={templateKey} onDirtyChange={setEmailEditorDirty} />

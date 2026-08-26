@@ -1,7 +1,9 @@
 package com.nolyvra.app.service;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +21,8 @@ import java.util.Map;
 
 @Service
 public class PasswordResetService {
+
+    private static final Logger log = LoggerFactory.getLogger(PasswordResetService.class);
 
     public enum AccountType {
         TENANT,
@@ -277,6 +281,8 @@ public class PasswordResetService {
     private void sendResetEmail(String email, String rawToken, AccountType accountType) {
         String accountQuery = accountType == AccountType.EMPLOYEE ? "&type=employee" : "";
         String resetUrl = frontendUrl + "/reset-password?token=" + rawToken + accountQuery;
+        log.info("Password reset email URL: accountType={}, url={}/reset-password?token=[REDACTED]{}",
+                accountType.name().toLowerCase(Locale.ROOT), frontendUrl, accountQuery);
         String subject = "Reset your nolyvra password";
         String body = defaultResetBody(resetUrl);
         String htmlBody = defaultResetHtml(resetUrl);

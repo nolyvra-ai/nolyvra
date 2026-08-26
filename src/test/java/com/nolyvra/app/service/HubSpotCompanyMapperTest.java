@@ -20,7 +20,7 @@ class HubSpotCompanyMapperTest {
                 null, null, null, null, "https://linkedin.com/company/nolyvra",
                 null, null, null, null, null, null, null, null, null,
                 List.of(), "Recruitment platform",
-                null, null, Instant.now(), 0, 0, 0, List.of(), List.of(), "CLIENT");
+                null, null, Instant.now(), 0, 0, 0, List.of(), List.of(), "CLIENT", null, null, null);
 
         Map<String, String> properties = mapper.fromClient(client);
 
@@ -37,7 +37,7 @@ class HubSpotCompanyMapperTest {
                 null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null,
                 List.of(), null, null, null,
-                Instant.now(), 0, 0, 0, List.of(), List.of(), "CLIENT");
+                Instant.now(), 0, 0, 0, List.of(), List.of(), "CLIENT", null, null, null);
 
         assertThat(mapper.fromClient(client)).containsOnly(Map.entry("name", "Nolyvra"));
     }
