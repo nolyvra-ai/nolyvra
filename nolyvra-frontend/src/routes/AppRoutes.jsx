@@ -47,6 +47,7 @@ import CrmMyGrievancePage         from "../pages/CrmMyGrievancePage";
 import CrmTimesheetsPage          from "../pages/CrmTimesheetsPage";
 import CrmMyTimesheetPage         from "../pages/CrmMyTimesheetPage";
 import AdminContactListBuilderPage from "../pages/AdminContactListBuilderPage";
+import HelpCenterPage             from "../pages/HelpCenterPage";
 
 export default function AppRoutes() {
   return (
@@ -87,6 +88,7 @@ export default function AppRoutes() {
       <Route path="/settings/:section"                  element={<SettingsPage />} />
       <Route path="/settings/:section/:templateKey"     element={<SettingsPage />} />
       <Route path="/coworker"                           element={<CoWorkerPage />} />
+      <Route path="/help"                               element={<HelpCenterPage />} />
       <Route path="/clients"                            element={<ClientTrackerPage />} />
       <Route path="/contacts"                           element={<ContactsListPage />} />
       <Route path="/contacts/:id"                       element={<ContactDetailPage />} />

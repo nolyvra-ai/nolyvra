@@ -172,9 +172,22 @@ export default function TopBar() {
         </Box>
       )}
 
+      {/* Help */}
+      <Box onClick={() => nav("/help")} title="Help Center" sx={{
+        ml: tokens !== null ? "8px" : "auto",
+        width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        border: `1px solid ${ACCENT}`, color: ACCENT,
+        fontSize: 13, fontWeight: 700, cursor: "pointer",
+        userSelect: "none", transition: "all .15s",
+        "&:hover": { borderColor: "#3D8EFF", color: "#3D8EFF", bgcolor: "rgba(29,114,232,0.08)" },
+      }}>
+        ?
+      </Box>
+
       {/* Logout */}
       <Box onClick={handleLogout} sx={{
-        ml: tokens !== null ? "8px" : "auto",
+        ml: "8px",
         display: "flex", alignItems: "center", gap: "6px",
         px: "12px", py: "4px", borderRadius: "20px",
         border: `1px solid ${ACCENT}`, color: ACCENT,
