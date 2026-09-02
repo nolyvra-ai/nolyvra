@@ -44,6 +44,9 @@ const articles = Object.entries(modules).map(([path, raw]) => {
     order: Number(meta.order) || 0,
     tags: Array.isArray(meta.tags) ? meta.tags : [],
     summary: meta.summary || "",
+    hasVideo: "video" in meta,
+    video: meta.video || "",
+    videoAspect: meta.videoAspect || "16 / 9",
     body,
   };
 });

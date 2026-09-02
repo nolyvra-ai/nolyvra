@@ -1,7 +1,7 @@
 ---
 title: Dashboard overview
 category: getting-started
-order: 1
+order: 5
 tags: [dashboard, overview]
 summary: Your dashboard shows recent AI analyses and, in CRMx mode, an HR summary panel.
 ---

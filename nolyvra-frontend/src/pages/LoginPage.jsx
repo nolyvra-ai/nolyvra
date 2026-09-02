@@ -197,7 +197,7 @@ export default function LoginPage() {
       localStorage.removeItem("authType");
       localStorage.removeItem("employeeId");
       setSuccess(true);
-      nav("/dashboard");
+      nav("/dashboard", { state: { showWalkthrough: true } });
     } catch (err) {
       setApiError(err.message || "Login failed. Please try again.");
     } finally {

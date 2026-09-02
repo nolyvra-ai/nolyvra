@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { Box, Drawer, Typography, useMediaQuery } from "@mui/material";
+import { Box, Button, Drawer, Typography, useMediaQuery } from "@mui/material";
 import { useSearchParams } from "react-router-dom";
 import HelpSidebar from "../components/help/HelpSidebar";
 import HelpSearchBar from "../components/help/HelpSearchBar";
 import HelpArticleList from "../components/help/HelpArticleList";
 import HelpArticleView from "../components/help/HelpArticleView";
+import ProductWalkthroughModal from "../components/onboarding/ProductWalkthroughModal";
 import { helpCategories, getArticle, getCategory } from "../content/help";
 
 export default function HelpCenterPage() {
   const isMobile = useMediaQuery("(max-width:768px)");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [walkthroughOpen, setWalkthroughOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const categorySlug = searchParams.get("category") || helpCategories[0]?.slug || "";
@@ -58,10 +60,27 @@ export default function HelpCenterPage() {
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ mb: 0.5, color: "#0F1623" }}>Help Center</Typography>
-      <Typography variant="body2" sx={{ mb: 3 }}>
-        Guides for every part of Nolyvra — search, or browse by category.
-      </Typography>
+      <ProductWalkthroughModal open={walkthroughOpen} onClose={() => setWalkthroughOpen(false)} />
+
+      <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2, mb: 3 }}>
+        <Box>
+          <Typography variant="h4" sx={{ mb: 0.5, color: "#0F1623" }}>Help Center</Typography>
+          <Typography variant="body2">
+            Guides for every part of Nolyvra — search, or browse by category.
+          </Typography>
+        </Box>
+        <Button
+          onClick={() => setWalkthroughOpen(true)}
+          variant="outlined"
+          sx={{
+            textTransform: "none", fontWeight: 600, borderRadius: "8px",
+            borderColor: "#E2E6ED", color: "#0F1623", flexShrink: 0,
+            "&:hover": { borderColor: "#1D72E8", bgcolor: "rgba(29,114,232,0.06)" },
+          }}
+        >
+          ▶ Replay walkthrough
+        </Button>
+      </Box>
 
       <Box sx={{ mb: 3, position: isMobile ? "sticky" : "static", top: 0, zIndex: 4, bgcolor: "#F7F8FA", pt: isMobile ? 1 : 0, pb: isMobile ? 1 : 0 }}>
         <HelpSearchBar onSelectArticle={selectArticle} />

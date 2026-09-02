@@ -1,7 +1,7 @@
 ---
 title: Where to find your account settings
 category: getting-started
-order: 2
+order: 6
 tags: [settings, account, orientation]
 summary: A quick pointer to where your profile, password, and admin settings live.
 ---

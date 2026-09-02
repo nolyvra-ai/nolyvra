@@ -1,6 +1,7 @@
 import { Box, Chip, Typography } from "@mui/material";
 import ReactMarkdown from "react-markdown";
 import HelpImage from "./HelpImage";
+import HelpVideo from "./HelpVideo";
 import { getCategory } from "../../content/help";
 
 export default function HelpArticleView({ article, onBack }) {
@@ -35,6 +36,10 @@ export default function HelpArticleView({ article, onBack }) {
             <Chip key={tag} label={tag} size="small" sx={{ bgcolor: "#F0F4FA", color: "#5A6480", fontSize: 11 }} />
           ))}
         </Box>
+      )}
+
+      {article.hasVideo && (
+        <HelpVideo src={article.video} title={article.title} aspect={article.videoAspect} />
       )}
 
       <Box
