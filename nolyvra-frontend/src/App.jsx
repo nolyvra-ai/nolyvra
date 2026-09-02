@@ -9,7 +9,7 @@ const PUBLIC_ROUTES = ["/", "/pricing", "/login", "/forgot-password", "/reset-pa
 // Employee sessions may only ever reach these — everything else (RecruitIQ,
 // tenant-admin CRM screens) redirects back. Mirrors the server-side allowlist
 // in SessionInterceptor.java; this is the UX guard, not the security boundary.
-const EMPLOYEE_ROUTES = ["/crm/my-leave", "/crm/my-expenses", "/crm/my-grievances", "/crm/my-timesheet", "/settings", "/settings/account"];
+const EMPLOYEE_ROUTES = ["/crm/my-leave", "/crm/my-expenses", "/crm/my-grievances", "/crm/my-timesheet", "/settings", "/settings/account", "/help"];
 
 function Layout() {
   const { pathname } = useLocation();

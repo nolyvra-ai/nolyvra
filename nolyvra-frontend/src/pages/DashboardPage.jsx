@@ -6,7 +6,8 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   FormControl, InputLabel, Select, MenuItem, TextField,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import ProductWalkthroughModal from "../components/onboarding/ProductWalkthroughModal";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -1251,9 +1252,14 @@ function CRMxDashboard({ loginId, nav }) {
 
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const nav     = useNavigate();
-  const loginId = localStorage.getItem("loginId") || "";
-  const name    = localStorage.getItem("name") || "";
+  const nav      = useNavigate();
+  const location = useLocation();
+  const loginId  = localStorage.getItem("loginId") || "";
+  const name     = localStorage.getItem("name") || "";
+
+  // Iteration 1: no persistence — this only opens when LoginPage navigates
+  // here with { showWalkthrough: true } right after a successful login.
+  const [showWalkthrough, setShowWalkthrough] = useState(!!location.state?.showWalkthrough);
 
   const [recentJobs,          setRecentJobs]          = useState([]);
   const [recentAnalyses,      setRecentAnalyses]      = useState([]);
@@ -1383,6 +1389,11 @@ export default function DashboardPage() {
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}>
+
+      <ProductWalkthroughModal
+        open={showWalkthrough}
+        onClose={() => setShowWalkthrough(false)}
+      />
 
       {/* ── Animated Page Content ── */}
       <Box id="dashboard-print-root" sx={{ display: "flex", flexDirection: "column", gap: 2.5, transformOrigin: "center top", ...flipStyles }}>
