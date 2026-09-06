@@ -46,6 +46,11 @@ public class JobsController {
         return jobService.listJobs(loginId);
     }
 
+    @GetMapping("/count")
+    public java.util.Map<String, Long> countJobs(@RequestParam String loginId) {
+        return java.util.Map.of("count", jobService.countJobs(loginId));
+    }
+
     @GetMapping("/{jobId}")
     public JobResponse getJob(
             @PathVariable String jobId,
