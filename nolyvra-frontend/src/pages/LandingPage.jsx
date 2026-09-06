@@ -862,7 +862,7 @@ export default function LandingPage() {
               { name:"Rec2",        src:"/rec2_logo.png" },
               { name:"Revise",      src:"/revise_logo.png" },
               { name:"Exclaim",     src:"/exclaim_logo.png" },
-              { name:"Ross",        src:"/ross_logo.png" },
+              { name:"Hoff",        src:"/hoff_logo.png" },
               { name:"Lynx",        src:"/lynx_logo.png" },
               { name:"Odin",        src:"/odin_logo.png" },
               { name:"Stratacon",   src:"/stratacon_logo.png" },
