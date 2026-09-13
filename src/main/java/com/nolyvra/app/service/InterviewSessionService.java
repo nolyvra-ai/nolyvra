@@ -157,10 +157,32 @@ public class InterviewSessionService {
                     "The candidate hasn't completed the interview yet.");
         }
 
-        interviewTranscriptService.analyseTranscript(candidateId, loginId, null, row.transcript());
+        JobApplicationResponse app = jobApplicationService.getById(applicationId, loginId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Application not found: " + applicationId));
+
+        // analyseTranscript() only resolves job context via interviews.job_id (through
+        // interviewId) — without a real interview row, the CV-analysis context lookup
+        // loses job scoping AND the resulting interview_transcripts row (interview_id
+        // = null) becomes invisible to the existing Interview Analysis card, which
+        // filters through this same join. A minimal synthetic interviews row (same
+        // shape CoWorkerService already uses for its own ad-hoc scheduling) fixes both.
+        String interviewId = createSyntheticInterview(candidateId, app.jobId(), loginId);
+        interviewTranscriptService.analyseTranscript(candidateId, loginId, interviewId, row.transcript());
 
         jdbc.update("update interview_session set status = 'ANALYSED', updated_at = now() where id = ?", row.id());
         return getSessionResponse(row.id());
+    }
+
+    private String createSyntheticInterview(String candidateId, String jobId, String loginId) {
+        String id = "int-" + UUID.randomUUID();
+        jdbc.update("""
+                insert into interviews
+                    (id, candidate_id, job_id, login_id, interview_type, scheduled_at, status, notes)
+                values (?, ?, ?, ?, 'Async Audio Interview', now(), 'Completed',
+                        'Auto-created for an async audio interview analysis.')
+                """, id, candidateId, jobId, loginId);
+        return id;
     }
 
     // ─── Public: intro screen ──────────────────────────────────────────────────
