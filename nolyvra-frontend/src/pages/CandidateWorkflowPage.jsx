@@ -149,6 +149,10 @@ function JobApplicationRow({ application, candidateId, candidateName, candidateE
   const [msgError,   setMsgError]   = useState(null);
   const [analyses,        setAnalyses]        = useState([]);
   const [analysesLoading, setAnalysesLoading] = useState(false);
+  const [interviewSession,        setInterviewSession]        = useState(null);
+  const [interviewSessionLoading, setInterviewSessionLoading] = useState(false);
+  const [interviewActionLoading,  setInterviewActionLoading]  = useState(false);
+  const [interviewError,          setInterviewError]          = useState(null);
   const nav = useNavigate();
 
   useEffect(() => { setSelectedStage(application.stage); }, [application.stage]);
@@ -161,6 +165,37 @@ function JobApplicationRow({ application, candidateId, candidateName, candidateE
       .catch(() => {})
       .finally(() => setAnalysesLoading(false));
   }, [expanded, candidateId, application.jobId]);
+
+  useEffect(() => {
+    if (!expanded) return;
+    setInterviewSessionLoading(true);
+    apiGet(`/api/candidates/${candidateId}/applications/${application.id}/interview`)
+      .then(d => setInterviewSession(d || null))
+      .catch(() => {})
+      .finally(() => setInterviewSessionLoading(false));
+  }, [expanded, candidateId, application.id]);
+
+  async function startOrRegenerateInterview() {
+    if (interviewSession && !window.confirm(
+        "This will invalidate the current interview link and clear any transcript already recorded. Continue?")) {
+      return;
+    }
+    setInterviewActionLoading(true); setInterviewError(null);
+    try {
+      const data = await apiPost(`/api/candidates/${candidateId}/applications/${application.id}/interview`, {});
+      setInterviewSession(data);
+    } catch (e) { setInterviewError(e.message); }
+    finally { setInterviewActionLoading(false); }
+  }
+
+  async function analyseInterview() {
+    setInterviewActionLoading(true); setInterviewError(null);
+    try {
+      const data = await apiPost(`/api/candidates/${candidateId}/applications/${application.id}/interview/analyse`, {});
+      setInterviewSession(data);
+    } catch (e) { setInterviewError(e.message); }
+    finally { setInterviewActionLoading(false); }
+  }
 
   async function changeStage(stage) {
     setStageLoading(true);
@@ -262,7 +297,46 @@ function JobApplicationRow({ application, candidateId, candidateName, candidateE
                 sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none","&:hover":{bgcolor:SURFACE}}}>
                 💡 Suggested Questions
               </Button>
+
+              {interviewSessionLoading ? (
+                <CircularProgress size={14} sx={{ color: MUTED }} />
+              ) : !interviewSession ? (
+                <Button variant="outlined" size="small" disabled={interviewActionLoading} onClick={startOrRegenerateInterview}
+                  sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none","&:hover":{bgcolor:SURFACE}}}>
+                  {interviewActionLoading ? <CircularProgress size={12} /> : "🎙 Start Audio Interview"}
+                </Button>
+              ) : (interviewSession.status === "SENT" || interviewSession.status === "STARTED") ? (
+                <>
+                  <Badge label="Interview sent" variant="warning" />
+                  <Button variant="outlined" size="small" disabled={interviewActionLoading} onClick={startOrRegenerateInterview}
+                    sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none","&:hover":{bgcolor:SURFACE}}}>
+                    {interviewActionLoading ? <CircularProgress size={12} /> : "↻ Regenerate Interview"}
+                  </Button>
+                </>
+              ) : interviewSession.status === "COMPLETED" ? (
+                <>
+                  <Button variant="contained" size="small" disabled={interviewActionLoading} onClick={analyseInterview}
+                    sx={{fontSize:11,bgcolor:PURPLE,borderRadius:"6px",textTransform:"none",boxShadow:"none","&:hover":{bgcolor:"#6D28D9",boxShadow:"none"}}}>
+                    {interviewActionLoading ? <CircularProgress size={12} sx={{color:"#fff"}} /> : "✦ Analyse Interview"}
+                  </Button>
+                  <Button variant="outlined" size="small" disabled={interviewActionLoading} onClick={startOrRegenerateInterview}
+                    sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none","&:hover":{bgcolor:SURFACE}}}>
+                    ↻ Regenerate Interview
+                  </Button>
+                </>
+              ) : interviewSession.status === "ANALYSED" ? (
+                <>
+                  <Badge label="✓ Interview analysed" variant="success" />
+                  <Button variant="outlined" size="small" disabled={interviewActionLoading} onClick={startOrRegenerateInterview}
+                    sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none","&:hover":{bgcolor:SURFACE}}}>
+                    ↻ Regenerate Interview
+                  </Button>
+                </>
+              ) : null}
             </Box>
+            {interviewError && (
+              <Typography sx={{ fontSize: 11, color: DANGER, mt: 0.75 }}>{interviewError}</Typography>
+            )}
           </Box>
 
           {/* AI Message Generator */}

@@ -22,6 +22,7 @@ public class EmailService {
     private final WorkflowService workflowService;
     private final MicrosoftOAuthService microsoftOAuthService;
     private final GoogleOAuthService googleOAuthService;
+    private final ResendEmailService resendEmailService;
     private final String mailFrom;
 
     public EmailService(
@@ -30,12 +31,14 @@ public class EmailService {
             WorkflowService workflowService,
             @Lazy MicrosoftOAuthService microsoftOAuthService,
             @Lazy GoogleOAuthService googleOAuthService,
+            ResendEmailService resendEmailService,
             @Value("${spring.mail.username:}") String mailFrom) {
         this.mailSender             = mailSender;
         this.jdbc                   = jdbc;
         this.workflowService        = workflowService;
         this.microsoftOAuthService  = microsoftOAuthService;
         this.googleOAuthService     = googleOAuthService;
+        this.resendEmailService     = resendEmailService;
         this.mailFrom               = mailFrom;
     }
 
@@ -140,6 +143,51 @@ public class EmailService {
                 finalStatus,
                 java.time.Instant.now(),
                 req.clientId());
+    }
+
+    // ─── Interview invitation (async audio interview) ────────────────────────
+    // Sent via Resend (unlike the Gmail/Outlook/JavaMail fallback chain used by
+    // sendEmail() above) but still logged into email_history so it shows in
+    // the candidate's Email tab like any other candidate email. Returns the
+    // new email_history row's id so the caller can delete this exact entry
+    // later if the interview is regenerated.
+    public Long sendInterviewInviteEmail(String toAddress, String candidateId, String loginId,
+                                          String subject, String textBody, String htmlBody) {
+        boolean sent = resendEmailService.sendHtml(toAddress, subject, textBody, htmlBody);
+        String status = sent ? "Sent" : "Failed";
+
+        var keys = new org.springframework.jdbc.support.GeneratedKeyHolder();
+        jdbc.update(con -> {
+            var ps = con.prepareStatement("""
+                    insert into email_history
+                        (candidate_id, login_id, to_address, subject, body, template_type, status)
+                    values (?, ?, ?, ?, ?, 'INTERVIEW_INVITE', ?)
+                    """, new String[]{"id"});
+            ps.setString(1, candidateId);
+            ps.setString(2, loginId);
+            ps.setString(3, toAddress);
+            ps.setString(4, subject);
+            ps.setString(5, textBody);
+            ps.setString(6, status);
+            return ps;
+        }, keys);
+
+        if (candidateId != null) {
+            workflowService.recordEvent(candidateId, loginId, "EMAIL_SENT",
+                    "Interview invitation sent: " + subject, null);
+        }
+
+        return keys.getKey() != null ? keys.getKey().longValue() : null;
+    }
+
+    // ─── Delete one email_history row by id (used when Start/Regenerate wipes
+    // the previous interview invitation so only the latest link's email
+    // remains in the log) ──────────────────────────────────────────────────────
+    public boolean deleteEmailHistory(Long id, String loginId) {
+        int rows = jdbc.update(
+                "delete from email_history where id = ? and login_id = ?",
+                id, loginId);
+        return rows > 0;
     }
 
     public boolean sendSystemEmail(String toAddress, String subject, String body) {
