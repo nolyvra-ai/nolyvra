@@ -213,6 +213,62 @@ function NewTimesheetDialog({ open, onClose, loginId, employeeId, onCreated }) {
   );
 }
 
+function TimesheetDetailDialog({ open, timesheet, onClose }) {
+  if (!timesheet) return null;
+  const days = timesheet.days || [];
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ fontSize: 14, fontWeight: 700, pb: 1 }}>
+        Week of {timesheet.weekStartDate} → {weekDates(timesheet.weekStartDate)[6]}
+      </DialogTitle>
+      <DialogContent sx={{ pt: "8px !important" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
+          <StatusChip status={timesheet.status} />
+          <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: TEXT }}>
+            Total: {timesheet.totalHours}h
+          </Typography>
+        </Box>
+        {timesheet.approverComment && (
+          <Typography sx={{ fontSize: 12, color: MUTED, mb: 1.5 }}>
+            Comment: {timesheet.approverComment}
+          </Typography>
+        )}
+        {days.length === 0 ? (
+          <Typography sx={{ fontSize: 12, color: MUTED }}>No line items recorded.</Typography>
+        ) : (
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={thSx}>Date</TableCell>
+                <TableCell sx={thSx}>Hours</TableCell>
+                <TableCell sx={thSx}>Note</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {days.map((d, i) => (
+                <TableRow key={i} sx={{ "&:last-child td": { borderBottom: 0 } }}>
+                  <TableCell sx={{ py: 1, px: 2, fontSize: 12, color: TEXT, borderBottom: `1px solid ${BORDER}`, whiteSpace: "nowrap" }}>
+                    {d.workDate}
+                  </TableCell>
+                  <TableCell sx={{ py: 1, px: 2, fontSize: 12, fontWeight: 600, color: TEXT, borderBottom: `1px solid ${BORDER}` }}>
+                    {d.hours}h
+                  </TableCell>
+                  <TableCell sx={{ py: 1, px: 2, fontSize: 12, color: MUTED, borderBottom: `1px solid ${BORDER}` }}>
+                    {d.note || "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        <Button onClick={onClose} sx={{ fontSize: 12, textTransform: "none", color: MUTED }}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 export default function CrmMyTimesheetPage() {
   const loginId = localStorage.getItem("loginId") || "";
 
@@ -226,6 +282,7 @@ export default function CrmMyTimesheetPage() {
   const [loading,     setLoading]   = useState(true);
   const [error,       setError]     = useState(null);
   const [showNew,     setShowNew]   = useState(false);
+  const [detailTs,    setDetailTs]  = useState(null);
 
   useEffect(() => {
     if (employeeId) return;
@@ -318,7 +375,8 @@ export default function CrmMyTimesheetPage() {
             </TableHead>
             <TableBody>
               {timesheets.map(ts => (
-                <TableRow key={ts.id} sx={{ "&:last-child td": { borderBottom: 0 } }}>
+                <TableRow key={ts.id} onClick={() => setDetailTs(ts)}
+                  sx={{ cursor: "pointer", "&:hover": { bgcolor: "#FAFBFD" }, "&:last-child td": { borderBottom: 0 } }}>
                   <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, color: TEXT, borderBottom: `1px solid ${BORDER}`, whiteSpace: "nowrap" }}>
                     {ts.weekStartDate} → {weekDates(ts.weekStartDate)[6]}
                   </TableCell>
@@ -336,7 +394,7 @@ export default function CrmMyTimesheetPage() {
                   <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}`, textAlign: "right" }}>
                     {ts.status === "PENDING" && (
                       <Tooltip title="Cancel timesheet">
-                        <IconButton size="small" onClick={() => cancel(ts.id)}
+                        <IconButton size="small" onClick={(e) => { e.stopPropagation(); cancel(ts.id); }}
                           sx={{ color: MUTED, "&:hover": { color: DANGER } }}>
                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </IconButton>
@@ -354,6 +412,11 @@ export default function CrmMyTimesheetPage() {
         open={showNew} onClose={() => setShowNew(false)}
         loginId={loginId} employeeId={employeeId}
         onCreated={handleCreated} />
+
+      <TimesheetDetailDialog
+        open={!!detailTs}
+        timesheet={detailTs}
+        onClose={() => setDetailTs(null)} />
     </Box>
   );
 }

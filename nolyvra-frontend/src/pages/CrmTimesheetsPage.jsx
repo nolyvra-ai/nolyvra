@@ -113,6 +113,62 @@ function ActionDialog({ open, action, timesheetId, loginId, onClose, onDone }) {
   );
 }
 
+function TimesheetDetailDialog({ open, timesheet, onClose }) {
+  if (!timesheet) return null;
+  const days = timesheet.days || [];
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle sx={{ fontSize: 14, fontWeight: 700, pb: 1 }}>
+        {timesheet.employeeFirstName} {timesheet.employeeLastName} — {timesheet.weekStartDate} → {weekEnd(timesheet.weekStartDate)}
+      </DialogTitle>
+      <DialogContent sx={{ pt: "8px !important" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, mb: 1.5 }}>
+          <StatusChip status={timesheet.status} />
+          <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: TEXT }}>
+            Total: {timesheet.totalHours}h
+          </Typography>
+        </Box>
+        {timesheet.approverComment && (
+          <Typography sx={{ fontSize: 12, color: MUTED, mb: 1.5 }}>
+            Comment: {timesheet.approverComment}
+          </Typography>
+        )}
+        {days.length === 0 ? (
+          <Typography sx={{ fontSize: 12, color: MUTED }}>No line items recorded.</Typography>
+        ) : (
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={thSx}>Date</TableCell>
+                <TableCell sx={thSx}>Hours</TableCell>
+                <TableCell sx={thSx}>Note</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {days.map((d, i) => (
+                <TableRow key={i} sx={{ "&:last-child td": { borderBottom: 0 } }}>
+                  <TableCell sx={{ py: 1, px: 2, fontSize: 12, color: TEXT, borderBottom: `1px solid ${BORDER}`, whiteSpace: "nowrap" }}>
+                    {d.workDate}
+                  </TableCell>
+                  <TableCell sx={{ py: 1, px: 2, fontSize: 12, fontWeight: 600, color: TEXT, borderBottom: `1px solid ${BORDER}` }}>
+                    {d.hours}h
+                  </TableCell>
+                  <TableCell sx={{ py: 1, px: 2, fontSize: 12, color: MUTED, borderBottom: `1px solid ${BORDER}` }}>
+                    {d.note || "—"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2.5 }}>
+        <Button onClick={onClose} sx={{ fontSize: 12, textTransform: "none", color: MUTED }}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function StatTile({ label, value }) {
   return (
     <Paper elevation={0} sx={{ ...CARD, p: 2.5, flex: 1, minWidth: 160 }}>
@@ -138,6 +194,7 @@ export default function CrmTimesheetsPage() {
   const [empFilter,    setEmpFilter]    = useState("");
   const [actionDialog, setActionDialog] = useState({ open: false, action: "", timesheetId: "" });
   const [exporting,    setExporting]    = useState(false);
+  const [detailTs,     setDetailTs]     = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true); setError(null);
@@ -278,7 +335,8 @@ export default function CrmTimesheetsPage() {
                 </TableHead>
                 <TableBody>
                   {filtered.map(ts => (
-                    <TableRow key={ts.id} sx={{ "&:last-child td": { borderBottom: 0 } }}>
+                    <TableRow key={ts.id} onClick={() => setDetailTs(ts)}
+                      sx={{ cursor: "pointer", "&:hover": { bgcolor: "#FAFBFD" }, "&:last-child td": { borderBottom: 0 } }}>
                       <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
                         <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: TEXT }}>
                           {ts.employeeFirstName} {ts.employeeLastName}
@@ -302,13 +360,13 @@ export default function CrmTimesheetsPage() {
                         {ts.status === "PENDING" && (
                           <Box sx={{ display: "flex", gap: 0.75, justifyContent: "flex-end" }}>
                             <Button size="small" variant="contained"
-                              onClick={() => setActionDialog({ open: true, action: "APPROVED", timesheetId: ts.id })}
+                              onClick={(e) => { e.stopPropagation(); setActionDialog({ open: true, action: "APPROVED", timesheetId: ts.id }); }}
                               sx={{ fontSize: 11, textTransform: "none", borderRadius: "6px", boxShadow: "none",
                                     bgcolor: SUCCESS, "&:hover": { bgcolor: "#15803D" }, minWidth: 0, px: 1.5 }}>
                               Approve
                             </Button>
                             <Button size="small" variant="outlined"
-                              onClick={() => setActionDialog({ open: true, action: "REJECTED", timesheetId: ts.id })}
+                              onClick={(e) => { e.stopPropagation(); setActionDialog({ open: true, action: "REJECTED", timesheetId: ts.id }); }}
                               sx={{ fontSize: 11, textTransform: "none", borderRadius: "6px",
                                     borderColor: DANGER, color: DANGER, "&:hover": { bgcolor: DANGER_L }, minWidth: 0, px: 1.5 }}>
                               Reject
@@ -385,6 +443,11 @@ export default function CrmTimesheetsPage() {
         loginId={loginId}
         onClose={() => setActionDialog({ open: false, action: "", timesheetId: "" })}
         onDone={handleActioned} />
+
+      <TimesheetDetailDialog
+        open={!!detailTs}
+        timesheet={detailTs}
+        onClose={() => setDetailTs(null)} />
     </Box>
   );
 }

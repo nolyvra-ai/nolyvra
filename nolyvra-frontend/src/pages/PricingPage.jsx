@@ -166,7 +166,7 @@ export default function PricingPage() {
                 <div style={{ fontSize:12,color:"#9AA3B4",marginTop:3 }}>1 month trial · No card needed</div>
               </div>
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20 }}>
-                {limitItem("30","Candidates")}{limitItem("10","Jobs")}{limitItem("100","Tokens")}{limitItem("1","User")}
+                {limitItem("100","Tokens")}{limitItem("1","User")}
               </div>
               <div style={{ height:1,background:"#E2E6ED",margin:"18px 0" }} />
               <div style={{ display:"flex",flexDirection:"column",gap:9,flex:1,marginBottom:22 }}>
@@ -192,13 +192,13 @@ export default function PricingPage() {
                 <div style={{ fontSize:11,color:"#9AA3B4",marginBottom:4,fontWeight:500 }}>Starting from</div>
                 <div style={{ display:"flex",alignItems:"baseline",gap:3,marginBottom:2 }}>
                   <span style={{ fontSize:18,fontWeight:600,color:"#0F1623" }}>$</span>
-                  <span style={{ fontSize:36,fontWeight:700,color:"#0F1623",letterSpacing:"-1px",lineHeight:1 }}>{isYearly?"9":"16"}</span>
+                  <span style={{ fontSize:36,fontWeight:700,color:"#0F1623",letterSpacing:"-1px",lineHeight:1 }}>{isYearly?"39":"49"}</span>
                   <span style={{ fontSize:12,color:"#9AA3B4" }}>/ month{isYearly?" · billed yearly":""}</span>
                 </div>
-                <span style={{ display:"inline-flex",background:"#ECFDF5",border:"1px solid #A7F3D0",borderRadius:4,padding:"2px 7px",fontSize:11,fontWeight:600,color:"#065F46",marginTop:5 }}>{isYearly?"Save 44% vs monthly":"Flexible, cancel anytime"}</span>
+                <span style={{ display:"inline-flex",background:"#ECFDF5",border:"1px solid #A7F3D0",borderRadius:4,padding:"2px 7px",fontSize:11,fontWeight:600,color:"#065F46",marginTop:5 }}>{isYearly?"Save 20% vs monthly":"Flexible, cancel anytime"}</span>
               </div>
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20 }}>
-                {limitItem("30","Candidates")}{limitItem("10","Jobs")}{limitItem("100","Tokens")}{limitItem("1","User")}
+                {limitItem("100","Tokens")}{limitItem("1","User")}
               </div>
               <div style={{ height:1,background:"#E2E6ED",margin:"18px 0" }} />
               <div style={{ display:"flex",flexDirection:"column",gap:9,flex:1,marginBottom:22 }}>
@@ -230,7 +230,7 @@ export default function PricingPage() {
                 <span style={{ display:"inline-flex",background:"#F0FDF4",border:"1px solid #BBF7D0",borderRadius:4,padding:"2px 7px",fontSize:11,fontWeight:600,color:"#16A34A",marginTop:5 }}>{isYearly?"Save $600/yr · First year pricing":"Save $50/mo · Launch pricing"}</span>
               </div>
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20 }}>
-                {limitItem("150","Candidates")}{limitItem("50","Jobs")}{limitItem("500","Tokens/mo")}{limitItem("1","User")}
+                {limitItem("500","Tokens/mo")}{limitItem("1","User")}
               </div>
               <div style={{ height:1,background:"#E2E6ED",margin:"18px 0" }} />
               <div style={{ display:"flex",flexDirection:"column",gap:9,flex:1,marginBottom:22 }}>
@@ -262,7 +262,7 @@ export default function PricingPage() {
                 <span style={{ display:"inline-flex",background:"#F0FDF4",border:"1px solid #BBF7D0",borderRadius:4,padding:"2px 7px",fontSize:11,fontWeight:600,color:"#16A34A",marginTop:5 }}>{isYearly?"Save $1,200/yr · First year pricing":"Save $100/mo · Launch pricing"}</span>
               </div>
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20 }}>
-                {limitItem("750","Candidates")}{limitItem("250","Jobs")}{limitItem("750","Tokens/mo")}{limitItem("5","Users")}
+                {limitItem("750","Tokens/mo")}{limitItem("5","Users")}
               </div>
               <div style={{ height:1,background:"#E2E6ED",margin:"18px 0" }} />
               <div style={{ display:"flex",flexDirection:"column",gap:9,flex:1,marginBottom:22 }}>
@@ -293,7 +293,7 @@ export default function PricingPage() {
                 <span style={{ display:"inline-flex",background:"#F0FDF4",border:"1px solid #BBF7D0",borderRadius:4,padding:"2px 7px",fontSize:11,fontWeight:600,color:"#16A34A",marginTop:5 }}>{isYearly?"Save $1,800/yr · First year pricing":"Save $100/mo · Launch pricing"}</span>
               </div>
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20 }}>
-                {limitItem("2,250","Candidates")}{limitItem("750","Jobs")}{limitItem("3,000","Tokens/mo")}{limitItem("15","Users")}
+                {limitItem("3,000","Tokens/mo")}{limitItem("15","Users")}
               </div>
               <div style={{ height:1,background:"#E2E6ED",margin:"18px 0" }} />
               <div style={{ display:"flex",flexDirection:"column",gap:9,flex:1,marginBottom:22 }}>
@@ -319,7 +319,7 @@ export default function PricingPage() {
                 <div style={{ fontSize:12,color:"#9AA3B4",marginTop:6 }}>Tailored to your organisation</div>
               </div>
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20 }}>
-                {limitItem("∞","Candidates")}{limitItem("∞","Jobs")}{limitItem("Custom","Tokens")}{limitItem("∞","Users")}
+                {limitItem("Custom","Tokens")}{limitItem("∞","Users")}
               </div>
               <div style={{ height:1,background:"#E2E6ED",margin:"18px 0" }} />
               <div style={{ display:"flex",flexDirection:"column",gap:9,flex:1,marginBottom:22 }}>
@@ -378,9 +378,7 @@ export default function PricingPage() {
               </tr>
             </thead>
             <tbody>
-              {[["Candidates / month","3","30","150","750","2,250","Unlimited"],
-                ["Jobs","10","10","50","250","750","Unlimited"],
-                ["AI Tokens / month","100","100","500","750","3,000","Custom"],
+              {[["AI Tokens / month","100","100","500","750","3,000","Custom"],
                 ["Users","1","1","1","5","15","Unlimited"],
               ].map(([feat,...vals]) => (
                 <tr key={feat}>
