@@ -48,6 +48,7 @@ import CrmTimesheetsPage          from "../pages/CrmTimesheetsPage";
 import CrmMyTimesheetPage         from "../pages/CrmMyTimesheetPage";
 import AdminContactListBuilderPage from "../pages/AdminContactListBuilderPage";
 import HelpCenterPage             from "../pages/HelpCenterPage";
+import PublicInterviewPage        from "../pages/PublicInterviewPage";
 
 export default function AppRoutes() {
   return (
@@ -63,6 +64,7 @@ export default function AppRoutes() {
       <Route path="/privacy"                            element={<PrivacyPage />} />
       <Route path="/terms"                              element={<TermsPage />} />
       <Route path="/recruitment-united"                 element={<RecruitmentUnitedPage />} />
+      <Route path="/interview/:token"                   element={<PublicInterviewPage />} />
 
       {/* App pages */}
       <Route path="/dashboard"                          element={<DashboardPage />} />
