@@ -123,6 +123,8 @@ class CoWorkerServiceTest {
                         null,
                         null,
                         null,
+                        null,
+                        null,
                         null));
 
         Map<String, Object> result = service.confirmAction(

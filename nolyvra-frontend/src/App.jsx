@@ -13,7 +13,7 @@ const EMPLOYEE_ROUTES = ["/crm/my-leave", "/crm/my-expenses", "/crm/my-grievance
 
 function Layout() {
   const { pathname } = useLocation();
-  const isPublic   = PUBLIC_ROUTES.includes(pathname);
+  const isPublic   = PUBLIC_ROUTES.includes(pathname) || pathname.startsWith("/interview/");
   const isLoggedIn = !!localStorage.getItem("loginId");
   const isEmployee = localStorage.getItem("authType") === "EMPLOYEE";
 

@@ -42,8 +42,11 @@ public class JobsController {
     }
 
     @GetMapping
-    public List<JobResponse> listJobs(@RequestParam String loginId) {
-        return jobService.listJobs(loginId);
+    public List<JobResponse> listJobs(
+            @RequestParam String loginId,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) Integer offset) {
+        return jobService.listJobs(loginId, limit, offset);
     }
 
     @GetMapping("/{jobId}")

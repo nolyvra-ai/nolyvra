@@ -11,6 +11,7 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import SyncIcon from "@mui/icons-material/Sync";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import ColumnPickerButton from "../components/ColumnPickerButton";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
@@ -175,7 +176,7 @@ function StageBadge({ stage }) {
   return <Badge label={c.label} variant={c.variant} />;
 }
 // ─── Candidate sub-table ──────────────────────────────────────────────────────
-function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandidate, onAnalysisStarted }) {
+function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandidate, onAnalysisStarted, extraColumns = [] }) {
   const nav = useNavigate();
 
   if (candidates.length === 0) {
@@ -197,6 +198,7 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
           <TableCell sx={{ ...thSx, textAlign: "center" }}>Capability Match</TableCell>
           <TableCell sx={thSx}>Risk Flags</TableCell>
           <TableCell sx={{ ...thSx, textAlign: "center" }}>Status</TableCell>
+          {extraColumns.map(c => <TableCell key={c.key} sx={thSx}>{c.label}</TableCell>)}
           <TableCell sx={{ ...thSx, textAlign: "right" }} />
         </TableRow>
       </TableHead>
@@ -235,6 +237,11 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
             <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}` }}>
               <StatusBadge status={c.status} />
             </TableCell>
+            {extraColumns.map(col => (
+              <TableCell key={col.key} sx={{ py: 1.5, px: 2, fontSize: 12, color: TEXT, borderBottom: `1px solid ${BORDER}` }}>
+                {col.get(c)}
+              </TableCell>
+            ))}
             <TableCell sx={{ py: 1.5, px: 2, textAlign: "right", borderBottom: `1px solid ${BORDER}` }}
               onClick={e => e.stopPropagation()}>
               <Box sx={{ display: "flex", gap: 0.75, justifyContent: "flex-end" }}>
@@ -375,12 +382,52 @@ function ExternalCandidateCard({ c, onAdd, adding, added }) {
   );
 }
 
+const JOBS_PAGE_SIZE = 10;
+const CANDIDATES_PAGE_SIZE = 10;
+
+// Extra, opt-in columns for the Jobs table — checked via ColumnPickerButton,
+// appended after the default columns rather than replacing any of them.
+const JOB_EXTRA_COLUMNS = [
+  { key: "seniority",  label: "Seniority",  get: j => j.seniority || "—" },
+  { key: "salary",     label: "Salary",     get: j => j.salary != null ? `${j.currency || ""} ${Number(j.salary).toLocaleString()}` : "—" },
+  { key: "feePercentage", label: "Fee %",   get: j => j.feePercentage != null ? `${j.feePercentage}%` : "—" },
+  { key: "feeType",    label: "Fee Type",   get: j => j.feeType || "—" },
+  { key: "fixedFee",   label: "Fixed Fee",  get: j => j.fixedFee != null ? `${j.currency || ""} ${Number(j.fixedFee).toLocaleString()}` : "—" },
+  { key: "stackTags",  label: "Stack Tags", get: j => (j.stackTags && j.stackTags.length) ? j.stackTags.join(", ") : "—" },
+];
+
+// Extra, opt-in columns for the per-job Candidate sub-table.
+const CANDIDATE_EXTRA_COLUMNS = [
+  { key: "phoneNumber",  label: "Phone",      get: c => c.phoneNumber || "—" },
+  { key: "linkedinUrl",  label: "LinkedIn",   get: c => c.linkedinUrl || "—" },
+  { key: "currentTitle", label: "Current Title", get: c => c.currentTitle || "—" },
+  { key: "location",     label: "Location",   get: c => [c.location, c.state].filter(Boolean).join(", ") || "—" },
+  { key: "yearsExperience", label: "Years Exp", get: c => c.yearsExperience != null ? c.yearsExperience : "—" },
+  { key: "seniorityLevel",  label: "Seniority Level", get: c => c.seniorityLevel || "—" },
+  { key: "expectedSalary",  label: "Expected Salary", get: c => c.expectedSalaryMin != null
+      ? `${c.salaryCurrency || ""} ${Number(c.expectedSalaryMin).toLocaleString()}${c.expectedSalaryMax != null ? ` – ${Number(c.expectedSalaryMax).toLocaleString()}` : ""}`
+      : "—" },
+  { key: "noticePeriodWeeks", label: "Notice Period", get: c => c.noticePeriodWeeks != null ? `${c.noticePeriodWeeks} wk` : "—" },
+  { key: "workRights",   label: "Work Rights", get: c => c.workRights || "—" },
+  { key: "remoteFlexible", label: "Remote Flexible", get: c => c.remoteFlexible == null ? "—" : (c.remoteFlexible ? "Yes" : "No") },
+  { key: "createdAt",    label: "Applied On", get: c => c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-GB") : "—" },
+];
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function JobsPage() {
   const nav = useNavigate();
 
   const [jobs, setJobs] = useState([]);
+  const [jobsHasMore, setJobsHasMore] = useState(false);
+  const [jobsLoadingMore, setJobsLoadingMore] = useState(false);
+  const [extraJobColumns, setExtraJobColumns] = useState(new Set());
+  const [extraCandidateColumns, setExtraCandidateColumns] = useState(new Set());
   const [candidatesByJob, setCandidatesByJob] = useState(new Map());
+  // Per-job pagination progress: jobId -> { offset, hasMore } — lets switching
+  // between jobs preserve each job's own "Load More" position.
+  const [candidatesMeta, setCandidatesMeta] = useState(new Map());
+  const [candidatesLoading, setCandidatesLoading] = useState(false);
+  const [candidatesLoadingMore, setCandidatesLoadingMore] = useState(false);
   const [jobHubSpotStatuses, setJobHubSpotStatuses] = useState(new Map());
   const [hubSpotPushingIds, setHubSpotPushingIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -390,6 +437,22 @@ export default function JobsPage() {
   const [statusFilter, setStatusFilter] = useState("All");
   const [analysisDialog, setAnalysisDialog] = useState(false); // Change 4
   // ── Removed: editJob, editOpen state — no longer needed ──────────────────
+
+  function toggleExtraJobColumn(key) {
+    setExtraJobColumns(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
+  function toggleExtraCandidateColumn(key) {
+    setExtraCandidateColumns(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
 
   // ── Suitable / External candidates (per selected job) ────────────────────
   const [suitableCandidates, setSuitableCandidates] = useState([]);
@@ -520,6 +583,8 @@ export default function JobsPage() {
         ]);
         return next;
       });
+      setJobs(prev => prev.map(j => j.id === selectedJobId
+        ? { ...j, candidateCount: (j.candidateCount ?? 0) + 1 } : j));
     } catch (e) {
       setErr(e?.message || "Failed to add candidate to job");
     } finally {
@@ -528,14 +593,20 @@ export default function JobsPage() {
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
+  // Loads only the first page of jobs — candidateCount/avgMatchScore for the
+  // table come straight from the job response (server-side aggregate), so
+  // there's no per-job candidates+analysis fetch here anymore. Candidates are
+  // fetched lazily, per job, only once that job's row is expanded (see the
+  // selectedJobId effect below).
   useEffect(() => {
     let cancelled = false;
     async function load() {
       setLoading(true); setErr("");
       try {
-        const jobsResp = await apiGet("/api/jobs");
+        const jobsResp = await apiGet(`/api/jobs?limit=${JOBS_PAGE_SIZE}&offset=0`);
         if (cancelled) return;
         setJobs(jobsResp ?? []);
+        setJobsHasMore((jobsResp ?? []).length === JOBS_PAGE_SIZE);
 
         const statusPairs = await Promise.all(
           (jobsResp ?? []).map(async (job) => {
@@ -550,36 +621,6 @@ export default function JobsPage() {
         if (cancelled) return;
         setJobHubSpotStatuses(new Map(statusPairs));
 
-        const map = new Map();
-        await Promise.all(
-          (jobsResp ?? []).map(async (job) => {
-            try {
-              const candidates = await apiGet(`/api/jobs/${job.id}/candidates`);
-              const enriched = await Promise.all(
-                (candidates ?? []).map(async (c) => {
-                  try {
-                    const analysis = await apiGet(`/api/candidates/${c.id}/analysis`);
-                    return {
-                      ...c, consistencyScore: analysis?.consistencyScore ?? null,
-                      capabilityScore: analysis?.capabilityScore ?? null,
-                      risk: analysis?.riskLevel ?? null, status: "Analysed"
-                    };
-                  } catch {
-                    return {
-                      ...c, consistencyScore: null, capabilityScore: null,
-                      risk: null, status: "Pending"
-                    };
-                  }
-                })
-              );
-              map.set(job.id, enriched);
-            } catch {
-              map.set(job.id, []);
-            }
-          })
-        );
-        if (cancelled) return;
-        setCandidatesByJob(map);
         if ((jobsResp ?? []).length > 0) setSelectedJobId(jobsResp[0].id);
       } catch (e) {
         if (cancelled) return;
@@ -591,6 +632,84 @@ export default function JobsPage() {
     load();
     return () => { cancelled = true; };
   }, []);
+
+  async function handleLoadMoreJobs() {
+    setJobsLoadingMore(true);
+    try {
+      const more = await apiGet(`/api/jobs?limit=${JOBS_PAGE_SIZE}&offset=${jobs.length}`);
+      setJobs(prev => [...prev, ...(more ?? [])]);
+      setJobsHasMore((more ?? []).length === JOBS_PAGE_SIZE);
+      const statusPairs = await Promise.all(
+        (more ?? []).map(async (job) => {
+          try { return [job.id, await apiGet(`/api/jobs/${job.id}/hubspot/status`)]; }
+          catch { return [job.id, null]; }
+        })
+      );
+      setJobHubSpotStatuses(prev => new Map([...prev, ...statusPairs]));
+    } catch (e) {
+      setErr(e?.message || "Failed to load more jobs");
+    } finally {
+      setJobsLoadingMore(false);
+    }
+  }
+
+  async function enrichCandidatesWithAnalysis(candidates) {
+    return Promise.all(
+      (candidates ?? []).map(async (c) => {
+        try {
+          const analysis = await apiGet(`/api/candidates/${c.id}/analysis`);
+          return {
+            ...c, consistencyScore: analysis?.consistencyScore ?? null,
+            capabilityScore: analysis?.capabilityScore ?? null,
+            risk: analysis?.riskLevel ?? null, status: "Analysed"
+          };
+        } catch {
+          return { ...c, consistencyScore: null, capabilityScore: null, risk: null, status: "Pending" };
+        }
+      })
+    );
+  }
+
+  async function loadCandidatesForJob(jobId, offset, isInitial) {
+    if (isInitial) setCandidatesLoading(true); else setCandidatesLoadingMore(true);
+    try {
+      const candidates = await apiGet(`/api/jobs/${jobId}/candidates?limit=${CANDIDATES_PAGE_SIZE}&offset=${offset}`);
+      const enriched = await enrichCandidatesWithAnalysis(candidates);
+      setCandidatesByJob(prev => {
+        const next = new Map(prev);
+        const existing = isInitial ? [] : (next.get(jobId) ?? []);
+        next.set(jobId, [...existing, ...enriched]);
+        return next;
+      });
+      setCandidatesMeta(prev => {
+        const next = new Map(prev);
+        next.set(jobId, { offset: offset + enriched.length, hasMore: enriched.length === CANDIDATES_PAGE_SIZE });
+        return next;
+      });
+    } catch {
+      setCandidatesByJob(prev => {
+        const next = new Map(prev);
+        if (!next.has(jobId)) next.set(jobId, []);
+        return next;
+      });
+    } finally {
+      if (isInitial) setCandidatesLoading(false); else setCandidatesLoadingMore(false);
+    }
+  }
+
+  // Fetch a job's candidates only the first time its row is expanded —
+  // switching back to an already-loaded job just shows the cached page(s).
+  useEffect(() => {
+    if (!selectedJobId || candidatesByJob.has(selectedJobId)) return;
+    loadCandidatesForJob(selectedJobId, 0, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedJobId]);
+
+  function handleLoadMoreCandidates() {
+    if (!selectedJobId) return;
+    const meta = candidatesMeta.get(selectedJobId);
+    loadCandidatesForJob(selectedJobId, meta?.offset ?? 0, false);
+  }
 
   // ── Derived values ────────────────────────────────────────────────────────
   const jobsWithDefaults = useMemo(() =>
@@ -619,12 +738,7 @@ export default function JobsPage() {
 
   const selectedJob = jobsWithDefaults.find(j => j.id === selectedJobId);
   const selectedCandidates = selectedJobId ? (candidatesByJob.get(selectedJobId) ?? []) : [];
-
-  function jobAvg(jobId) {
-    const analysed = (candidatesByJob.get(jobId) ?? []).filter(c => c.capabilityScore != null);
-    if (!analysed.length) return null;
-    return Math.round(analysed.reduce((s, c) => s + c.capabilityScore, 0) / analysed.length);
-  }
+  const selectedCandidatesMeta = selectedJobId ? candidatesMeta.get(selectedJobId) : null;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   async function handleRunAnalysis(candidateId) {
@@ -636,19 +750,44 @@ export default function JobsPage() {
       if (res.status === 402) { setErr("You have run out of tokens. Please upgrade your plan to continue."); return; }
       if (!res.ok) { setErr("Analysis failed. Please try again."); return; }
       const analysis = await apiGet(`/api/candidates/${candidateId}/analysis`);
+
+      // Read current state directly (not via a setState updater) so the
+      // resulting per-job avg recompute below can run as a plain, separate
+      // setJobs call rather than a setState nested inside another one.
+      const touchedJobIds = [];
+      const updatedCandidatesByJob = new Map();
+      for (const [jid, cands] of candidatesByJob.entries()) {
+        if (!cands.some(c => c.id === candidateId)) continue;
+        touchedJobIds.push(jid);
+        updatedCandidatesByJob.set(jid, cands.map(c => c.id === candidateId
+          ? {
+            ...c, consistencyScore: analysis?.consistencyScore ?? null,
+            capabilityScore: analysis?.capabilityScore ?? null,
+            risk: analysis?.riskLevel ?? null, status: "Analysed"
+          }
+          : c));
+      }
+
       setCandidatesByJob(prev => {
         const next = new Map(prev);
-        for (const [jid, cands] of next.entries()) {
-          next.set(jid, cands.map(c => c.id === candidateId
-            ? {
-              ...c, consistencyScore: analysis?.consistencyScore ?? null,
-              capabilityScore: analysis?.capabilityScore ?? null,
-              risk: analysis?.riskLevel ?? null, status: "Analysed"
-            }
-            : c));
-        }
+        for (const jid of touchedJobIds) next.set(jid, updatedCandidatesByJob.get(jid));
         return next;
       });
+
+      // Best-effort live update of the table's Avg. Match — derived from
+      // whichever candidates are currently loaded for the job, which may be
+      // a partial page; the server-side aggregate remains authoritative on
+      // the next full page load.
+      if (touchedJobIds.length > 0) {
+        setJobs(prevJobs => prevJobs.map(j => {
+          if (!touchedJobIds.includes(j.id)) return j;
+          const analysed = (updatedCandidatesByJob.get(j.id) ?? []).filter(c => c.capabilityScore != null);
+          const avg = analysed.length
+            ? Math.round(analysed.reduce((s, c) => s + c.capabilityScore, 0) / analysed.length)
+            : j.avgMatchScore;
+          return { ...j, avgMatchScore: avg };
+        }));
+      }
     } catch (e) { setErr("Analysis failed: " + (e.message || "Please try again.")); }
   }
 
@@ -656,13 +795,20 @@ export default function JobsPage() {
     if (!window.confirm("Remove this candidate from the pipeline?")) return;
     try {
       await apiDelete(`/api/candidates/${candidateId}`);
+      const touchedJobIds = [];
       setCandidatesByJob(prev => {
         const next = new Map(prev);
         for (const [jid, cands] of next.entries()) {
+          if (!cands.some(c => c.id === candidateId)) continue;
+          touchedJobIds.push(jid);
           next.set(jid, cands.filter(c => c.id !== candidateId));
         }
         return next;
       });
+      if (touchedJobIds.length > 0) {
+        setJobs(prev => prev.map(j => touchedJobIds.includes(j.id)
+          ? { ...j, candidateCount: Math.max(0, (j.candidateCount ?? 0) - 1) } : j));
+      }
     } catch (e) { setErr(e.message); }
   }
 
@@ -864,6 +1010,7 @@ export default function JobsPage() {
           <Typography sx={{ fontSize: 12, color: MUTED, ml: "auto" }}>
             {visibleJobs.length} job{visibleJobs.length !== 1 ? "s" : ""} found
           </Typography>
+          <ColumnPickerButton options={JOB_EXTRA_COLUMNS} selected={extraJobColumns} onToggle={toggleExtraJobColumn} />
         </Box>
 
         {/* Jobs table */}
@@ -884,21 +1031,24 @@ export default function JobsPage() {
                 <TableCell sx={thSx}>Status</TableCell>
                 <TableCell sx={thSx}>Created</TableCell>
                 <TableCell sx={thSx}>Est. Fee</TableCell>
+                {JOB_EXTRA_COLUMNS.filter(c => extraJobColumns.has(c.key)).map(c => (
+                  <TableCell key={c.key} sx={thSx}>{c.label}</TableCell>
+                ))}
                 <TableCell sx={{ ...thSx, textAlign: "right" }} />
               </TableRow>
             </TableHead>
             <TableBody>
               {!loading && visibleJobs.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={11} sx={{ textAlign: "center", py: 5, color: MUTED, fontSize: 13 }}>
+                  <TableCell colSpan={11 + extraJobColumns.size} sx={{ textAlign: "center", py: 5, color: MUTED, fontSize: 13 }}>
                     No jobs found
                   </TableCell>
                 </TableRow>
               )}
               {visibleJobs.map((job, idx) => {
                 const isSelected = job.id === selectedJobId;
-                const candCount = (candidatesByJob.get(job.id) ?? []).length;
-                const avg = jobAvg(job.id);
+                const candCount = job.candidateCount ?? 0;
+                const avg = job.avgMatchScore ?? null;
                 const hubSpotStatus = jobHubSpotStatuses.get(job.id);
                 const hubSpotLinked = hubSpotStatus?.linked;
                 return (
@@ -965,6 +1115,11 @@ export default function JobsPage() {
                           </Typography>
                         : <Typography sx={{ fontSize: 12, color: MUTED }}>—</Typography>}
                     </TableCell>
+                    {JOB_EXTRA_COLUMNS.filter(c => extraJobColumns.has(c.key)).map(c => (
+                      <TableCell key={c.key} sx={{ py: 1.5, px: 2, fontSize: 12, color: TEXT, borderBottom: `1px solid ${BORDER}` }}>
+                        {c.get(job)}
+                      </TableCell>
+                    ))}
 
                     <TableCell sx={{ py: 1.5, px: 2, borderBottom: `1px solid ${BORDER}`, textAlign: "right" }}
                       onClick={e => e.stopPropagation()}>
@@ -1014,6 +1169,18 @@ export default function JobsPage() {
               })}
             </TableBody>
           </Table>
+          {!search && jobsHasMore && (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 1.5, borderTop: `1px solid ${BORDER}` }}>
+              <Button variant="outlined" onClick={handleLoadMoreJobs} disabled={jobsLoadingMore}
+                sx={{
+                  fontSize: 12, fontWeight: 500, borderColor: BORDER, color: TEXT,
+                  borderRadius: "6px", textTransform: "none",
+                  "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE }
+                }}>
+                {jobsLoadingMore ? <CircularProgress size={16} sx={{ color: ACCENT }} /> : "Load More Jobs"}
+              </Button>
+            </Box>
+          )}
         </Paper>
 
         {/* Candidate panel */}
@@ -1047,15 +1214,37 @@ export default function JobsPage() {
                   }}>
                   Add Candidate
                 </Button>
+                <ColumnPickerButton options={CANDIDATE_EXTRA_COLUMNS} selected={extraCandidateColumns} onToggle={toggleExtraCandidateColumn} />
               </Box>
             </Box>
-            <CandidateSubTable
-              candidates={selectedCandidates}
-              jobTitle={selectedJob.title}
-              onRunAnalysis={handleRunAnalysis}
-              onRemoveCandidate={handleRemoveCandidate}
-              onAnalysisStarted={() => setAnalysisDialog(true)}
-            />
+            {candidatesLoading ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                <CircularProgress size={22} sx={{ color: ACCENT }} />
+              </Box>
+            ) : (
+              <>
+                <CandidateSubTable
+                  candidates={selectedCandidates}
+                  jobTitle={selectedJob.title}
+                  extraColumns={CANDIDATE_EXTRA_COLUMNS.filter(c => extraCandidateColumns.has(c.key))}
+                  onRunAnalysis={handleRunAnalysis}
+                  onRemoveCandidate={handleRemoveCandidate}
+                  onAnalysisStarted={() => setAnalysisDialog(true)}
+                />
+                {selectedCandidatesMeta?.hasMore && (
+                  <Box sx={{ display: "flex", justifyContent: "center", py: 1.5, borderTop: `1px solid ${BORDER}` }}>
+                    <Button variant="outlined" onClick={handleLoadMoreCandidates} disabled={candidatesLoadingMore}
+                      sx={{
+                        fontSize: 12, fontWeight: 500, borderColor: BORDER, color: TEXT,
+                        borderRadius: "6px", textTransform: "none",
+                        "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE }
+                      }}>
+                      {candidatesLoadingMore ? <CircularProgress size={16} sx={{ color: ACCENT }} /> : "Load More Candidates"}
+                    </Button>
+                  </Box>
+                )}
+              </>
+            )}
           </Paper>
         )}
 

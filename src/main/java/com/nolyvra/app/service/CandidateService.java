@@ -252,7 +252,12 @@ public class CandidateService {
     // "win" the cache). jobId/stage in the response reflect THIS job's
     // application, not the person's cached most-recent one.
     public List<CandidateResponse> getCandidatesByJob(String jobId, String loginId) {
-        return jdbc.query("""
+        return getCandidatesByJob(jobId, loginId, null, null);
+    }
+
+    public List<CandidateResponse> getCandidatesByJob(String jobId, String loginId, Integer limit, Integer offset) {
+        boolean paginated = limit != null;
+        String sql = """
                 select c.id, ja.job_id, c.name, c.email, c.phone_number, c.linkedin_url, c.created_at, ja.stage,
                        c.cv_text, c.skills, c.current_title, c.location, c.state, c.years_experience,
                        c.seniority_level, c.expected_salary_min, c.expected_salary_max, c.salary_currency,
@@ -264,7 +269,17 @@ public class CandidateService {
                   and ja.is_active = true
                   and c.is_active = true
                 order by ja.created_at desc
-                """, CANDIDATE_MAPPER, jobId, loginId);
+                """
+                + (paginated ? "limit ? offset ?" : "");
+
+        List<Object> params = new ArrayList<>();
+        params.add(jobId);
+        params.add(loginId);
+        if (paginated) {
+            params.add(limit);
+            params.add(offset != null ? offset : 0);
+        }
+        return jdbc.query(sql, CANDIDATE_MAPPER, params.toArray());
     }
 
     public List<CandidateResponse> getAllCandidates(String loginId) {

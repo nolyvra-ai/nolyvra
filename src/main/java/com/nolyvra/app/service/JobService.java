@@ -16,8 +16,11 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -68,8 +71,22 @@ public class JobService {
                 feePercentage,
                 feeType,
                 fixedFee,
-                computeEstimatedFee(salary, feePercentage, feeType, fixedFee));
+                computeEstimatedFee(salary, feePercentage, feeType, fixedFee),
+                optionalInt(rs, "candidate_count"),
+                optionalInt(rs, "avg_capability_score"));
     };
+
+    // getJob()'s plain query has neither column (no aggregate join there — a
+    // single-job fetch has no need for it); listJobs()'s aggregate query
+    // always supplies candidate_count (coalesced to 0) and avg_capability_score.
+    private static Integer optionalInt(ResultSet rs, String column) {
+        try {
+            Object value = rs.getObject(column);
+            return value != null ? ((Number) value).intValue() : null;
+        } catch (SQLException e) {
+            return null;
+        }
+    }
 
     // ─── Estimated fee — FIXED: the flat fee as-is. PERCENTAGE (default,
     // including pre-existing jobs with no fee_type set): salary * fee% / 100.
@@ -106,20 +123,55 @@ public class JobService {
                 req.stackTags() != null ? req.stackTags() : List.of(),
                 Instant.now(), req.jobStatus(),
                 req.salary(), req.currency(), req.feePercentage(), feeType, req.fixedFee(),
-                computeEstimatedFee(req.salary(), req.feePercentage(), feeType, req.fixedFee()));
+                computeEstimatedFee(req.salary(), req.feePercentage(), feeType, req.fixedFee()),
+                0, null);
     }
 
     // ─── List ─────────────────────────────────────────────────────────────────
+    // candidate_count/avg_capability_score are computed here (not fetched
+    // per-job by the frontend) specifically so JobsPage can page the jobs
+    // list without an N+1 candidates+analysis fetch per job just to render
+    // those two table columns.
 
     public List<JobResponse> listJobs(String loginId) {
-        return jdbc.query("""
-                select id, title, company, job_type, jd_text, created_at, location, status,
-                       salary, currency, fee_percentage, fee_type, fixed_fee
-                from jobs
-                where login_id = ?
-                  and is_active = true
-                order by created_at desc
-                """, JOB_MAPPER, loginId);
+        return listJobs(loginId, null, null);
+    }
+
+    public List<JobResponse> listJobs(String loginId, Integer limit, Integer offset) {
+        boolean paginated = limit != null;
+        String sql = """
+                select j.id, j.title, j.company, j.job_type, j.jd_text, j.created_at, j.location, j.status,
+                       j.salary, j.currency, j.fee_percentage, j.fee_type, j.fixed_fee,
+                       coalesce(stats.candidate_count, 0) as candidate_count,
+                       stats.avg_capability_score
+                from jobs j
+                left join (
+                    select ja.job_id,
+                           count(distinct ja.candidate_id) as candidate_count,
+                           avg(latest.capability_score) as avg_capability_score
+                    from job_applications ja
+                    left join lateral (
+                        select a.capability_score
+                        from analyses a
+                        where a.candidate_id = ja.candidate_id and a.job_id = ja.job_id
+                        order by a.analyzed_at desc
+                        limit 1
+                    ) latest on true
+                    where ja.is_active = true
+                    group by ja.job_id
+                ) stats on stats.job_id = j.id
+                where j.login_id = ? and j.is_active = true
+                order by j.created_at desc
+                """
+                + (paginated ? "limit ? offset ?" : "");
+
+        List<Object> params = new ArrayList<>();
+        params.add(loginId);
+        if (paginated) {
+            params.add(limit);
+            params.add(offset != null ? offset : 0);
+        }
+        return jdbc.query(sql, JOB_MAPPER, params.toArray());
     }
 
     // ─── Get single ───────────────────────────────────────────────────────────

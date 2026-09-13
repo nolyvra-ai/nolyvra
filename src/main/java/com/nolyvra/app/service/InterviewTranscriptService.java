@@ -225,7 +225,7 @@ public class InterviewTranscriptService {
         return jdbc.query("""
                 select consistency_score, capability_score, risk_level, ai_summary_json
                 from analyses
-                where candidate_id = ? and (job_id = ? or ? is null)
+                where candidate_id = ? and (job_id = ? or ?::text is null)
                 order by analyzed_at desc nulls last
                 limit 1
                 """, rs -> {

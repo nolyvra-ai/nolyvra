@@ -10,6 +10,7 @@ import com.nolyvra.app.model.CandidateListItemResponse;
 import com.nolyvra.app.model.CandidateResponse;
 import com.nolyvra.app.model.CandidateSearchResult;
 import com.nolyvra.app.model.CandidateUpdateRequest;
+import com.nolyvra.app.model.InterviewSessionResponse;
 import com.nolyvra.app.model.JobApplicationResponse;
 import com.nolyvra.app.model.StageUpdateRequest;
 import com.nolyvra.app.service.CandidateExperienceService;
@@ -17,6 +18,7 @@ import com.nolyvra.app.service.CandidateFileService;
 import com.nolyvra.app.service.CandidateService;
 import com.nolyvra.app.service.CvFormatService;
 import com.nolyvra.app.service.InterviewQuestionsService;
+import com.nolyvra.app.service.InterviewSessionService;
 import com.nolyvra.app.service.JobApplicationService;
 import com.nolyvra.app.service.NexusPipelineEventPublisher;
 import com.nolyvra.app.service.TalentSearchService;
@@ -48,6 +50,7 @@ public class CandidatesController {
     private final CandidateFileService candidateFileService;
     private final CandidateExperienceService candidateExperienceService;
     private final JobApplicationService jobApplicationService;
+    private final InterviewSessionService interviewSessionService;
     private final ObjectMapper objectMapper;
     private final NexusPipelineEventPublisher nexusPipelineEventPublisher;
 
@@ -59,6 +62,7 @@ public class CandidatesController {
                                 CandidateFileService candidateFileService,
                                 CandidateExperienceService candidateExperienceService,
                                 JobApplicationService jobApplicationService,
+                                InterviewSessionService interviewSessionService,
                                 ObjectMapper objectMapper,
                                 NexusPipelineEventPublisher nexusPipelineEventPublisher) {
         this.candidateService          = candidateService;
@@ -69,6 +73,7 @@ public class CandidatesController {
         this.candidateFileService      = candidateFileService;
         this.candidateExperienceService = candidateExperienceService;
         this.jobApplicationService     = jobApplicationService;
+        this.interviewSessionService   = interviewSessionService;
         this.objectMapper              = objectMapper;
         this.nexusPipelineEventPublisher = nexusPipelineEventPublisher;
     }
@@ -172,8 +177,10 @@ public class CandidatesController {
     @GetMapping("/jobs/{jobId}/candidates")
     public List<CandidateResponse> getCandidatesByJob(
             @PathVariable String jobId,
-            @RequestParam String loginId) {
-        return candidateService.getCandidatesByJob(jobId, loginId);
+            @RequestParam String loginId,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) Integer offset) {
+        return candidateService.getCandidatesByJob(jobId, loginId, limit, offset);
     }
 
     // ── MVP2: All candidates (used by Candidates List page) ─────────────────
@@ -341,6 +348,36 @@ public class CandidatesController {
                 "Stage updated to: " + req.stage(), null);
         nexusPipelineEventPublisher.publishStageChanged(candidateId, loginId, req.stage());
         return Map.of("stage", req.stage(), "status", "updated");
+    }
+
+    // ── Async Audio Interview (Phase 3) — one session per (candidate, job
+    // application). Start/Regenerate share one endpoint: it always deletes any
+    // prior session + prior invitation email log entry first, so only the
+    // latest link is ever valid ───────────────────────────────────────────────
+    @PostMapping("/candidates/{candidateId}/applications/{applicationId}/interview")
+    public InterviewSessionResponse startOrRegenerateInterview(
+            @PathVariable String candidateId,
+            @PathVariable String applicationId,
+            @RequestParam String loginId) {
+        return interviewSessionService.startOrRegenerate(candidateId, applicationId, loginId);
+    }
+
+    // Drives the Jobs Applied card's button/status state — null body means
+    // "no session yet" (Start Audio Interview).
+    @GetMapping("/candidates/{candidateId}/applications/{applicationId}/interview")
+    public InterviewSessionResponse getInterview(
+            @PathVariable String candidateId,
+            @PathVariable String applicationId,
+            @RequestParam String loginId) {
+        return interviewSessionService.getStatus(candidateId, applicationId, loginId).orElse(null);
+    }
+
+    @PostMapping("/candidates/{candidateId}/applications/{applicationId}/interview/analyse")
+    public InterviewSessionResponse analyseInterview(
+            @PathVariable String candidateId,
+            @PathVariable String applicationId,
+            @RequestParam String loginId) {
+        return interviewSessionService.analyse(candidateId, applicationId, loginId);
     }
 
     // ── MVP2: Update recruiter notes ─────────────────────────────────────────
