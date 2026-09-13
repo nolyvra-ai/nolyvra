@@ -151,9 +151,9 @@ export default function Sidebar() {
     if (!loginIdVal || isEmployee) return;
     const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
     const authHeader = { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` };
-    fetch(`${API_BASE}/api/jobs?loginId=${encodeURIComponent(loginIdVal)}`, { headers: authHeader })
-      .then(r => r.ok ? r.json() : [])
-      .then(d => setJobCount(Array.isArray(d) ? d.length : null))
+    fetch(`${API_BASE}/api/jobs/count?loginId=${encodeURIComponent(loginIdVal)}`, { headers: authHeader })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setJobCount(typeof d?.count === "number" ? d.count : null))
       .catch(() => {});
     fetch(`${API_BASE}/api/candidates/count?loginId=${encodeURIComponent(loginIdVal)}`, { headers: authHeader })
       .then(r => r.ok ? r.json() : null)
