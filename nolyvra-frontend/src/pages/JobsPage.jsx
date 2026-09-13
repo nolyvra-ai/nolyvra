@@ -188,6 +188,7 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
   }
 
   return (
+    <Box sx={{ overflowX: "auto" }}>
     <Table>
       <TableHead>
         <TableRow>
@@ -281,6 +282,7 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
         ))}
       </TableBody>
     </Table>
+    </Box>
   );
 }
 
@@ -1018,6 +1020,7 @@ export default function JobsPage() {
           border: `1px solid ${BORDER}`, borderRadius: "10px",
           boxShadow: "0 1px 3px rgba(0,0,0,0.05)", overflow: "hidden", mb: 1.75
         }}>
+          <Box sx={{ overflowX: "auto" }}>
           <Table>
             <TableHead>
               <TableRow>
@@ -1169,6 +1172,7 @@ export default function JobsPage() {
               })}
             </TableBody>
           </Table>
+          </Box>
           {!search && jobsHasMore && (
             <Box sx={{ display: "flex", justifyContent: "center", py: 1.5, borderTop: `1px solid ${BORDER}` }}>
               <Button variant="outlined" onClick={handleLoadMoreJobs} disabled={jobsLoadingMore}
