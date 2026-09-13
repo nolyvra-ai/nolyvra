@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Box, Drawer, Tooltip } from "@mui/material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAppMode } from "../context/AppModeContext";
+import { usePlanLimit } from "../hooks/usePlanLimit";
 
 const W_FULL      = 224;
 const W_COLLAPSED = 64;
@@ -98,16 +99,52 @@ function Section({ label, isNew = false, collapsed, children }) {
   );
 }
 
+function GoPremiumCard() {
+  const nav = useNavigate();
+  return (
+    <Box sx={{ px: "10px", pb: "12px" }}>
+      <Box sx={{
+        borderRadius: "12px", p: "14px",
+        background: `linear-gradient(135deg, ${ACCENT} 0%, ${PURPLE} 100%)`,
+        boxShadow: "0 4px 14px rgba(124,58,237,0.35)",
+      }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: "8px", mb: "12px" }}>
+          <Box sx={{
+            width: 30, height: 30, borderRadius: "8px", flexShrink: 0,
+            bgcolor: "rgba(255,255,255,0.18)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="#fff"><path d="M2 19h20l-2-9-5 4-3-8-3 8-5-4z"/></svg>
+          </Box>
+          <Box sx={{ minWidth: 0 }}>
+            <Box sx={{ color: "#fff", fontSize: 13, fontWeight: 700, lineHeight: 1.25 }}>Go Premium</Box>
+            <Box sx={{ color: "rgba(255,255,255,0.75)", fontSize: 10.5, lineHeight: 1.3 }}>Unlock all features</Box>
+          </Box>
+        </Box>
+        <Box onClick={() => nav("/pricing")} sx={{
+          bgcolor: "#fff", color: ACCENT, fontSize: 12, fontWeight: 700,
+          textAlign: "center", borderRadius: "7px", py: "7px", cursor: "pointer",
+          transition: "background .15s",
+          "&:hover": { bgcolor: "rgba(255,255,255,0.9)" },
+        }}>
+          Check Pricing
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
 export default function Sidebar() {
   const loginId    = localStorage.getItem("name")    || "";
   const loginIdVal = localStorage.getItem("loginId") || "";
   const isEmployee  = localStorage.getItem("authType") === "EMPLOYEE";
-  const [collapsed,      setCollapsed]      = useState(true);
+  const [collapsed,      setCollapsed]      = useState(false);
   const [jobCount,       setJobCount]       = useState(null);
   const [candidateCount, setCandidateCount] = useState(null);
   const [grievanceEnabled, setGrievanceEnabled] = useState(true);
 
   const { mode } = useAppMode();
+  const { usage } = usePlanLimit();
   const W = collapsed ? W_COLLAPSED : W_FULL;
 
   useEffect(() => {
@@ -263,6 +300,8 @@ export default function Sidebar() {
           </>
         )}
       </Box>
+
+      {!collapsed && !isEmployee && usage?.planName === "Free" && <GoPremiumCard />}
 
       {/* User footer */}
       <Box sx={{ px: "10px", py: "12px", borderTop: `1px solid ${SIDEBAR_BORDER}`, flexShrink: 0 }}>
