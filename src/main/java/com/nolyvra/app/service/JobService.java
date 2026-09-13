@@ -111,6 +111,13 @@ public class JobService {
 
     // ─── List ─────────────────────────────────────────────────────────────────
 
+    public long countJobs(String loginId) {
+        Long count = jdbc.queryForObject(
+                "select count(*) from jobs where login_id = ? and is_active = true",
+                Long.class, loginId);
+        return count == null ? 0L : count;
+    }
+
     public List<JobResponse> listJobs(String loginId) {
         return jdbc.query("""
                 select id, title, company, job_type, jd_text, created_at, location, status,
