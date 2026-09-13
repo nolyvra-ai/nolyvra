@@ -177,8 +177,10 @@ public class CandidatesController {
     @GetMapping("/jobs/{jobId}/candidates")
     public List<CandidateResponse> getCandidatesByJob(
             @PathVariable String jobId,
-            @RequestParam String loginId) {
-        return candidateService.getCandidatesByJob(jobId, loginId);
+            @RequestParam String loginId,
+            @RequestParam(required = false) Integer limit,
+            @RequestParam(required = false) Integer offset) {
+        return candidateService.getCandidatesByJob(jobId, loginId, limit, offset);
     }
 
     // ── MVP2: All candidates (used by Candidates List page) ─────────────────

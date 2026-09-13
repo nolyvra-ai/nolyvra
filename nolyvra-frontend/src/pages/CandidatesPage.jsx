@@ -14,6 +14,7 @@ import BookmarkBorderIcon from "@mui/icons-material/BookmarkBorder";
 import CloseIcon from "@mui/icons-material/Close";
 import { useNavigate } from "react-router-dom";
 import { usePlanLimit } from "../hooks/usePlanLimit";
+import ColumnPickerButton from "../components/ColumnPickerButton";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const BORDER = "#E8ECF2", MUTED = "#9AA3B4", TEXT = "#0F1623", ACCENT = "#1D72E8";
@@ -136,6 +137,25 @@ const SUMMARY_FIELDS = [
   { key: "minSalary",    label: "Min Expected Salary", get: c => formatMinSalary(c) },
 ];
 
+// Extra, opt-in columns — checked via ColumnPickerButton, List view only.
+// Appended after SUMMARY_FIELDS rather than replacing any default column.
+const CANDIDATE_OPTIONAL_FIELDS = [
+  { key: "currentCompany",  label: "Current Company",  get: c => c.currentCompany || "—" },
+  { key: "seniorityLevel",  label: "Seniority Level",  get: c => c.seniorityLevel || "—" },
+  { key: "maxSalary",       label: "Max Expected Salary", get: c => c.expectedSalaryMax != null ? `${c.salaryCurrency || "AUD"} ${Number(c.expectedSalaryMax).toLocaleString()}` : "—" },
+  { key: "noticePeriodWeeks", label: "Notice Period",  get: c => c.noticePeriodWeeks != null ? `${c.noticePeriodWeeks} wk` : "—" },
+  { key: "workRights",      label: "Work Rights",      get: c => c.workRights || "—" },
+  { key: "remoteFlexible",  label: "Remote Flexible",  get: c => c.remoteFlexible == null ? "—" : (c.remoteFlexible ? "Yes" : "No") },
+  { key: "matchedSkills",   label: "Matched Skills",   get: c => skillsPreview(c.matchedSkills) },
+  { key: "gapSkills",       label: "Gap Skills",       get: c => skillsPreview(c.gapSkills) },
+  { key: "consistencyScore", label: "Consistency Score", get: c => c.consistencyScore != null ? `${c.consistencyScore}%` : "—" },
+  { key: "capabilityScore", label: "Capability Score", get: c => c.capabilityScore != null ? `${c.capabilityScore}%` : "—" },
+  { key: "riskLevel",       label: "Risk Level",       get: c => c.riskLevel || "—" },
+  { key: "status",          label: "Status",           get: c => c.status || "—" },
+  { key: "updatedAt",       label: "Last Updated",     get: c => formatUpdatedAt(c.updatedAt) },
+  { key: "distanceKm",      label: "Distance",         get: c => c.distanceKm != null ? `${Number(c.distanceKm).toFixed(1)} km` : "—" },
+];
+
 export default function CandidatesPage() {
   const nav = useNavigate();
   const loginId = localStorage.getItem("loginId") || "";
@@ -143,6 +163,14 @@ export default function CandidatesPage() {
 
   const [limitDialog, setLimitDialog] = useState(false);
   const [analysisDialog, setAnalysisDialog] = useState(false);
+  const [extraCandidateColumns, setExtraCandidateColumns] = useState(new Set());
+  function toggleExtraCandidateColumn(key) {
+    setExtraCandidateColumns(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
 
   // ── Filter panel state ───────────────────────────────────────────────────
   const [jobTitleKeywords, setJobTitleKeywords] = useState("");
@@ -471,6 +499,9 @@ export default function CandidatesPage() {
             <Box component="button" onClick={() => setViewMode("list")} sx={toggleBtn(viewMode === "list")}>List</Box>
             <Box component="button" onClick={() => setViewMode("grid")} sx={toggleBtn(viewMode === "grid")}>Grid</Box>
           </Box>
+          {viewMode === "list" && (
+            <ColumnPickerButton options={CANDIDATE_OPTIONAL_FIELDS} selected={extraCandidateColumns} onToggle={toggleExtraCandidateColumn} />
+          )}
         </Box>
       </Box>
 
@@ -493,7 +524,9 @@ export default function CandidatesPage() {
               <Table size="small">
                 <TableHead>
                   <TableRow sx={{ bgcolor: SURFACE }}>
-                    {["Name", ...SUMMARY_FIELDS.map(f => f.label), "Match", ""].map(h => (
+                    {["Name", ...SUMMARY_FIELDS.map(f => f.label),
+                      ...CANDIDATE_OPTIONAL_FIELDS.filter(f => extraCandidateColumns.has(f.key)).map(f => f.label),
+                      "Match", ""].map(h => (
                       <TableCell key={h} sx={{ fontSize: 11, fontWeight: 700, color: MUTED, borderBottom: `1px solid ${BORDER}`, py: 1.25, whiteSpace: "nowrap" }}>{h}</TableCell>
                     ))}
                   </TableRow>
@@ -522,6 +555,11 @@ export default function CandidatesPage() {
                                 LinkedIn ↗
                               </Typography>
                             ) : f.get(c)}
+                          </TableCell>
+                        ))}
+                        {CANDIDATE_OPTIONAL_FIELDS.filter(f => extraCandidateColumns.has(f.key)).map(f => (
+                          <TableCell key={f.key} sx={{ py: 1, borderBottom: `1px solid ${BORDER}`, fontSize: 12, color: TEXT, whiteSpace: "nowrap", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {f.get(c)}
                           </TableCell>
                         ))}
                         <TableCell sx={{ py: 1, borderBottom: `1px solid ${BORDER}` }}>

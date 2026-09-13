@@ -20,5 +20,7 @@ public record JobResponse(
     BigDecimal feePercentage,
     String feeType,
     BigDecimal fixedFee,
-    BigDecimal estimatedFee
+    BigDecimal estimatedFee,
+    Integer candidateCount,
+    Integer avgMatchScore
 ) {}
