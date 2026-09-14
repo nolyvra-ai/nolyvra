@@ -49,7 +49,7 @@ public record ClientResponse(
     public record FeeTotal(String currency, BigDecimal amount) {}
 
     public record JobSummary(
-        String title, int daysOld, String status,
+        String id, String title, int daysOld, String status,
         BigDecimal salary, String currency, BigDecimal feePercentage,
         String feeType, BigDecimal fixedFee, BigDecimal estimatedFee) {}
 }

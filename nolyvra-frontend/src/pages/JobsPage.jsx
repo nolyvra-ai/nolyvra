@@ -1146,15 +1146,15 @@ export default function JobsPage() {
                             </IconButton>
                           </Tooltip>
                         )}
-                        {/* ── Edit now navigates to edit page with job prepopulated ── */}
+                        {/* ── View Job opens the read-only Job Detail page (Edit lives there) ── */}
                         <Button size="small" variant="outlined"
-                          onClick={e => { e.stopPropagation(); nav(`/jobs/${job.id}/edit`); }}
+                          onClick={e => { e.stopPropagation(); nav(`/jobs/${job.id}`); }}
                           sx={{
                             fontSize: 11, fontWeight: 500, borderColor: BORDER, color: TEXT,
                             borderRadius: "6px", textTransform: "none",
                             "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE }
                           }}>
-                          Edit
+                          View Job
                         </Button>
                         <Button size="small" variant="outlined"
                           onClick={e => handleRemoveJob(job.id, e)}

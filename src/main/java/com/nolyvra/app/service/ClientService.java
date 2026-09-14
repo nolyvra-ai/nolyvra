@@ -245,7 +245,7 @@ public class ClientService {
 
     public List<ClientResponse.JobSummary> getClientJobs(String companyName, String loginId) {
         return jdbc.query("""
-                SELECT title, status, salary, currency, fee_percentage, fee_type, fixed_fee,
+                SELECT id, title, status, salary, currency, fee_percentage, fee_type, fixed_fee,
                        EXTRACT(DAY FROM now() - created_at)::int AS days_old
                 FROM jobs
                 WHERE login_id = ? AND lower(company) = lower(?)
@@ -260,7 +260,7 @@ public class ClientService {
 
     public List<ClientResponse.JobSummary> getAllClientJobs(String companyName, String loginId) {
         return jdbc.query("""
-                SELECT title, status, salary, currency, fee_percentage, fee_type, fixed_fee,
+                SELECT id, title, status, salary, currency, fee_percentage, fee_type, fixed_fee,
                        EXTRACT(DAY FROM now() - created_at)::int AS days_old
                 FROM jobs
                 WHERE login_id = ? AND lower(company) = lower(?)
@@ -276,6 +276,7 @@ public class ClientService {
         String feeType = rs.getString("fee_type");
         BigDecimal fixedFee = rs.getBigDecimal("fixed_fee");
         return new ClientResponse.JobSummary(
+                rs.getString("id"),
                 rs.getString("title"),
                 rs.getInt("days_old"),
                 rs.getString("status"),
@@ -347,6 +348,20 @@ public class ClientService {
                     id, loginId, req.note().trim());
 
         return fetchClientResponse(id, loginId);
+    }
+
+    // ─── GET /api/clients/by-company ──────────────────────────────────────────
+    // Exact (case-insensitive) company-name match — same lookup JobService
+    // already uses to decide whether a job's company is a known client.
+    // Used by the Job Detail page to resolve "which client does this job's
+    // company belong to" for its Client Comms tab.
+
+    public Optional<ClientResponse> findByCompanyName(String loginId, String companyName) {
+        if (companyName == null || companyName.isBlank()) return Optional.empty();
+        List<Long> ids = jdbc.query(
+                "SELECT id FROM clients WHERE login_id = ? AND lower(company_name) = lower(?)",
+                (rs, i) -> rs.getLong("id"), loginId, companyName);
+        return ids.isEmpty() ? Optional.empty() : Optional.of(fetchClientResponse(ids.get(0), loginId));
     }
 
     private ClientResponse fetchClientResponse(Long id, String loginId) {

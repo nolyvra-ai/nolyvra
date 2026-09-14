@@ -1231,27 +1231,6 @@ export default function AddCandidatePage() {
                   <Box sx={{ flex: 1, height: 1, bgcolor: BORDER }} />
                 </Box>
 
-                {/* PII disclaimer */}
-                <Box
-                  sx={{
-                    display: "flex",
-                    gap: 1,
-                    bgcolor: WARN_BG,
-                    border: `1px solid ${WARN_BORDER}`,
-                    borderRadius: "7px",
-                    p: 1.25,
-                    mb: 1.5,
-                  }}
-                >
-                  <Typography sx={{ fontSize: 13, flexShrink: 0, mt: 0.1 }}>🔒</Typography>
-                  <Typography sx={{ fontSize: 11, color: WARN_TEXT, lineHeight: 1.6 }}>
-                    <strong>Do not include any personally identifiable information</strong> (phone
-                    numbers, addresses, national ID or other PII) beyond what is needed for
-                    analysis. nolyvra does not store any personally identifiable information
-                    entered in this field.
-                  </Typography>
-                </Box>
-
                 <TextField
                   fullWidth
                   multiline

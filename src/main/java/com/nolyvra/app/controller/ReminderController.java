@@ -2,6 +2,7 @@ package com.nolyvra.app.controller;
 
 import com.nolyvra.app.model.ReminderCreateRequest;
 import com.nolyvra.app.model.ReminderResponse;
+import com.nolyvra.app.model.ReminderStatusUpdateRequest;
 import com.nolyvra.app.service.ReminderService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -44,6 +45,18 @@ public class ReminderController {
         if (!done) throw new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Reminder not found: " + reminderId);
         return Map.of("status", "completed");
+    }
+
+    // Drives the Kanban board's drag-and-drop between columns.
+    @PatchMapping("/{reminderId}/status")
+    public Map<String, String> updateStatus(
+            @PathVariable Long reminderId,
+            @RequestParam String loginId,
+            @Valid @RequestBody ReminderStatusUpdateRequest req) {
+        boolean updated = reminderService.updateStatus(reminderId, loginId, req.status());
+        if (!updated) throw new ResponseStatusException(HttpStatus.NOT_FOUND,
+                "Reminder not found: " + reminderId);
+        return Map.of("status", req.status());
     }
 
     @DeleteMapping("/{reminderId}")
