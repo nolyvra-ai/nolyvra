@@ -20,7 +20,7 @@ public class SupportChatService {
 
     private final OpenAIClient openAI;
     private final ObjectMapper objectMapper;
-    private final EmailService emailService;
+    private final ResendEmailService resendEmailService;
     private final JdbcTemplate jdbc;
     private final String model;
     private final String escalationEmail;
@@ -28,13 +28,13 @@ public class SupportChatService {
     public SupportChatService(
             OpenAIClient openAI,
             ObjectMapper objectMapper,
-            EmailService emailService,
+            ResendEmailService resendEmailService,
             JdbcTemplate jdbc,
             @Value("${openai.model:gpt-4o-mini}") String model,
             @Value("${support.escalation-email:sayan.b@nolyvra.com}") String escalationEmail) {
         this.openAI = openAI;
         this.objectMapper = objectMapper;
-        this.emailService = emailService;
+        this.resendEmailService = resendEmailService;
         this.jdbc = jdbc;
         this.model = model;
         this.escalationEmail = escalationEmail;
@@ -128,7 +128,7 @@ public class SupportChatService {
         String body = "Login ID: " + loginId
                 + "\nReporter email: " + (reporterEmail != null ? reporterEmail : "unknown")
                 + "\n\nQuestion:\n" + question;
-        emailService.sendSystemEmail(escalationEmail, subject, body);
+        resendEmailService.sendText(escalationEmail, subject, body);
     }
 
     private String lookupEmail(String loginId) {
