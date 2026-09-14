@@ -1,8 +1,10 @@
 import { useState, useEffect, Fragment } from "react";
 import {
   Box, Paper, Typography, Button, TextField, MenuItem,
-  Alert, CircularProgress, LinearProgress, Slider
+  Alert, CircularProgress, LinearProgress, Slider,
+  Dialog, DialogTitle, DialogContent, DialogActions,
 } from "@mui/material";
+import { BarChart } from "@mui/x-charts/BarChart";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { usePlanLimit } from "../hooks/usePlanLimit";
 import SystemEmailTemplatesPanel from "../components/SystemEmailTemplatesPanel";
@@ -176,6 +178,22 @@ function AdminSettingsPanel() {
   const loginId = localStorage.getItem("loginId") || "";
   const name = localStorage.getItem("name") || "";
   const [emailEditorDirty, setEmailEditorDirty] = useState(false);
+
+  const [usageDialogOpen, setUsageDialogOpen] = useState(false);
+  const [usageData,    setUsageData]    = useState(null);
+  const [usageLoading, setUsageLoading] = useState(false);
+  const [usageError,   setUsageError]   = useState("");
+
+  function openUsageAnalysis() {
+    setUsageDialogOpen(true);
+    setUsageLoading(true); setUsageError("");
+    fetch(`${API_BASE}/api/auth/admin/system-usage?loginId=${encodeURIComponent(loginId)}`,
+        { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } })
+      .then(res => { if (!res.ok) throw new Error("Failed to load usage data."); return res.json(); })
+      .then(setUsageData)
+      .catch(e => setUsageError(e.message))
+      .finally(() => setUsageLoading(false));
+  }
 
   function navigateSettings(nextSection) {
     if (emailEditorDirty && !window.confirm("Discard unsaved template changes?")) return;
@@ -790,9 +808,80 @@ function AdminSettingsPanel() {
                 Open tool
               </Button>
             </Box>
+
+            <Box sx={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2,
+              p: 2, mt: 1.5, border: `1px solid ${BORDER}`, borderRadius: "9px", bgcolor: SURFACE,
+            }}>
+              <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, minWidth: 0 }}>
+                <Box sx={{
+                  width: 38, height: 38, borderRadius: "9px", bgcolor: ACCENT_BG, color: ACCENT,
+                  display: "grid", placeItems: "center", fontSize: 20, flexShrink: 0,
+                }}>📊</Box>
+                <Box>
+                  <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: TEXT }}>System Usage Analysis</Typography>
+                  <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.35, lineHeight: 1.5 }}>
+                    Candidate, client and employee counts per tenant, side by side.
+                  </Typography>
+                </Box>
+              </Box>
+              <Button
+                variant="contained"
+                onClick={openUsageAnalysis}
+                sx={{ flexShrink: 0, textTransform: "none", borderRadius: "7px", fontSize: 11.5, boxShadow: "none" }}
+              >
+                View Analysis
+              </Button>
+            </Box>
           </Box>
         </Paper>
       )}
+
+      <Dialog open={usageDialogOpen} onClose={() => setUsageDialogOpen(false)} maxWidth="lg" fullWidth>
+        <DialogTitle sx={{ fontSize: 15, fontWeight: 700, color: TEXT }}>System Usage Analysis</DialogTitle>
+        <DialogContent>
+          {usageLoading ? (
+            <Box sx={{ display: "flex", justifyContent: "center", py: 5 }}>
+              <CircularProgress size={24} sx={{ color: ACCENT }} />
+            </Box>
+          ) : usageError ? (
+            <Alert severity="error">{usageError}</Alert>
+          ) : usageData && (
+            <>
+              <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", mb: 2.5 }}>
+                {[
+                  ["Total Candidates", usageData.reduce((s, r) => s + Number(r.candidateCount || 0), 0)],
+                  ["Total Clients",    usageData.reduce((s, r) => s + Number(r.clientCount || 0), 0)],
+                  ["Total Employees",  usageData.reduce((s, r) => s + Number(r.employeeCount || 0), 0)],
+                ].map(([label, value]) => (
+                  <Paper key={label} elevation={0} sx={{ border: `1px solid ${BORDER}`, borderRadius: "9px", p: 2, flex: 1, minWidth: 150 }}>
+                    <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      {label}
+                    </Typography>
+                    <Typography sx={{ fontSize: 22, fontWeight: 800, color: TEXT, mt: 0.5 }}>{value}</Typography>
+                  </Paper>
+                ))}
+              </Box>
+
+              <Box sx={{ overflowX: "auto" }}>
+                <BarChart
+                  xAxis={[{ scaleType: "band", data: usageData.map(r => r.name || r.email || r.loginId) }]}
+                  series={[
+                    { data: usageData.map(r => Number(r.candidateCount || 0)), label: "Candidates", color: ACCENT },
+                    { data: usageData.map(r => Number(r.clientCount || 0)),    label: "Clients",    color: SUCCESS },
+                    { data: usageData.map(r => Number(r.employeeCount || 0)),  label: "Employees",  color: PURPLE },
+                  ]}
+                  height={340}
+                  width={Math.max(640, usageData.length * 90)}
+                />
+              </Box>
+            </>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setUsageDialogOpen(false)} sx={{ textTransform: "none", color: MUTED }}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
       {activeSection === "email" && isAdmin && (
         <SystemEmailTemplatesPanel selectedKey={templateKey} onDirtyChange={setEmailEditorDirty} />

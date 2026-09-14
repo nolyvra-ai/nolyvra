@@ -252,6 +252,7 @@ function formatFeeTotals(totals) {
 
 // ─── Client row ───────────────────────────────────────────────────────────────
 function ClientRow({ client, onEdit, onSelect, onInvoice, hubSpotStatus }) {
+  const nav = useNavigate();
   const feeLabel = formatFeeTotals(client.totalFee);
   const hubSpotLinked = Boolean(hubSpotStatus?.linked);
   const hubSpotFailed = hubSpotStatus?.state === "sync_failed";
@@ -326,7 +327,14 @@ function ClientRow({ client, onEdit, onSelect, onInvoice, hubSpotStatus }) {
         {client.recentJobs?.length > 0 ? (
           client.recentJobs.map((job, i) => (
             <Box key={i} sx={{ display: "flex", alignItems: "center", gap: "6px", mb: "3px" }}>
-              <Box sx={{ fontSize: 12, color: TEXT, fontWeight: 500, flexShrink: 0 }}>{job.title}</Box>
+              <Box onClick={e => { e.stopPropagation(); job.id && nav(`/jobs/${job.id}`); }}
+                sx={{
+                  fontSize: 12, color: TEXT, fontWeight: 500, flexShrink: 0,
+                  cursor: job.id ? "pointer" : "default",
+                  "&:hover": job.id ? { color: ACCENT, textDecoration: "underline" } : {},
+                }}>
+                {job.title}
+              </Box>
               <Box sx={{ fontSize: 11, color: MUTED, flexShrink: 0 }}>· {job.daysOld}d</Box>
               <JobStatusTag status={job.status} />
             </Box>
@@ -1033,9 +1041,13 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
                 <TabEmptyState icon="💼" title="No Jobs Found" desc="Jobs for this client will appear here." />
               )}
               {!loading && !err && jobs.map((job, i) => (
-                <Box key={i} sx={{
+                <Box key={i} onClick={() => job.id && nav(`/jobs/${job.id}`)} sx={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
-                  py: "10px", borderBottom: i < jobs.length - 1 ? `1px solid ${BORDER}` : "none",
+                  py: "10px", px: "8px", mx: "-8px", borderRadius: "6px",
+                  borderBottom: i < jobs.length - 1 ? `1px solid ${BORDER}` : "none",
+                  cursor: job.id ? "pointer" : "default",
+                  transition: "background .15s",
+                  "&:hover": job.id ? { bgcolor: ACCENT_L } : {},
                 }}>
                   <Box>
                     <Box sx={{ display: "flex", alignItems: "center", gap: "8px" }}>

@@ -7,15 +7,16 @@ import { usePlanLimit } from "../hooks/usePlanLimit";
 const W_FULL      = 224;
 const W_COLLAPSED = 64;
 
-const SIDEBAR_BG     = "#0F1623";
-const SIDEBAR_BORDER = "rgba(255,255,255,0.06)";
-const SIDEBAR_HOVER  = "rgba(255,255,255,0.06)";
-const SIDEBAR_ACTIVE = "rgba(29,114,232,0.22)";
+const SIDEBAR_BG     = "#FFFFFF";
+const SIDEBAR_BORDER = "#E8ECF2";
+const SIDEBAR_HOVER  = "#F1F3F7";
+const SIDEBAR_ACTIVE = "#EBF2FF";
 const ACCENT         = "#1D72E8";
 const PURPLE         = "#7C3AED";
-const TEXT_DIM       = "rgba(255,255,255,0.5)";
-const TEXT_ACTIVE    = "#ffffff";
-const TEXT_LABEL     = "rgba(255,255,255,0.25)";
+const TEXT           = "#0F1623";
+const TEXT_DIM        = "#5A6480";
+const TEXT_ACTIVE    = "#1D72E8";
+const TEXT_LABEL     = "#9AA3B4";
 
 function SectionLabel({ children, isNew = false, collapsed }) {
   if (collapsed) return <Box sx={{ height: 8 }} />;
@@ -29,8 +30,8 @@ function SectionLabel({ children, isNew = false, collapsed }) {
       {children}
       {isNew && (
         <Box sx={{
-          fontSize: 9, color: "rgba(180,160,255,0.7)", letterSpacing: ".5px",
-          background: "rgba(124,58,237,0.2)", px: "5px", py: "1px",
+          fontSize: 9, color: PURPLE, letterSpacing: ".5px",
+          background: "rgba(124,58,237,0.12)", px: "5px", py: "1px",
           borderRadius: "3px", fontWeight: 700
         }}>NEW</Box>
       )}
@@ -62,7 +63,7 @@ function NavItem({ to, icon, label, badge, isNew = false, collapsed }) {
       mb: "1px", transition: "all .15s",
       "&:hover": to ? {
         bgcolor: active ? SIDEBAR_ACTIVE : SIDEBAR_HOVER,
-        color: "rgba(255,255,255,0.85)"
+        color: active ? TEXT_ACTIVE : TEXT
       } : {},
       userSelect: "none",
     }}>
@@ -176,7 +177,7 @@ export default function Sidebar() {
       width: W, flexShrink: 0,
       transition: "width .2s ease",
       "& .MuiDrawer-paper": {
-        width: W, bgcolor: SIDEBAR_BG, color: "#fff",
+        width: W, bgcolor: SIDEBAR_BG, color: TEXT,
         border: "none", borderRight: `1px solid ${SIDEBAR_BORDER}`,
         boxShadow: "none", display: "flex", flexDirection: "column",
         overflow: "visible", transition: "width .2s ease",
@@ -196,7 +197,7 @@ export default function Sidebar() {
           color: TEXT_DIM,
           "&:hover": { bgcolor: ACCENT, color: "#fff", borderColor: ACCENT },
           transition: "all .15s",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+          boxShadow: "0 2px 6px rgba(15,22,35,0.15)",
         }}>
           <span style={{ fontSize: 10 }}>{collapsed ? "▶" : "◀"}</span>
         </Box>
@@ -211,18 +212,12 @@ export default function Sidebar() {
         flexShrink: 0, gap: 1
       }}>
         {!collapsed && (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <img src="/nolyvra_logo.png" alt="nolyvra"
-              style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover" }} />
-            <Box>
-              <Box sx={{ color: "#fff", fontSize: 14, fontWeight: 600, lineHeight: 1.2 }}>nolyvra</Box>
-              <Box sx={{ fontSize: 9, color: "rgba(255,255,255,0.3)", lineHeight: 1.2 }}>MVP v2.0</Box>
-            </Box>
-          </Box>
+          <img src="/nolyvra_white_logo.png" alt="nolyvra"
+            style={{ height: 30, width: "auto", objectFit: "contain" }} />
         )}
         {collapsed && (
-          <img src="/nolyvra_logo.png" alt="nolyvra"
-            style={{ width: 32, height: 32, borderRadius: 6, objectFit: "cover" }} />
+          <img src="/nolyvra_white_logo.png" alt="nolyvra"
+            style={{ width: 32, height: 32, objectFit: "cover", objectPosition: "left center" }} />
         )}
       </Box>
 
@@ -322,10 +317,10 @@ export default function Sidebar() {
             </Box>
             {!collapsed && (
               <Box>
-                <Box sx={{ color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: 500, lineHeight: 1.3 }}>
+                <Box sx={{ color: TEXT, fontSize: 12, fontWeight: 500, lineHeight: 1.3 }}>
                   {loginId}
                 </Box>
-                <Box sx={{ color: "rgba(255,255,255,0.3)", fontSize: 10, lineHeight: 1.3 }}>{isEmployee ? "Employee" : "Recruiter"}</Box>
+                <Box sx={{ color: TEXT_LABEL, fontSize: 10, lineHeight: 1.3 }}>{isEmployee ? "Employee" : "Recruiter"}</Box>
               </Box>
             )}
           </Box>

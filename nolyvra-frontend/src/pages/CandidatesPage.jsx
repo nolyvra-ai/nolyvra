@@ -270,8 +270,7 @@ export default function CandidatesPage() {
   }
 
   function viewProfile(c) {
-    if (c.status === "Analysed") nav(`/analysis/${c.candidateId}`);
-    else nav(`/candidates/${c.candidateId}/workflow`);
+    nav(`/candidates/${c.candidateId}/workflow`);
   }
 
   async function handleRunAnalysis(candidateId) {
