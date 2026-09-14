@@ -11,5 +11,6 @@ public record PlanUsageResponse(
         int currentCandidates,
         int maxTokens,
         int tokensRemaining,
-        LocalDate renewDate
+        LocalDate renewDate,
+        boolean trialExpired
 ) {}
