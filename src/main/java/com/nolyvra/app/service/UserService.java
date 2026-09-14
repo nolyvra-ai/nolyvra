@@ -164,6 +164,45 @@ public class UserService {
                 });
     }
 
+    // ─── System usage analysis (admin) ────────────────────────────────────────
+    // One row per tenant — candidate/client/employee counts, same filters as
+    // each table's own "active" convention (is_active / status = 'CLIENT').
+    // Every login is included (even zero-usage ones) since seeing who ISN'T
+    // using the product is part of the point of this analysis.
+
+    public List<Map<String, Object>> getSystemUsage() {
+        return jdbc.query("""
+                select l.id, l.name, l.email,
+                       coalesce(cand.cnt, 0) as candidate_count,
+                       coalesce(cli.cnt, 0)  as client_count,
+                       coalesce(emp.cnt, 0)  as employee_count
+                from login l
+                left join (
+                    select login_id, count(*) as cnt from candidates
+                    where is_active = true group by login_id
+                ) cand on cand.login_id = l.id
+                left join (
+                    select login_id, count(*) as cnt from clients
+                    where status = 'CLIENT' group by login_id
+                ) cli on cli.login_id = l.id
+                left join (
+                    select login_id, count(*) as cnt from employees
+                    where is_active = true group by login_id
+                ) emp on emp.login_id = l.id
+                order by (coalesce(cand.cnt, 0) + coalesce(cli.cnt, 0) + coalesce(emp.cnt, 0)) desc
+                """,
+                (rs, r) -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("loginId",        rs.getString("id"));
+                    m.put("name",           rs.getString("name"));
+                    m.put("email",          rs.getString("email"));
+                    m.put("candidateCount", rs.getLong("candidate_count"));
+                    m.put("clientCount",    rs.getLong("client_count"));
+                    m.put("employeeCount",  rs.getLong("employee_count"));
+                    return m;
+                });
+    }
+
     // ─── Onboard a registered user ────────────────────────────────────────────
 
     public Map<String, Object> onboardUser(String targetLoginId, String adminLoginId) {

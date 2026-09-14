@@ -55,6 +55,17 @@ public class ClientController {
         return ResponseEntity.ok(clientService.getClients(loginId, limit, offset, search));
     }
 
+    // Exact company-name match — used by the Job Detail page's Client Comms tab
+    // to resolve which client (if any) a job's company field belongs to.
+    @GetMapping("/by-company")
+    public ResponseEntity<ClientResponse> getClientByCompany(
+            @RequestParam String loginId,
+            @RequestParam String company) {
+        return clientService.findByCompanyName(loginId, company)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @GetMapping("/stats")
     public ResponseEntity<ClientService.ClientStats> getClientStats(@RequestParam String loginId) {
         return ResponseEntity.ok(clientService.getClientStats(loginId));

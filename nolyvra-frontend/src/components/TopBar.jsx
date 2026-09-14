@@ -4,10 +4,12 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAppMode } from "../context/AppModeContext";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
-const BG     = "#0F1623";
+const BG     = "#FFFFFF";
 const ACCENT = "#1D72E8";
 const PURPLE = "#7C3AED";
-const BORDER = "rgba(255,255,255,0.05)";
+const BORDER = "#E8ECF2";
+const TEXT   = "#0F1623";
+const MUTED  = "#9AA3B4";
 
 const PILLS = [
   { num: "①", label: "Dashboard",          to: "/dashboard" },
@@ -26,9 +28,9 @@ const PILLS = [
 function NavPill({ num, label, to, active, isNew }) {
   const nav = useNavigate();
   const activeBg    = isNew ? PURPLE : ACCENT;
-  const inactiveBg  = isNew ? "rgba(124,58,237,0.2)" : "transparent";
-  const inactiveColor = isNew ? "rgba(200,180,255,0.8)" : "rgba(255,255,255,0.45)";
-  const inactiveBorder = isNew ? "rgba(124,58,237,0.5)" : "transparent";
+  const inactiveBg  = isNew ? "rgba(124,58,237,0.1)" : "transparent";
+  const inactiveColor = isNew ? PURPLE : MUTED;
+  const inactiveBorder = isNew ? "rgba(124,58,237,0.3)" : "transparent";
 
   return (
     <Box onClick={() => to && nav(to)} sx={{
@@ -40,8 +42,8 @@ function NavPill({ num, label, to, active, isNew }) {
       border: `1px solid ${active ? activeBg : inactiveBorder}`,
       whiteSpace: "nowrap", transition: "all .15s", userSelect: "none", flexShrink: 0,
       "&:hover": to && !active ? {
-        color: "rgba(255,255,255,0.9)",
-        borderColor: isNew ? "rgba(124,58,237,0.8)" : "rgba(255,255,255,0.15)",
+        color: TEXT,
+        borderColor: isNew ? "rgba(124,58,237,0.6)" : BORDER,
       } : {},
     }}>
       {num} {label}
@@ -52,7 +54,7 @@ function NavPill({ num, label, to, active, isNew }) {
 function Arrow() {
   return (
     <Box component="span" sx={{
-      fontSize: 10, color: "rgba(255,255,255,0.18)",
+      fontSize: 10, color: "#D4D8E0",
       lineHeight: 1, userSelect: "none", flexShrink: 0,
     }}>›</Box>
   );
@@ -123,7 +125,7 @@ export default function TopBar() {
         </Box>
       </Box> */} 
 
-      <Box component="span" sx={{ fontSize: 14, color: "rgba(255,255,255,0.15)", mr: 0.5, userSelect: "none", flexShrink: 0 }}>│</Box>
+      <Box component="span" sx={{ fontSize: 14, color: "#D4D8E0", mr: 0.5, userSelect: "none", flexShrink: 0 }}>│</Box>
 
       {isEmployee ? (
         <Box sx={{
@@ -147,7 +149,7 @@ export default function TopBar() {
         </Box>
       ) : (
         <>
-          <Box component="span" sx={{ fontSize: 10, color: "rgba(255,255,255,0.25)", mr: "4px", whiteSpace: "nowrap", userSelect: "none", flexShrink: 0 }}>
+          <Box component="span" sx={{ fontSize: 10, color: MUTED, mr: "4px", whiteSpace: "nowrap", userSelect: "none", flexShrink: 0 }}>
             PAGES:
           </Box>
           {PILLS.map((pill, i) => (
@@ -164,8 +166,8 @@ export default function TopBar() {
         <Box sx={{
           ml: "auto", display: "flex", alignItems: "center", gap: "5px",
           px: "10px", py: "4px", borderRadius: "20px", flexShrink: 0,
-          border: `1px solid ${tokens < 30 ? "#DC2626" : tokens < 100 ? "#D97706" : "rgba(124,58,237,0.6)"}`,
-          color: tokens < 30 ? "#FF6B6B" : tokens < 100 ? "#FBB040" : "rgba(200,180,255,0.85)",
+          border: `1px solid ${tokens < 30 ? "#DC2626" : tokens < 100 ? "#D97706" : "rgba(124,58,237,0.4)"}`,
+          color: tokens < 30 ? "#DC2626" : tokens < 100 ? "#D97706" : PURPLE,
           fontSize: 11, fontWeight: 600, userSelect: "none",
         }}>
           ✦ {tokens} tokens
@@ -195,7 +197,7 @@ export default function TopBar() {
         userSelect: "none", flexShrink: 0, transition: "all .15s",
         "&:hover": { borderColor: "#3D8EFF", color: "#3D8EFF" },
       }}>
-        <Box component="span" sx={{ color: "rgba(255,255,255,0.25)", mr: "4px" }}>{loginId}</Box>
+        <Box component="span" sx={{ color: MUTED, mr: "4px" }}>{loginId}</Box>
         ⎋ Logout
       </Box>
     </Box>

@@ -11,6 +11,7 @@ public record ReminderResponse(
     String description,
     String reminderType,    // MANUAL | AUTO_ANALYSIS_PENDING | AUTO_SCREENING_STUCK | AUTO_INTERVIEW_UPCOMING | AUTO_FOLLOWUP_PENDING
     String priority,        // Low | Normal | High
+    String status,          // To Do | In Progress | Awaiting Response | Done
     Instant dueAt,
     boolean isCompleted,
     Instant completedAt,

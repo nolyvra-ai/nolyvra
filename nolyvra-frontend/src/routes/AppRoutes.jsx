@@ -6,6 +6,7 @@ import ForgotPasswordPage     from "../pages/ForgotPasswordPage";
 import ResetPasswordPage      from "../pages/ResetPasswordPage";
 import DashboardPage          from "../pages/DashboardPage";
 import JobsPage               from "../pages/JobsPage";
+import JobDetailPage          from "../pages/JobDetailPage";
 import CreateJobPage          from "../pages/CreateJobPage";
 import CreateJobPageModern    from "../pages/CreateJobPageModern";
 import AddCandidatesModernPage from "../pages/AddCandidatesModernPage";
@@ -74,6 +75,7 @@ export default function AppRoutes() {
       <Route path="/jobs/new-classic"                   element={<CreateJobPage />} />
       <Route path="/jobs/:jobId/add-candidates-modern"  element={<AddCandidatesModernPage />} />
       <Route path="/jobs/:jobId/edit"                   element={<CreateJobPage />} />
+      <Route path="/jobs/:jobId"                        element={<JobDetailPage />} />
       <Route path="/candidates"                         element={<CandidatesPage />} />
       <Route path="/candidates/new-modern"              element={<AddCandidateModernPage />} />
       <Route path="/candidates/new"                     element={<AddCandidatePage />} />

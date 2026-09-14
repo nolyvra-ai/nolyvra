@@ -232,6 +232,17 @@ public class AuthController {
         return ResponseEntity.ok(users);
     }
 
+    // GET /api/auth/admin/system-usage?loginId=x
+    // Admin only — candidate/client/employee counts per tenant, for the
+    // Settings → Tools → System Usage Analysis chart.
+    @GetMapping("/admin/system-usage")
+    public ResponseEntity<?> getSystemUsage(@RequestParam String loginId) {
+        if (!userService.isAdmin(loginId)) {
+            return ResponseEntity.status(403).body(Map.of("error", "Access denied."));
+        }
+        return ResponseEntity.ok(userService.getSystemUsage());
+    }
+
     // POST /api/auth/admin/update-limits?loginId=x  ← CHANGE: new endpoint
     // Admin only — sets additional tokens/jobs/candidates for a user
     @PostMapping("/admin/update-limits")

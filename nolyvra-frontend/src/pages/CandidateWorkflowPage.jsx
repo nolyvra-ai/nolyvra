@@ -84,6 +84,25 @@ function Badge({ label, variant = "neutral" }) {
   );
 }
 
+// Small "icon chip + text" row for plain contact facts (email/phone/LinkedIn) —
+// distinct from Badge, which is used for the highlighted location/skills pills.
+function InfoItem({ icon, value, href }) {
+  const content = (
+    <Box sx={{display:"flex",alignItems:"center",gap:0.75}}>
+      <Box sx={{width:22,height:22,borderRadius:"6px",bgcolor:"#F1F3F7",flexShrink:0,
+        display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:MUTED}}>
+        {icon}
+      </Box>
+      <Typography sx={{fontSize:12.5,color:TEXT,fontWeight:500}}>{value}</Typography>
+    </Box>
+  );
+  return href ? (
+    <Box component="a" href={href} target="_blank" rel="noopener noreferrer" sx={{textDecoration:"none"}}>
+      {content}
+    </Box>
+  ) : content;
+}
+
 function NewTag() {
   return (
     <Box sx={{display:"inline-flex",alignItems:"center",px:"7px",py:"2px",
@@ -464,6 +483,12 @@ export default function CandidateWorkflowPage() {
   const [applicationsLoading, setApplicationsLoading] = useState(true);
   const [expandedJobId, setExpandedJobId] = useState(null);
 
+  // Add to Job dropdown (header)
+  const [allJobs,        setAllJobs]        = useState([]);
+  const [addToJobId,     setAddToJobId]     = useState("");
+  const [addingToJob,    setAddingToJob]    = useState(false);
+  const [addToJobError,  setAddToJobError]  = useState("");
+
   // Work Experience / Education
   const [experience, setExperience] = useState(null);
   const [experienceLoading, setExperienceLoading] = useState(true);
@@ -520,6 +545,8 @@ export default function CandidateWorkflowPage() {
       .then(d => setApplications(d || []))
       .catch(() => {})
       .finally(() => setApplicationsLoading(false));
+
+    apiGet("/api/jobs").then(d => setAllJobs(d || [])).catch(() => {});
 
     setExperienceLoading(true);
     apiGet(`/api/candidates/${candidateId}/experience`)
@@ -597,6 +624,21 @@ export default function CandidateWorkflowPage() {
       nav(`/analysis/${candidateId}`);
     } catch(e) { setAnalysisError(e.message); }
     finally { setAnalysisRunning(false); }
+  }
+
+  async function handleAddToJob(jobId) {
+    if (!jobId) return;
+    setAddingToJob(true); setAddToJobError("");
+    try {
+      await apiPost(`/api/candidates/${candidateId}/applications?jobId=${encodeURIComponent(jobId)}`, {});
+      const refreshed = await apiGet(`/api/candidates/${candidateId}/applications`);
+      setApplications(refreshed || []);
+      setAddToJobId("");
+    } catch (e) {
+      setAddToJobError(e.message || "Could not add candidate to that job.");
+    } finally {
+      setAddingToJob(false);
+    }
   }
 
   async function handleRegenerateExperience() {
@@ -822,59 +864,81 @@ export default function CandidateWorkflowPage() {
       {/* Header — person info only */}
       <Box sx={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",
         border:`1px solid ${BORDER}`,borderRadius:"10px",p:"18px 22px",bgcolor:"#fff"}}>
-        <Box sx={{display:"flex",gap:2,alignItems:"center"}}>
+        <Box sx={{display:"flex",gap:2,alignItems:"flex-start",minWidth:0}}>
           <Box sx={{width:52,height:52,borderRadius:"50%",bgcolor:ACCENT,color:"#fff",display:"flex",
             alignItems:"center",justifyContent:"center",fontSize:18,fontWeight:700,flexShrink:0}}>
             {candidate.name?.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase()}
           </Box>
-          <Box>
+          <Box sx={{minWidth:0}}>
             <Typography sx={{fontSize:18,fontWeight:700,color:TEXT}}>{candidate.name}</Typography>
             {candidate.currentTitle && (
               <Typography sx={{fontSize:13,color:MUTED,mt:0.25}}>{candidate.currentTitle}</Typography>
             )}
+
+            <Box sx={{display:"flex",gap:2,flexWrap:"wrap",mt:1.25}}>
+              {candidate.email && <InfoItem icon="✉" value={candidate.email} />}
+              {candidate.phone && <InfoItem icon="☎" value={candidate.phone} />}
+              {candidate.linkedinUrl && <InfoItem icon="🔗" value="LinkedIn" href={candidate.linkedinUrl} />}
+            </Box>
+
             <Box sx={{display:"flex",gap:0.75,flexWrap:"wrap",mt:1}}>
-              {candidate.email && <Badge label={`✉ ${candidate.email}`} />}
-              {candidate.phone && <Badge label={`☎ ${candidate.phone}`} />}
               {(candidate.location || candidate.state) && (
-                <Badge label={`📍 ${[candidate.location, candidate.state].filter(Boolean).join(", ")}`} />
+                <Badge label={`📍 ${[candidate.location, candidate.state].filter(Boolean).join(", ")}`} variant="accent" />
               )}
-              {candidate.linkedinUrl && (
-                <Box component="a" href={candidate.linkedinUrl} target="_blank" rel="noopener noreferrer"
-                  sx={{textDecoration:"none"}}>
-                  <Badge label="🔗 LinkedIn" variant="accent" />
-                </Box>
-              )}
+              {candidate.skills?.slice(0, 8).map(skill => (
+                <Badge key={skill} label={skill} variant="purple" />
+              ))}
             </Box>
           </Box>
         </Box>
-        <Box sx={{display:"flex",gap:1,flexShrink:0}}>
-          <Button variant="outlined" size="small" onClick={() => nav("/candidates")}
-            sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
-            ← Back
-          </Button>
-          <Button variant="outlined" size="small"
-            onClick={() => nav("/candidates/new", { state: { prefill: { candidateId } } })}
-            sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
-            ✎ Edit Profile
-          </Button>
-          <Button variant="outlined" size="small"
-            onClick={() => nav("/email", { state: { candidateId, candidateName: candidate.name, toAddress: candidate.email || "" } })}
-            sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
-            ✉ Send Email
-          </Button>
-          <Tooltip title="Available on paid subscriptions">
-            <span>
-              <Button variant="outlined" size="small" disabled
-                sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
-                💬 Send SMS (available on paid subscriptions)
-              </Button>
-            </span>
-          </Tooltip>
-          <Button variant="contained" size="small"
-            onClick={() => nav("/scheduler", { state: { candidateId } })}
-            sx={{fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>
-            📅 Schedule Interview
-          </Button>
+        <Box sx={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:1,flexShrink:0}}>
+          <Box sx={{display:"flex",gap:1,flexWrap:"wrap",justifyContent:"flex-end"}}>
+            <Button variant="outlined" size="small" onClick={() => nav("/candidates")}
+              sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
+              ← Back
+            </Button>
+            <Button variant="outlined" size="small"
+              onClick={() => nav("/candidates/new", { state: { prefill: { candidateId } } })}
+              sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
+              ✎ Edit Profile
+            </Button>
+            <Button variant="outlined" size="small"
+              onClick={() => nav("/email", { state: { candidateId, candidateName: candidate.name, toAddress: candidate.email || "" } })}
+              sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
+              ✉ Send Email
+            </Button>
+            <Tooltip title="Available on paid subscriptions">
+              <span>
+                <Button variant="outlined" size="small" disabled
+                  sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none"}}>
+                  💬 Send SMS (available on paid subscriptions)
+                </Button>
+              </span>
+            </Tooltip>
+            <Button variant="contained" size="small"
+              onClick={() => nav("/scheduler", { state: { candidateId } })}
+              sx={{fontSize:11,bgcolor:ACCENT,borderRadius:"6px",textTransform:"none",boxShadow:"none","&:hover":{bgcolor:"#1660CC",boxShadow:"none"}}}>
+              📅 Schedule Interview
+            </Button>
+          </Box>
+          <Box sx={{display:"flex",alignItems:"center",gap:1}}>
+            <TextField select size="small" label={addingToJob ? "Adding…" : "Add to Job"}
+              value={addToJobId} disabled={addingToJob}
+              onChange={e => { setAddToJobId(e.target.value); handleAddToJob(e.target.value); }}
+              sx={{width:160,
+                "& .MuiInputBase-root":{borderRadius:"6px",fontSize:11.5},
+                "& .MuiInputLabel-root":{fontSize:11.5},
+              }}>
+              {allJobs.map(job => (
+                <MenuItem key={job.id} value={job.id} sx={{fontSize:12}}>
+                  {job.title}{job.company ? ` — ${job.company}` : ""}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Box>
+          {addToJobError && (
+            <Typography sx={{fontSize:11,color:DANGER,textAlign:"right"}}>{addToJobError}</Typography>
+          )}
         </Box>
       </Box>
 

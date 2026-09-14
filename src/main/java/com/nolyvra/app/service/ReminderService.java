@@ -2,19 +2,25 @@ package com.nolyvra.app.service;
 
 import com.nolyvra.app.model.ReminderCreateRequest;
 import com.nolyvra.app.model.ReminderResponse;
+import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class ReminderService {
 
     private final JdbcTemplate jdbc;
+
+    private static final Set<String> VALID_STATUSES =
+            Set.of("To Do", "In Progress", "Awaiting Response", "Done");
 
     public ReminderService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -33,6 +39,7 @@ public class ReminderService {
                 rs.getString("description"),
                 rs.getString("reminder_type"),
                 rs.getString("priority"),
+                rs.getString("status"),
                 dueAt       != null ? dueAt.toInstant()       : null,
                 rs.getBoolean("is_completed"),
                 completedAt != null ? completedAt.toInstant() : null,
@@ -53,7 +60,7 @@ public class ReminderService {
                 select r.id, r.login_id, r.candidate_id,
                        c.name as candidate_name,
                        r.title, r.description, r.reminder_type,
-                       r.priority, r.due_at, r.is_completed,
+                       r.priority, r.status, r.due_at, r.is_completed,
                        r.completed_at, r.created_at
                 from reminders r
                 left join candidates c on c.id = r.candidate_id
@@ -93,9 +100,29 @@ public class ReminderService {
     public boolean markComplete(Long reminderId, String loginId) {
         int rows = jdbc.update("""
                 update reminders
-                set is_completed = true, completed_at = now()
+                set is_completed = true, completed_at = now(), status = 'Done'
                 where id = ? and login_id = ?
                 """, reminderId, loginId);
+        return rows > 0;
+    }
+
+    // ─── PATCH /api/reminders/{id}/status ────────────────────────────────────
+    // Drives the Kanban board's drag-and-drop between columns. is_completed
+    // stays in sync with status = 'Done' so the existing auto-scan queries
+    // (which filter on is_completed) keep working unchanged.
+
+    public boolean updateStatus(Long reminderId, String loginId, String status) {
+        if (!VALID_STATUSES.contains(status)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid status: " + status);
+        }
+        boolean done = "Done".equals(status);
+        int rows = jdbc.update("""
+                update reminders
+                set status = ?,
+                    is_completed = ?,
+                    completed_at = case when ? then now() else null end
+                where id = ? and login_id = ?
+                """, status, done, done, reminderId, loginId);
         return rows > 0;
     }
 
@@ -256,7 +283,7 @@ public class ReminderService {
                 select r.id, r.login_id, r.candidate_id,
                        c.name as candidate_name,
                        r.title, r.description, r.reminder_type,
-                       r.priority, r.due_at, r.is_completed,
+                       r.priority, r.status, r.due_at, r.is_completed,
                        r.completed_at, r.created_at
                 from reminders r
                 left join candidates c on c.id = r.candidate_id
