@@ -281,7 +281,7 @@ export default function PublicInterviewPage() {
           <Typography sx={{ fontSize: 14, color: MUTED, mb: 2.5, lineHeight: 1.6 }}>
             Thanks for your interest in the <b style={{ color: TEXT }}>{intro?.jobTitle}</b>
             {intro?.companyName ? <> role at <b style={{ color: TEXT }}>{intro.companyName}</b></> : null}. As the
-            next step, we'd like you to complete a short audio interview — you'll answer {questions.length}{" "}
+            next step, we'd like you to complete a short automated voice pre-screening — you'll answer {questions.length}{" "}
             question{questions.length === 1 ? "" : "s"} by recording short audio responses (no video, nothing to
             schedule). You'll have {intro?.sessionTimeoutMinutes} minutes in total, so find a quiet spot with a
             working microphone.

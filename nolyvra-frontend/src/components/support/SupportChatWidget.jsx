@@ -151,7 +151,12 @@ export default function SupportChatWidget() {
                   px: 1.5, py: 1,
                 }}
                 >
-                  <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{m.content}</Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ whiteSpace: "pre-wrap", color: m.role === "user" ? "#fff" : "#0F1623" }}
+                  >
+                    {m.content}
+                  </Typography>
                   {m.escalated && (
                     <Typography variant="caption" sx={{ display: "block", mt: 0.5, color: PURPLE, fontWeight: 600 }}>
                       Flagged for our team — you'll hear back by email shortly.

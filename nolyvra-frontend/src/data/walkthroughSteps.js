@@ -37,7 +37,7 @@ export const WALKTHROUGH_STEPS = [
     slug: "interviews",
     icon: "📅",
     headline: "Interviews",
-    body: "Schedule interviews with automatic conflict checking, then upload the transcript afterwards for an AI analysis and suggested follow-up questions.",
+    body: "Schedule interviews with automatic conflict checking, then upload the transcript afterwards for an AI analysis and suggested follow-up questions. Or skip the scheduling entirely and trigger an Automated Voice Pre-Screening — the candidate records short audio answers on their own time.",
   },
   {
     slug: "ai-coworker",

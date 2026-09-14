@@ -319,6 +319,8 @@ export default function CreateJobPageModern() {
   const [pastedJD, setPastedJD] = useState("");
   const [manualSkills, setManualSkills] = useState([]);
   const [skillInput, setSkillInput] = useState("");
+  const [jdUploading, setJdUploading] = useState(false);
+  const [jdUploadError, setJdUploadError] = useState(null);
 
   // Step 2
   const [form, setForm] = useState({
@@ -343,6 +345,36 @@ export default function CreateJobPageModern() {
       })
       .catch(() => {});
   }, [loginId]);
+
+  async function handleJdFileUpload(file) {
+    const allowed = [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/msword",
+    ];
+    if (!allowed.includes(file.type)) {
+      setJdUploadError("Only PDF and Word (.docx / .doc) files are supported.");
+      return;
+    }
+    setJdUploading(true);
+    setJdUploadError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`${API_BASE}/api/jobs/extract-jd-file`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not extract text from that file.");
+      setPastedJD(data.text || "");
+    } catch (e) {
+      setJdUploadError(e.message);
+    } finally {
+      setJdUploading(false);
+    }
+  }
 
   function handleSkillKeyDown(e) {
     if ((e.key === " " || e.key === "Enter") && skillInput.trim()) {
@@ -508,6 +540,17 @@ export default function CreateJobPageModern() {
             subtitle="Let AI help you create a compelling job posting"
           />
 
+          <Alert severity="info" sx={{ mb: 2.5, borderRadius: "10px" }}>
+            💡 Tip: You can also create jobs and find candidates straight from the AI{" "}
+            <Box
+              component="span"
+              onClick={() => nav("/coworker")}
+              sx={{ color: ACCENT, textDecoration: "underline", cursor: "pointer", fontWeight: 600 }}
+            >
+              Co-worker
+            </Box> chat.
+          </Alert>
+
           {/* Brief textarea */}
           <FieldLabel>Enter Job Brief</FieldLabel>
           <TextField
@@ -569,23 +612,43 @@ export default function CreateJobPageModern() {
                 </Box>
                 <Box>
                   <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: TEXT, lineHeight: 1.2 }}>
-                    Paste Existing Job Description
+                    Paste or Upload Existing Job Description
                   </Typography>
                   <Typography sx={{ fontSize: 11.5, color: MUTED, mt: 0.25 }}>
-                    Skip AI generation — paste your JD and we'll extract skills automatically
+                    Skip AI generation — paste or upload your JD and we'll extract skills automatically
                   </Typography>
                 </Box>
               </Box>
 
               {/* JD textarea */}
-              <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT, mb: 0.75 }}>
-                Job Description
-              </Typography>
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 0.75 }}>
+                <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
+                  Job Description
+                </Typography>
+                <Box
+                  component="label"
+                  htmlFor="jd-file-input"
+                  sx={{
+                    display: "inline-flex", alignItems: "center", gap: 0.5,
+                    fontSize: 12, fontWeight: 600, color: ACCENT, cursor: jdUploading ? "default" : "pointer",
+                    opacity: jdUploading ? 0.6 : 1,
+                    "&:hover": { opacity: jdUploading ? 0.6 : 0.75 },
+                  }}
+                >
+                  {jdUploading ? "Uploading…" : "⬆ Upload PDF / Word"}
+                  <Box id="jd-file-input" component="input" type="file"
+                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    disabled={jdUploading}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleJdFileUpload(f); e.target.value = ""; }}
+                    sx={{ display: "none" }} />
+                </Box>
+              </Box>
+              {jdUploadError && <Alert severity="error" sx={{ mb: 1.5, borderRadius: "10px" }}>{jdUploadError}</Alert>}
               <TextField
                 multiline rows={8} fullWidth
                 value={pastedJD}
                 onChange={e => setPastedJD(e.target.value)}
-                placeholder="Paste the full job description here…"
+                placeholder="Paste the full job description here, or upload a PDF/Word file above…"
                 sx={{
                   mb: 2,
                   "& .MuiOutlinedInput-root": {
