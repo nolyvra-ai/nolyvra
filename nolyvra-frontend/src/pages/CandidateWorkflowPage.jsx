@@ -322,7 +322,7 @@ function JobApplicationRow({ application, candidateId, candidateName, candidateE
               ) : !interviewSession ? (
                 <Button variant="outlined" size="small" disabled={interviewActionLoading} onClick={startOrRegenerateInterview}
                   sx={{fontSize:11,borderColor:BORDER,color:TEXT,borderRadius:"6px",textTransform:"none","&:hover":{bgcolor:SURFACE}}}>
-                  {interviewActionLoading ? <CircularProgress size={12} /> : "🎙 Start Audio Interview"}
+                  {interviewActionLoading ? <CircularProgress size={12} /> : "🎙 Start Automated Voice Pre-Screening"}
                 </Button>
               ) : (interviewSession.status === "SENT" || interviewSession.status === "STARTED") ? (
                 <>

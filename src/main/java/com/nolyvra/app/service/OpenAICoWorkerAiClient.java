@@ -73,7 +73,7 @@ public class OpenAICoWorkerAiClient implements CoWorkerAiClient {
                 {
                   "message": "<friendly conversational reply, briefly confirm what you found and what you plan to do>",
                   "pendingAction": {
-                    "type": "RUN_ANALYSIS|SCHEDULE_INTERVIEW|RESCHEDULE_AND_NOTIFY|MOVE_PIPELINE|EMAIL|CREATE_REMINDER|CREATE_JOB|ADD_CANDIDATES|NONE",
+                    "type": "RUN_ANALYSIS|SCHEDULE_INTERVIEW|RESCHEDULE_AND_NOTIFY|MOVE_PIPELINE|EMAIL|CREATE_REMINDER|CREATE_JOB|ADD_CANDIDATES|FIND_CANDIDATES|START_AUDIO_INTERVIEW|NONE",
                     "description": "<1-sentence human-readable action description>",
                     "params": { <action-specific parameters — see below> }
                   }
@@ -116,10 +116,27 @@ public class OpenAICoWorkerAiClient implements CoWorkerAiClient {
                   name and cvText are required. Use extracted attachment fields when present; do not invent email or phone.
                   If the user message includes an "Attached CVs:" section, preserve each attachment's cvText exactly in the matching candidate object.
 
+                FIND_CANDIDATES:
+                  { "query": "<natural language search query — role, key skills, seniority, location as mentioned>" }
+                  Use this when the user asks to find, search, source, or recommend candidates — from their own
+                  pipeline or externally (LinkedIn/Bright Data) — for a role or skillset, whether or not it matches
+                  an existing job. If it references an existing job from the JOBS context, work its title into the
+                  query text. Turn the ask into one clear search query string; do not invent a candidate list yourself.
+
+                START_AUDIO_INTERVIEW:
+                  { "candidateId": "cand-xxx", "candidateName": "...", "jobTitle": "... or null" }
+                  Use this when the user asks to start, send, trigger, or kick off an automated voice
+                  pre-screening (async audio pre-screening) for a candidate. jobTitle disambiguates which
+                  of the candidate's job applications to use if they have more than one; leave null if only
+                  one is implied. This is different from SCHEDULE_INTERVIEW (a human-scheduled calendar
+                  interview) — use this specifically for the automated voice pre-screening.
+
                 Rules:
                 - Always match candidate and job names to real IDs from the context above.
                 - If you cannot find a match, say so in the message and set pendingAction type to NONE.
                 - For EMAIL actions, always mention in your message that you will take the user to the email page.
+                - For candidate search/sourcing requests, always use FIND_CANDIDATES with a well-formed query — never fabricate candidates in the message itself.
+                - For automated voice pre-screening requests, always use START_AUDIO_INTERVIEW, not SCHEDULE_INTERVIEW.
                 - For questions about upcoming meetings or free time, answer directly from UPCOMING INTERVIEWS data above — set pendingAction to NONE.
                 - For reschedule + notify + next slots requests, always use RESCHEDULE_AND_NOTIFY (not SCHEDULE_INTERVIEW).
                 - Keep your message friendly, concise and specific (mention names and counts).

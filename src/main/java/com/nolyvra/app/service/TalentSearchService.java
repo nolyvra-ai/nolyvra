@@ -29,7 +29,8 @@ import java.util.stream.Collectors;
 public class TalentSearchService {
 
     private static final int CACHE_DAYS_VALID   = 30;
-    private static final int EXTERNAL_BATCH_SIZE = 5;   // 5 random-cached + 5 fresh from Bright Data, every call
+    private static final int EXTERNAL_BATCH_SIZE = 10;  // 10 random-cached + 10 fresh from Bright Data, every call
+    private static final int AI_SELECTED_TOP_N   = 10;  // AI scores the full batch, we keep only the top N
 
     // Real CoreSignal API — kept to exactly 3 results per search (each is a billed
     // CoreSignal API call: 1 search + up to 3 profile collects). Additive to the
@@ -650,9 +651,9 @@ public class TalentSearchService {
 
     // ─── External search (Bright Data) — shared by NL search, job-page search, ──
     // and both "Load more external candidates" endpoints. Every call is the
-    // same stateless operation: 5 random candidates already cached for this
-    // term + 5 fresh candidates pulled live from Bright Data, deduped against
-    // what's already cached for the term.
+    // same stateless operation: 10 random candidates already cached for this
+    // term + 10 fresh candidates pulled live from Bright Data (deduped against
+    // what's already cached for the term), then AI-scored down to the top 10.
 
     private List<TalentSearchResult> searchExternal(SearchFilters filters, String loginId,
                                                       String originalQuery) {
@@ -684,23 +685,40 @@ public class TalentSearchService {
                     aiScores.get(i), p.yearsExperience(), p.source(), p.alreadyInPipeline(),
                     p.coresignalId(), p.avatarUrl(), p.defaultAvatar(), p.coreSignalApiId()));
         }
-        return scored;
+        // AI scored the full fetched batch — keep only the top N by that score.
+        return scored.stream()
+                .sorted(Comparator.comparingInt(TalentSearchResult::matchScore).reversed())
+                .limit(AI_SELECTED_TOP_N)
+                .collect(Collectors.toList());
     }
 
     // ─── Job-based candidate search (Suitable/External Candidates panel) ─────
-    // No OpenAI call, no token deduction — cheap skill/title-overlap scoring
-    // baked in at fetch time (see fetchExternalCandidates / mapBrightDataRecord).
+    // Same fetch-20-then-AI-select-top-10 behavior as the NL search flow — one
+    // extra token deducted per call for the AI scoring pass (see applyAiScoring).
 
     public List<TalentSearchResult> searchCoreSignalForJob(List<String> skills, String location,
-                                                             String title, String seniority) {
+                                                             String title, String seniority, String loginId) {
         if (brightDataApiKey == null || brightDataApiKey.isBlank()) return List.of();
-        return fetchExternalCandidates(buildJobFilters(skills, location, title, seniority));
+        SearchFilters filters = buildJobFilters(skills, location, title, seniority);
+        List<TalentSearchResult> results = fetchExternalCandidates(filters);
+        return applyAiScoring(results, jobSearchQuery(title, skills, location), loginId);
     }
 
     public List<TalentSearchResult> loadMoreExternalForJob(List<String> skills, String location,
-                                                             String title, String seniority) {
+                                                             String title, String seniority, String loginId) {
         if (brightDataApiKey == null || brightDataApiKey.isBlank()) return List.of();
-        return fetchExternalCandidates(buildJobFilters(skills, location, title, seniority));
+        SearchFilters filters = buildJobFilters(skills, location, title, seniority);
+        List<TalentSearchResult> results = fetchExternalCandidates(filters);
+        return applyAiScoring(results, jobSearchQuery(title, skills, location), loginId);
+    }
+
+    // Builds a natural-language-style query string for scoreWithAI's prompt,
+    // since the job-page panel has structured fields instead of a free-text query.
+    private String jobSearchQuery(String title, List<String> skills, String location) {
+        StringBuilder sb = new StringBuilder(title != null ? title : "");
+        if (skills != null && !skills.isEmpty()) sb.append(" with skills: ").append(String.join(", ", skills));
+        if (location != null && !location.isBlank()) sb.append(" in ").append(location);
+        return sb.toString();
     }
 
     private static final Set<String> SENIORITY_WORDS = Set.of(

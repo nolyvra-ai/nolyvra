@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { Box, Paper, Typography, Button, CircularProgress, Tabs, Tab, TextField } from "@mui/material";
+import {
+  Box, Paper, Typography, Button, CircularProgress, Tabs, Tab, TextField,
+  Table, TableHead, TableBody, TableRow, TableCell,
+} from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -35,6 +38,17 @@ async function apiPostJson(path, body) {
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
+}
+
+function skillsPreview(skills) {
+  if (!skills || skills.length === 0) return "—";
+  return skills.slice(0, 3).join(", ");
+}
+
+// "City, State" if both exist, otherwise whichever one is present, otherwise "—"
+function formatLocation(c) {
+  const parts = [c.location, c.state].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : "—";
 }
 
 function Badge({ label, variant = "neutral" }) {
@@ -315,22 +329,47 @@ export default function JobDetailPage() {
             ) : candidates.length === 0 ? (
               <Typography sx={{ fontSize: 12.5, color: MUTED }}>No candidates linked to this job yet.</Typography>
             ) : (
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                {candidates.map(c => (
-                  <Box key={c.id} onClick={() => nav(`/candidates/${c.id}/workflow`)} sx={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    p: 1.5, border: `1px solid ${BORDER}`, borderRadius: "8px", cursor: "pointer",
-                    "&:hover": { bgcolor: SURFACE },
-                  }}>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT }}>{c.name || "—"}</Typography>
-                      <Typography sx={{ fontSize: 11.5, color: MUTED, mt: 0.25 }}>
-                        {[c.currentTitle, c.email].filter(Boolean).join(" · ") || "—"}
-                      </Typography>
-                    </Box>
-                    <StageBadge stage={c.stage} />
-                  </Box>
-                ))}
+              <Box sx={{ border: `1px solid ${BORDER}`, borderRadius: "10px", overflow: "auto", bgcolor: "#fff" }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: SURFACE }}>
+                      {["Name", "Title", "Location", "Skills", "Email", "Phone", "Stage"].map(h => (
+                        <TableCell key={h} sx={{
+                          fontSize: 11, fontWeight: 700, color: MUTED,
+                          borderBottom: `1px solid ${BORDER}`, py: 1.25, whiteSpace: "nowrap",
+                        }}>{h}</TableCell>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {candidates.map(c => (
+                      <TableRow key={c.id} onClick={() => nav(`/candidates/${c.id}/workflow`)}
+                        sx={{ cursor: "pointer", "&:hover": { bgcolor: SURFACE } }}>
+                        <TableCell sx={{ py: 1, borderBottom: `1px solid ${BORDER}`, fontSize: 12.5, fontWeight: 700, color: TEXT, whiteSpace: "nowrap" }}>
+                          {c.name || "—"}
+                        </TableCell>
+                        <TableCell sx={{ py: 1, borderBottom: `1px solid ${BORDER}`, fontSize: 12, color: TEXT, whiteSpace: "nowrap", maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {c.currentTitle || "—"}
+                        </TableCell>
+                        <TableCell sx={{ py: 1, borderBottom: `1px solid ${BORDER}`, fontSize: 12, color: TEXT, whiteSpace: "nowrap" }}>
+                          {formatLocation(c)}
+                        </TableCell>
+                        <TableCell sx={{ py: 1, borderBottom: `1px solid ${BORDER}`, fontSize: 12, color: TEXT, whiteSpace: "nowrap", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {skillsPreview(c.skills)}
+                        </TableCell>
+                        <TableCell sx={{ py: 1, borderBottom: `1px solid ${BORDER}`, fontSize: 12, color: TEXT, whiteSpace: "nowrap" }}>
+                          {c.email || "—"}
+                        </TableCell>
+                        <TableCell sx={{ py: 1, borderBottom: `1px solid ${BORDER}`, fontSize: 12, color: TEXT, whiteSpace: "nowrap" }}>
+                          {c.phone || "—"}
+                        </TableCell>
+                        <TableCell sx={{ py: 1, borderBottom: `1px solid ${BORDER}` }}>
+                          <StageBadge stage={c.stage} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </Box>
             )}
             <Button size="small" onClick={() => nav("/jobs")}

@@ -8,14 +8,19 @@ import com.nolyvra.app.model.JobResponse;
 import com.nolyvra.app.model.HubSpotSyncStatusResponse;
 import com.nolyvra.app.service.HubSpotJobSyncService;
 import com.nolyvra.app.model.TalentSearchResult;
+import com.nolyvra.app.service.CvExtractService;
 import com.nolyvra.app.service.JobService;
 import com.nolyvra.app.service.TalentSearchService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/jobs")
@@ -24,14 +29,17 @@ public class JobsController {
     private final JobService jobService;
     private final TalentSearchService talentSearchService;
     private final HubSpotJobSyncService hubSpotJobSyncService;
+    private final CvExtractService cvExtractService;
 
     public JobsController(
             JobService jobService,
             TalentSearchService talentSearchService,
-            HubSpotJobSyncService hubSpotJobSyncService) {
+            HubSpotJobSyncService hubSpotJobSyncService,
+            CvExtractService cvExtractService) {
         this.jobService = jobService;
         this.talentSearchService = talentSearchService;
         this.hubSpotJobSyncService = hubSpotJobSyncService;
+        this.cvExtractService = cvExtractService;
     }
 
     @PostMapping
@@ -109,6 +117,24 @@ public class JobsController {
         return jobService.analyzeClientBrief(req, loginId);
     }
 
+    // ── Extract plain text from an uploaded JD file (PDF/DOCX) — no CV-specific ──
+    // field extraction, just the raw text for the "paste JD" textarea.
+    @PostMapping(value = "/extract-jd-file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> extractJdFile(@RequestParam("file") MultipartFile file) {
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "No file uploaded"));
+        }
+        try {
+            String text = cvExtractService.extractText(file);
+            return ResponseEntity.ok(Map.of("text", text));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Failed to extract text: " + e.getMessage()));
+        }
+    }
+
     // ── Suitable Candidates: top 10 internal matches (title + skills + location) ──
     @GetMapping("/{jobId}/suitable-candidates")
     public List<CandidateSearchResult> getSuitableCandidates(
@@ -119,7 +145,7 @@ public class JobsController {
         return talentSearchService.suitableInternalCandidatesForJob(job, loginId);
     }
 
-    // ── External Candidates: 5 cached + 5 fresh from Bright Data, every call ──
+    // ── External Candidates: 10 cached + 10 fresh from Bright Data, AI-selected top 10 ──
     @GetMapping("/{jobId}/external-candidates")
     public List<TalentSearchResult> getExternalCandidates(
             @PathVariable String jobId,
@@ -127,7 +153,7 @@ public class JobsController {
         JobResponse job = jobService.getJob(jobId, loginId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found: " + jobId));
         return talentSearchService.searchCoreSignalForJob(
-                job.stackTags(), job.location(), job.title(), job.seniority());
+                job.stackTags(), job.location(), job.title(), job.seniority(), loginId);
     }
 
     // ── "Load more external candidates" (Jobs page) ──────────────────────────
@@ -138,6 +164,6 @@ public class JobsController {
         JobResponse job = jobService.getJob(jobId, loginId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found: " + jobId));
         return talentSearchService.loadMoreExternalForJob(
-                job.stackTags(), job.location(), job.title(), job.seniority());
+                job.stackTags(), job.location(), job.title(), job.seniority(), loginId);
     }
 }

@@ -179,8 +179,8 @@ public class InterviewSessionService {
         jdbc.update("""
                 insert into interviews
                     (id, candidate_id, job_id, login_id, interview_type, scheduled_at, status, notes)
-                values (?, ?, ?, ?, 'Async Audio Interview', now(), 'Completed',
-                        'Auto-created for an async audio interview analysis.')
+                values (?, ?, ?, ?, 'Async Automated Voice Pre-Screening', now(), 'Completed',
+                        'Auto-created for an async automated voice pre-screening analysis.')
                 """, id, candidateId, jobId, loginId);
         return id;
     }
@@ -422,11 +422,11 @@ public class InterviewSessionService {
         String recruiterName = (recruiter.name() != null && !recruiter.name().isBlank()) ? recruiter.name() : teamLine;
         String interviewLink = frontendUrl + "/interview/" + rawToken;
 
-        String subject = "Your audio interview for " + jobTitle + companySuffix;
+        String subject = "Your automated voice pre-screening for " + jobTitle + companySuffix;
         String textBody = """
                 Hi %s,
 
-                Thanks for your interest in the %s role%s. As the next step, we'd like to invite you to complete a short audio interview.
+                Thanks for your interest in the %s role%s. As the next step, we'd like to invite you to complete a short automated voice pre-screening.
 
                 How it works:
                 • It takes about %d minutes.
@@ -448,7 +448,7 @@ public class InterviewSessionService {
 
         String htmlBody = """
                 <p>Hi %s,</p>
-                <p>Thanks for your interest in the %s role%s. As the next step, we'd like to invite you to complete a short audio interview.</p>
+                <p>Thanks for your interest in the %s role%s. As the next step, we'd like to invite you to complete a short automated voice pre-screening.</p>
                 <p><b>How it works:</b></p>
                 <ul>
                   <li>It takes about %d minutes.</li>
