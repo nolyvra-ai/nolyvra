@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -25,6 +26,9 @@ public class CoWorkerService {
     private final JobService jobService;
     private final CandidateService candidateService;
     private final PlanService planService;
+    private final TalentSearchService talentSearchService;
+    private final InterviewSessionService interviewSessionService;
+    private final JobApplicationService jobApplicationService;
 
     public CoWorkerService(
             ObjectMapper objectMapper,
@@ -34,7 +38,10 @@ public class CoWorkerService {
             CoWorkerAnalysisExecutor analysisExecutor,
             JobService jobService,
             CandidateService candidateService,
-            PlanService planService) {
+            PlanService planService,
+            TalentSearchService talentSearchService,
+            InterviewSessionService interviewSessionService,
+            JobApplicationService jobApplicationService) {
         this.objectMapper = objectMapper;
         this.jdbc = jdbc;
         this.aiClient = aiClient;
@@ -43,6 +50,9 @@ public class CoWorkerService {
         this.jobService = jobService;
         this.candidateService = candidateService;
         this.planService = planService;
+        this.talentSearchService = talentSearchService;
+        this.interviewSessionService = interviewSessionService;
+        this.jobApplicationService = jobApplicationService;
     }
 
     // ─── Main chat endpoint ───────────────────────────────────────────────────
@@ -259,6 +269,8 @@ public class CoWorkerService {
             case "CREATE_REMINDER" -> executeCreateReminder(loginId, params);
             case "CREATE_JOB" -> executeCreateJob(loginId, params);
             case "ADD_CANDIDATES" -> executeAddCandidates(loginId, params);
+            case "FIND_CANDIDATES" -> executeFindCandidates(loginId, params);
+            case "START_AUDIO_INTERVIEW" -> executeStartAudioInterview(loginId, params);
             default -> Map.of("message", "Unknown action type: " + type, "success", false);
         };
     }
@@ -559,14 +571,33 @@ public class CoWorkerService {
                         "success", false);
             }
 
+            // The chat model's own jdText is thin (it's one line of guidance inside a
+            // multi-action prompt) — re-run it through the same JD generator the
+            // Create Job page uses so Co-worker-created jobs get an equally detailed
+            // description. Falls back to the chat model's jdText/stackTags if this
+            // extra call fails (e.g. out of tokens), so job creation still succeeds.
+            String fullJdText = jdText;
+            List<String> stackTags = listParam(params, "stackTags");
+            try {
+                ClientBriefResponse expanded = jobService.analyzeClientBrief(new ClientBriefRequest(jdText), loginId);
+                if (expanded.generatedJdText() != null && !expanded.generatedJdText().isBlank()) {
+                    fullJdText = expanded.generatedJdText();
+                }
+                if (stackTags.isEmpty() && expanded.extractedSkills() != null) {
+                    stackTags = expanded.extractedSkills();
+                }
+            } catch (Exception e) {
+                System.err.println("[CoWorker] JD expansion failed, using chat-generated jdText: " + e.getMessage());
+            }
+
             JobCreateRequest request = new JobCreateRequest(
                     title,
                     textParam(params, "company", ""),
                     textParam(params, "jobType", "Full-time"),
                     textParam(params, "seniority", null),
-                    jdText,
+                    fullJdText,
                     textParam(params, "location", ""),
-                    listParam(params, "stackTags"),
+                    stackTags,
                     textParam(params, "jobStatus", "Active"),
                     decimalParam(params, "salary"),
                     textParam(params, "currency", "AUD"),
@@ -694,6 +725,74 @@ public class CoWorkerService {
         result.put("skipped", skipped);
         if (taskId != null) result.put("taskId", taskId);
         return result;
+    }
+
+    // ─── Find best suited candidates (DB + external, via Talent Search) ──────
+
+    private Map<String, Object> executeFindCandidates(String loginId, Map<String, Object> params) {
+        String query = (String) params.get("query");
+        if (query == null || query.isBlank()) {
+            return Map.of("message", "I need a bit more detail on what kind of candidate to search for.", "success", false);
+        }
+        try {
+            TalentSearchResponse res = talentSearchService.search(
+                    new TalentSearchRequest(query, "MATCH_SCORE", 0, 9), loginId);
+            String message = res.totalFound() > 0
+                    ? String.format(
+                            "Found %d matching candidates (%d in your pipeline, %d external). Opening Talent Search with the results.",
+                            res.totalFound(), res.internalCount(), res.coreSignalCount())
+                    : "I couldn't find any matching candidates for that search.";
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("message", message);
+            result.put("success", true);
+            result.put("navigateTo", "/talent-search");
+            result.put("searchQuery", query);
+            return result;
+        } catch (ResponseStatusException e) {
+            return Map.of("message", "You're out of tokens for a candidate search — please top up or upgrade your plan.", "success", false);
+        } catch (Exception e) {
+            System.err.println("[CoWorker] executeFindCandidates() failed: " + e.getMessage());
+            return Map.of("message", "Something went wrong while searching for candidates.", "success", false);
+        }
+    }
+
+    // ─── Start async audio interview (distinct from calendar SCHEDULE_INTERVIEW) ──
+
+    private Map<String, Object> executeStartAudioInterview(String loginId, Map<String, Object> params) {
+        String candidateId = (String) params.get("candidateId");
+        String candidateName = (String) params.getOrDefault("candidateName", "Candidate");
+        String jobTitle = (String) params.get("jobTitle");
+
+        if (candidateId == null || candidateId.isBlank()) {
+            return Map.of("message", "I couldn't find that candidate.", "success", false);
+        }
+
+        List<JobApplicationResponse> apps = jobApplicationService.getApplicationsForCandidate(candidateId, loginId);
+        JobApplicationResponse app = (jobTitle != null && !jobTitle.isBlank())
+                ? apps.stream().filter(a -> a.jobTitle().equalsIgnoreCase(jobTitle)).findFirst().orElse(null)
+                : apps.stream().findFirst().orElse(null);
+
+        if (app == null) {
+            return Map.of(
+                    "message", candidateName + " doesn't have an active job application to start an interview for.",
+                    "success", false);
+        }
+
+        try {
+            interviewSessionService.startOrRegenerate(candidateId, app.id(), loginId);
+            return Map.of(
+                    "message", "Automated voice pre-screening sent to " + candidateName + " for " + app.jobTitle()
+                            + " — they'll get an email with the link.",
+                    "success", true);
+        } catch (ResponseStatusException e) {
+            return Map.of(
+                    "message", e.getReason() != null ? e.getReason() : "Couldn't start the automated voice pre-screening for " + candidateName + ".",
+                    "success", false);
+        } catch (Exception e) {
+            System.err.println("[CoWorker] executeStartAudioInterview() failed: " + e.getMessage());
+            return Map.of("message", "Something went wrong starting the automated voice pre-screening.", "success", false);
+        }
     }
 
     // ─── Reschedule + notify + next slots (multi-step) ───────────────────────

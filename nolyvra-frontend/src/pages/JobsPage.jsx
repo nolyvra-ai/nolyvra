@@ -990,6 +990,17 @@ export default function JobsPage() {
       {/* Scrollable content */}
       <Box sx={{ flex: 1, overflow: "auto", p: 2.5 }}>
 
+        <Alert severity="info" sx={{ mb: 2, borderRadius: "8px" }}>
+          💡 Tip: You can create new jobs and find candidates all from{" "}
+          <Box
+            component="span"
+            onClick={() => nav("/coworker")}
+            sx={{ color: ACCENT, textDecoration: "underline", cursor: "pointer", fontWeight: 600 }}
+          >
+            Co-worker
+          </Box>.
+        </Alert>
+
         {err && (
           <Alert severity="error" sx={{ mb: 2, borderRadius: "8px" }} onClose={() => setErr("")}>
             {err}

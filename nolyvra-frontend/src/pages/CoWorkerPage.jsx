@@ -711,7 +711,7 @@ export default function CoWorkerPage() {
           id: Date.now(),
         }]);
         setLoading(false);
-        nav(res.navigateTo);
+        nav(res.navigateTo, res.searchQuery ? { state: { prefillQuery: res.searchQuery } } : undefined);
         return;
       }
       setMessages(prev => [...prev, {

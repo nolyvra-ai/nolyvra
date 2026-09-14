@@ -6,7 +6,7 @@ import { useEffect, useState, useMemo } from "react";
 import {
   Box, Paper, Typography, Button, TextField, MenuItem, Switch, Slider,
   CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions,
-  Table, TableHead, TableBody, TableRow, TableCell,
+  Table, TableHead, TableBody, TableRow, TableCell, Alert,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import BookmarkIcon from "@mui/icons-material/Bookmark";
@@ -368,6 +368,25 @@ export default function CandidatesPage() {
           </Button>
         </Box>
       </Box>
+
+      <Alert severity="info" sx={{ borderRadius: "8px" }}>
+        💡 Tip: Find relevant candidates from{" "}
+        <Box
+          component="span"
+          onClick={() => nav("/talent-search")}
+          sx={{ color: ACCENT, textDecoration: "underline", cursor: "pointer", fontWeight: 600 }}
+        >
+          Talent Search
+        </Box>{" "}
+        or{" "}
+        <Box
+          component="span"
+          onClick={() => nav("/coworker")}
+          sx={{ color: ACCENT, textDecoration: "underline", cursor: "pointer", fontWeight: 600 }}
+        >
+          Co-worker
+        </Box>.
+      </Alert>
 
       {/* ── Filter panel ──────────────────────────────────────────────────── */}
       <Paper elevation={0} sx={{ border: `1px solid ${BORDER}`, borderRadius: "10px", p: 2.5, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>

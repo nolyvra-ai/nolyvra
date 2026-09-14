@@ -1,5 +1,5 @@
 ---
-title: Async audio interview
+title: Async Automated Voice Pre-Screening
 category: interviews
 order: 3
 tags: [interviews, audio, async, recording, transcript]
@@ -8,8 +8,8 @@ summary: Send a candidate a link to record short audio answers — no scheduling
 
 ## What it does
 
-Lets you interview a candidate without scheduling a call. From a candidate's job application,
-click **Start Audio Interview** to email them a unique link with a handful of questions (drawn
+Lets you pre-screen a candidate without scheduling a call. From a candidate's job application,
+click **Start Automated Voice Pre-Screening** to email them a unique link with a handful of questions (drawn
 from their CV analysis). The candidate opens the link, gives consent, and records a short audio
 answer to each question in their browser — no video, nothing to schedule, with a 15-minute timer
 once they start.

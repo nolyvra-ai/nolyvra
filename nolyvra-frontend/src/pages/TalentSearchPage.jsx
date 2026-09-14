@@ -6,7 +6,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, IconButton,
   Table, TableHead, TableBody, TableRow, TableCell, Chip, Divider,
 } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const BORDER = "#E8ECF2", MUTED = "#9AA3B4", TEXT = "#0F1623", ACCENT = "#1D72E8";
@@ -237,6 +237,7 @@ function saveTalentSearchCache(loginId, cache) {
 
 export function TalentSearchPage() {
   const nav = useNavigate();
+  const location = useLocation();
   const loginId = localStorage.getItem("loginId") || "";
 
   // ── AI search state (unchanged) ──────────────────────────────────────────
@@ -280,6 +281,18 @@ export function TalentSearchPage() {
       setPage(cached.page ?? 0);
     }
   }, [loginId]);
+
+  // Arriving here from the Co-worker chat's FIND_CANDIDATES action — run the
+  // suggested query immediately instead of showing a blank/cached page, then
+  // clear the nav state so a later back-navigation doesn't re-trigger it.
+  useEffect(() => {
+    const prefillQuery = location.state?.prefillQuery;
+    if (!prefillQuery) return;
+    setQuery(prefillQuery);
+    handleSearch(prefillQuery);
+    nav(location.pathname, { replace: true, state: {} });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state]);
 
   // ── Import dialog ────────────────────────────────────────────────────────
   const [importOpen,        setImportOpen]        = useState(false);

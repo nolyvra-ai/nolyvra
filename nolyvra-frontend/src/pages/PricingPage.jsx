@@ -185,9 +185,9 @@ export default function PricingPage() {
 
             {/* PAY-AS-YOU-GO */}
             <div className="plan-card" style={CARD_W}>
-              <span style={{ display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",borderRadius:20,fontSize:11,fontWeight:700,letterSpacing:".4px",textTransform:"uppercase",marginBottom:14,background:"#ECFDF5",color:"#065F46",border:"1px solid #A7F3D0",alignSelf:"flex-start" }}>⚡ PAYG</span>
-              <div style={{ fontSize:17,fontWeight:700,color:"#0F1623",marginBottom:5 }}>Pay-As-You-Go</div>
-              <div style={{ fontSize:12,color:"#9AA3B4",lineHeight:1.5,marginBottom:20,minHeight:36 }}>Pay only for what you use, when you use it.</div>
+              <span style={{ display:"inline-flex",alignItems:"center",gap:5,padding:"4px 10px",borderRadius:20,fontSize:11,fontWeight:700,letterSpacing:".4px",textTransform:"uppercase",marginBottom:14,background:"#ECFDF5",color:"#065F46",border:"1px solid #A7F3D0",alignSelf:"flex-start" }}>⚡ Introductory Offer</span>
+              <div style={{ fontSize:17,fontWeight:700,color:"#0F1623",marginBottom:5 }}>Introductory Offer</div>
+              <div style={{ fontSize:12,color:"#9AA3B4",lineHeight:1.5,marginBottom:20,minHeight:36 }}>Special introductory pricing to help you get started.</div>
               <div style={{ marginBottom:20 }}>
                 <div style={{ fontSize:11,color:"#9AA3B4",marginBottom:4,fontWeight:500 }}>Starting from</div>
                 <div style={{ display:"flex",alignItems:"baseline",gap:3,marginBottom:2 }}>
@@ -370,7 +370,7 @@ export default function PricingPage() {
               <tr>
                 <th style={{ width:"22%",textAlign:"left" }}>Feature</th>
                 <th>Free</th>
-                <th>PAYG</th>
+                <th>Intro Offer</th>
                 <th style={{ background:"rgba(29,114,232,.04)" }}>Bronze</th>
                 <th style={{ background:"rgba(29,114,232,.08)" }}>Silver ⭐</th>
                 <th>Gold</th>

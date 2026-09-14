@@ -19,11 +19,13 @@ public class PlanService {
     // Change: include additional_jobs, additional_candidates, additional_tokens
     // from login table and add them to the plan limits before returning.
 
+    private static final int TRIAL_EXPIRY_DAYS = 14;
+
     public PlanUsageResponse getPlanUsage(String loginId) {
         var rows = jdbc.query("""
                 select p.id as plan_id, p.name as plan_name,
                        p.max_jobs, p.max_candidates, p.max_tokens,
-                       l.tokens_remaining, l.renew_date,
+                       l.tokens_remaining, l.renew_date, l.created_at,
                        coalesce(l.additional_jobs, 0)       as additional_jobs,
                        coalesce(l.additional_candidates, 0) as additional_candidates,
                        coalesce(l.additional_tokens, 0)     as additional_tokens
@@ -39,6 +41,7 @@ public class PlanService {
                         rs.getInt("max_tokens"),
                         rs.getInt("tokens_remaining"),
                         rs.getObject("renew_date", LocalDate.class),
+                        rs.getObject("created_at", java.time.OffsetDateTime.class),
                         rs.getInt("additional_jobs"),
                         rs.getInt("additional_candidates"),
                         rs.getInt("additional_tokens")
@@ -47,19 +50,24 @@ public class PlanService {
         if (rows.isEmpty()) {
             return new PlanUsageResponse("plan-free", "Free", 7, 10,
                     currentJobCount(loginId), currentCandidateCount(loginId),
-                    100, 100, LocalDate.now().plusDays(30));
+                    100, 100, LocalDate.now().plusDays(30), false);
         }
 
         Object[] row = rows.get(0);
-        int planMaxJobs        = (Integer) row[2];
-        int planMaxCandidates  = (Integer) row[3];
-        int planMaxTokens      = (Integer) row[4];
-        int additionalJobs     = (Integer) row[7];
-        int additionalCandidates = (Integer) row[8];
-        int additionalTokens   = (Integer) row[9];
+        String planId           = (String) row[0];
+        int planMaxJobs          = (Integer) row[2];
+        int planMaxCandidates    = (Integer) row[3];
+        int planMaxTokens        = (Integer) row[4];
+        java.time.OffsetDateTime createdAt = (java.time.OffsetDateTime) row[7];
+        int additionalJobs       = (Integer) row[8];
+        int additionalCandidates = (Integer) row[9];
+        int additionalTokens     = (Integer) row[10];
+
+        boolean trialExpired = "plan-free".equals(planId) && createdAt != null
+                && createdAt.toLocalDate().plusDays(TRIAL_EXPIRY_DAYS).isBefore(LocalDate.now());
 
         return new PlanUsageResponse(
-                (String)    row[0],
+                planId,
                 (String)    row[1],
                 planMaxJobs       + additionalJobs,       // effective max
                 planMaxCandidates + additionalCandidates, // effective max
@@ -67,7 +75,8 @@ public class PlanService {
                 currentCandidateCount(loginId),
                 planMaxTokens     + additionalTokens,     // effective max
                 (Integer)   row[5],
-                (LocalDate) row[6]);
+                (LocalDate) row[6],
+                trialExpired);
     }
 
     // ─── Limit checks ─────────────────────────────────────────────────────────
