@@ -4,6 +4,7 @@ import com.nolyvra.app.config.SessionContext;
 import com.nolyvra.app.service.SessionService;
 import com.nolyvra.app.service.AdminSettingsService;
 import com.nolyvra.app.service.CandidateMergeMigrationService;
+import com.nolyvra.app.service.EmailVerificationService;
 import com.nolyvra.app.service.EmployeeService;
 import com.nolyvra.app.service.PasswordResetService;
 import com.nolyvra.app.service.RegisterInterestNotificationService;
@@ -26,6 +27,7 @@ public class AuthController {
     private final RegisterInterestNotificationService registerInterestNotificationService;
     private final CandidateMergeMigrationService candidateMergeMigrationService;
     private final PasswordResetService passwordResetService;
+    private final EmailVerificationService emailVerificationService;
 
     public AuthController(
             UserService userService,
@@ -35,7 +37,8 @@ public class AuthController {
             AdminSettingsService adminSettingsService,
             RegisterInterestNotificationService registerInterestNotificationService,
             CandidateMergeMigrationService candidateMergeMigrationService,
-            PasswordResetService passwordResetService) {
+            PasswordResetService passwordResetService,
+            EmailVerificationService emailVerificationService) {
         this.userService = userService;
         this.employeeService = employeeService;
         this.sessionService = sessionService;
@@ -44,6 +47,7 @@ public class AuthController {
         this.registerInterestNotificationService = registerInterestNotificationService;
         this.candidateMergeMigrationService = candidateMergeMigrationService;
         this.passwordResetService = passwordResetService;
+        this.emailVerificationService = emailVerificationService;
     }
 
     // Always returns the same response for valid input to prevent account discovery.
@@ -171,7 +175,33 @@ public class AuthController {
                     .body(Map.of("error", "User already exists. Please proceed to login."));
         }
         registerInterestNotificationService.notifyNewRegistration(firstName, lastName, company, email, phone);
+        emailVerificationService.sendVerificationEmail(email, email);
         return ResponseEntity.ok(Map.of("status", "registered"));
+    }
+
+    // GET /api/auth/verify-email/validate?token=x
+    @GetMapping("/verify-email/validate")
+    public ResponseEntity<?> validateEmailVerificationToken(@RequestParam String token) {
+        if (!emailVerificationService.isTokenValid(token)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "This verification link is invalid or has expired."));
+        }
+        return ResponseEntity.ok(Map.of("valid", true));
+    }
+
+    // POST /api/auth/verify-email
+    // Verifies the token, sets the user's chosen password, and auto-onboards
+    // the account onto the free plan — no admin step required.
+    @PostMapping("/verify-email")
+    public ResponseEntity<?> verifyEmail(@RequestBody Map<String, String> body) {
+        String token = body.getOrDefault("token", "");
+        String password = body.getOrDefault("password", "");
+        if (password.length() < 8) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 8 characters."));
+        }
+        if (!emailVerificationService.completeVerification(token, password)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "This verification link is invalid or has expired."));
+        }
+        return ResponseEntity.ok(Map.of("status", "onboarded"));
     }
 
     // POST /api/auth/logout

@@ -4,6 +4,7 @@ import PricingPage            from "../pages/PricingPage";
 import LoginPage              from "../pages/LoginPage";
 import ForgotPasswordPage     from "../pages/ForgotPasswordPage";
 import ResetPasswordPage      from "../pages/ResetPasswordPage";
+import VerifyEmailPage        from "../pages/VerifyEmailPage";
 import DashboardPage          from "../pages/DashboardPage";
 import JobsPage               from "../pages/JobsPage";
 import JobDetailPage          from "../pages/JobDetailPage";
@@ -60,6 +61,7 @@ export default function AppRoutes() {
       <Route path="/login"                              element={<LoginPage />} />
       <Route path="/forgot-password"                    element={<ForgotPasswordPage />} />
       <Route path="/reset-password"                     element={<ResetPasswordPage />} />
+      <Route path="/verify-email"                       element={<VerifyEmailPage />} />
       <Route path="/ai-in-recruitment"                  element={<AgentEconomyPage />} />
       <Route path="/stack-audit"                        element={<StackAuditPage />} />
       <Route path="/privacy"                            element={<PrivacyPage />} />
