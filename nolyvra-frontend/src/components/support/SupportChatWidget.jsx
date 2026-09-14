@@ -176,6 +176,10 @@ export default function SupportChatWidget() {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={sending}
+              sx={{
+                "& .MuiInputBase-input": { color: "#0F1623", caretColor: "#0F1623" },
+                "& .MuiOutlinedInput-root": { bgcolor: "#fff" },
+              }}
             />
             <IconButton color="primary" onClick={handleSend} disabled={sending || !input.trim()}>
               <SendRoundedIcon />
