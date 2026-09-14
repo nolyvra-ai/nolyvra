@@ -35,6 +35,9 @@ class CoWorkerServiceTest {
     private final JobService jobService = mock(JobService.class);
     private final CandidateService candidateService = mock(CandidateService.class);
     private final PlanService planService = mock(PlanService.class);
+    private final TalentSearchService talentSearchService = mock(TalentSearchService.class);
+    private final InterviewSessionService interviewSessionService = mock(InterviewSessionService.class);
+    private final JobApplicationService jobApplicationService = mock(JobApplicationService.class);
     private ExecutorService analysisPool;
     private CoWorkerService service;
 
@@ -52,7 +55,10 @@ class CoWorkerServiceTest {
                 analysisExecutor,
                 jobService,
                 candidateService,
-                planService);
+                planService,
+                talentSearchService,
+                interviewSessionService,
+                jobApplicationService);
     }
 
     @AfterEach
