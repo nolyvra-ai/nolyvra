@@ -1053,7 +1053,7 @@ export default function LandingPage() {
               <div style={{ textAlign:"center",paddingTop:24 }}>
                 <div style={{ fontSize:48,marginBottom:12 }}>🎉</div>
                 <div style={{ fontSize:18,fontWeight:700,color:C.ink,marginBottom:8 }}>Thank you for your interest!</div>
-                <div style={{ fontSize:14,color:"#9AA3B4",lineHeight:1.6,marginBottom:20 }}>One of our Customer Service Representatives will get in touch shortly.</div>
+                <div style={{ fontSize:14,color:"#9AA3B4",lineHeight:1.6,marginBottom:20 }}>Check your email and verify your address to log in.</div>
                 <button onClick={()=>setModalOpen(false)} style={{ padding:"10px 24px",borderRadius:7,background:C.indigo,color:"#fff",border:"none",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit" }}>Close</button>
               </div>
             )}
