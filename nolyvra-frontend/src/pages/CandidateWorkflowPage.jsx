@@ -861,6 +861,10 @@ export default function CandidateWorkflowPage() {
 
   return (
     <Box sx={{display:"flex",flexDirection:"column",gap:2}}>
+      <Alert severity="info" sx={{borderRadius:"8px"}}>
+        💡 Tip: Try the AI Automated Voice Pre-Screening with this candidate to get better insights before an interview.
+      </Alert>
+
       {/* Header — person info only */}
       <Box sx={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",
         border:`1px solid ${BORDER}`,borderRadius:"10px",p:"18px 22px",bgcolor:"#fff"}}>

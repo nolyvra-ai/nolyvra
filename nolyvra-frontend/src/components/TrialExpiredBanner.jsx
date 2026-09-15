@@ -23,7 +23,7 @@ export default function TrialExpiredBanner() {
       flexWrap: "wrap",
     }}
     >
-      <Typography variant="body2" fontWeight={600}>
+      <Typography variant="body2" fontWeight={600} sx={{ color: "#fff" }}>
         Your free plan has expired. Select a subscription to keep using Nolyvra.
       </Typography>
       <Button
