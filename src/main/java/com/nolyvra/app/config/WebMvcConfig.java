@@ -24,6 +24,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
                         "/api/auth/forgot-password",
                         "/api/auth/reset-password",
                         "/api/auth/reset-password/validate",
+                        "/api/auth/verify-email",
+                        "/api/auth/verify-email/validate",
                         "/api/login",
                         "/api/stripe/webhook",
                         "/api/nexus/webhook",
