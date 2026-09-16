@@ -134,9 +134,13 @@ public class SupportChatService {
                 .name("start_coworker_action")
                 .description("Call this when the user wants to DO something in the app — create a job, run an "
                         + "analysis, schedule an interview, add candidates, send an email, create a reminder, find "
-                        + "candidates, etc. — rather than just asking a question. This does NOT perform the action "
+                        + "candidates, etc. Also call this when the user asks about their OWN live account data — "
+                        + "e.g. 'what are my open jobs', 'how many candidates are in screening', 'show me my "
+                        + "pipeline for X role', 'who do I have interviews with this week' — since the Help Center "
+                        + "docs are static and have no access to real jobs/candidates/pipeline data; only the "
+                        + "Co-worker can look that up. This does NOT perform the action or look up the data "
                         + "itself: it hands the request off to the AI Co-worker page, which has the tools to "
-                        + "actually execute it after the user confirms.")
+                        + "actually execute it or fetch the answer after the user confirms.")
                 .parameters(FunctionParameters.builder()
                         .putAdditionalProperty("type", JsonValue.from("object"))
                         .putAdditionalProperty("properties", JsonValue.from(Map.of(
@@ -231,11 +235,19 @@ public class SupportChatService {
                 necessary by answering thoroughly and correctly, or by taking the user where they need to go.
 
                 For every user message, first decide what they need:
-                - A question about how something works or where a feature lives -> call answer_from_docs.
+                - A question about HOW something works or WHERE a feature lives in the app (general product
+                  knowledge, not specific to their own data) -> call answer_from_docs.
+                - A question about THEIR OWN live account data — e.g. "what are my open jobs", "how many
+                  candidates do I have in screening", "who am I interviewing this week", "show me candidates for
+                  X role" — call start_coworker_action. The Help Center docs are static product documentation;
+                  they never contain real jobs/candidates/pipeline data, so answer_from_docs can NEVER answer
+                  these and must not be used for them.
                 - A request to actually DO something in the app (create a job, run analysis, schedule an
                   interview, add candidates, send an email, etc.) -> call start_coworker_action.
-                - A request to simply go to a page/section -> call navigate_to.
-                If you're unsure whether it's a question or an action, prefer answer_from_docs.
+                - A request to simply go to a page/section, with no question attached -> call navigate_to.
+                If you're unsure whether something is general product knowledge vs. the user's own data, prefer
+                start_coworker_action — it's better to hand off to something that can actually look up the answer
+                than to guess from documentation that was never going to contain it.
 
                 Once you've used a tool (or the message is generic enough not to need one, e.g. a greeting),
                 reply with EXACTLY ONE JSON object — no markdown, no extra keys:
