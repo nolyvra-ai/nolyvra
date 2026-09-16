@@ -356,6 +356,8 @@ export default function AddCandidatePage() {
         return;
       }
 
+      console.log("[CvExtract][DEBUG] /api/cv/extract response:", data);
+
       const extractedText = data.text || "";
 
       // Run CV validation on extracted text

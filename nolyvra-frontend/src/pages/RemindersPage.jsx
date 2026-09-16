@@ -259,27 +259,38 @@ export default function RemindersPage() {
             ))}
           </Box>
 
-          {isDragging && (
-            <Droppable droppableId="delete-zone">
-              {(provided, snapshot) => (
-                <Box
-                  ref={provided.innerRef}
-                  {...provided.droppableProps}
-                  sx={{
-                    mt: 1.75, borderRadius: "10px", border: `2px dashed ${DANGER}`,
-                    bgcolor: snapshot.isDraggingOver ? "#FCA5A5" : "#FEF2F2",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    gap: 1, py: 2.5, transition: "background .15s",
-                  }}>
-                  <CloseIcon sx={{ color: DANGER, fontSize: 20 }} />
-                  <Typography sx={{ fontSize: 13, fontWeight: 700, color: DANGER }}>
-                    Drop here to delete
-                  </Typography>
-                  {provided.placeholder}
-                </Box>
-              )}
-            </Droppable>
-          )}
+          {/* Always mounted — @hello-pangea/dnd requires every Droppable to be
+              registered before a drag starts; conditionally mounting this on
+              isDragging caused an "Invariant failed" crash mid-drag. Visibility
+              is toggled via styling instead. */}
+          <Droppable droppableId="delete-zone">
+            {(provided, snapshot) => (
+              <Box
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+                sx={{
+                  mt: isDragging ? 1.75 : 0,
+                  height: isDragging ? "auto" : 0,
+                  py: isDragging ? 2.5 : 0,
+                  overflow: "hidden",
+                  borderRadius: "10px",
+                  border: isDragging ? `2px dashed ${DANGER}` : "2px dashed transparent",
+                  bgcolor: snapshot.isDraggingOver ? "#FCA5A5" : "#FEF2F2",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  gap: 1, transition: "background .15s, height .15s, margin .15s, padding .15s",
+                }}>
+                {isDragging && (
+                  <>
+                    <CloseIcon sx={{ color: DANGER, fontSize: 20 }} />
+                    <Typography sx={{ fontSize: 13, fontWeight: 700, color: DANGER }}>
+                      Drop here to delete
+                    </Typography>
+                  </>
+                )}
+                {provided.placeholder}
+              </Box>
+            )}
+          </Droppable>
         </DragDropContext>
       )}
 

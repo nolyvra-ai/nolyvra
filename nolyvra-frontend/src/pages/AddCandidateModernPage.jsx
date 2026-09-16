@@ -176,11 +176,19 @@ export default function AddCandidateModernPage() {
       if (res.status === 402) throw new Error("Token limit reached. Please upgrade your plan.");
       if (!res.ok) throw new Error("Could not parse CV. Please try a different file.");
       const data = await res.json();
+      const allowedSeniority = ["Junior", "Mid", "Mid-Senior", "Senior", "Lead/Principal"];
       setCandidateForm(p => ({
         ...p,
-        name:        data.name        || p.name,
-        email:       data.email       || p.email,
-        linkedinUrl: data.linkedinUrl || p.linkedinUrl,
+        name:               data.name              || p.name,
+        email:              data.email             || p.email,
+        phone:              data.phone             || p.phone,
+        linkedinUrl:        data.linkedinUrl       || p.linkedinUrl,
+        currentTitle:       data.currentTitle      || p.currentTitle,
+        location:           data.location          || p.location,
+        state:              data.state             || p.state,
+        yearsExperience:    data.yearsExperience   || p.yearsExperience,
+        seniorityLevel:     allowedSeniority.includes(data.seniorityLevel) ? data.seniorityLevel : p.seniorityLevel,
+        expectedSalaryMin:  data.expectedSalaryMin || p.expectedSalaryMin,
         cvText:      data.text        || p.cvText,
         skills:      Array.isArray(data.skills) && data.skills.length > 0 ? data.skills : p.skills,
       }));
@@ -324,9 +332,16 @@ export default function AddCandidateModernPage() {
           body: JSON.stringify({
             name:        cv.name        || files[i].file.name.replace(/\.[^.]+$/, ""),
             email:       cv.email       || "",
+            phone:       cv.phone       || "",
             linkedinUrl: cv.linkedinUrl || "",
             cvText:      cv.text        || "",
             skills:      Array.isArray(cv.skills) ? cv.skills : [],
+            currentTitle:      cv.currentTitle      || null,
+            location:          cv.location          || null,
+            state:             cv.state             || null,
+            yearsExperience:   cv.yearsExperience    || null,
+            seniorityLevel:    cv.seniorityLevel     || null,
+            expectedSalaryMin: cv.expectedSalaryMin  || null,
           }),
         });
         if (sr.status === 409) throw new Error("Already in pipeline");
