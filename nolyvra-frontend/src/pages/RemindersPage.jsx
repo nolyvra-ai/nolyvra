@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import {
   Box, Paper, Typography, Button, TextField, MenuItem, Alert,
-  CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions
+  CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, IconButton
 } from "@mui/material";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const BORDER = "#E8ECF2", MUTED = "#9AA3B4", TEXT = "#0F1623", ACCENT = "#1D72E8";
@@ -79,7 +80,7 @@ async function apiDelete(path) {
   if (!res.ok) throw new Error(await res.text());
 }
 
-function ReminderCard({ reminder, index }) {
+function ReminderCard({ reminder, index, onDelete }) {
   const due = dueInfo(reminder.dueAt, reminder.isCompleted);
   return (
     <Draggable draggableId={String(reminder.id)} index={index}>
@@ -89,11 +90,23 @@ function ReminderCard({ reminder, index }) {
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           sx={{
+            position: "relative",
             border: `1px solid ${BORDER}`, borderRadius: "10px", bgcolor: "#fff",
             p: 1.75, mb: 1.25, cursor: "grab",
             boxShadow: snapshot.isDragging ? "0 8px 20px rgba(15,22,35,0.15)" : "0 1px 2px rgba(15,22,35,0.04)",
           }}>
-          <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT, mb: 1.25, lineHeight: 1.4 }}>
+          <IconButton
+            size="small"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onDelete(reminder.id); }}
+            sx={{
+              position: "absolute", top: 6, right: 6, width: 22, height: 22, color: MUTED,
+              "&:hover": { color: DANGER, bgcolor: "#FEF2F2" },
+            }}
+          >
+            <CloseRoundedIcon sx={{ fontSize: 14 }} />
+          </IconButton>
+          <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT, mb: 1.25, lineHeight: 1.4, pr: 2.5 }}>
             {reminder.title}
           </Typography>
           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -160,18 +173,22 @@ export default function RemindersPage() {
     finally { setSaving(false); }
   }
 
+  function deleteReminder(reminderId) {
+    const previous = reminders;
+    setReminders(prev => prev.filter(r => r.id !== reminderId));
+    apiDelete(`/api/reminders/${reminderId}`)
+      .catch(e => { setError(e.message); setReminders(previous); });
+  }
+
   function onDragEnd(result) {
     setIsDragging(false);
     const { source, destination, draggableId } = result;
     if (!destination) return;
 
     const reminderId = Number(draggableId);
-    const previous = reminders;
 
     if (destination.droppableId === "delete-zone") {
-      setReminders(prev => prev.filter(r => r.id !== reminderId));
-      apiDelete(`/api/reminders/${reminderId}`)
-        .catch(e => { setError(e.message); setReminders(previous); });
+      deleteReminder(reminderId);
       return;
     }
 
@@ -179,6 +196,7 @@ export default function RemindersPage() {
 
     const sourceStatus = source.droppableId;
     const destStatus = destination.droppableId;
+    const previous = reminders;
 
     // Reorder the underlying list itself, not just its status — `columns`
     // below derives each column's display order directly from this array's
@@ -282,7 +300,7 @@ export default function RemindersPage() {
                         </Typography>
                       )}
                       {col.items.map((reminder, index) => (
-                        <ReminderCard key={reminder.id} reminder={reminder} index={index} />
+                        <ReminderCard key={reminder.id} reminder={reminder} index={index} onDelete={deleteReminder} />
                       ))}
                       {provided.placeholder}
                     </Box>
