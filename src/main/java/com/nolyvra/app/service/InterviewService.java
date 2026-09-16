@@ -16,10 +16,12 @@ public class InterviewService {
 
     private final JdbcTemplate jdbc;
     private final WorkflowService workflowService;
+    private final ReminderService reminderService;
 
-    public InterviewService(JdbcTemplate jdbc, WorkflowService workflowService) {
+    public InterviewService(JdbcTemplate jdbc, WorkflowService workflowService, ReminderService reminderService) {
         this.jdbc = jdbc;
         this.workflowService = workflowService;
+        this.reminderService = reminderService;
     }
 
     // INTERVIEW_MAPPER updated: left join on jobs so unassigned candidates work
@@ -72,6 +74,8 @@ public class InterviewService {
         // Record timeline event
         workflowService.recordEvent(req.candidateId(), loginId, "INTERVIEW_SCHEDULED",
                 "Interview scheduled: " + req.interviewType(), null);
+
+        reminderService.autoCompleteByCandidateAndType(req.candidateId(), "AUTO_INTERVIEW_UPCOMING");
 
         return getInterview(id, loginId);
     }

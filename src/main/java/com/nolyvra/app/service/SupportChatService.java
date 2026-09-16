@@ -1,22 +1,46 @@
 package com.nolyvra.app.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nolyvra.app.model.SupportChatRequest;
 import com.nolyvra.app.model.SupportChatResponse;
-import com.openai.client.OpenAIClient;
+import com.openai.core.JsonValue;
+import com.openai.models.FunctionDefinition;
+import com.openai.models.FunctionParameters;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
+import com.openai.models.chat.completions.ChatCompletionMessage;
+import com.openai.models.chat.completions.ChatCompletionMessageFunctionToolCall;
+import com.openai.models.chat.completions.ChatCompletionMessageToolCall;
+import com.openai.models.chat.completions.ChatCompletionToolMessageParam;
+import com.openai.client.OpenAIClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 public class SupportChatService {
 
     private static final String FALLBACK_ESCALATED_MESSAGE =
             "I couldn't find a confident answer to that in our Help Center. I've flagged your question for our team — you'll hear back by email shortly.";
+
+    // Safety net against a runaway tool-calling loop — normal flow is at most
+    // 2 rounds (one tool round, then the final JSON answer).
+    private static final int MAX_TOOL_ROUNDS = 4;
+
+    // navigate_to is only allowed to target static, parameter-free routes — a
+    // blind "take me to a candidate" without knowing which candidate doesn't
+    // make sense from a chat message, so dynamic routes (/analysis/:id etc.)
+    // are deliberately excluded. Sourced from AppRoutes.jsx.
+    private static final Set<String> ALLOWED_NAV_PATHS = new LinkedHashSet<>(List.of(
+            "/dashboard", "/jobs", "/jobs/new", "/candidates", "/candidates/new-modern",
+            "/talent-search", "/scheduler", "/email", "/reminders", "/settings/account",
+            "/coworker", "/help"));
 
     private final OpenAIClient openAI;
     private final ObjectMapper objectMapper;
@@ -41,54 +65,198 @@ public class SupportChatService {
     }
 
     public SupportChatResponse respond(String loginId, SupportChatRequest request) {
-        var params = ChatCompletionCreateParams.builder()
+        var builder = ChatCompletionCreateParams.builder()
                 .model(model)
-                .addSystemMessage(buildSystemPrompt(request.articles(), request.history()))
-                .addUserMessage(request.message())
                 .temperature(0.2)
-                .build();
+                .addFunctionTool(answerFromDocsTool())
+                .addFunctionTool(startCoworkerActionTool())
+                .addFunctionTool(navigateToTool())
+                .addSystemMessage(buildSystemPrompt(request.history()))
+                .addUserMessage(request.message());
 
-        var completion = openAI.chat().completions().create(params);
-        String content = completion.choices().getFirst().message().content()
-                .orElse("{\"answer\":\"\",\"canAnswer\":false}");
+        String navigateTo = null;
+        SupportChatResponse.CoworkerIntent coworkerIntent = null;
 
-        return parseResponse(loginId, request.message(), content);
-    }
+        for (int round = 0; round < MAX_TOOL_ROUNDS; round++) {
+            var completion = openAI.chat().completions().create(builder.build());
+            ChatCompletionMessage message = completion.choices().getFirst().message();
 
-    private String buildSystemPrompt(
-            List<SupportChatRequest.ArticleContext> articles,
-            List<SupportChatRequest.ChatMessage> history) {
-        StringBuilder articleContext = new StringBuilder();
-        if (articles != null) {
-            for (var a : articles) {
-                articleContext.append("Title: ").append(a.title())
-                        .append("\nSummary: ").append(a.summary())
-                        .append("\nContent: ").append(a.body())
-                        .append("\n---\n");
+            if (message.toolCalls().isPresent() && !message.toolCalls().get().isEmpty()) {
+                builder.addMessage(message.toParam());
+
+                for (ChatCompletionMessageToolCall call : message.toolCalls().get()) {
+                    if (!call.isFunction()) continue;
+                    ChatCompletionMessageFunctionToolCall fn = call.asFunction();
+                    ToolResult result = executeTool(fn.function().name(), fn.function().arguments(), request);
+                    if (result.navigateTo() != null) navigateTo = result.navigateTo();
+                    if (result.coworkerIntent() != null) coworkerIntent = result.coworkerIntent();
+
+                    builder.addMessage(ChatCompletionToolMessageParam.builder()
+                            .toolCallId(fn.id())
+                            .content(result.content())
+                            .build());
+                }
+                continue;
             }
+
+            // No further tool calls — this is the model's final reply.
+            String content = message.content().orElse("{\"answer\":\"\",\"canAnswer\":false}");
+            return buildFinalResponse(loginId, request.message(), content, navigateTo, coworkerIntent);
         }
 
+        // Exceeded MAX_TOOL_ROUNDS without a final answer — fail safe, same as
+        // the existing "can't answer" path.
+        escalate(loginId, request.message());
+        return new SupportChatResponse(FALLBACK_ESCALATED_MESSAGE, true, null, null);
+    }
+
+    // ─── Tool definitions ──────────────────────────────────────────────────────
+
+    private static FunctionDefinition answerFromDocsTool() {
+        return FunctionDefinition.builder()
+                .name("answer_from_docs")
+                .description("Look up the Help Center articles matched to the user's message, so you can answer "
+                        + "their question about how Nolyvra works or where a feature lives. Call this whenever the "
+                        + "user is asking a question rather than requesting an action or navigation.")
+                .parameters(FunctionParameters.builder()
+                        .putAdditionalProperty("type", JsonValue.from("object"))
+                        .putAdditionalProperty("properties", JsonValue.from(Map.of(
+                                "query", Map.of(
+                                        "type", "string",
+                                        "description", "The user's question, rephrased concisely if helpful."))))
+                        .putAdditionalProperty("required", JsonValue.from(List.of("query")))
+                        .build())
+                .build();
+    }
+
+    private static FunctionDefinition startCoworkerActionTool() {
+        return FunctionDefinition.builder()
+                .name("start_coworker_action")
+                .description("Call this when the user wants to DO something in the app — create a job, run an "
+                        + "analysis, schedule an interview, add candidates, send an email, create a reminder, find "
+                        + "candidates, etc. — rather than just asking a question. This does NOT perform the action "
+                        + "itself: it hands the request off to the AI Co-worker page, which has the tools to "
+                        + "actually execute it after the user confirms.")
+                .parameters(FunctionParameters.builder()
+                        .putAdditionalProperty("type", JsonValue.from("object"))
+                        .putAdditionalProperty("properties", JsonValue.from(Map.of(
+                                "intent", Map.of(
+                                        "type", "string",
+                                        "description", "A short natural-language description of what the user wants done, "
+                                                + "e.g. 'create a job for a Senior Backend Engineer role'."),
+                                "params", Map.of(
+                                        "type", "object",
+                                        "description", "Any structured details already mentioned (job title, candidate "
+                                                + "name, etc.) as key-value pairs. Empty object if none."))))
+                        .putAdditionalProperty("required", JsonValue.from(List.of("intent")))
+                        .build())
+                .build();
+    }
+
+    private static FunctionDefinition navigateToTool() {
+        return FunctionDefinition.builder()
+                .name("navigate_to")
+                .description("Call this when the user just wants to go to a specific page/section of the app and "
+                        + "isn't asking a question or requesting an action. path must be one of: "
+                        + String.join(", ", ALLOWED_NAV_PATHS))
+                .parameters(FunctionParameters.builder()
+                        .putAdditionalProperty("type", JsonValue.from("object"))
+                        .putAdditionalProperty("properties", JsonValue.from(Map.of(
+                                "path", Map.of(
+                                        "type", "string",
+                                        "description", "One of the allowed app routes listed above."))))
+                        .putAdditionalProperty("required", JsonValue.from(List.of("path")))
+                        .build())
+                .build();
+    }
+
+    // ─── Tool execution ────────────────────────────────────────────────────────
+
+    private record ToolResult(String content, String navigateTo, SupportChatResponse.CoworkerIntent coworkerIntent) {
+        static ToolResult of(String content) {
+            return new ToolResult(content, null, null);
+        }
+    }
+
+    private ToolResult executeTool(String name, String argumentsJson, SupportChatRequest request) {
+        try {
+            JsonNode args = objectMapper.readTree(argumentsJson);
+            return switch (name) {
+                case "answer_from_docs" -> executeAnswerFromDocs(request);
+                case "start_coworker_action" -> executeStartCoworkerAction(args);
+                case "navigate_to" -> executeNavigateTo(args);
+                default -> ToolResult.of("{\"error\":\"Unknown tool: " + name + "\"}");
+            };
+        } catch (Exception e) {
+            return ToolResult.of("{\"error\":\"Tool execution failed: " + e.getMessage() + "\"}");
+        }
+    }
+
+    private ToolResult executeAnswerFromDocs(SupportChatRequest request) {
+        List<SupportChatRequest.ArticleContext> articles = request.articles();
+        if (articles == null || articles.isEmpty()) {
+            return ToolResult.of("{\"articles\":[],\"note\":\"No matching Help Center articles were found for this query.\"}");
+        }
+        try {
+            return ToolResult.of(objectMapper.writeValueAsString(Map.of("articles", articles)));
+        } catch (Exception e) {
+            return ToolResult.of("{\"articles\":[],\"note\":\"Failed to serialize matched articles.\"}");
+        }
+    }
+
+    private ToolResult executeStartCoworkerAction(JsonNode args) {
+        String intent = args.path("intent").asText("");
+        Map<String, Object> params = objectMapper.convertValue(
+                args.path("params"), new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+        if (params == null) params = Map.of();
+        var coworkerIntent = new SupportChatResponse.CoworkerIntent(intent, params);
+        return new ToolResult("{\"handoff\":true}", null, coworkerIntent);
+    }
+
+    private ToolResult executeNavigateTo(JsonNode args) {
+        String path = args.path("path").asText("");
+        if (!ALLOWED_NAV_PATHS.contains(path)) {
+            return ToolResult.of("{\"error\":\"'" + path + "' is not a valid app route. Valid routes: "
+                    + String.join(", ", ALLOWED_NAV_PATHS) + "\"}");
+        }
+        return new ToolResult("{\"navigated\":true,\"path\":\"" + path + "\"}", path, null);
+    }
+
+    // ─── System prompt ─────────────────────────────────────────────────────────
+
+    private String buildSystemPrompt(List<SupportChatRequest.ChatMessage> history) {
         String systemPrompt = """
-                You are the Nolyvra Help Center assistant. You answer recruiter questions about how to use the
-                Nolyvra app using ONLY the Help Center articles provided below. Do not use outside knowledge and
-                do not guess.
+                You are the Nolyvra Help Center assistant — a knowledgeable, confident product expert for
+                recruiters using the Nolyvra app. Your job is to make human support intervention barely
+                necessary by answering thoroughly and correctly, or by taking the user where they need to go.
 
-                HELP CENTER ARTICLES:
-                %s
+                For every user message, first decide what they need:
+                - A question about how something works or where a feature lives -> call answer_from_docs.
+                - A request to actually DO something in the app (create a job, run analysis, schedule an
+                  interview, add candidates, send an email, etc.) -> call start_coworker_action.
+                - A request to simply go to a page/section -> call navigate_to.
+                If you're unsure whether it's a question or an action, prefer answer_from_docs.
 
-                You MUST return EXACTLY ONE JSON object with this shape:
+                Once you've used a tool (or the message is generic enough not to need one, e.g. a greeting),
+                reply with EXACTLY ONE JSON object — no markdown, no extra keys:
                 {
-                  "answer": "<your answer, or a short note that you can't help with this>",
+                  "answer": "<your reply to the user>",
                   "canAnswer": true|false
                 }
 
-                Rules:
-                - Set "canAnswer" to true only if the articles above directly answer the question.
-                - If the articles don't cover the question, set "canAnswer" to false and leave "answer" empty.
-                - Keep answers concise and specific, referencing steps from the articles where relevant.
-                - No markdown. No extra keys. Respond with ONLY the JSON object, nothing else.
-                """
-                .formatted(articleContext.length() > 0 ? articleContext : "(no matching articles found)");
+                Rules for the answer:
+                - When answering from Help Center articles: synthesize a complete, specific, step-by-step answer
+                  from the matched articles. You may combine information across multiple matched articles. Only
+                  set "canAnswer" to false (leaving "answer" empty) if the matched articles genuinely don't cover
+                  what was asked — do not guess or use outside knowledge about how the app works.
+                - When you just called navigate_to successfully: write a short confirmation (e.g. "Taking you to
+                  Create Job now.") and set "canAnswer" to true.
+                - When you just called start_coworker_action: write a short confirmation that you're handing this
+                  to the AI Co-worker to help complete it (e.g. "I'll take you to the Co-worker so it can create
+                  that job for you — heading there now.") and set "canAnswer" to true.
+                - Keep answers concise but complete — a recruiter should rarely need to ask a follow-up.
+                - No markdown formatting in "answer". No extra keys in the JSON object.
+                """;
 
         if (history == null || history.isEmpty()) {
             return systemPrompt;
@@ -101,7 +269,10 @@ public class SupportChatService {
         return systemPrompt + "\n\nCONVERSATION SO FAR:\n" + conversation;
     }
 
-    private SupportChatResponse parseResponse(String loginId, String question, String content) {
+    // ─── Final response assembly ───────────────────────────────────────────────
+
+    private SupportChatResponse buildFinalResponse(String loginId, String question, String content,
+            String navigateTo, SupportChatResponse.CoworkerIntent coworkerIntent) {
         String clean = cleanJson(content);
         boolean canAnswer = false;
         String answer = "";
@@ -114,12 +285,18 @@ public class SupportChatService {
             // Fall through — treat an unparsable response as "can't answer" and escalate.
         }
 
+        // A successful navigate/handoff is a successful outcome regardless of how
+        // the model phrased canAnswer — only escalate on the pure Q&A path.
+        if (navigateTo != null || coworkerIntent != null) {
+            return new SupportChatResponse(answer, false, navigateTo, coworkerIntent);
+        }
+
         if (canAnswer && !answer.isBlank()) {
-            return new SupportChatResponse(answer, false);
+            return new SupportChatResponse(answer, false, null, null);
         }
 
         escalate(loginId, question);
-        return new SupportChatResponse(FALLBACK_ESCALATED_MESSAGE, true);
+        return new SupportChatResponse(FALLBACK_ESCALATED_MESSAGE, true, null, null);
     }
 
     private void escalate(String loginId, String question) {

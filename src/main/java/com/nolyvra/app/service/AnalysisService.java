@@ -26,6 +26,7 @@ public class AnalysisService {
     private final JdbcTemplate jdbc;
     private final TokenService tokenService;
     private final CandidateAnalysisRunner analysisRunner;
+    private final ReminderService reminderService;
 
     public AnalysisService(
             ObjectMapper objectMapper,
@@ -33,13 +34,15 @@ public class AnalysisService {
             JdbcTemplate jdbcTemplate,
             TokenService tokenService,
             @Value("${openai.model:gpt-4o-mini}") String model,
-            CandidateAnalysisRunner analysisRunner) {
+            CandidateAnalysisRunner analysisRunner,
+            ReminderService reminderService) {
         this.objectMapper = objectMapper;
         this.openAI = openAIClient;
         this.jdbc = jdbcTemplate;
         this.tokenService = tokenService;
         this.model = model;
         this.analysisRunner = analysisRunner;
+        this.reminderService = reminderService;
     }
 
     // ─── Loaders ──────────────────────────────────────────────────────────────
@@ -91,6 +94,7 @@ public class AnalysisService {
         CandidateAnalysisResponse response = analysisRunner.analyze(
                 candidateId, candidateResponse, loginId, jdText, cvText, linkedinUrl);
         persistAnalysisToDb(response, loginId);
+        reminderService.autoCompleteByCandidateAndType(candidateId, "AUTO_ANALYSIS_PENDING");
         return response;
     }
 
