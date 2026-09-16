@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Fuse from "fuse.js";
 import {
   Box, Paper, IconButton, TextField, Typography, CircularProgress,
@@ -48,6 +49,7 @@ async function postSupportChat(loginId, body) {
 }
 
 export default function SupportChatWidget() {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([]);
@@ -80,6 +82,13 @@ export default function SupportChatWidget() {
         ...prev,
         { role: "assistant", content: res.answer, escalated: res.escalated },
       ]);
+      if (res.navigateTo) {
+        setOpen(false);
+        navigate(res.navigateTo);
+      } else if (res.coworkerIntent) {
+        setOpen(false);
+        navigate("/coworker", { state: { coworkerIntent: res.coworkerIntent } });
+      }
     } catch {
       setMessages((prev) => [
         ...prev,

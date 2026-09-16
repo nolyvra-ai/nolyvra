@@ -4,6 +4,7 @@ import {
   CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions
 } from "@mui/material";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import CloseIcon from "@mui/icons-material/Close";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const BORDER = "#E8ECF2", MUTED = "#9AA3B4", TEXT = "#0F1623", ACCENT = "#1D72E8";
@@ -69,6 +70,13 @@ async function apiPatchJson(path, body) {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+async function apiDelete(path) {
+  const loginId = localStorage.getItem("loginId") || "";
+  const url = new URL(`${API_BASE}${path}`);
+  url.searchParams.set("loginId", loginId);
+  const res = await fetch(url.toString(), { method: "DELETE", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
+  if (!res.ok) throw new Error(await res.text());
+}
 
 function ReminderCard({ reminder, index }) {
   const due = dueInfo(reminder.dueAt, reminder.isCompleted);
@@ -125,6 +133,7 @@ export default function RemindersPage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState({ title: "", candidateId: "", dueAt: "", priority: "Normal", description: "" });
+  const [isDragging, setIsDragging] = useState(false);
 
   function loadReminders() {
     setLoading(true);
@@ -151,13 +160,23 @@ export default function RemindersPage() {
   }
 
   function onDragEnd(result) {
+    setIsDragging(false);
     const { source, destination, draggableId } = result;
     if (!destination) return;
-    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
     const reminderId = Number(draggableId);
-    const newStatus = destination.droppableId;
     const previous = reminders;
+
+    if (destination.droppableId === "delete-zone") {
+      setReminders(prev => prev.filter(r => r.id !== reminderId));
+      apiDelete(`/api/reminders/${reminderId}`)
+        .catch(e => { setError(e.message); setReminders(previous); });
+      return;
+    }
+
+    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+
+    const newStatus = destination.droppableId;
 
     setReminders(prev => prev.map(r => r.id === reminderId
       ? { ...r, status: newStatus, isCompleted: newStatus === "Done" }
@@ -195,7 +214,7 @@ export default function RemindersPage() {
           <CircularProgress size={22} sx={{ color: ACCENT }} />
         </Box>
       ) : (
-        <DragDropContext onDragEnd={onDragEnd}>
+        <DragDropContext onDragStart={() => setIsDragging(true)} onDragEnd={onDragEnd}>
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1.75, alignItems: "start" }}>
             {columns.map(col => (
               <Box key={col.key}>
@@ -239,6 +258,28 @@ export default function RemindersPage() {
               </Box>
             ))}
           </Box>
+
+          {isDragging && (
+            <Droppable droppableId="delete-zone">
+              {(provided, snapshot) => (
+                <Box
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  sx={{
+                    mt: 1.75, borderRadius: "10px", border: `2px dashed ${DANGER}`,
+                    bgcolor: snapshot.isDraggingOver ? "#FCA5A5" : "#FEF2F2",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    gap: 1, py: 2.5, transition: "background .15s",
+                  }}>
+                  <CloseIcon sx={{ color: DANGER, fontSize: 20 }} />
+                  <Typography sx={{ fontSize: 13, fontWeight: 700, color: DANGER }}>
+                    Drop here to delete
+                  </Typography>
+                  {provided.placeholder}
+                </Box>
+              )}
+            </Droppable>
+          )}
         </DragDropContext>
       )}
 

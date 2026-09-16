@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Box, CircularProgress, LinearProgress, Typography } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { isSupportedCvFile, validateCvContent } from "../utils/cvValidation";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -476,6 +476,7 @@ const iconBtnSx = {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function CoWorkerPage() {
   const nav      = useNavigate();
+  const location = useLocation();
   const loginId  = localStorage.getItem("loginId") || "";
   const userName = localStorage.getItem("name") || "there";
   const initials = userName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
@@ -514,6 +515,18 @@ export default function CoWorkerPage() {
   }, [loginId]);
 
   useEffect(() => { loadSessions(); }, [loadSessions]);
+
+  // ── Auto-send an intent handed off from the Support Chat widget ────────────
+  useEffect(() => {
+    const incoming = location.state?.coworkerIntent;
+    if (!incoming) return;
+    const paramsText = incoming.params && Object.keys(incoming.params).length
+      ? ` (${Object.entries(incoming.params).map(([k, v]) => `${k}: ${v}`).join(", ")})`
+      : "";
+    sendMessage(`${incoming.intent}${paramsText}`);
+    nav(location.pathname, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Poll active tasks ───────────────────────────────────────────────────────
   useEffect(() => {

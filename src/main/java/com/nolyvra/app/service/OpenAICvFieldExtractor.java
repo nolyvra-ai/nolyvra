@@ -49,6 +49,12 @@ public class OpenAICvFieldExtractor implements CvFieldExtractor {
                       "email": "Email address or null",
                       "phone": "Phone number or null",
                       "linkedinUrl": "LinkedIn profile URL or null",
+                      "currentTitle": "Candidate's most recent/current job title or null",
+                      "location": "City or suburb the candidate is based in, or null",
+                      "state": "State/region abbreviation (e.g. VIC, NSW) or null",
+                      "yearsExperience": "Total years of professional experience as a number, or null",
+                      "seniorityLevel": "One of exactly: Junior, Mid, Mid-Senior, Senior, Lead/Principal — or null if unclear",
+                      "expectedSalaryMin": "Minimum expected/current salary as a number if stated in the CV, or null",
                       "skills": ["up to 15 core technical/professional skills, ordered by relevance"]
                     }
 
@@ -72,15 +78,28 @@ public class OpenAICvFieldExtractor implements CvFieldExtractor {
                     if (!s.asText("").isBlank()) skills.add(s.asText());
                 });
             }
-            return Map.of(
-                    "name", root.path("name").isNull() ? "" : root.path("name").asText(""),
-                    "email", root.path("email").isNull() ? "" : root.path("email").asText(""),
-                    "phone", root.path("phone").isNull() ? "" : root.path("phone").asText(""),
-                    "linkedinUrl", root.path("linkedinUrl").isNull() ? "" : root.path("linkedinUrl").asText(""),
-                    "skills", skills);
+            Map<String, Object> result = new java.util.HashMap<>();
+            result.put("name", root.path("name").isNull() ? "" : root.path("name").asText(""));
+            result.put("email", root.path("email").isNull() ? "" : root.path("email").asText(""));
+            result.put("phone", root.path("phone").isNull() ? "" : root.path("phone").asText(""));
+            result.put("linkedinUrl", root.path("linkedinUrl").isNull() ? "" : root.path("linkedinUrl").asText(""));
+            result.put("currentTitle", root.path("currentTitle").isNull() ? "" : root.path("currentTitle").asText(""));
+            result.put("location", root.path("location").isNull() ? "" : root.path("location").asText(""));
+            result.put("state", root.path("state").isNull() ? "" : root.path("state").asText(""));
+            result.put("yearsExperience", root.path("yearsExperience").isNull() ? "" : root.path("yearsExperience").asText(""));
+            result.put("seniorityLevel", root.path("seniorityLevel").isNull() ? "" : root.path("seniorityLevel").asText(""));
+            result.put("expectedSalaryMin", root.path("expectedSalaryMin").isNull() ? "" : root.path("expectedSalaryMin").asText(""));
+            result.put("skills", skills);
+            return result;
         } catch (Exception e) {
             System.err.println("[CvExtract] Field extraction failed: " + e.getMessage());
-            return Map.of("name", "", "email", "", "phone", "", "linkedinUrl", "", "skills", List.of());
+            Map<String, Object> fallback = new java.util.HashMap<>();
+            for (String key : new String[]{"name", "email", "phone", "linkedinUrl", "currentTitle",
+                    "location", "state", "yearsExperience", "seniorityLevel", "expectedSalaryMin"}) {
+                fallback.put(key, "");
+            }
+            fallback.put("skills", List.of());
+            return fallback;
         }
     }
 
