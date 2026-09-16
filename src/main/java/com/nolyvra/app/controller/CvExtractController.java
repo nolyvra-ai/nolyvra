@@ -25,7 +25,8 @@ public class CvExtractController {
         }
 
         try {
-            // Returns { text, name, email, phone, linkedinUrl, skills }
+            // Returns { text, name, email, phone, linkedinUrl, currentTitle, location,
+            //           state, yearsExperience, seniorityLevel, expectedSalaryMin, skills }
             Map<String, Object> result = cvExtractService.extractWithFields(file, loginId);
             return ResponseEntity.ok(result);
         } catch (IllegalArgumentException e) {

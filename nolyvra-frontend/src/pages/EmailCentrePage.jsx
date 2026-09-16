@@ -298,6 +298,27 @@ export default function EmailCentrePage() {
         body:    textToHtml(substitute(rawTemplate.body, cand?.name || "", job)),
       } : {}),
     }));
+
+    if (!candId) return;
+    apiGet(`/api/candidates/${candId}/applications`)
+      .then(applications => {
+        if (!Array.isArray(applications) || applications.length !== 1) return;
+        const jobId = applications[0].jobId;
+        if (!jobId) return;
+        setForm(p => {
+          if (p.candidateId !== candId) return p; // candidate changed again before this resolved
+          const linkedJob = jobs.find(j => j.id === jobId);
+          return {
+            ...p,
+            jobId,
+            ...(rawTemplate.body ? {
+              subject: substitute(rawTemplate.subject, cand?.name || "", linkedJob),
+              body:    textToHtml(substitute(rawTemplate.body, cand?.name || "", linkedJob)),
+            } : {}),
+          };
+        });
+      })
+      .catch(() => {});
   }
 
   function handleJobChange(jobId) {
