@@ -2,6 +2,7 @@ import { Box } from "@mui/material";
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
 import SupportChatWidget from "./support/SupportChatWidget";
+import GettingStartedGuideWidget from "./onboarding/GettingStartedGuideWidget";
 import TrialExpiredBanner from "./TrialExpiredBanner";
 
 
@@ -23,6 +24,7 @@ export default function AppShell({ children }) {
       </Box>
 
       <SupportChatWidget />
+      <GettingStartedGuideWidget />
     </Box>
   );
 }
