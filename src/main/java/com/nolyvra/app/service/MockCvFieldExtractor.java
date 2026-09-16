@@ -14,6 +14,9 @@ public class MockCvFieldExtractor implements CvFieldExtractor {
 
     @Override
     public Map<String, Object> extractFields(String rawText, String originalFilename, String loginId) {
+        System.out.println("[CvExtract][DEBUG] MockCvFieldExtractor active — currentTitle/location/state/"
+                + "yearsExperience/seniorityLevel/expectedSalaryMin are ALWAYS blank from this extractor by "
+                + "design (no LLM call). If you're seeing this locally, check openai.api-key / nolyvra.mock-ai.");
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("name", mockName(rawText, originalFilename));
         result.put("email", firstMatch(rawText, "[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}"));
