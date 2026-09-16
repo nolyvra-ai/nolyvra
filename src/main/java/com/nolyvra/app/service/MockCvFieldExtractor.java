@@ -14,12 +14,22 @@ public class MockCvFieldExtractor implements CvFieldExtractor {
 
     @Override
     public Map<String, Object> extractFields(String rawText, String originalFilename, String loginId) {
-        return Map.of(
-                "name", mockName(rawText, originalFilename),
-                "email", firstMatch(rawText, "[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}"),
-                "phone", firstMatch(rawText, "(?:\\+?\\d[\\d .()\\-]{7,}\\d)"),
-                "linkedinUrl", firstMatch(rawText, "https?://(?:www\\.)?linkedin\\.com/[^\\s)]+"),
-                "skills", List.<String>of());
+        System.out.println("[CvExtract][DEBUG] MockCvFieldExtractor active — currentTitle/location/state/"
+                + "yearsExperience/seniorityLevel/expectedSalaryMin are ALWAYS blank from this extractor by "
+                + "design (no LLM call). If you're seeing this locally, check openai.api-key / nolyvra.mock-ai.");
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("name", mockName(rawText, originalFilename));
+        result.put("email", firstMatch(rawText, "[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}"));
+        result.put("phone", firstMatch(rawText, "(?:\\+?\\d[\\d .()\\-]{7,}\\d)"));
+        result.put("linkedinUrl", firstMatch(rawText, "https?://(?:www\\.)?linkedin\\.com/[^\\s)]+"));
+        result.put("currentTitle", "");
+        result.put("location", "");
+        result.put("state", "");
+        result.put("yearsExperience", "");
+        result.put("seniorityLevel", "");
+        result.put("expectedSalaryMin", "");
+        result.put("skills", List.<String>of());
+        return result;
     }
 
     private static String mockName(String text, String fallbackName) {

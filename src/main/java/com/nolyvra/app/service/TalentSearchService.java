@@ -242,13 +242,13 @@ public class TalentSearchService {
                 .limit(CORESIGNAL_API_MAX_RESULTS)
                 .collect(Collectors.toList());
         if (cached.size() >= CORESIGNAL_API_MAX_RESULTS) {
-            return applyAiScoring(cached, originalQuery, loginId);
+            return applyAiScoring(cached, originalQuery, loginId, filters.industry());
         }
 
         List<TalentSearchResult> live = fetchCoreSignalApiLive(filters);
-        if (live.isEmpty()) return cached.isEmpty() ? List.of() : applyAiScoring(cached, originalQuery, loginId);
+        if (live.isEmpty()) return cached.isEmpty() ? List.of() : applyAiScoring(cached, originalQuery, loginId, filters.industry());
 
-        return applyAiScoring(live, originalQuery, loginId);
+        return applyAiScoring(live, originalQuery, loginId, filters.industry());
     }
 
     private List<TalentSearchResult> fetchCoreSignalApiLive(SearchFilters filters) {
@@ -352,11 +352,12 @@ public class TalentSearchService {
                 for (JsonNode s : skillsNode) profileSkills.add(s.asText());
             }
 
+            String description = profile.path("description").asText(null);
             List<String> matched = extractMatchedSkills(String.join(" ", profileSkills), filters.skills());
             List<String> gaps = filters.skills().stream()
                     .filter(s -> !matched.contains(s))
                     .collect(Collectors.toList());
-            int score = Math.min(50 + (matched.size() * 5), 99);
+            int score = Math.min(50 + (matched.size() * 5) + industryAdjustment(description, filters.industry()), 99);
 
             try {
                 String skillsJson = objectMapper.writeValueAsString(profileSkills);
@@ -386,7 +387,7 @@ public class TalentSearchService {
                     profile.path("location_country").asText(null),
                     linkedinUrl, skillsJson, yearsExp,
                     profile.path("management_level").asText(null),
-                    profile.path("description").asText(null),
+                    description,
                     resp.getBody());
             } catch (Exception e) {
                 System.err.println("[CoreSignal] cache save failed for id " + id + ": " + e.getMessage());
@@ -410,7 +411,7 @@ public class TalentSearchService {
         try {
             StringBuilder sql = new StringBuilder(
                     "select coresignal_id, full_name, job_title, current_company," +
-                    " linkedin_url, skills, years_experience" +
+                    " linkedin_url, skills, years_experience, description" +
                     " from coresignal_api_cache" +
                     " where cached_at > now() - interval '" + CACHE_DAYS_VALID + " days'");
 
@@ -454,7 +455,8 @@ public class TalentSearchService {
                 List<String> gaps = filters.skills().stream()
                     .filter(s -> !matched.contains(s))
                     .collect(Collectors.toList());
-                int score = Math.min(50 + (matched.size() * 5), 99);
+                int score = Math.min(50 + (matched.size() * 5)
+                        + industryAdjustment(rs.getString("description"), filters.industry()), 99);
 
                 long id = rs.getLong("coresignal_id");
                 jdbc.update("update coresignal_api_cache set last_searched_at = now() where coresignal_id = ?", id);
@@ -574,6 +576,7 @@ public class TalentSearchService {
                     "null".equalsIgnoreCase(raw.location())   ? null : raw.location());
             System.out.println("[TalentSearch] extracted filters: skills=" + result.skills()
                     + " seniority=" + result.seniority()
+                    + " industry=" + result.industry()
                     + " keywords=" + result.keywords()
                     + " location=" + result.location());
             return result;
@@ -658,21 +661,21 @@ public class TalentSearchService {
     private List<TalentSearchResult> searchExternal(SearchFilters filters, String loginId,
                                                       String originalQuery) {
         List<TalentSearchResult> results = fetchExternalCandidates(filters);
-        return applyAiScoring(results, originalQuery, loginId);
+        return applyAiScoring(results, originalQuery, loginId, filters.industry());
     }
 
     public List<TalentSearchResult> loadMoreExternal(String originalQuery, String loginId) {
         SearchFilters filters = extractFilters(originalQuery);
         List<TalentSearchResult> results = fetchExternalCandidates(filters);
-        return applyAiScoring(results, originalQuery, loginId);
+        return applyAiScoring(results, originalQuery, loginId, filters.industry());
     }
 
     private List<TalentSearchResult> applyAiScoring(List<TalentSearchResult> results,
-                                                      String originalQuery, String loginId) {
+                                                      String originalQuery, String loginId, String industry) {
         if (results.isEmpty()) return results;
         List<Integer> aiScores = List.of();
         if (tokenService.deductToken(loginId)) {
-            aiScores = scoreWithAI(results, originalQuery);
+            aiScores = scoreWithAI(results, originalQuery, industry);
         }
         if (aiScores.size() != results.size()) return results;
         List<TalentSearchResult> scored = new ArrayList<>();
@@ -701,7 +704,7 @@ public class TalentSearchService {
         if (brightDataApiKey == null || brightDataApiKey.isBlank()) return List.of();
         SearchFilters filters = buildJobFilters(skills, location, title, seniority);
         List<TalentSearchResult> results = fetchExternalCandidates(filters);
-        return applyAiScoring(results, jobSearchQuery(title, skills, location), loginId);
+        return applyAiScoring(results, jobSearchQuery(title, skills, location), loginId, filters.industry());
     }
 
     public List<TalentSearchResult> loadMoreExternalForJob(List<String> skills, String location,
@@ -709,7 +712,7 @@ public class TalentSearchService {
         if (brightDataApiKey == null || brightDataApiKey.isBlank()) return List.of();
         SearchFilters filters = buildJobFilters(skills, location, title, seniority);
         List<TalentSearchResult> results = fetchExternalCandidates(filters);
-        return applyAiScoring(results, jobSearchQuery(title, skills, location), loginId);
+        return applyAiScoring(results, jobSearchQuery(title, skills, location), loginId, filters.industry());
     }
 
     // Builds a natural-language-style query string for scoreWithAI's prompt,
@@ -876,8 +879,8 @@ public class TalentSearchService {
                 insert into coresignal_cache
                     (coresignal_id, full_name, job_title, current_company,
                      location_city, location_country, linkedin_url,
-                     avatar_url, default_avatar, raw_json, last_searched_at)
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), now())
+                     avatar_url, default_avatar, description, raw_json, last_searched_at)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), now())
                 on conflict (coresignal_id) do update set
                     full_name        = excluded.full_name,
                     job_title        = excluded.job_title,
@@ -887,18 +890,19 @@ public class TalentSearchService {
                     linkedin_url     = excluded.linkedin_url,
                     avatar_url       = excluded.avatar_url,
                     default_avatar   = excluded.default_avatar,
+                    description      = excluded.description,
                     raw_json         = excluded.raw_json,
                     cached_at        = now(),
                     last_searched_at = now()
                 """,
                 id, name, position, currentCompany, city, countryCode, linkedinUrl,
-                avatarUrl, defaultAvatar, record.toString());
+                avatarUrl, defaultAvatar, about, record.toString());
 
             List<String> matched = extractMatchedSkills(about != null ? about : "", filters.skills());
             List<String> gaps = filters.skills().stream()
                     .filter(s -> !matched.contains(s))
                     .collect(Collectors.toList());
-            int score = Math.min(50 + (matched.size() * 5), 99);
+            int score = Math.min(50 + (matched.size() * 5) + industryAdjustment(about, filters.industry()), 99);
 
             return new TalentSearchResult(
                     null, name, position, currentCompany, linkedinUrl, null, null,
@@ -963,7 +967,7 @@ public class TalentSearchService {
         try {
             StringBuilder sql = new StringBuilder(
                     "select coresignal_id, full_name, job_title, current_company," +
-                    " linkedin_url, skills, years_experience, avatar_url, default_avatar" +
+                    " linkedin_url, skills, years_experience, avatar_url, default_avatar, description" +
                     " from coresignal_cache");
 
             List<Object> args = new ArrayList<>();
@@ -985,7 +989,8 @@ public class TalentSearchService {
                 List<String> gaps = filters.skills().stream()
                     .filter(s -> !matched.contains(s))
                     .collect(Collectors.toList());
-                int score = 50 + (matched.size() * 5);
+                int score = 50 + (matched.size() * 5)
+                        + industryAdjustment(rs.getString("description"), filters.industry());
                 score = Math.min(score, 99);
 
                 jdbc.update("update coresignal_cache set last_searched_at = now() where coresignal_id = ?",
@@ -1012,7 +1017,7 @@ public class TalentSearchService {
 
     // ─── Fix 6: Score CoreSignal results with OpenAI ──────────────────────────
 
-    private List<Integer> scoreWithAI(List<TalentSearchResult> profiles, String originalQuery) {
+    private List<Integer> scoreWithAI(List<TalentSearchResult> profiles, String originalQuery, String industry) {
         try {
             StringBuilder sb = new StringBuilder();
             for (int i = 0; i < profiles.size(); i++) {
@@ -1025,9 +1030,15 @@ public class TalentSearchService {
                   .append("\n");
             }
 
+            String industryRule = (industry != null && !industry.isBlank())
+                    ? "\nThe search requires the " + industry + " industry/sector specifically. Judge each "
+                      + "candidate's title and company for whether their background plausibly belongs to that "
+                      + "industry. A candidate who is clearly in an unrelated industry must score 35 or below, "
+                      + "even if their job title or skills otherwise match the query."
+                    : "";
             String systemPrompt = """
-                    You are a recruitment matcher. Score each candidate 0-100 against the query.
-                    Return ONLY a JSON array of integers in the same order: [85, 72, 60, ...]""";
+                    You are a recruitment matcher. Score each candidate 0-100 against the query.%s
+                    Return ONLY a JSON array of integers in the same order: [85, 72, 60, ...]""".formatted(industryRule);
             String userPrompt = "Query: " + originalQuery + "\n\nCandidates:\n" + sb;
 
             var params = ChatCompletionCreateParams.builder()
@@ -1308,7 +1319,17 @@ public class TalentSearchService {
                 .filter(s -> lower.contains(s.toLowerCase()))
                 .count();
         int bonus = filters.skills().isEmpty() ? 0 : (int) (matches * 10);
+        bonus += industryAdjustment(cvText, filters.industry());
         return Math.min(baseScore + bonus, 99);
+    }
+
+    // Bonus when the candidate's text (CV, LinkedIn "about", CoreSignal description)
+    // mentions the requested industry/sector; mild penalty when we have text to check
+    // and it clearly doesn't mention it. No adjustment when there's no industry filter
+    // or no text available to judge against (can't tell either way).
+    private int industryAdjustment(String text, String industry) {
+        if (industry == null || industry.isBlank() || text == null || text.isBlank()) return 0;
+        return text.toLowerCase().contains(industry.toLowerCase()) ? 12 : -12;
     }
 
     private List<String> extractMatchedSkills(String cvText, List<String> skills) {

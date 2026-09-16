@@ -356,6 +356,8 @@ export default function AddCandidatePage() {
         return;
       }
 
+      console.log("[CvExtract][DEBUG] /api/cv/extract response:", data);
+
       const extractedText = data.text || "";
 
       // Run CV validation on extracted text
@@ -367,12 +369,20 @@ export default function AddCandidatePage() {
       }
 
       // Prefill all available fields from CV
+      const allowedSeniority = ["Junior", "Mid", "Mid-Senior", "Senior", "Lead/Principal"];
       setForm(prev => ({
         ...prev,
-        cvText:      extractedText        || prev.cvText,
-        name:        data.name        || prev.name,
-        email:       data.email       || prev.email,
-        linkedinUrl: data.linkedinUrl || prev.linkedinUrl,
+        cvText:            extractedText        || prev.cvText,
+        name:               data.name              || prev.name,
+        email:              data.email             || prev.email,
+        phone:              data.phone             || prev.phone,
+        linkedinUrl:        data.linkedinUrl       || prev.linkedinUrl,
+        currentTitle:       data.currentTitle      || prev.currentTitle,
+        location:           data.location          || prev.location,
+        state:              data.state             || prev.state,
+        yearsExperience:    data.yearsExperience   || prev.yearsExperience,
+        seniorityLevel:     allowedSeniority.includes(data.seniorityLevel) ? data.seniorityLevel : prev.seniorityLevel,
+        expectedSalaryMin:  data.expectedSalaryMin || prev.expectedSalaryMin,
         skills:      Array.isArray(data.skills) && data.skills.length > 0 ? data.skills : prev.skills,
       }));
     } catch (e) {

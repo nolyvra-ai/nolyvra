@@ -256,6 +256,8 @@ public class JobService {
                   "seniorityLevel": "e.g. Senior · 5+ yrs",
                   "roleType": "e.g. Technical Lead | Individual Contributor | Manager",
                   "industry": "e.g. FinTech | HealthTech | E-Commerce",
+                  "jobTitle": "<concise job title for this role, e.g. Senior Backend Engineer>",
+                  "employmentType": "<one of exactly: Full-time, Contract, Part-time>",
                   "company": "<company or client name if mentioned in the brief, otherwise empty string>",
                   "location": "<work location or city if mentioned in the brief, otherwise empty string>",
                   "generatedJdText": "<full formal job description as a multi-line string>",
@@ -267,7 +269,9 @@ public class JobService {
                 - generatedJdText must be a complete, professional job description.
                 - extractedSkills: technical skills only, max 10 items.
                 - softSkills: non-technical, max 6 items.
-                - company: extract from brief if mentioned (e.g. company name, client name). Return "" if not found.
+                - jobTitle: infer the most fitting job title from the brief's role description, even if not stated verbatim.
+                - employmentType: infer from the brief if possible; default to "Full-time" if not specified.
+                - company: extract from brief if mentioned (e.g. company name, client name, or a clear contextual reference like "our client, a FinTech startup"). Return "" only if genuinely no company/client is referenced.
                 - location: extract from brief if mentioned (e.g. city, country, remote). Return "" if not found.
                 - All fields are required.
                 """;

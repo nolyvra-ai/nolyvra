@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react";
 import {
   Box, Paper, Typography, Button, TextField, MenuItem, Alert,
-  CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions
+  CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, IconButton
 } from "@mui/material";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const BORDER = "#E8ECF2", MUTED = "#9AA3B4", TEXT = "#0F1623", ACCENT = "#1D72E8";
 const SUCCESS = "#16A34A", DANGER = "#DC2626", WARN = "#D97706";
 const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
 const SURFACE = "#FAFBFD";
+const BIN_GREY = "#6B7280", BIN_GREY_BG = "#F3F4F6", BIN_GREY_BORDER = "#9CA3AF";
 
 const COLUMNS = [
   { key: "To Do",              headerBg: "#FDEDE3", headerColor: "#C2521B" },
@@ -69,8 +72,15 @@ async function apiPatchJson(path, body) {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+async function apiDelete(path) {
+  const loginId = localStorage.getItem("loginId") || "";
+  const url = new URL(`${API_BASE}${path}`);
+  url.searchParams.set("loginId", loginId);
+  const res = await fetch(url.toString(), { method: "DELETE", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
+  if (!res.ok) throw new Error(await res.text());
+}
 
-function ReminderCard({ reminder, index }) {
+function ReminderCard({ reminder, index, onDelete }) {
   const due = dueInfo(reminder.dueAt, reminder.isCompleted);
   return (
     <Draggable draggableId={String(reminder.id)} index={index}>
@@ -80,11 +90,23 @@ function ReminderCard({ reminder, index }) {
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           sx={{
+            position: "relative",
             border: `1px solid ${BORDER}`, borderRadius: "10px", bgcolor: "#fff",
             p: 1.75, mb: 1.25, cursor: "grab",
             boxShadow: snapshot.isDragging ? "0 8px 20px rgba(15,22,35,0.15)" : "0 1px 2px rgba(15,22,35,0.04)",
           }}>
-          <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT, mb: 1.25, lineHeight: 1.4 }}>
+          <IconButton
+            size="small"
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); onDelete(reminder.id); }}
+            sx={{
+              position: "absolute", top: 6, right: 6, width: 22, height: 22, color: MUTED,
+              "&:hover": { color: DANGER, bgcolor: "#FEF2F2" },
+            }}
+          >
+            <CloseRoundedIcon sx={{ fontSize: 14 }} />
+          </IconButton>
+          <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT, mb: 1.25, lineHeight: 1.4, pr: 2.5 }}>
             {reminder.title}
           </Typography>
           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -125,6 +147,7 @@ export default function RemindersPage() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState({ title: "", candidateId: "", dueAt: "", priority: "Normal", description: "" });
+  const [isDragging, setIsDragging] = useState(false);
 
   function loadReminders() {
     setLoading(true);
@@ -150,21 +173,68 @@ export default function RemindersPage() {
     finally { setSaving(false); }
   }
 
+  function deleteReminder(reminderId) {
+    const previous = reminders;
+    setReminders(prev => prev.filter(r => r.id !== reminderId));
+    apiDelete(`/api/reminders/${reminderId}`)
+      .catch(e => { setError(e.message); setReminders(previous); });
+  }
+
   function onDragEnd(result) {
+    setIsDragging(false);
     const { source, destination, draggableId } = result;
     if (!destination) return;
-    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
     const reminderId = Number(draggableId);
-    const newStatus = destination.droppableId;
+
+    if (destination.droppableId === "delete-zone") {
+      deleteReminder(reminderId);
+      return;
+    }
+
+    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+
+    const sourceStatus = source.droppableId;
+    const destStatus = destination.droppableId;
     const previous = reminders;
 
-    setReminders(prev => prev.map(r => r.id === reminderId
-      ? { ...r, status: newStatus, isCompleted: newStatus === "Done" }
-      : r));
+    // Reorder the underlying list itself, not just its status — `columns`
+    // below derives each column's display order directly from this array's
+    // order, so without actually splicing it a reordered card would just
+    // snap back to its old position on the next render.
+    setReminders(prev => {
+      const byColumn = {};
+      for (const col of COLUMNS) byColumn[col.key] = prev.filter(r => (r.status || "To Do") === col.key);
 
-    apiPatchJson(`/api/reminders/${reminderId}/status`, { status: newStatus })
-      .catch(e => { setError(e.message); setReminders(previous); });
+      const sourceItems = Array.from(byColumn[sourceStatus]);
+      const [moved] = sourceItems.splice(source.index, 1);
+      const updatedMoved = sourceStatus === destStatus
+        ? moved
+        : { ...moved, status: destStatus, isCompleted: destStatus === "Done" };
+
+      if (sourceStatus === destStatus) {
+        sourceItems.splice(destination.index, 0, updatedMoved);
+        byColumn[sourceStatus] = sourceItems;
+      } else {
+        byColumn[sourceStatus] = sourceItems;
+        const destItems = Array.from(byColumn[destStatus]);
+        destItems.splice(destination.index, 0, updatedMoved);
+        byColumn[destStatus] = destItems;
+      }
+
+      const reordered = COLUMNS.flatMap(col => byColumn[col.key]);
+      const reorderedIds = new Set(reordered.map(r => r.id));
+      const leftovers = prev.filter(r => !reorderedIds.has(r.id));
+      return [...reordered, ...leftovers];
+    });
+
+    // Status change is the only thing persisted server-side — there's no
+    // order/position column on reminders, so within-column reordering is
+    // visual-only for this session and will reset to due-date order next load.
+    if (sourceStatus !== destStatus) {
+      apiPatchJson(`/api/reminders/${reminderId}/status`, { status: destStatus })
+        .catch(e => { setError(e.message); setReminders(previous); });
+    }
   }
 
   const columns = COLUMNS.map(col => ({
@@ -195,7 +265,7 @@ export default function RemindersPage() {
           <CircularProgress size={22} sx={{ color: ACCENT }} />
         </Box>
       ) : (
-        <DragDropContext onDragEnd={onDragEnd}>
+        <DragDropContext onDragStart={() => setIsDragging(true)} onDragEnd={onDragEnd}>
           <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1.75, alignItems: "start" }}>
             {columns.map(col => (
               <Box key={col.key}>
@@ -230,7 +300,7 @@ export default function RemindersPage() {
                         </Typography>
                       )}
                       {col.items.map((reminder, index) => (
-                        <ReminderCard key={reminder.id} reminder={reminder} index={index} />
+                        <ReminderCard key={reminder.id} reminder={reminder} index={index} onDelete={deleteReminder} />
                       ))}
                       {provided.placeholder}
                     </Box>
@@ -238,6 +308,40 @@ export default function RemindersPage() {
                 </Droppable>
               </Box>
             ))}
+          </Box>
+
+          {/* Always mounted — @hello-pangea/dnd requires every Droppable to be
+              registered before a drag starts; conditionally mounting this on
+              isDragging caused an "Invariant failed" crash mid-drag. It's kept
+              fixed to the viewport bottom (not in normal document flow) so it
+              stays reachable without scrolling even when a column is long —
+              visibility toggles by sliding off-screen, never by unmounting. */}
+          <Box sx={{
+            position: "fixed", left: 0, right: 0, bottom: isDragging ? 20 : -120,
+            display: "flex", justifyContent: "center", zIndex: 1300,
+            transition: "bottom .2s ease", pointerEvents: isDragging ? "auto" : "none",
+          }}>
+            <Droppable droppableId="delete-zone">
+              {(provided, snapshot) => (
+                <Box
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                  sx={{
+                    width: 320, borderRadius: "12px",
+                    border: `2px dashed ${BIN_GREY_BORDER}`,
+                    bgcolor: snapshot.isDraggingOver ? "#E5E7EB" : BIN_GREY_BG,
+                    boxShadow: "0 10px 30px rgba(15,22,35,0.18)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    gap: 1, py: 2, transition: "background .15s",
+                  }}>
+                  <DeleteOutlineRoundedIcon sx={{ color: BIN_GREY, fontSize: 22 }} />
+                  <Typography sx={{ fontSize: 13, fontWeight: 700, color: BIN_GREY }}>
+                    Drop here to delete
+                  </Typography>
+                  {provided.placeholder}
+                </Box>
+              )}
+            </Droppable>
           </Box>
         </DragDropContext>
       )}

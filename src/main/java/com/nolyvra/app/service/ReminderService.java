@@ -135,6 +135,39 @@ public class ReminderService {
         return rows > 0;
     }
 
+    // ─── Auto-complete when the underlying action is performed elsewhere ─────
+    // Called by InterviewService/AnalysisService right after a successful
+    // schedule/analyze action, so the matching auto-generated reminder for
+    // that candidate doesn't linger on the board once it's no longer needed.
+    public void autoCompleteByCandidateAndType(String candidateId, String reminderType) {
+        if (candidateId == null) return;
+        jdbc.update("""
+                update reminders
+                set status = 'Done', is_completed = true, completed_at = now()
+                where candidate_id = ? and reminder_type = ? and is_completed = false
+                """, candidateId, reminderType);
+    }
+
+    // ─── Cleanup (runs every 30 minutes) ─────────────────────────────────────
+    // Hard-deletes reminders 24h after they were marked Done, so the Done
+    // column doesn't accumulate indefinitely.
+
+    @Scheduled(fixedRate = 1_800_000) // 30 minutes in ms
+    public void cleanupCompletedReminders() {
+        try {
+            int deleted = jdbc.update("""
+                    delete from reminders
+                    where is_completed = true
+                      and completed_at < now() - interval '24 hours'
+                    """);
+            if (deleted > 0) {
+                System.out.println("[Reminders] cleaned up " + deleted + " completed reminder(s) older than 24h");
+            }
+        } catch (Exception e) {
+            System.err.println("Reminder cleanup failed: " + e.getMessage());
+        }
+    }
+
     // ─── Auto-scan (runs every 30 minutes) ───────────────────────────────────
     // Creates automatic reminders when pipeline conditions are met.
 

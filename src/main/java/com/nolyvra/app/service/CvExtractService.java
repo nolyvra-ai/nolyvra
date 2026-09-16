@@ -42,20 +42,29 @@ public class CvExtractService {
         }
     }
 
-    // ── Extended extract — returns text + name/email/phone/linkedinUrl ────────
+    // ── Extended extract — returns text + candidate detail fields ─────────────
     // Used by the Add Candidate page to prefill form fields from uploaded CV.
     public Map<String, Object> extractWithFields(MultipartFile file, String loginId) throws IOException {
         String rawText = extractText(file);
 
         Map<String, Object> fields = fieldExtractor.extractFields(rawText, file.getOriginalFilename(), loginId);
 
-        return Map.of(
-                "text",        rawText,
-                "name",        fields.getOrDefault("name", ""),
-                "email",       fields.getOrDefault("email", ""),
-                "phone",       fields.getOrDefault("phone", ""),
-                "linkedinUrl", fields.getOrDefault("linkedinUrl", ""),
-                "skills",      fields.getOrDefault("skills", java.util.List.of()));
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("text",              rawText);
+        result.put("name",              fields.getOrDefault("name", ""));
+        result.put("email",             fields.getOrDefault("email", ""));
+        result.put("phone",             fields.getOrDefault("phone", ""));
+        result.put("linkedinUrl",       fields.getOrDefault("linkedinUrl", ""));
+        result.put("currentTitle",      fields.getOrDefault("currentTitle", ""));
+        result.put("location",          fields.getOrDefault("location", ""));
+        result.put("state",             fields.getOrDefault("state", ""));
+        result.put("yearsExperience",   fields.getOrDefault("yearsExperience", ""));
+        result.put("seniorityLevel",    fields.getOrDefault("seniorityLevel", ""));
+        result.put("expectedSalaryMin", fields.getOrDefault("expectedSalaryMin", ""));
+        result.put("skills",            fields.getOrDefault("skills", java.util.List.of()));
+        System.out.println("[CvExtract][DEBUG] extractWithFields response for " + file.getOriginalFilename()
+                + ": " + result);
+        return result;
     }
 
     private String extractFromPdf(InputStream inputStream) throws IOException {
