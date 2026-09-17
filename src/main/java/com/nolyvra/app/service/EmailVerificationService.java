@@ -82,6 +82,29 @@ public class EmailVerificationService {
         sendVerificationLinkEmail(email, rawToken);
     }
 
+    // Same token mechanism as self-registration, reused for sub-user invites —
+    // just a different email and no "reset plan to free" behavior on completion
+    // (handled by completeSubUserVerification above).
+    @Transactional
+    public void sendSubUserInviteEmail(String loginId, String email, String inviterName, String ownerCompany) {
+        OffsetDateTime now = OffsetDateTime.now(clock);
+        jdbc.update("""
+                update email_verification_tokens
+                set used_at = ?
+                where login_id = ?
+                  and used_at is null
+                """, now, loginId);
+
+        String rawToken = generateToken();
+        jdbc.update("""
+                insert into email_verification_tokens
+                    (token_hash, login_id, created_at, expires_at)
+                values (?, ?, ?, ?)
+                """, hash(rawToken), loginId, now, now.plusHours(tokenTtlHours));
+
+        sendSubUserInviteLinkEmail(email, rawToken, inviterName, ownerCompany);
+    }
+
     public boolean isTokenValid(String rawToken) {
         if (rawToken == null || rawToken.isBlank()) {
             return false;
@@ -118,6 +141,13 @@ public class EmailVerificationService {
         }
 
         String loginId = loginIds.get(0);
+
+        Boolean isSubuser = jdbc.queryForObject(
+                "select is_subuser from login where id = ?", Boolean.class, loginId);
+        if (Boolean.TRUE.equals(isSubuser)) {
+            return completeSubUserVerification(loginId, newPassword);
+        }
+
         List<Map<String, Object>> onboarded = jdbc.queryForList("""
                 update login
                 set password_hash = ?,
@@ -143,6 +173,29 @@ public class EmailVerificationService {
         return true;
     }
 
+    // Sub-users don't have their own plan/quota — plan_id, tokens_remaining and
+    // renew_date belong to the parent and must not be touched here. Guarded by
+    // password_hash = '' (the sentinel set at invite time) rather than
+    // plan_id = 'registered', which sub-user rows never carry.
+    private boolean completeSubUserVerification(String loginId, String newPassword) {
+        List<Map<String, Object>> updated = jdbc.queryForList("""
+                update login
+                set password_hash = ?,
+                    email_verified_at = ?,
+                    updated_at = ?
+                where id = ? and password_hash = ''
+                returning id, name, email
+                """, hash(newPassword), OffsetDateTime.now(clock), OffsetDateTime.now(clock), loginId);
+
+        if (updated.isEmpty()) {
+            return true;
+        }
+
+        Map<String, Object> account = updated.get(0);
+        sendSubUserWelcomeEmail((String) account.get("email"), (String) account.get("name"));
+        return true;
+    }
+
     private void sendVerificationLinkEmail(String email, String rawToken) {
         String verifyUrl = frontendUrl + "/verify-email?token=" + rawToken;
         String subject = "Verify your email for nolyvra";
@@ -160,6 +213,65 @@ public class EmailVerificationService {
         } catch (RuntimeException ignored) {
             // Verification is essential: database/template failures use the built-in copy.
         }
+        resendEmailService.sendHtml(email, subject, body, htmlBody);
+    }
+
+    private void sendSubUserInviteLinkEmail(String email, String rawToken, String inviterName, String ownerCompany) {
+        String verifyUrl = frontendUrl + "/verify-email?token=" + rawToken;
+        String companyPart = (ownerCompany == null || ownerCompany.isBlank()) ? "" : " at " + ownerCompany;
+        String subject = "You've been invited to join " + inviterName + "'s team on nolyvra";
+        String body = """
+                Hi,
+
+                %s has invited you to join their team%s on nolyvra.
+
+                Verify your email and set your password within %d hours:
+                %s
+
+                If you did not expect this invitation, you can ignore this email.
+                """.formatted(inviterName, companyPart, tokenTtlHours, verifyUrl);
+        String htmlBody = """
+                <p>Hi,</p>
+                <p>%s has invited you to join their team%s on nolyvra.</p>
+                <p><a href="%s">Verify your email and set your password</a></p>
+                <p>This link expires in %d hours.</p>
+                <p>If you did not expect this invitation, you can ignore this email.</p>
+                """.formatted(inviterName, companyPart, verifyUrl, tokenTtlHours);
+        try {
+            SystemEmailTemplateService.RenderedTemplate rendered = systemEmailTemplateService.render(
+                    "sub_user_invite",
+                    Map.of(
+                            "verify_link", verifyUrl,
+                            "expiry_hours", String.valueOf(tokenTtlHours),
+                            "inviter_name", inviterName,
+                            "owner_company", ownerCompany == null ? "" : ownerCompany));
+            subject = rendered.subject();
+            body = rendered.textBody();
+            htmlBody = rendered.htmlBody();
+        } catch (RuntimeException ignored) {
+            // No custom template configured — built-in copy above is used.
+        }
+        resendEmailService.sendHtml(email, subject, body, htmlBody);
+    }
+
+    private void sendSubUserWelcomeEmail(String email, String name) {
+        String loginUrl = frontendUrl + "/login";
+        String subject = "Your nolyvra account is active";
+        String body = """
+                Hi %s,
+
+                Your email is verified and your nolyvra account is now active.
+
+                Log in here: %s
+
+                Welcome aboard!
+                """.formatted(name, loginUrl);
+        String htmlBody = """
+                <p>Hi %s,</p>
+                <p>Your email is verified and your nolyvra account is now active.</p>
+                <p><a href="%s">Log in to nolyvra</a></p>
+                <p>Welcome aboard!</p>
+                """.formatted(name, loginUrl);
         resendEmailService.sendHtml(email, subject, body, htmlBody);
     }
 

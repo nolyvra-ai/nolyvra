@@ -101,7 +101,9 @@ public class AuthController {
     // POST /api/auth/change-password?loginId=x
     // For an employee session, updates the employee's own password instead of
     // the tenant's — loginId is ignored in that case (identity comes from the
-    // session, not the request).
+    // session, not the request). Same for a sub-user session: loginId is the
+    // PARENT's id (for tenant data scoping), so their own password must be
+    // changed via actorLoginId, not the request's loginId.
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(
             @RequestParam String loginId,
@@ -120,9 +122,10 @@ public class AuthController {
                     .body(Map.of("error", "New password must be at least 6 characters."));
         }
 
+        String targetLoginId = sessionContext.isSubUser() ? sessionContext.actorLoginId() : loginId;
         boolean updated = sessionContext.isEmployee()
                 ? employeeService.changePassword(sessionContext.employeeId(), currentPassword, newPassword)
-                : userService.changePassword(loginId, currentPassword, newPassword);
+                : userService.changePassword(targetLoginId, currentPassword, newPassword);
         if (!updated) {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "Current password is incorrect."));
