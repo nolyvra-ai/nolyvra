@@ -62,8 +62,6 @@ public class CvExtractService {
         result.put("seniorityLevel",    fields.getOrDefault("seniorityLevel", ""));
         result.put("expectedSalaryMin", fields.getOrDefault("expectedSalaryMin", ""));
         result.put("skills",            fields.getOrDefault("skills", java.util.List.of()));
-        System.out.println("[CvExtract][DEBUG] extractWithFields response for " + file.getOriginalFilename()
-                + ": " + result);
         return result;
     }
 

@@ -8,5 +8,7 @@ public record LoginResponse(
     String company,
     String email,
     Instant createdAt,
-    Integer monthlyTarget
+    Integer monthlyTarget,
+    boolean isSubuser,
+    String parentLoginId
 ) {}

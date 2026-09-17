@@ -27,4 +27,15 @@ public class SessionContext {
     public String loginId() {
         return (String) request.getAttribute("loginId");
     }
+
+    // True when the authenticated session belongs to a sub-user (operating
+    // within a parent tenant's loginId, but not the parent's own identity).
+    public boolean isSubUser() {
+        return request.getAttribute("actorLoginId") != null;
+    }
+
+    // The sub-user's own login.id — null for the owner's own sessions.
+    public String actorLoginId() {
+        return (String) request.getAttribute("actorLoginId");
+    }
 }

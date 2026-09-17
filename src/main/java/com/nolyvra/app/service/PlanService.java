@@ -24,7 +24,7 @@ public class PlanService {
     public PlanUsageResponse getPlanUsage(String loginId) {
         var rows = jdbc.query("""
                 select p.id as plan_id, p.name as plan_name,
-                       p.max_jobs, p.max_candidates, p.max_tokens,
+                       p.max_jobs, p.max_candidates, p.max_tokens, p.max_subusers,
                        l.tokens_remaining, l.renew_date, l.created_at,
                        coalesce(l.additional_jobs, 0)       as additional_jobs,
                        coalesce(l.additional_candidates, 0) as additional_candidates,
@@ -44,13 +44,14 @@ public class PlanService {
                         rs.getObject("created_at", java.time.OffsetDateTime.class),
                         rs.getInt("additional_jobs"),
                         rs.getInt("additional_candidates"),
-                        rs.getInt("additional_tokens")
+                        rs.getInt("additional_tokens"),
+                        rs.getInt("max_subusers")
                 }, loginId);
 
         if (rows.isEmpty()) {
             return new PlanUsageResponse("plan-free", "Free", 7, 10,
                     currentJobCount(loginId), currentCandidateCount(loginId),
-                    100, 100, LocalDate.now().plusDays(30), false);
+                    100, 100, LocalDate.now().plusDays(30), false, 0, currentSubUserCount(loginId));
         }
 
         Object[] row = rows.get(0);
@@ -62,6 +63,7 @@ public class PlanService {
         int additionalJobs       = (Integer) row[8];
         int additionalCandidates = (Integer) row[9];
         int additionalTokens     = (Integer) row[10];
+        int maxSubUsers          = (Integer) row[11];
 
         boolean trialExpired = "plan-free".equals(planId) && createdAt != null
                 && createdAt.toLocalDate().plusDays(TRIAL_EXPIRY_DAYS).isBefore(LocalDate.now());
@@ -76,7 +78,9 @@ public class PlanService {
                 planMaxTokens     + additionalTokens,     // effective max
                 (Integer)   row[5],
                 (LocalDate) row[6],
-                trialExpired);
+                trialExpired,
+                maxSubUsers,
+                currentSubUserCount(loginId));
     }
 
     // ─── Limit checks ─────────────────────────────────────────────────────────
@@ -103,6 +107,13 @@ public class PlanService {
     private int currentCandidateCount(String loginId) {
         Integer count = jdbc.queryForObject(
                 "select count(*) from candidates where login_id = ? and is_active = true",
+                Integer.class, loginId);
+        return count != null ? count : 0;
+    }
+
+    private int currentSubUserCount(String loginId) {
+        Integer count = jdbc.queryForObject(
+                "select count(*) from login where parent_login_id = ?",
                 Integer.class, loginId);
         return count != null ? count : 0;
     }

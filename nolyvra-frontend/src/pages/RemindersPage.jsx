@@ -79,6 +79,14 @@ async function apiDelete(path) {
   const res = await fetch(url.toString(), { method: "DELETE", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
   if (!res.ok) throw new Error(await res.text());
 }
+async function apiClearStatus(status) {
+  const loginId = localStorage.getItem("loginId") || "";
+  const url = new URL(`${API_BASE}/api/reminders`);
+  url.searchParams.set("loginId", loginId);
+  url.searchParams.set("status", status);
+  const res = await fetch(url.toString(), { method: "DELETE", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
+  if (!res.ok) throw new Error(await res.text());
+}
 
 function ReminderCard({ reminder, index, onDelete }) {
   const due = dueInfo(reminder.dueAt, reminder.isCompleted);
@@ -148,6 +156,7 @@ export default function RemindersPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState({ title: "", candidateId: "", dueAt: "", priority: "Normal", description: "" });
   const [isDragging, setIsDragging] = useState(false);
+  const [clearDialog, setClearDialog] = useState(null); // { status, count } | null
 
   function loadReminders() {
     setLoading(true);
@@ -177,6 +186,14 @@ export default function RemindersPage() {
     const previous = reminders;
     setReminders(prev => prev.filter(r => r.id !== reminderId));
     apiDelete(`/api/reminders/${reminderId}`)
+      .catch(e => { setError(e.message); setReminders(previous); });
+  }
+
+  function clearColumn(status) {
+    const previous = reminders;
+    setReminders(prev => prev.filter(r => (r.status || "To Do") !== status));
+    setClearDialog(null);
+    apiClearStatus(status)
       .catch(e => { setError(e.message); setReminders(previous); });
   }
 
@@ -275,12 +292,26 @@ export default function RemindersPage() {
                   px: 1.75, py: 1.25, mb: 1.25,
                 }}>
                   <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: "inherit" }}>{col.key}</Typography>
-                  <Box sx={{
-                    minWidth: 22, height: 22, borderRadius: "50%", bgcolor: "rgba(255,255,255,0.6)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 11.5, fontWeight: 700, color: "inherit", px: "6px",
-                  }}>
-                    {col.items.length}
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    {col.items.length > 0 && (
+                      <Typography
+                        onClick={() => setClearDialog({ status: col.key, count: col.items.length })}
+                        sx={{
+                          fontSize: 11, fontWeight: 600, color: "inherit", opacity: 0.75,
+                          cursor: "pointer", textDecoration: "underline",
+                          "&:hover": { opacity: 1 },
+                        }}
+                      >
+                        Clear all
+                      </Typography>
+                    )}
+                    <Box sx={{
+                      minWidth: 22, height: 22, borderRadius: "50%", bgcolor: "rgba(255,255,255,0.6)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 11.5, fontWeight: 700, color: "inherit", px: "6px",
+                    }}>
+                      {col.items.length}
+                    </Box>
                   </Box>
                 </Box>
 
@@ -388,6 +419,32 @@ export default function RemindersPage() {
           <Button variant="contained" onClick={handleAdd} disabled={saving}
             sx={{ fontSize: 12, fontWeight: 600, bgcolor: ACCENT, borderRadius: "8px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
             {saving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Add Reminder"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Clear-all-in-column confirmation */}
+      <Dialog open={!!clearDialog} onClose={() => setClearDialog(null)} maxWidth="xs" fullWidth
+        PaperProps={{ sx: { borderRadius: "12px" } }}>
+        <DialogTitle sx={{ fontSize: 14, fontWeight: 700, color: TEXT }}>
+          Clear all in "{clearDialog?.status}"?
+        </DialogTitle>
+        <DialogContent sx={{ pt: "8px !important" }}>
+          <Typography sx={{ fontSize: 13, color: MUTED }}>
+            This will permanently delete all {clearDialog?.count} reminder{clearDialog?.count === 1 ? "" : "s"} in
+            "{clearDialog?.status}". This can't be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={() => setClearDialog(null)} sx={{ fontSize: 12, textTransform: "none", color: MUTED }}>
+            Cancel
+          </Button>
+          <Button variant="contained" onClick={() => clearColumn(clearDialog.status)}
+            sx={{
+              fontSize: 12, fontWeight: 600, bgcolor: DANGER, borderRadius: "8px", textTransform: "none",
+              boxShadow: "none", "&:hover": { bgcolor: "#B91C1C", boxShadow: "none" },
+            }}>
+            Clear all
           </Button>
         </DialogActions>
       </Dialog>
