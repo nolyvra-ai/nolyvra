@@ -1,5 +1,6 @@
 package com.nolyvra.app.controller;
 
+import com.nolyvra.app.config.SessionContext;
 import com.nolyvra.app.model.LoginRequest;
 import com.nolyvra.app.model.LoginResponse;
 import com.nolyvra.app.service.LoginService;
@@ -19,10 +20,12 @@ public class LoginController {
 
     private final LoginService loginService;
     private final SessionService sessionService;
+    private final SessionContext sessionContext;
 
-    public LoginController(LoginService loginService, SessionService sessionService) {
+    public LoginController(LoginService loginService, SessionService sessionService, SessionContext sessionContext) {
         this.loginService = loginService;
         this.sessionService = sessionService;
+        this.sessionContext = sessionContext;
     }
 
     @PostMapping("/login")
@@ -35,13 +38,22 @@ public class LoginController {
                         HttpStatus.UNAUTHORIZED,
                         "Invalid email or password"));
 
-        String sessionToken = sessionService.createSession(resp.id());
+        // A sub-user's session is created against the PARENT's loginId so the
+        // rest of the app (which sends loginId from local storage on every
+        // request) transparently operates on the owner's tenant data. Their
+        // own identity is preserved as actorLoginId for privileged-action checks.
+        boolean isSubuser = resp.isSubuser();
+        String effectiveLoginId = isSubuser ? resp.parentLoginId() : resp.id();
+        String actorLoginId = isSubuser ? resp.id() : null;
+
+        String sessionToken = sessionService.createSession(effectiveLoginId, actorLoginId);
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("id", resp.id());
+        result.put("id", effectiveLoginId);
         result.put("name", resp.name());
         result.put("company", resp.company());
         result.put("email", resp.email());
         result.put("sessionToken", sessionToken);
+        result.put("isSubUser", isSubuser);
         return result;
     }
 
@@ -60,10 +72,24 @@ public class LoginController {
 
     @GetMapping("/settings")
     public Map<String, Object> getSettings(@RequestParam String loginId) {
+        // monthlyTarget is a tenant-wide setting (shared team target) — stays
+        // scoped by loginId. phone is personal, so a sub-user must see/edit
+        // their OWN number, not the parent's.
+        String phoneTarget = sessionContext.isSubUser() ? sessionContext.actorLoginId() : loginId;
         int target = loginService.getMonthlyTarget(loginId);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("monthlyTarget", target);
+        result.put("phone", loginService.getPhoneNumber(phoneTarget));
         return result;
+    }
+
+    @PutMapping("/settings/phone")
+    public ResponseEntity<?> savePhone(
+            @RequestParam String loginId,
+            @RequestBody Map<String, String> body) {
+        String phoneTarget = sessionContext.isSubUser() ? sessionContext.actorLoginId() : loginId;
+        loginService.savePhoneNumber(phoneTarget, body.get("phone"));
+        return ResponseEntity.ok(Map.of("status", "saved"));
     }
 
     @PutMapping("/settings/monthly-target")

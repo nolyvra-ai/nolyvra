@@ -61,10 +61,11 @@ public class SessionInterceptor implements HandlerInterceptor {
 
         String token = authHeader.substring(7).trim();
 
-        Optional<String> tenantLoginId = sessionService.validateSession(token);
-        if (tenantLoginId.isPresent()) {
+        Optional<SessionService.TenantSessionInfo> tenantSession = sessionService.validateSession(token);
+        if (tenantSession.isPresent()) {
             request.setAttribute("authType", "TENANT");
-            request.setAttribute("loginId", tenantLoginId.get());
+            request.setAttribute("loginId", tenantSession.get().loginId());
+            request.setAttribute("actorLoginId", tenantSession.get().actorLoginId());
             return true;
         }
 

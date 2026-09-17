@@ -1,6 +1,8 @@
 package com.nolyvra.app.controller;
 
+import com.nolyvra.app.config.SessionContext;
 import com.nolyvra.app.service.StripeService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,9 +13,11 @@ import java.util.Map;
 public class StripeController {
 
     private final StripeService stripeService;
+    private final SessionContext sessionContext;
 
-    public StripeController(StripeService stripeService) {
+    public StripeController(StripeService stripeService, SessionContext sessionContext) {
         this.stripeService = stripeService;
+        this.sessionContext = sessionContext;
     }
 
     // ─── POST /api/stripe/checkout ────────────────────────────────────────────
@@ -28,6 +32,10 @@ public class StripeController {
             @RequestParam String successUrl,
             @RequestParam String cancelUrl) {
 
+        if (sessionContext.isSubUser()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Sub-user accounts cannot change plans."));
+        }
         if (loginId == null || loginId.isBlank()) {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "loginId is required."));
@@ -100,6 +108,10 @@ public class StripeController {
             @RequestParam String loginId,
             @RequestParam String returnUrl) {
 
+        if (sessionContext.isSubUser()) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Sub-user accounts cannot manage billing."));
+        }
         if (loginId == null || loginId.isBlank()) {
             return ResponseEntity.badRequest()
                     .body(Map.of("error", "loginId is required."));

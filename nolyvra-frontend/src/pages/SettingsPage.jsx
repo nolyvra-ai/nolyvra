@@ -22,6 +22,7 @@ const SURFACE = "#FAFBFD";
 const SETTINGS_SECTIONS = [
   { key: "account", label: "Account", description: "Password and session" },
   { key: "billing", label: "Billing", description: "Plan, usage and tokens" },
+  { key: "team", label: "Team", description: "Invite and manage team members" },
   { key: "integrations", label: "Integrations", description: "Connected services" },
   { key: "email", label: "Email & Notifications", description: "Notification preferences" },
   { key: "admin", label: "Administration", description: "Users, limits and leads" },
@@ -350,9 +351,114 @@ function AdminSettingsPanel() {
       headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
     })
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.monthlyTarget !== undefined) setMonthlyTarget(d.monthlyTarget); })
+      .then(d => {
+        if (d?.monthlyTarget !== undefined) setMonthlyTarget(d.monthlyTarget);
+        if (d?.phone !== undefined) setPhone(d.phone || "");
+      })
       .catch(() => {});
   }, [loginId]);
+
+  // ── Phone Number state ────────────────────────────────────────────────────
+  const [phone,        setPhone]        = useState("");
+  const [phoneSaving,  setPhoneSaving]  = useState(false);
+  const [phoneSaved,   setPhoneSaved]   = useState(false);
+  const [phoneError,   setPhoneError]   = useState("");
+
+  async function handleSavePhone() {
+    setPhoneSaving(true);
+    setPhoneError("");
+    try {
+      const url = new URL(`${API_BASE}/api/settings/phone`);
+      url.searchParams.set("loginId", loginId);
+      const res = await fetch(url.toString(), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}`,
+        },
+        body: JSON.stringify({ phone }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setPhoneSaved(true);
+      setTimeout(() => setPhoneSaved(false), 2500);
+    } catch (e) {
+      setPhoneError(e.message || "Failed to save phone number.");
+    } finally {
+      setPhoneSaving(false);
+    }
+  }
+
+  // ── Team (sub-users) state ────────────────────────────────────────────────
+  const [subUsers,        setSubUsers]        = useState([]);
+  const [subUsersLoading, setSubUsersLoading] = useState(false);
+  const [subUserForm,     setSubUserForm]     = useState({ firstName: "", lastName: "", email: "", company: "", phone: "" });
+  const [subUserSaving,   setSubUserSaving]   = useState(false);
+  const [subUserError,    setSubUserError]    = useState("");
+  const [subUserInvited,  setSubUserInvited]  = useState(false);
+
+  function loadSubUsers() {
+    if (!loginId) return;
+    setSubUsersLoading(true);
+    const url = new URL(`${API_BASE}/api/sub-users`);
+    url.searchParams.set("loginId", loginId);
+    fetch(url.toString(), { headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } })
+      .then(r => r.ok ? r.json() : [])
+      .then(setSubUsers)
+      .catch(() => {})
+      .finally(() => setSubUsersLoading(false));
+  }
+
+  useEffect(() => {
+    if (activeSection === "team") loadSubUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSection, loginId]);
+
+  function updateSubUserForm(k, v) { setSubUserForm(p => ({ ...p, [k]: v })); }
+
+  async function handleInviteSubUser() {
+    if (!subUserForm.firstName || !subUserForm.lastName || !subUserForm.email) {
+      setSubUserError("First name, last name, and email are required.");
+      return;
+    }
+    setSubUserSaving(true);
+    setSubUserError("");
+    try {
+      const url = new URL(`${API_BASE}/api/sub-users`);
+      url.searchParams.set("loginId", loginId);
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}`,
+        },
+        body: JSON.stringify(subUserForm),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setSubUserForm({ firstName: "", lastName: "", email: "", company: "", phone: "" });
+      setSubUserInvited(true);
+      setTimeout(() => setSubUserInvited(false), 2500);
+      loadSubUsers();
+    } catch (e) {
+      setSubUserError(e.message || "Failed to invite team member.");
+    } finally {
+      setSubUserSaving(false);
+    }
+  }
+
+  async function handleRemoveSubUser(subUserId) {
+    try {
+      const url = new URL(`${API_BASE}/api/sub-users/${encodeURIComponent(subUserId)}`);
+      url.searchParams.set("loginId", loginId);
+      const res = await fetch(url.toString(), {
+        method: "DELETE",
+        headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setSubUsers(prev => prev.filter(u => u.id !== subUserId));
+    } catch (e) {
+      setSubUserError(e.message || "Failed to remove team member.");
+    }
+  }
 
   async function handleSaveTarget() {
     setTargetSaving(true);
@@ -686,6 +792,9 @@ function AdminSettingsPanel() {
   if (!activeSection) {
     return <Navigate to="/settings/account" replace />;
   }
+  const isSubUserAccount = localStorage.getItem("isSubUser") === "true";
+  const canManageTeam = !isSubUserAccount && !!usage && usage.maxSubUsers > 0;
+
   const isProtectedSection = activeSection === "email" || activeSection === "admin" || activeSection === "tools";
   if (isProtectedSection && isAdmin === null) {
     return <Box sx={{ minHeight: 180, display: "grid", placeItems: "center" }}><CircularProgress size={24} /></Box>;
@@ -693,11 +802,16 @@ function AdminSettingsPanel() {
   if (isProtectedSection && !isAdmin) {
     return <Navigate to="/settings/account" replace />;
   }
+  // Sub-users (and plans without team seats) can't reach "team" directly either.
+  if (activeSection === "team" && !planLoading && !canManageTeam) {
+    return <Navigate to="/settings/account" replace />;
+  }
   // Keep the complete navigation stable while the admin check is in flight.
   // A confirmed non-admin still gets the restricted navigation below.
-  const visibleSections = isAdmin === false
+  const visibleSections = (isAdmin === false
     ? SETTINGS_SECTIONS.filter(item => item.key !== "email" && item.key !== "admin" && item.key !== "tools")
-    : SETTINGS_SECTIONS;
+    : SETTINGS_SECTIONS
+  ).filter(item => item.key !== "team" || canManageTeam);
 
   return (
     <Box sx={{ maxWidth: 900 }}>
@@ -973,8 +1087,8 @@ function AdminSettingsPanel() {
           {!planLoading && usage && (
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
               <PlanBadge name={usage.planName} />
-              {/* Show portal button for paid plans */}
-              {usage.planName !== "Free" && usage.planName !== "Registered" && (
+              {/* Show portal button for paid plans — sub-users can't manage billing */}
+              {!isSubUserAccount && usage.planName !== "Free" && usage.planName !== "Registered" && (
                 <Button size="small" variant="outlined"
                   onClick={handleManageSubscription}
                   disabled={portalLoading}
@@ -1039,8 +1153,8 @@ function AdminSettingsPanel() {
                 />
               </Box>
 
-              {/* Upgrade nudge for Free plan */}
-              {usage.planName !== "Registered" && (
+              {/* Upgrade nudge for Free plan — sub-users can't change plans */}
+              {!isSubUserAccount && usage.planName !== "Registered" && (
                 <Box sx={{
                   display: "flex", gap: 1.25, alignItems: "center",
                   bgcolor: PURPLE_BG, border: `1px solid ${PURPLE_BR}`,
@@ -1300,6 +1414,130 @@ function AdminSettingsPanel() {
           </Button>
         </Box>
       </Paper>}
+
+      {/* ── Phone Number ────────────────────────────────────────────────────── */}
+      {activeSection === "account" && <Paper elevation={0} sx={{
+        border: `1px solid ${BORDER}`, borderRadius: "10px",
+        overflow: "hidden", bgcolor: "#fff", mt: 2
+      }}>
+        <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}` }}>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>
+            Phone Number
+          </Typography>
+          <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
+            Used for account contact and CV letterhead details
+          </Typography>
+        </Box>
+        <Box sx={{ p: 2.25, display: "flex", flexDirection: "column", gap: 1.5 }}>
+          {phoneError && <Alert severity="error" onClose={() => setPhoneError("")}>{phoneError}</Alert>}
+          {phoneSaved && <Alert severity="success" onClose={() => setPhoneSaved(false)}>Phone number updated.</Alert>}
+          <Box>
+            <Typography sx={{ fontSize: 12, fontWeight: 600, color: TEXT, mb: 0.5 }}>
+              Phone Number
+            </Typography>
+            <TextField fullWidth size="small" value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="e.g. +61 400 000 000"
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }} />
+          </Box>
+          <Button variant="contained" onClick={handleSavePhone} disabled={phoneSaving}
+            sx={{
+              alignSelf: "flex-start", fontSize: 12, fontWeight: 500,
+              bgcolor: ACCENT, borderRadius: "8px", textTransform: "none",
+              boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" }
+            }}>
+            {phoneSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Save Phone Number"}
+          </Button>
+        </Box>
+      </Paper>}
+
+      {/* ── Team (sub-users) — Silver/Gold plans only, not visible to sub-users ── */}
+      {activeSection === "team" && canManageTeam && (
+        <Paper elevation={0} sx={{ border: `1px solid ${BORDER}`, borderRadius: "10px", overflow: "hidden", bgcolor: "#fff" }}>
+          <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <Box>
+              <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>Team Members</Typography>
+              <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
+                {usage.currentSubUsers} of {usage.maxSubUsers} team member{usage.maxSubUsers === 1 ? "" : "s"} used on your {usage.planName} plan
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ p: 2.25, display: "flex", flexDirection: "column", gap: 2 }}>
+            {subUserError && <Alert severity="error" onClose={() => setSubUserError("")}>{subUserError}</Alert>}
+            {subUserInvited && (
+              <Alert severity="success" onClose={() => setSubUserInvited(false)}>
+                Invitation sent — they'll receive an email to verify and set their password.
+              </Alert>
+            )}
+
+            {/* Existing team members */}
+            {subUsersLoading ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 2 }}>
+                <CircularProgress size={20} />
+              </Box>
+            ) : subUsers.length === 0 ? (
+              <Typography sx={{ fontSize: 12.5, color: MUTED }}>No team members yet.</Typography>
+            ) : (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                {subUsers.map(u => (
+                  <Box key={u.id} sx={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    border: `1px solid ${BORDER}`, borderRadius: "8px", px: 1.75, py: 1.1,
+                  }}>
+                    <Box>
+                      <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: TEXT }}>
+                        {u.name} {u.verified
+                          ? <Box component="span" sx={{ color: SUCCESS, fontSize: 11, fontWeight: 600, ml: 0.5 }}>· Verified</Box>
+                          : <Box component="span" sx={{ color: WARN, fontSize: 11, fontWeight: 600, ml: 0.5 }}>· Pending</Box>}
+                      </Typography>
+                      <Typography sx={{ fontSize: 11.5, color: MUTED }}>{u.email}{u.company ? ` · ${u.company}` : ""}</Typography>
+                    </Box>
+                    <Button onClick={() => handleRemoveSubUser(u.id)}
+                      sx={{ fontSize: 11.5, textTransform: "none", color: DANGER }}>
+                      Remove
+                    </Button>
+                  </Box>
+                ))}
+              </Box>
+            )}
+
+            {/* Invite form */}
+            {usage.currentSubUsers < usage.maxSubUsers && (
+              <Box sx={{ borderTop: `1px solid ${BORDER}`, pt: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
+                <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: TEXT }}>Invite a team member</Typography>
+                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
+                  <TextField fullWidth size="small" label="First Name" value={subUserForm.firstName}
+                    onChange={e => updateSubUserForm("firstName", e.target.value)}
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }} />
+                  <TextField fullWidth size="small" label="Last Name" value={subUserForm.lastName}
+                    onChange={e => updateSubUserForm("lastName", e.target.value)}
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }} />
+                </Box>
+                <TextField fullWidth size="small" label="Email" type="email" value={subUserForm.email}
+                  onChange={e => updateSubUserForm("email", e.target.value)}
+                  sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }} />
+                <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
+                  <TextField fullWidth size="small" label="Company" value={subUserForm.company}
+                    onChange={e => updateSubUserForm("company", e.target.value)}
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }} />
+                  <TextField fullWidth size="small" label="Phone" value={subUserForm.phone}
+                    onChange={e => updateSubUserForm("phone", e.target.value)}
+                    sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }} />
+                </Box>
+                <Button variant="contained" onClick={handleInviteSubUser} disabled={subUserSaving}
+                  sx={{
+                    alignSelf: "flex-start", fontSize: 12, fontWeight: 500,
+                    bgcolor: ACCENT, borderRadius: "8px", textTransform: "none",
+                    boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" }
+                  }}>
+                  {subUserSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Send Invite"}
+                </Button>
+              </Box>
+            )}
+          </Box>
+        </Paper>
+      )}
 
       {/* ── Admin Panel — only visible to admin users ─────────────────────── */}
       {activeSection === "admin" && isAdmin && (

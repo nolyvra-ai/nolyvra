@@ -135,6 +135,16 @@ public class ReminderService {
         return rows > 0;
     }
 
+    // ─── DELETE /api/reminders?status= ───────────────────────────────────────
+    // "Clear all" on a Kanban column.
+
+    public int clearByStatus(String loginId, String status) {
+        if (!VALID_STATUSES.contains(status)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid status: " + status);
+        }
+        return jdbc.update("delete from reminders where login_id = ? and status = ?", loginId, status);
+    }
+
     // ─── Auto-complete when the underlying action is performed elsewhere ─────
     // Called by InterviewService/AnalysisService right after a successful
     // schedule/analyze action, so the matching auto-generated reminder for

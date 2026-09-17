@@ -35,7 +35,6 @@ public class OpenAICvFieldExtractor implements CvFieldExtractor {
 
     @Override
     public Map<String, Object> extractFields(String rawText, String originalFilename, String loginId) {
-        System.out.println("[CvExtract][DEBUG] OpenAICvFieldExtractor active (model=" + model + ")");
         try {
             if (!tokenService.deductToken(loginId)) {
                 throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
@@ -72,8 +71,6 @@ public class OpenAICvFieldExtractor implements CvFieldExtractor {
             String content = openAI.chat().completions().create(params)
                     .choices().getFirst().message().content().orElse("{}");
 
-            System.out.println("[CvExtract][DEBUG] raw model response for " + originalFilename + ":\n" + content);
-
             var root = objectMapper.readTree(cleanJson(content));
             List<String> skills = new ArrayList<>();
             if (root.path("skills").isArray()) {
@@ -93,12 +90,9 @@ public class OpenAICvFieldExtractor implements CvFieldExtractor {
             result.put("seniorityLevel", root.path("seniorityLevel").isNull() ? "" : root.path("seniorityLevel").asText(""));
             result.put("expectedSalaryMin", root.path("expectedSalaryMin").isNull() ? "" : root.path("expectedSalaryMin").asText(""));
             result.put("skills", skills);
-            System.out.println("[CvExtract][DEBUG] parsed fields: " + result);
             return result;
         } catch (Exception e) {
-            System.err.println("[CvExtract] Field extraction failed: "
-                    + e.getClass().getSimpleName() + ": " + e.getMessage());
-            e.printStackTrace();
+            System.err.println("[CvExtract] Field extraction failed: " + e.getMessage());
             Map<String, Object> fallback = new java.util.HashMap<>();
             for (String key : new String[]{"name", "email", "phone", "linkedinUrl", "currentTitle",
                     "location", "state", "yearsExperience", "seniorityLevel", "expectedSalaryMin"}) {

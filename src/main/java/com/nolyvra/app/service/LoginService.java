@@ -31,13 +31,15 @@ public class LoginService {
                 rs.getString("company"),
                 rs.getString("email"),
                 created != null ? created.toInstant() : null,
-                rs.getInt("monthly_target")
+                rs.getInt("monthly_target"),
+                rs.getBoolean("is_subuser"),
+                rs.getString("parent_login_id")
         );
     };
 
     public Optional<LoginResponse> login(LoginRequest req) {
         List<LoginResponse> rows = jdbc.query("""
-                select id, name, company, email, created_at, monthly_target
+                select id, name, company, email, created_at, monthly_target, is_subuser, parent_login_id
                 from login
                 where email = ?
                   and password_hash = ?
@@ -60,6 +62,18 @@ public class LoginService {
 
     public void saveMonthlyTarget(String loginId, int target) {
         jdbc.update("update login set monthly_target = ? where id = ?", target, loginId);
+    }
+
+    public String getPhoneNumber(String loginId) {
+        List<String> rows = jdbc.query(
+                "select phone_number from login where id = ?",
+                (rs, r) -> rs.getString("phone_number"), loginId);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    public void savePhoneNumber(String loginId, String phone) {
+        jdbc.update("update login set phone_number = ?, updated_at = now() where id = ?",
+                phone == null || phone.isBlank() ? null : phone.trim(), loginId);
     }
 
     public int getFulfilledThisMonth(String loginId) {

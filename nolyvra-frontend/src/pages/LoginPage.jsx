@@ -196,8 +196,13 @@ export default function LoginPage() {
       localStorage.setItem("sessionToken", data.sessionToken);
       localStorage.removeItem("authType");
       localStorage.removeItem("employeeId");
+      if (data.isSubUser) {
+        localStorage.setItem("isSubUser", "true");
+      } else {
+        localStorage.removeItem("isSubUser");
+      }
       setSuccess(true);
-      nav("/dashboard", { state: { showWalkthrough: true } });
+      nav("/dashboard");
     } catch (err) {
       setApiError(err.message || "Login failed. Please try again.");
     } finally {

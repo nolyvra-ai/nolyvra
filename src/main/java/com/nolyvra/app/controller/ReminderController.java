@@ -68,4 +68,13 @@ public class ReminderController {
         if (!deleted) throw new ResponseStatusException(HttpStatus.NOT_FOUND,
                 "Reminder not found: " + reminderId);
     }
+
+    // "Clear all" on a Kanban column — deletes every reminder with the given status.
+    @DeleteMapping
+    public Map<String, Object> clearByStatus(
+            @RequestParam String loginId,
+            @RequestParam String status) {
+        int deleted = reminderService.clearByStatus(loginId, status);
+        return Map.of("deleted", deleted);
+    }
 }

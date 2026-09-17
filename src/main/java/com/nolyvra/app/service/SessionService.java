@@ -20,37 +20,56 @@ public class SessionService {
         this.jdbc = jdbc;
     }
 
-    // Creates a new session for the given loginId.
-    // Invalidates all existing active sessions first — only one session per user at a time.
-    public String createSession(String loginId) {
+    // A sub-user's session stores the PARENT's loginId (so every existing
+    // loginId-scoped query in the app naturally operates on the owner's
+    // tenant data) plus actorLoginId identifying the real person who
+    // authenticated, so privileged actions can be gated on their actual
+    // identity regardless of which loginId a request carries.
+    public record TenantSessionInfo(String loginId, String actorLoginId) {
+        public boolean isSubUser() { return actorLoginId != null; }
+    }
+
+    // Creates a new session. actorLoginId is null for an owner's own login;
+    // set to the sub-user's own login.id when a sub-user authenticates.
+    // Invalidates the same real person's prior sessions only — scoping
+    // invalidation by tenant loginId would log out the whole team whenever
+    // any one of them (owner or any sub-user) logs in.
+    public String createSession(String loginId, String actorLoginId) {
+        String identityKey = actorLoginId != null ? actorLoginId : loginId;
         jdbc.update("""
                 update user_sessions
                 set is_active = false
-                where login_id = ? and is_active = true
-                """, loginId);
+                where is_active = true
+                  and coalesce(actor_login_id, login_id) = ?
+                """, identityKey);
 
         UUID token = UUID.randomUUID();
         OffsetDateTime now = OffsetDateTime.now();
         jdbc.update("""
-                insert into user_sessions (token, login_id, created_at, expires_at, is_active)
-                values (?::uuid, ?, ?, ?, true)
+                insert into user_sessions (token, login_id, actor_login_id, created_at, expires_at, is_active)
+                values (?::uuid, ?, ?, ?, ?, true)
                 """,
-                token.toString(), loginId, now, now.plusHours(SESSION_HOURS));
+                token.toString(), loginId, actorLoginId, now, now.plusHours(SESSION_HOURS));
 
         return token.toString();
     }
 
-    // Returns the loginId if the token is valid, active, and not expired.
-    public Optional<String> validateSession(String token) {
+    public String createSession(String loginId) {
+        return createSession(loginId, null);
+    }
+
+    // Returns the effective tenant loginId + actual actor identity if the
+    // token is valid, active, and not expired.
+    public Optional<TenantSessionInfo> validateSession(String token) {
         if (token == null || token.isBlank()) return Optional.empty();
         try {
-            List<String> rows = jdbc.query("""
-                    select login_id from user_sessions
+            List<TenantSessionInfo> rows = jdbc.query("""
+                    select login_id, actor_login_id from user_sessions
                     where token = ?::uuid
                       and is_active = true
                       and expires_at > now()
                     """,
-                    (rs, r) -> rs.getString("login_id"),
+                    (rs, r) -> new TenantSessionInfo(rs.getString("login_id"), rs.getString("actor_login_id")),
                     token);
             return rows.stream().findFirst();
         } catch (Exception e) {
