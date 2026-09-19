@@ -848,12 +848,13 @@ export default function LandingPage() {
         <div style={{ overflow:"hidden" }}>
           <div className="nl-marq">
             {(arr=>[...arr,...arr])([
-              { name:"BrightSide",  src:"/brightside_logo.png" },
+              { name:"ebay",  src:"/ebay_logo.png" },
+              { name:"randstad",  src:"/randstad_logo.png" },
+              { name:"gumtree",     src:"/gumtree_logo.png" },
               { name:"OneTracker",  src:"/onetracker_logo.png" },
               { name:"Hyperon",     src:"/hyperon_logo.png" },
               { name:"Lúxi Living", src:"/luxi_logo.png" },
               { name:"ConnecTed",   src:"/connected_logo.png" },
-              { name:"Peppard",     src:"/peppard.png" },
               { name:"Cornerstone", src:"/cornerstone.png" },
               { name:"InTimeTec",   src:"/intimetec.png" },
               { name:"HNH",         src:"/hnh_logo.png" },
