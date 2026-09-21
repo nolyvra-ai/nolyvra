@@ -381,7 +381,7 @@ export default function ContactDetailPage() {
             ) : (
               <Button size="small" variant="outlined" startIcon={LinkSvg} onClick={handleLinkCandidate} disabled={linking}
                 sx={{ fontSize: 12, textTransform: "none", borderRadius: "8px", borderColor: BORDER, color: TEXT }}>
-                {linking ? <CircularProgress size={14} /> : "Link to Candidate"}
+                {linking ? <CircularProgress size={14} /> : "Add as Candidate"}
               </Button>
             )}
             <IconButton size="small" onClick={() => setEditOpen(true)} sx={{ color: MUTED, border: `1px solid ${BORDER}`, "&:hover": { color: ACCENT, borderColor: ACCENT } }}>

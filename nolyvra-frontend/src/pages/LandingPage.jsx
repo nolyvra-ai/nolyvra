@@ -460,6 +460,9 @@ export default function LandingPage() {
               <button onClick={()=>nav("/login")} style={{ display:"inline-flex",alignItems:"center",gap:8,padding:"13px 22px",borderRadius:999,fontSize:14,fontWeight:500,fontFamily:"inherit",cursor:"pointer",background:"rgba(255,255,255,.06)",color:"#fff",border:"1px solid rgba(255,255,255,.16)",transition:"all .2s" }}>
                 Login to Platform →
               </button>
+              <a href="https://calendar.app.google/ZTop8tDUSfVZnmJz8" target="_blank" rel="noopener noreferrer" style={{ display:"inline-flex",alignItems:"center",gap:8,padding:"13px 22px",borderRadius:999,fontSize:14,fontWeight:500,fontFamily:"inherit",cursor:"pointer",background:"rgba(255,255,255,.06)",color:"#fff",border:"1px solid rgba(255,255,255,.16)",transition:"all .2s",textDecoration:"none" }}>
+                Book Demo
+              </a>
             </div>
 
             <div style={{ display:"flex",flexDirection:"column",alignItems:"center",animation:"nlUp 1.1s .6s ease both" }}>
@@ -848,12 +851,13 @@ export default function LandingPage() {
         <div style={{ overflow:"hidden" }}>
           <div className="nl-marq">
             {(arr=>[...arr,...arr])([
-              { name:"BrightSide",  src:"/brightside_logo.png" },
+              { name:"ebay",  src:"/ebay_logo.png" },
+              { name:"randstad",  src:"/randstad_logo.png" },
+              { name:"gumtree",     src:"/gumtree_logo.png" },
               { name:"OneTracker",  src:"/onetracker_logo.png" },
               { name:"Hyperon",     src:"/hyperon_logo.png" },
               { name:"Lúxi Living", src:"/luxi_logo.png" },
               { name:"ConnecTed",   src:"/connected_logo.png" },
-              { name:"Peppard",     src:"/peppard.png" },
               { name:"Cornerstone", src:"/cornerstone.png" },
               { name:"InTimeTec",   src:"/intimetec.png" },
               { name:"HNH",         src:"/hnh_logo.png" },
