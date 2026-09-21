@@ -17,12 +17,10 @@ const PILLS = [
   { num: "③", label: "Create Job",          to: "/jobs/new" },
   { num: "④", label: "Candidates",          to: "/candidates" },
   { num: "⑤", label: "Add Candidate",       to: "/candidates/new-modern" },
-  { num: "⑥", label: "Analysis",            to: null },
-  { num: "⑦", label: "AI Talent Search ✦",  to: "/talent-search",  isNew: true },
-  { num: "⑧", label: "Candidate Workflow ✦",to: null,               isNew: true },
+  { num: "⑥", label: "AI Talent Search ✦",  to: "/talent-search",  isNew: true },
+  { num: "⑦", label: "Email ✦",             to: "/email",          isNew: true },
+  { num: "⑧", label: "Reminders ✦",         to: "/reminders",      isNew: true },
   { num: "⑨", label: "Scheduler ✦",         to: "/scheduler",      isNew: true },
-  { num: "⑩", label: "Email ✦",             to: "/email",          isNew: true },
-  { num: "⑪", label: "Reminders ✦",         to: "/reminders",      isNew: true },
 ];
 
 function NavPill({ num, label, to, active, isNew }) {
