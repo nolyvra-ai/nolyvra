@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+import RegisterInterestModal from "../components/RegisterInterestModal.jsx";
 
 /* ─── Wireframe palette ──────────────────────────────────────── */
 const C = {
@@ -239,17 +238,8 @@ function FTag({ children }) {
 export default function LandingPage() {
   const nav = useNavigate();
 
-  /* form / modal state */
-  const [modalOpen,  setModalOpen]  = useState(false);
-  const [submitted,  setSubmitted]  = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [formError,  setFormError]  = useState("");
-  const [form, setForm] = useState({ firstName:"", lastName:"", company:"", email:"", phone:"" });
-  const COUNTRIES = [
-    { flag:"🇦🇺", code:"+61" }, { flag:"🇬🇧", code:"+44" }, { flag:"🇺🇸", code:"+1" },
-    { flag:"🇮🇳", code:"+91" }, { flag:"🇳🇿", code:"+64" }, { flag:"🇸🇬", code:"+65" },
-  ];
-  const [selCountry, setSelCountry] = useState(COUNTRIES[0]);
+  /* modal state */
+  const [modalOpen, setModalOpen] = useState(false);
 
   /* hero animation */
   const [wordIdx,  setWordIdx]  = useState(0);
@@ -266,32 +256,7 @@ export default function LandingPage() {
   const verify = useVerifyAnim();
   const agent  = useAgentAnim();
 
-  function fmtPhone(r) {
-    const d=r.replace(/\D/g,"");
-    if(d.length<=4)return d;
-    if(d.length<=7)return `${d.slice(0,4)} ${d.slice(4)}`;
-    return `${d.slice(0,4)} ${d.slice(4,7)} ${d.slice(7,10)}`;
-  }
-  function setField(k,v){ setForm(p=>({...p,[k]:v})); }
-
-  async function handleRegister() {
-    if(!form.firstName.trim()||!form.email.trim()){ setFormError("First name and email are required."); return; }
-    setSubmitting(true); setFormError("");
-    try {
-      const res=await fetch(`${API_BASE}/api/auth/register`,{
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({...form, phone:form.phone?`${selCountry.code} ${form.phone}`:""}),
-      });
-      const data=await res.json();
-      if(!res.ok){ setFormError(data.error||"Registration failed."); return; }
-      setSubmitted(true);
-    } catch { setFormError("Network error. Please try again."); }
-    finally { setSubmitting(false); }
-  }
-
   function openModal(){
-    setSubmitted(false); setFormError("");
-    setForm({firstName:"",lastName:"",company:"",email:"",phone:""});
     setModalOpen(true);
   }
 
@@ -331,7 +296,6 @@ export default function LandingPage() {
         @keyframes nlBlink { 50%{opacity:0} }
         @keyframes nlPulse { 0%,100%{opacity:.4} 50%{opacity:1} }
         @keyframes nlMarq  { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
-        @keyframes modalIn { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
         @keyframes nlTestIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
         @keyframes dashRowIn { from{opacity:0;transform:translateX(-8px)} to{opacity:1;transform:translateX(0)} }
         @keyframes dashMetIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
@@ -354,10 +318,6 @@ export default function LandingPage() {
         .nl-int-chip:hover{border-color:#6366F1;box-shadow:0 0 0 3px rgba(99,102,241,.08)}
         .nl-marq{display:flex;width:max-content;animation:nlMarq 28s linear infinite}
         .nl-marq:hover{animation-play-state:paused}
-        .modal-overlay{position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center}
-        .modal-box{background:#fff;border-radius:16px;padding:40px;width:100%;max-width:460px;position:relative;box-shadow:0 24px 64px rgba(0,0,0,.3);animation:modalIn .2s ease}
-        .form-input{width:100%;padding:10px 13px;border:1px solid #E2E6ED;border-radius:8px;font-size:13px;font-family:inherit;color:#0F1623;background:#F7F8FA;outline:none;transition:border-color .15s}
-        .form-input:focus{border-color:#6366F1;box-shadow:0 0 0 3px rgba(99,102,241,.12)}
         .dash-toast{position:absolute;z-index:10;background:#fff;border:1px solid #E8E6F3;border-radius:12px;padding:12px 15px;box-shadow:0 10px 30px rgba(99,102,241,.10);min-width:175px;pointer-events:none}
         .dash-toast.vis{animation:toastIn .45s cubic-bezier(.2,.8,.2,1) both}
 
@@ -378,8 +338,6 @@ export default function LandingPage() {
           .lp-nav{padding:0 16px!important}
           .nl-hero{padding-left:20px!important;padding-right:20px!important}
           .lp-footer{flex-direction:column!important;gap:20px!important;text-align:center!important;padding:32px 20px!important;align-items:center!important}
-          .modal-box{padding:24px 20px!important;margin:16px!important;max-width:calc(100vw - 32px)!important}
-          .modal-name-row{grid-template-columns:1fr!important}
         }
       `}</style>
 
@@ -410,7 +368,7 @@ export default function LandingPage() {
         </div>
         <div style={{ display:"flex",gap:10,alignItems:"center" }}>
           <button onClick={()=>nav("/login")} style={{ padding:"7px 16px",borderRadius:999,fontSize:13,fontWeight:500,border:"1px solid rgba(255,255,255,.18)",color:"rgba(255,255,255,.8)",background:"transparent",cursor:"pointer",fontFamily:"inherit",transition:"all .15s" }}>Login</button>
-          <button onClick={openModal} style={{ padding:"7px 18px",borderRadius:999,fontSize:13,fontWeight:600,background:"#fff",color:C.ink,border:"none",cursor:"pointer",fontFamily:"inherit" }}>Register Interest</button>
+          <button onClick={openModal} style={{ padding:"7px 18px",borderRadius:999,fontSize:13,fontWeight:600,background:"#fff",color:C.ink,border:"none",cursor:"pointer",fontFamily:"inherit" }}>Sign Up</button>
         </div>
       </nav>
 
@@ -1009,61 +967,7 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      {/* ══════════════ MODAL ══════════════ */}
-      {modalOpen&&(
-        <div className="modal-overlay" onClick={e=>{if(e.target===e.currentTarget)setModalOpen(false);}}>
-          <div className="modal-box">
-            <button onClick={()=>setModalOpen(false)} style={{ position:"absolute",top:16,right:16,width:32,height:32,borderRadius:"50%",background:"#F7F8FA",border:"1px solid #E2E6ED",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:16,color:"#9AA3B4" }}>✕</button>
-            {!submitted?(
-              <>
-                <div style={{ fontSize:28,marginBottom:10 }}>✦</div>
-                <div style={{ fontSize:22,fontWeight:700,color:C.ink,letterSpacing:"-.4px",marginBottom:6 }}>Register Your Interest</div>
-                <div style={{ fontSize:13,color:"#9AA3B4",marginBottom:28,lineHeight:1.5 }}>Tell us about yourself and we'll be in touch shortly with early access details.</div>
-                {formError&&<div style={{ background:"#FEF2F2",border:"1px solid #FECACA",borderRadius:8,padding:"10px 14px",marginBottom:16,fontSize:12,color:"#DC2626" }}>{formError}</div>}
-                <div className="modal-name-row" style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:14,marginBottom:16 }}>
-                  <div>
-                    <label style={{ display:"block",fontSize:12,fontWeight:600,color:C.ink,marginBottom:5 }}>First Name *</label>
-                    <input className="form-input" type="text" placeholder="Sarah" value={form.firstName} onChange={e=>setField("firstName",e.target.value)} />
-                  </div>
-                  <div>
-                    <label style={{ display:"block",fontSize:12,fontWeight:600,color:C.ink,marginBottom:5 }}>Last Name</label>
-                    <input className="form-input" type="text" placeholder="Reynolds" value={form.lastName} onChange={e=>setField("lastName",e.target.value)} />
-                  </div>
-                </div>
-                <div style={{ marginBottom:16 }}>
-                  <label style={{ display:"block",fontSize:12,fontWeight:600,color:C.ink,marginBottom:5 }}>Company *</label>
-                  <input className="form-input" type="text" placeholder="Your recruitment agency" value={form.company} onChange={e=>setField("company",e.target.value)} />
-                </div>
-                <div style={{ marginBottom:16 }}>
-                  <label style={{ display:"block",fontSize:12,fontWeight:600,color:C.ink,marginBottom:5 }}>Email Address *</label>
-                  <input className="form-input" type="email" placeholder="sarah@agency.com" value={form.email} onChange={e=>setField("email",e.target.value)} />
-                </div>
-                <div style={{ marginBottom:20 }}>
-                  <label style={{ display:"block",fontSize:12,fontWeight:600,color:C.ink,marginBottom:5 }}>Phone Number</label>
-                  <div style={{ display:"flex",gap:8,alignItems:"center" }}>
-                    <select value={selCountry.code} onChange={e=>setSelCountry(COUNTRIES.find(c=>c.code===e.target.value))}
-                      style={{ padding:"10px 8px",border:"1px solid #E2E6ED",borderRadius:8,fontSize:13,fontFamily:"inherit",color:C.ink,background:"#F7F8FA",cursor:"pointer",outline:"none",flexShrink:0 }}>
-                      {COUNTRIES.map(c=><option key={c.code} value={c.code}>{c.flag} {c.code}</option>)}
-                    </select>
-                    <input className="form-input" type="tel" placeholder="04XX XXX XXX" value={form.phone} onChange={e=>setField("phone",fmtPhone(e.target.value))} maxLength={12} style={{ flex:1 }} />
-                  </div>
-                  <div style={{ fontSize:11,color:"#9AA3B4",marginTop:4 }}>Country code: {selCountry.flag} {selCountry.code}</div>
-                </div>
-                <button onClick={handleRegister} disabled={submitting} style={{ width:"100%",padding:12,borderRadius:8,fontSize:14,fontWeight:600,background:C.indigo,color:"#fff",border:"none",cursor:"pointer",fontFamily:"inherit",transition:"all .15s" }}>
-                  {submitting?"Submitting…":"Submit →"}
-                </button>
-              </>
-            ):(
-              <div style={{ textAlign:"center",paddingTop:24 }}>
-                <div style={{ fontSize:48,marginBottom:12 }}>🎉</div>
-                <div style={{ fontSize:18,fontWeight:700,color:C.ink,marginBottom:8 }}>Thank you for your interest!</div>
-                <div style={{ fontSize:14,color:"#9AA3B4",lineHeight:1.6,marginBottom:20 }}>Check your email and verify your address to log in.</div>
-                <button onClick={()=>setModalOpen(false)} style={{ padding:"10px 24px",borderRadius:7,background:C.indigo,color:"#fff",border:"none",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit" }}>Close</button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <RegisterInterestModal open={modalOpen} onClose={()=>setModalOpen(false)} />
     </div>
   );
 }
