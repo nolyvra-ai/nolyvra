@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import RegisterInterestModal from "../components/RegisterInterestModal.jsx";
 
 // ─── Encryption helper ────────────────────────────────────────────────────────
 // Uses Web Crypto API (built-in to all modern browsers, no extra deps needed)
@@ -79,6 +80,7 @@ export default function LoginPage() {
   // ── Change 1: popup state ─────────────────────────────────────────────────
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [policyOpen,  setPolicyOpen]  = useState(false);
+  const [signupOpen,  setSignupOpen]  = useState(false);
 
   const passwordRef = useRef(null);
 
@@ -131,6 +133,13 @@ export default function LoginPage() {
 
   function handlePasswordKeyDown(e) {
     if (e.key === "Enter" && password.length >= 6) handleSubmit();
+  }
+
+  function handleBack() {
+    setStep(0);
+    setPassword("");
+    setPwHint("");
+    setApiError("");
   }
 
   // ── Mode toggle ────────────────────────────────────────────────────────────
@@ -567,21 +576,46 @@ export default function LoginPage() {
                       {pwHint}
                     </div>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => nav(`/forgot-password?type=${loginMode}`)}
-                    style={{
-                      alignSelf: "flex-end",
-                      padding: 0,
-                      border: 0,
-                      background: "transparent",
-                      color: "#72adff",
-                      fontSize: 12,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Forgot password?
-                  </button>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <button
+                      type="button"
+                      onClick={handleBack}
+                      style={{
+                        padding: 0,
+                        border: 0,
+                        background: "transparent",
+                        color: "rgba(255,255,255,0.55)",
+                        fontSize: 12,
+                        cursor: "pointer",
+                      }}
+                    >
+                      ← Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => nav(`/forgot-password?type=${loginMode}`)}
+                      style={{
+                        padding: 0,
+                        border: 0,
+                        background: "transparent",
+                        color: "#72adff",
+                        fontSize: 12,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", textAlign: "center" }}>
+                    New to nolyvra?{" "}
+                    <a
+                      href="#"
+                      onClick={e => { e.preventDefault(); setSignupOpen(true); }}
+                      style={{ color: "#72adff", textDecoration: "none", cursor: "pointer" }}
+                    >
+                      Sign Up
+                    </a>
+                  </div>
                 </div>
               )}
 
@@ -694,6 +728,9 @@ export default function LoginPage() {
           </div>
         </div>
       )}
+
+      {/* ── Sign Up (Register Your Interest) Modal ── */}
+      <RegisterInterestModal open={signupOpen} onClose={() => setSignupOpen(false)} />
     </>
   );
 }
