@@ -16,19 +16,23 @@ const DANGER = "#DC2626", DANGER_BG = "#FEF2F2", DANGER_BR = "#FECACA";
 const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
 const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
 const NEXUS = "#0D9488", NEXUS_BG = "#F0FDFA", NEXUS_BR = "#99F6E4";
+const SELTZ = "#DB2777", SELTZ_BG = "#FDF2F8", SELTZ_BR = "#FBCFE8";
 
 function sourceAccent(source) {
   if (source === "CORESIGNAL") return PURPLE;
+  if (source === "SELTZ") return SELTZ;
   if (source === "NEXUS" || source === "BOTH") return NEXUS;
   return ACCENT;
 }
 function sourceAccentHover(source) {
   if (source === "CORESIGNAL") return "#6D28D9";
+  if (source === "SELTZ") return "#BE185D";
   if (source === "NEXUS" || source === "BOTH") return "#0F766E";
   return "#1660CC";
 }
 function sourceBorder(source) {
   if (source === "CORESIGNAL") return PURPLE_BR;
+  if (source === "SELTZ") return SELTZ_BR;
   if (source === "NEXUS" || source === "BOTH") return NEXUS_BR;
   return ACCENT_BR;
 }
@@ -51,6 +55,7 @@ function Badge({ label, variant = "neutral" }) {
     accent:  { bg: ACCENT_BG,  border: ACCENT_BR,  color: ACCENT  },
     purple:  { bg: PURPLE_BG,  border: PURPLE_BR,  color: PURPLE  },
     nexus:   { bg: NEXUS_BG,   border: NEXUS_BR,   color: NEXUS   },
+    seltz:   { bg: SELTZ_BG,   border: SELTZ_BR,   color: SELTZ   },
     neutral: { bg: "#F1F3F7",  border: BORDER,     color: MUTED   },
   }[variant] ?? { bg: "#F1F3F7", border: BORDER, color: MUTED };
   return (
@@ -104,6 +109,14 @@ function SourceBadge({ source, tier }) {
       <Box sx={{ display: "inline-flex", alignItems: "center", gap: "6px", px: "9px", py: "3px", bgcolor: NEXUS_BG, border: `1px solid ${NEXUS_BR}`, borderRadius: "20px", fontSize: 10.5, fontWeight: 600, color: NEXUS, mb: 1 }}>
         <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: NEXUS, flexShrink: 0 }} />
         Nexus Verified{tier ? ` · ${tier.replaceAll("_", " ")}` : ""}
+      </Box>
+    );
+  }
+  if (source === "SELTZ") {
+    return (
+      <Box sx={{ display: "inline-flex", alignItems: "center", gap: "6px", px: "9px", py: "3px", bgcolor: SELTZ_BG, border: `1px solid ${SELTZ_BR}`, borderRadius: "20px", fontSize: 10.5, fontWeight: 600, color: SELTZ, mb: 1 }}>
+        <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: SELTZ, flexShrink: 0 }} />
+        Source · Agent Suggestion
       </Box>
     );
   }
@@ -590,6 +603,11 @@ export function TalentSearchPage() {
       openCoreSignalApiProfile(c.coreSignalApiId);
     } else if (c.source === "NEXUS" && c.nexusProfileUrl) {
       window.open(c.nexusProfileUrl, "_blank", "noopener,noreferrer");
+    } else if (c.source === "SELTZ" && c.linkedinUrl) {
+      // Seltz returns the full profile in the search response itself (no
+      // separate "collect" call like CoreSignal/Bright Data) — nothing to
+      // fetch here, just open the source profile.
+      window.open(c.linkedinUrl, "_blank", "noopener,noreferrer");
     }
   }
 
@@ -604,6 +622,7 @@ export function TalentSearchPage() {
   // Source-breakdown counts for the header badges — computed client-side since
   // the blended response no longer carries internalCount/coreSignalCount.
   const internalCount   = (result?.results ?? []).filter(c => c.source === "INTERNAL").length;
+  const seltzCount      = (result?.results ?? []).filter(c => c.source === "SELTZ").length;
   const coreSignalCount = (result?.results ?? []).filter(c => c.source === "CORESIGNAL").length;
   const nexusCount      = (result?.results ?? []).filter(c => c.source === "NEXUS" || c.source === "BOTH").length;
 
@@ -726,6 +745,7 @@ export function TalentSearchPage() {
                 ? <Badge label={`● ${dbResults.length} total records`} variant="accent" />
                 : <>
                     <Badge label={`● Internal DB (${internalCount})`} variant="accent" />
+                    <Badge label={`● Agent Suggestion (${seltzCount})`} variant="seltz" />
                     <Badge label={`● Active Profiles in Market (${coreSignalCount})`} variant="purple" />
                     <Badge label={`● Nexus Verified (${nexusCount})`} variant="nexus" />
                   </>}
@@ -817,7 +837,8 @@ export function TalentSearchPage() {
                     {/* Skill tags */}
                     {c.isAI && (
                       <Box sx={{ mb: 1 }}>
-                        {c.matchedSkills?.map(s => <Tag key={s} label={s} variant="match" />)}
+                        {c.matchedSkills?.slice(0, 5).map(s => <Tag key={s} label={s} variant="match" />)}
+                        {c.matchedSkills?.length > 5 && <Tag label="…" variant="neutral" />}
                         {c.gapSkills?.slice(0, 2).map(s => <Tag key={s} label={`No ${s}`} variant="gap" />)}
                       </Box>
                     )}
@@ -859,6 +880,12 @@ export function TalentSearchPage() {
                           sx={{ flex: 1, fontSize: 11, bgcolor: NEXUS, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#0F766E", boxShadow: "none" } }}>
                           View on Nexus
                         </Button>
+                      ) : c.source === "SELTZ" ? (
+                        <Button size="small" variant="contained"
+                          onClick={() => c.linkedinUrl && window.open(c.linkedinUrl, "_blank", "noopener,noreferrer")}
+                          sx={{ flex: 1, fontSize: 11, bgcolor: SELTZ, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#BE185D", boxShadow: "none" } }}>
+                          View Profile
+                        </Button>
                       ) : (
                         <Button size="small" variant="contained"
                           onClick={() => {
@@ -876,10 +903,10 @@ export function TalentSearchPage() {
                         + Pipeline
                       </Button>
 
-                      {c.source === "CORESIGNAL" && (
+                      {(c.source === "CORESIGNAL" || c.source === "SELTZ") && (
                         <Button size="small" variant="outlined"
                           onClick={e => { e.stopPropagation(); nav("/candidates/new", { state: { prefill: { name: c.name ?? "", email: c.email ?? "", linkedinUrl: c.linkedinUrl ?? "", cvText: "" } } }); }}
-                          sx={{ fontSize: 11, borderColor: PURPLE_BR, color: PURPLE, borderRadius: "6px", textTransform: "none", "&:hover": { borderColor: PURPLE, bgcolor: PURPLE_BG } }}>
+                          sx={{ fontSize: 11, borderColor: c.source === "SELTZ" ? SELTZ_BR : PURPLE_BR, color: c.source === "SELTZ" ? SELTZ : PURPLE, borderRadius: "6px", textTransform: "none", "&:hover": { borderColor: c.source === "SELTZ" ? SELTZ : PURPLE, bgcolor: c.source === "SELTZ" ? SELTZ_BG : PURPLE_BG } }}>
                           ⬆ Upload CV
                         </Button>
                       )}
@@ -948,10 +975,11 @@ export function TalentSearchPage() {
                               if (isCS && c.coresignalId) openCoreSignalProfile(c.coresignalId);
                               else if (isCS && c.coreSignalApiId) openCoreSignalApiProfile(c.coreSignalApiId);
                               else if (c.source === "NEXUS" && c.nexusProfileUrl) window.open(c.nexusProfileUrl, "_blank", "noopener,noreferrer");
+                              else if (c.source === "SELTZ" && c.linkedinUrl) window.open(c.linkedinUrl, "_blank", "noopener,noreferrer");
                               else if (c.candidateId) nav(`/candidates/${c.candidateId}/workflow`);
                             }}
                             sx={{ fontSize: 11, bgcolor: rowAccent, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: sourceAccentHover(c.source), boxShadow: "none" } }}>
-                            {isCS ? "View Details" : c.source === "NEXUS" ? "View on Nexus" : "View"}
+                            {isCS ? "View Details" : c.source === "NEXUS" ? "View on Nexus" : c.source === "SELTZ" ? "View Profile" : "View"}
                           </Button>
                         </TableCell>
                       </TableRow>

@@ -170,6 +170,43 @@ public class AnalysisService {
         }
     }
 
+    // ── Quick fit preview — short, unpersisted blurb for the candidate row's
+    // popup before a full analysis has been run. Deliberately not cached/stored
+    // (unlike getCandidateSummary above) — every click gets a fresh call, per
+    // product decision, and still costs one token via callOpenAI.
+    public FitPreviewResponse getFitPreview(String candidateId, String loginId) {
+        String cvText = loadCvTextFromDb(candidateId);
+        String jdText = getJdForCandidate(candidateId);
+        String candidateName = getCandidateName(candidateId);
+
+        String systemPrompt = """
+                You are a senior recruitment consultant giving a recruiter a quick,
+                informal read on a candidate before they decide whether to run a full
+                analysis. Return EXACTLY ONE JSON object:
+
+                {
+                  "summary": "<2-3 sentence plain-English assessment of fit for this role>"
+                }
+
+                Rules:
+                - Base the assessment only on the CV text and job description given.
+                - No markdown, no bullet points, no extra keys.
+                """;
+
+        String userPrompt = """
+                CANDIDATE NAME: %s
+                CV TEXT: %s
+                JOB DESCRIPTION: %s
+                """.formatted(candidateName, safeTrim(cvText, 8000), safeTrim(jdText, 4000));
+
+        String content = callOpenAI(systemPrompt, userPrompt, loginId);
+        try {
+            return objectMapper.readValue(cleanJson(content), FitPreviewResponse.class);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to parse fit preview: " + e.getMessage(), e);
+        }
+    }
+
     // ─── MVP2: Fraud Detection
 
     // ─── MVP2: Fraud Detection ────────────────────────────────────────────────

@@ -261,6 +261,15 @@ public class SupportChatService {
                   from the matched articles. You may combine information across multiple matched articles. Only
                   set "canAnswer" to false (leaving "answer" empty) if the matched articles genuinely don't cover
                   what was asked — do not guess or use outside knowledge about how the app works.
+                - If the matched article(s) are about posting jobs to LinkedIn, Seek, or a careers website (direct
+                  job board posting), explain briefly that this requires a one-time account setup with the Nolyvra
+                  team, then end your answer with exactly this sentence: "I am passing this info to our customer
+                  representative who will contact you directly."
+                - If the user asks generally how to transfer/migrate/upload candidates from another ATS/CRM (CSV
+                  or Excel upload, column mapping, etc.), just answer normally from the matched article — no
+                  special closing line needed. Only if they specifically ask for help with a complex migration, or
+                  ask to be connected with someone / want migration support, end your answer with exactly this
+                  sentence: "I am sending this request to our customer support who will reach out shortly."
                 - When you just called navigate_to successfully: write a short confirmation (e.g. "Taking you to
                   Create Job now.") and set "canAnswer" to true.
                 - When you just called start_coworker_action: write a short confirmation that you're handing this

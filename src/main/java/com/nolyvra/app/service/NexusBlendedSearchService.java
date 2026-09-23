@@ -134,7 +134,12 @@ public class NexusBlendedSearchService {
             blended.add(toBlended(r));
         }
 
-        blended.sort(Comparator.comparingInt(this::rankingScore).reversed());
+        // Fixed display-order grouping (Sayan-confirmed): Internal+Nexus/Both
+        // mixed together first (unchanged, by rankingScore), then Seltz, then
+        // CoreSignal/Bright Data — overrides pure score ordering across groups.
+        blended.sort(Comparator
+                .comparingInt((NexusBlendedSearchResult r) -> sourceGroupRank(r.source()))
+                .thenComparing(Comparator.comparingInt(this::rankingScore).reversed()));
 
         long nexusOnlyCount = blended.stream().filter(b -> "NEXUS".equals(b.source())).count();
         long bothCount = blended.stream().filter(b -> "BOTH".equals(b.source())).count();
@@ -150,6 +155,17 @@ public class NexusBlendedSearchService {
     private int rankingScore(NexusBlendedSearchResult r) {
         boolean nexusVerified = "NEXUS".equals(r.source()) || "BOTH".equals(r.source());
         return nexusVerified ? Math.min(100, r.matchScore() + NEXUS_VERIFIED_RANKING_BOOST) : r.matchScore();
+    }
+
+    // Fixed display-order grouping (Sayan-confirmed) — mirrors
+    // TalentSearchService.sourceGroupRank. INTERNAL/NEXUS/BOTH stay mixed
+    // together in group 0 (ranked amongst themselves by rankingScore above),
+    // Seltz is group 1, CoreSignal/Bright Data (still labeled "CORESIGNAL") is
+    // group 2.
+    private int sourceGroupRank(String source) {
+        if ("SELTZ".equals(source)) return 1;
+        if ("CORESIGNAL".equals(source)) return 2;
+        return 0;
     }
 
     // Resolves skills + location to send to Nexus for a query — Nexus's search API
