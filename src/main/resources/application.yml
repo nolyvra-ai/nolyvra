@@ -62,6 +62,10 @@ coresignal:
   api-key: ${CORESIGNAL_API_KEY:}
   base-url: ${CORESIGNAL_BASE_URL:https://api.coresignal.com/cdapi/v2}
 
+seltz:
+  api-key: ${SELTZ_API_KEY:}
+  base-url: ${SELTZ_BASE_URL:https://api.seltz.ai/v1}
+
 nexus:
   # Master feature toggle (2026-07-26) — off by default. NexusClient.isConfigured()
   # folds this in, which is already the single gate every Nexus-touching code path

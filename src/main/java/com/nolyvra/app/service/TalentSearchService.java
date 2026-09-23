@@ -23,6 +23,8 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -48,6 +50,8 @@ public class TalentSearchService {
     private final String brightDataBaseUrl;
     private final String coreSignalApiKey;
     private final String coreSignalApiBaseUrl;
+    private final String seltzApiKey;
+    private final String seltzBaseUrl;
     private final TokenService tokenService;
 
     public TalentSearchService(
@@ -60,7 +64,9 @@ public class TalentSearchService {
             @Value("${brightdata.dataset-id:gd_l1viktl72bvl7bjuj0}") String brightDataDatasetId,
             @Value("${brightdata.base-url:https://api.brightdata.com}") String brightDataBaseUrl,
             @Value("${coresignal.api-key:}") String coreSignalApiKey,
-            @Value("${coresignal.base-url:https://api.coresignal.com/cdapi/v2}") String coreSignalApiBaseUrl) {
+            @Value("${coresignal.base-url:https://api.coresignal.com/cdapi/v2}") String coreSignalApiBaseUrl,
+            @Value("${seltz.api-key:}") String seltzApiKey,
+            @Value("${seltz.base-url:https://api.seltz.ai/v1}") String seltzBaseUrl) {
         this.jdbc = jdbc;
         this.openAI = openAIClient;
         this.objectMapper = objectMapper;
@@ -73,6 +79,8 @@ public class TalentSearchService {
         this.brightDataBaseUrl = brightDataBaseUrl;
         this.coreSignalApiKey = coreSignalApiKey;
         this.coreSignalApiBaseUrl = coreSignalApiBaseUrl;
+        this.seltzApiKey = seltzApiKey;
+        this.seltzBaseUrl = seltzBaseUrl;
     }
 
     // ─── POST /api/talent-search/query ───────────────────────────────────────
@@ -88,6 +96,14 @@ public class TalentSearchService {
         // Step 2: Search internal DB candidates
         List<TalentSearchResult> internalResults = searchInternal(filters, loginId);
 
+        // Step 2b: Search Seltz (if API key configured) — plain prompt search,
+        // no AI relevance scoring. Kept as its own list, not merged into
+        // externalResults, so it can be surfaced as its own display block
+        // (see sourceGroupRank) ahead of CoreSignal/Bright Data.
+        List<TalentSearchResult> seltzResults = seltzApiKey != null && !seltzApiKey.isBlank()
+                ? searchSeltz(req.query(), loginId)
+                : List.of();
+
         // Step 3: Search Bright Data (if API key configured)
         // Re-enabled 2026-07-26 — Nexus integration is now behind its own feature
         // toggle (nexus.enabled, application.yml) rather than needing this disabled.
@@ -102,9 +118,13 @@ public class TalentSearchService {
             externalResults.addAll(searchCoreSignalApi(filters, loginId, req.query()));
         }
 
-        // Step 4: Paginate internal results separately; always surface CoreSignal on page 0
-        // Sort via stream (not in-place .sort()) since these lists may be the immutable List.of()
+        // Step 4: Paginate internal results separately; always surface Seltz +
+        // CoreSignal on page 0. Sort via stream (not in-place .sort()) since
+        // these lists may be the immutable List.of()
         internalResults = internalResults.stream()
+                .sorted(Comparator.comparingInt(TalentSearchResult::matchScore).reversed())
+                .collect(Collectors.toList());
+        seltzResults = seltzResults.stream()
                 .sorted(Comparator.comparingInt(TalentSearchResult::matchScore).reversed())
                 .collect(Collectors.toList());
         externalResults = externalResults.stream()
@@ -117,12 +137,18 @@ public class TalentSearchService {
         int to = Math.min(from + pageSize, internalResults.size());
         List<TalentSearchResult> paged = new ArrayList<>(
                 from < internalResults.size() ? internalResults.subList(from, to) : List.of());
-        if (page == 0) paged.addAll(externalResults);
-        paged.sort(Comparator.comparingInt(TalentSearchResult::matchScore).reversed());
+        if (page == 0) {
+            paged.addAll(seltzResults);
+            paged.addAll(externalResults);
+        }
+        // Fixed display-order grouping (not pure matchScore) — see sourceGroupRank.
+        paged.sort(Comparator
+                .comparingInt((TalentSearchResult r) -> sourceGroupRank(r.source()))
+                .thenComparing(Comparator.comparingInt(TalentSearchResult::matchScore).reversed()));
 
         return new TalentSearchResponse(
                 req.query(),
-                internalResults.size() + externalResults.size(),
+                internalResults.size() + seltzResults.size() + externalResults.size(),
                 internalResults.size(),
                 externalResults.size(),
                 paged);
@@ -607,6 +633,140 @@ public class TalentSearchService {
                 ? filters.skills()
                 : (filters.keywords() != null ? filters.keywords() : List.of());
         return new NexusSearchFilters(skills, filters.location());
+    }
+
+    // ─── Seltz.ai search — plain prompt/query, no OpenAI relevance scoring ───
+    // Seltz already returns a fully-formed markdown profile per result in one
+    // call (name/title/location/skills all embedded in `content`), so unlike
+    // Bright Data/CoreSignal there's no separate "collect full profile" step —
+    // what's parsed here from the search response IS the full profile.
+    // Cached the same way as the other external sources (30-day TTL, touch-on-
+    // read) even though there's no second paid call to save here — mainly so a
+    // repeat identical query doesn't re-hit Seltz's API for no reason.
+
+    private static final int SELTZ_MAX_RESULTS = 10;
+
+    private static final Pattern SELTZ_NAME_PATTERN = Pattern.compile("(?m)^#\\s+(.+)$");
+    private static final Pattern SELTZ_TITLE_PATTERN = Pattern.compile("(?m)^\\*\\*(.+?)\\*\\*\\s*$");
+    private static final Pattern SELTZ_LOCATION_PATTERN = Pattern.compile("(?m)^\uD83D\uDCCD\\s*(.+)$");
+    private static final Pattern SELTZ_SKILLS_PATTERN = Pattern.compile("(?s)##\\s*Skills\\s*\\n+(.+?)(?=\\n##|\\z)");
+
+    private List<TalentSearchResult> searchSeltz(String query, String loginId) {
+        if (seltzApiKey == null || seltzApiKey.isBlank()) return List.of();
+        // Same extra-token cost as the Bright Data/CoreSignal AI-scoring step,
+        // even though Seltz itself never calls OpenAI — Sayan-confirmed flat
+        // pricing across external sources regardless of which one actually
+        // does the relevance work.
+        if (!tokenService.deductToken(loginId)) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
+        }
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-api-key", seltzApiKey);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(
+                    Map.of("query", query, "scope", "people"), headers);
+
+            ResponseEntity<String> resp = restTemplate.exchange(
+                    seltzBaseUrl + "/search", HttpMethod.POST, entity, String.class);
+
+            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
+                System.err.println("[Seltz] search returned HTTP " + resp.getStatusCode());
+                return List.of();
+            }
+
+            JsonNode documents = objectMapper.readTree(resp.getBody()).path("documents");
+            if (!documents.isArray() || documents.isEmpty()) return List.of();
+
+            List<TalentSearchResult> results = new ArrayList<>();
+            for (JsonNode doc : documents) {
+                if (results.size() >= SELTZ_MAX_RESULTS) break;
+                String url = textField(doc, "url");
+                String content = textField(doc, "content");
+                if (url == null || content == null) continue;
+                TalentSearchResult mapped = upsertAndMapSeltz(url, content, results.size());
+                if (mapped != null) results.add(mapped);
+            }
+            return results;
+        } catch (Exception e) {
+            System.err.println("[Seltz] search failed: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            return List.of();
+        }
+    }
+
+    private TalentSearchResult upsertAndMapSeltz(String url, String content, int rank) {
+        try {
+            String name = firstMatch(SELTZ_NAME_PATTERN, content);
+            String tagline = firstMatch(SELTZ_TITLE_PATTERN, content);
+            String location = firstMatch(SELTZ_LOCATION_PATTERN, content);
+            List<String> skills = parseSeltzSkills(content);
+
+            // Taglines are often "<role> at <company>" — split it out when present.
+            String currentTitle = tagline;
+            String currentCompany = null;
+            if (tagline != null) {
+                int atIdx = tagline.lastIndexOf(" at ");
+                if (atIdx > 0) {
+                    currentTitle = tagline.substring(0, atIdx).trim();
+                    currentCompany = tagline.substring(atIdx + 4).trim();
+                }
+            }
+
+            jdbc.update("""
+                    insert into seltz_cache
+                        (seltz_url, full_name, job_title, current_company, location, skills, content, last_searched_at)
+                    values (?, ?, ?, ?, ?, CAST(? AS jsonb), ?, now())
+                    on conflict (seltz_url) do update set
+                        full_name        = excluded.full_name,
+                        job_title        = excluded.job_title,
+                        current_company  = excluded.current_company,
+                        location         = excluded.location,
+                        skills           = excluded.skills,
+                        content          = excluded.content,
+                        cached_at        = now(),
+                        last_searched_at = now()
+                    """,
+                    url, name, currentTitle, currentCompany, location,
+                    objectMapper.writeValueAsString(skills), content);
+
+            // No AI relevance scoring for Seltz — plain prompt search already
+            // does that work server-side. Synthetic descending score preserves
+            // Seltz's own return order for within-group sorting only.
+            int score = Math.max(60, 99 - rank);
+
+            return new TalentSearchResult(
+                    null, name, currentTitle, currentCompany, url, null, null,
+                    skills, List.of(), score, 0,
+                    "SELTZ", false, null, null, null, null);
+        } catch (Exception e) {
+            System.err.println("[Seltz] upsert/map failed for url " + url + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    private String firstMatch(Pattern pattern, String content) {
+        Matcher m = pattern.matcher(content);
+        return m.find() ? m.group(1).trim() : null;
+    }
+
+    private List<String> parseSeltzSkills(String content) {
+        Matcher m = SELTZ_SKILLS_PATTERN.matcher(content);
+        if (!m.find()) return List.of();
+        String block = m.group(1).replace("\n", " ").trim();
+        return Arrays.stream(block.split("\\s*\u2022\\s*"))
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .collect(Collectors.toList());
+    }
+
+    // Fixed display-order grouping (Sayan-confirmed): Internal (and, one layer
+    // up in NexusBlendedSearchService, Nexus/Both) first, then Seltz, then
+    // CoreSignal/Bright Data — overrides pure matchScore ordering across
+    // groups, while each group still sorts by matchScore within itself.
+    private int sourceGroupRank(String source) {
+        if ("SELTZ".equals(source)) return 1;
+        if ("CORESIGNAL".equals(source)) return 2;
+        return 0;
     }
 
     // ─── Step 2: Internal DB search ───────────────────────────────────────────
