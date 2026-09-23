@@ -576,48 +576,52 @@ export default function LoginPage() {
                       {pwHint}
                     </div>
                   )}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <button
-                      type="button"
-                      onClick={handleBack}
-                      style={{
-                        padding: 0,
-                        border: 0,
-                        background: "transparent",
-                        color: "rgba(255,255,255,0.55)",
-                        fontSize: 12,
-                        cursor: "pointer",
-                      }}
-                    >
-                      ← Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => nav(`/forgot-password?type=${loginMode}`)}
-                      style={{
-                        padding: 0,
-                        border: 0,
-                        background: "transparent",
-                        color: "#72adff",
-                        fontSize: 12,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Forgot password?
-                    </button>
-                  </div>
-                  <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", textAlign: "center" }}>
-                    New to nolyvra?{" "}
-                    <a
-                      href="#"
-                      onClick={e => { e.preventDefault(); setSignupOpen(true); }}
-                      style={{ color: "#72adff", textDecoration: "none", cursor: "pointer" }}
-                    >
-                      Sign Up
-                    </a>
-                  </div>
                 </div>
               )}
+
+              {/* ── Back / Forgot password / Sign up — visible from step 0 ── */}
+              <div style={{ display: "flex", justifyContent: step >= 1 ? "space-between" : "flex-end", alignItems: "center" }}>
+                {step >= 1 && (
+                  <button
+                    type="button"
+                    onClick={handleBack}
+                    style={{
+                      padding: 0,
+                      border: 0,
+                      background: "transparent",
+                      color: "rgba(255,255,255,0.55)",
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    ← Back
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => nav(`/forgot-password?type=${loginMode}`)}
+                  style={{
+                    padding: 0,
+                    border: 0,
+                    background: "transparent",
+                    color: "#72adff",
+                    fontSize: 12,
+                    cursor: "pointer",
+                  }}
+                >
+                  Forgot password?
+                </button>
+              </div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", textAlign: "center" }}>
+                New to nolyvra?{" "}
+                <a
+                  href="#"
+                  onClick={e => { e.preventDefault(); setSignupOpen(true); }}
+                  style={{ color: "#72adff", textDecoration: "none", cursor: "pointer" }}
+                >
+                  Sign Up
+                </a>
+              </div>
 
               {/* ── API error ── */}
               {apiError && (
