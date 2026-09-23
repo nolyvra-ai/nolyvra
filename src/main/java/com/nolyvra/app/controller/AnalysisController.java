@@ -81,4 +81,12 @@ public class AnalysisController {
             @RequestParam String loginId) {
         return analysisService.getPlacementProbability(candidateId, loginId);
     }
+
+    // ── Quick fit preview (pre-analysis popup) ────────────────────────────────
+    @GetMapping("/candidates/{candidateId}/analysis/fit-preview")
+    public FitPreviewResponse getFitPreview(
+            @PathVariable String candidateId,
+            @RequestParam String loginId) {
+        return analysisService.getFitPreview(candidateId, loginId);
+    }
 }

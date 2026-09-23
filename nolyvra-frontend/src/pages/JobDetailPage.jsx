@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   Box, Paper, Typography, Button, CircularProgress, Tabs, Tab, TextField,
   Table, TableHead, TableBody, TableRow, TableCell,
+  Dialog, DialogTitle, DialogContent, DialogActions,
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -34,6 +35,18 @@ async function apiPostJson(path, body) {
   url.searchParams.set("loginId", loginId);
   const res = await fetch(url.toString(), {
     method: "POST", headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function apiPutJson(path, body) {
+  const loginId = localStorage.getItem("loginId") || "";
+  const url = new URL(`${API_BASE}${path}`);
+  url.searchParams.set("loginId", loginId);
+  const res = await fetch(url.toString(), {
+    method: "PUT", headers: { "Content-Type": "application/json", ...authHeader() },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await res.text());
@@ -135,6 +148,10 @@ export default function JobDetailPage() {
   const [tab, setTab] = useState("candidates");
   const [jdExpanded, setJdExpanded] = useState(false);
 
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+  const [markingComplete, setMarkingComplete] = useState(false);
+  const [completeError, setCompleteError] = useState("");
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true); setError(null);
@@ -182,6 +199,34 @@ export default function JobDetailPage() {
     return () => { cancelled = true; };
   }, [client?.id]);
 
+  async function handleMarkComplete() {
+    if (!job) return;
+    setMarkingComplete(true); setCompleteError("");
+    try {
+      await apiPutJson(`/api/jobs/${jobId}`, {
+        title: job.title,
+        company: job.company,
+        jobType: job.jobType,
+        seniority: job.seniority,
+        jdText: job.jdText,
+        location: job.location,
+        stackTags: job.stackTags,
+        jobStatus: "Complete",
+        salary: job.salary,
+        currency: job.currency,
+        feePercentage: job.feePercentage,
+        feeType: job.feeType,
+        fixedFee: job.fixedFee,
+      });
+      setJob(prev => ({ ...prev, status: "Complete" }));
+      setCompleteDialogOpen(false);
+    } catch (e) {
+      setCompleteError(e.message || "Failed to mark job as complete.");
+    } finally {
+      setMarkingComplete(false);
+    }
+  }
+
   async function handleAddNote() {
     if (!newNote.trim() || !client) return;
     setAddingNote(true); setNoteError("");
@@ -216,6 +261,8 @@ export default function JobDetailPage() {
   }
 
   const estimatedFee = computeEstimatedFee(job);
+  const hasSelectedCandidate = candidates.some(c => c.stage === "Selected");
+  const showMarkComplete = hasSelectedCandidate && job.status !== "Complete";
 
   return (
     <Box sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2 }}>
@@ -245,6 +292,13 @@ export default function JobDetailPage() {
               "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
             ✎ Edit
           </Button>
+          {showMarkComplete && (
+            <Button variant="contained" size="small" onClick={() => setCompleteDialogOpen(true)}
+              sx={{ fontSize: 11, bgcolor: SUCCESS, borderRadius: "6px", textTransform: "none", boxShadow: "none",
+                "&:hover": { bgcolor: "#128A3E", boxShadow: "none" } }}>
+              ✓ Mark as Complete
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -454,6 +508,32 @@ export default function JobDetailPage() {
           </Box>
         )}
       </Card>
+
+      <Dialog open={completeDialogOpen} onClose={() => !markingComplete && setCompleteDialogOpen(false)}
+        maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "10px" } }}>
+        <DialogTitle sx={{ fontSize: 14, fontWeight: 600, color: TEXT, pb: 1 }}>
+          Mark this job as complete?
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: 12.5, color: MUTED }}>
+            This closes the job out as filled. You can still view it afterward, but it will show as Complete.
+          </Typography>
+          {completeError && (
+            <Typography sx={{ fontSize: 12, color: DANGER, mt: 1.5 }}>{completeError}</Typography>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button size="small" disabled={markingComplete} onClick={() => setCompleteDialogOpen(false)}
+            sx={{ fontSize: 12, textTransform: "none", color: MUTED }}>
+            Cancel
+          </Button>
+          <Button variant="contained" size="small" disabled={markingComplete} onClick={handleMarkComplete}
+            sx={{ fontSize: 12, bgcolor: SUCCESS, borderRadius: "6px", textTransform: "none", boxShadow: "none",
+              "&:hover": { bgcolor: "#128A3E", boxShadow: "none" } }}>
+            {markingComplete ? "Marking…" : "Mark as Complete"}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
