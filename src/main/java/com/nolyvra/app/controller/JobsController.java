@@ -153,7 +153,7 @@ public class JobsController {
         JobResponse job = jobService.getJob(jobId, loginId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Job not found: " + jobId));
         return talentSearchService.searchCoreSignalForJob(
-                job.stackTags(), job.location(), job.title(), job.seniority(), loginId);
+                job.jdText(), job.stackTags(), job.location(), job.title(), job.seniority(), loginId);
     }
 
     // ── "Load more external candidates" (Jobs page) ──────────────────────────

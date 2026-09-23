@@ -859,12 +859,25 @@ public class TalentSearchService {
     // Same fetch-20-then-AI-select-top-10 behavior as the NL search flow — one
     // extra token deducted per call for the AI scoring pass (see applyAiScoring).
 
-    public List<TalentSearchResult> searchCoreSignalForJob(List<String> skills, String location,
+    // Seltz results go first (Sayan-confirmed display order), BrightData's
+    // AI-scored batch follows — Seltz isn't merged into the scored batch since
+    // it skips AI scoring entirely, same as the main search() flow.
+    public List<TalentSearchResult> searchCoreSignalForJob(String jdText, List<String> skills, String location,
                                                              String title, String seniority, String loginId) {
-        if (brightDataApiKey == null || brightDataApiKey.isBlank()) return List.of();
-        SearchFilters filters = buildJobFilters(skills, location, title, seniority);
-        List<TalentSearchResult> results = fetchExternalCandidates(filters);
-        return applyAiScoring(results, jobSearchQuery(title, skills, location), loginId, filters.industry());
+        List<TalentSearchResult> seltzResults = seltzApiKey != null && !seltzApiKey.isBlank()
+                ? searchSeltz(seltzJobQuery(jdText, title, skills, location), loginId)
+                : List.of();
+
+        List<TalentSearchResult> brightDataResults = List.of();
+        if (brightDataApiKey != null && !brightDataApiKey.isBlank()) {
+            SearchFilters filters = buildJobFilters(skills, location, title, seniority);
+            List<TalentSearchResult> results = fetchExternalCandidates(filters);
+            brightDataResults = applyAiScoring(results, jobSearchQuery(title, skills, location), loginId, filters.industry());
+        }
+
+        List<TalentSearchResult> combined = new ArrayList<>(seltzResults);
+        combined.addAll(brightDataResults);
+        return combined;
     }
 
     public List<TalentSearchResult> loadMoreExternalForJob(List<String> skills, String location,
@@ -882,6 +895,21 @@ public class TalentSearchService {
         if (skills != null && !skills.isEmpty()) sb.append(" with skills: ").append(String.join(", ", skills));
         if (location != null && !location.isBlank()) sb.append(" in ").append(location);
         return sb.toString();
+    }
+
+    private static final int SELTZ_JOB_QUERY_JD_LIMIT = 4000;
+
+    // Seltz takes a plain prompt, so the job's actual JD text is a far more
+    // "relevant query" than the structured title/skills/location string built
+    // for Bright Data's AI-scoring prompt — falls back to that structured
+    // string only when a job has no JD text yet.
+    private String seltzJobQuery(String jdText, String title, List<String> skills, String location) {
+        if (jdText != null && !jdText.isBlank()) {
+            return jdText.length() <= SELTZ_JOB_QUERY_JD_LIMIT
+                    ? jdText
+                    : jdText.substring(0, SELTZ_JOB_QUERY_JD_LIMIT);
+        }
+        return jobSearchQuery(title, skills, location);
     }
 
     private static final Set<String> SENIORITY_WORDS = Set.of(
