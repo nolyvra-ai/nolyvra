@@ -116,7 +116,7 @@ function SourceBadge({ source, tier }) {
     return (
       <Box sx={{ display: "inline-flex", alignItems: "center", gap: "6px", px: "9px", py: "3px", bgcolor: SELTZ_BG, border: `1px solid ${SELTZ_BR}`, borderRadius: "20px", fontSize: 10.5, fontWeight: 600, color: SELTZ, mb: 1 }}>
         <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: SELTZ, flexShrink: 0 }} />
-        Source · Seltz
+        Source · Agent Suggestion
       </Box>
     );
   }
@@ -745,7 +745,7 @@ export function TalentSearchPage() {
                 ? <Badge label={`● ${dbResults.length} total records`} variant="accent" />
                 : <>
                     <Badge label={`● Internal DB (${internalCount})`} variant="accent" />
-                    <Badge label={`● Seltz (${seltzCount})`} variant="seltz" />
+                    <Badge label={`● Agent Suggestion (${seltzCount})`} variant="seltz" />
                     <Badge label={`● Active Profiles in Market (${coreSignalCount})`} variant="purple" />
                     <Badge label={`● Nexus Verified (${nexusCount})`} variant="nexus" />
                   </>}
@@ -837,7 +837,8 @@ export function TalentSearchPage() {
                     {/* Skill tags */}
                     {c.isAI && (
                       <Box sx={{ mb: 1 }}>
-                        {c.matchedSkills?.map(s => <Tag key={s} label={s} variant="match" />)}
+                        {c.matchedSkills?.slice(0, 5).map(s => <Tag key={s} label={s} variant="match" />)}
+                        {c.matchedSkills?.length > 5 && <Tag label="…" variant="neutral" />}
                         {c.gapSkills?.slice(0, 2).map(s => <Tag key={s} label={`No ${s}`} variant="gap" />)}
                       </Box>
                     )}

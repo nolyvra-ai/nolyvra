@@ -65,6 +65,7 @@ const WARN = "#D97706", WARN_BG = "#FFFBEB", WARN_BR = "#FDE68A";
 const DANGER = "#DC2626", DANGER_BG = "#FEF2F2", DANGER_BR = "#FECACA";
 const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
 const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
+const SELTZ = "#DB2777", SELTZ_BG = "#FDF2F8", SELTZ_BR = "#FBCFE8";
 const NEUTRAL_BG = "#F1F3F7", SURFACE = "#FAFBFD", SELECTED_BG = "#EBF2FF";
 const HUBSPOT = "#FF7A59", HUBSPOT_BG = "rgba(255,122,89,0.08)", HUBSPOT_BR = "rgba(255,122,89,0.25)";
 const HUBSPOT_LABEL_BG = "#FFF1EC";
@@ -411,32 +412,41 @@ function SuitableCandidateCard({ c, onView, onAdd, adding, added, alreadyOnJob }
 // ─── External Candidate card (Bright Data / LinkedIn match) ────────────────────
 function ExternalCandidateCard({ c, onAdd, adding, added }) {
   const hasPhoto = !!c.avatarUrl && c.defaultAvatar !== true;
+  const isSeltz = c.source === "SELTZ";
+  const accent = isSeltz ? SELTZ : PURPLE;
+  const accentBorder = isSeltz ? SELTZ_BR : PURPLE_BR;
+  const accentHover = isSeltz ? "#BE185D" : "#6D28D9";
   return (
     <Box sx={{
       display: "flex", alignItems: "center", gap: 1.25, p: "10px 14px",
-      border: `1px solid ${PURPLE_BR}`, borderLeft: `3px solid ${PURPLE}`, borderRadius: "8px", bgcolor: "#fff",
+      border: `1px solid ${accentBorder}`, borderLeft: `3px solid ${accent}`, borderRadius: "8px", bgcolor: "#fff",
     }}>
-      <Box sx={{ width: 30, height: 30, borderRadius: "50%", overflow: "hidden", bgcolor: hasPhoto ? "transparent" : PURPLE, color: "#fff", display: "flex",
+      <Box sx={{ width: 30, height: 30, borderRadius: "50%", overflow: "hidden", bgcolor: hasPhoto ? "transparent" : accent, color: "#fff", display: "flex",
         alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
         {hasPhoto
           ? <Box component="img" src={c.avatarUrl} alt={c.name || ""} sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
           : (c.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}
       </Box>
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: TEXT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {c.name}
-        </Typography>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
+          <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: TEXT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {c.name}
+          </Typography>
+          <Box sx={{ display: "inline-flex", px: "6px", py: "1px", bgcolor: isSeltz ? SELTZ_BG : ACCENT_BG, border: `1px solid ${isSeltz ? SELTZ_BR : ACCENT_BR}`, borderRadius: "10px", fontSize: 9.5, fontWeight: 600, color: isSeltz ? SELTZ : ACCENT, whiteSpace: "nowrap", flexShrink: 0 }}>
+            {isSeltz ? "Agent Suggestion" : "LinkedIn"}
+          </Box>
+        </Box>
         <Typography sx={{ fontSize: 11, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
           {[c.currentTitle, c.currentCompany].filter(Boolean).join(" at ") || "—"}
         </Typography>
         {c.matchedSkills?.length > 0 && (
           <Typography sx={{ fontSize: 10.5, color: SUCCESS, mt: 0.25 }}>
-            Matches: {c.matchedSkills.join(", ")}
+            Matches: {c.matchedSkills.slice(0, 5).join(", ")}{c.matchedSkills.length > 5 ? ", …" : ""}
           </Typography>
         )}
       </Box>
       <Box sx={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 0.5 }}>
-        <Typography sx={{ fontSize: 13, fontWeight: 700, color: PURPLE }}>{c.matchScore}%</Typography>
+        <Typography sx={{ fontSize: 13, fontWeight: 700, color: accent }}>{c.matchScore}%</Typography>
         {c.linkedinUrl && (
           <Typography component="a" href={c.linkedinUrl} target="_blank" rel="noreferrer"
             sx={{ fontSize: 10.5, color: ACCENT, textDecoration: "none", "&:hover": { textDecoration: "underline" } }}>
@@ -450,7 +460,7 @@ function ExternalCandidateCard({ c, onAdd, adding, added }) {
             fontSize: 10.5, fontWeight: 500, borderRadius: "6px", textTransform: "none", whiteSpace: "nowrap",
             ...(added
               ? { borderColor: SUCCESS_BR, color: SUCCESS }
-              : { bgcolor: PURPLE, boxShadow: "none", "&:hover": { bgcolor: "#6D28D9", boxShadow: "none" } })
+              : { bgcolor: accent, boxShadow: "none", "&:hover": { bgcolor: accentHover, boxShadow: "none" } })
           }}>
           {adding ? <CircularProgress size={12} sx={{ color: added ? SUCCESS : "#fff" }} /> : added ? "Added ✓" : "Add to Job"}
         </Button>

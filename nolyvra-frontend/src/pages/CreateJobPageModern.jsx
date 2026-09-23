@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Box, Paper, Typography, Button, TextField, MenuItem,
-  Alert, CircularProgress,
+  Alert, CircularProgress, Tooltip,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
@@ -299,6 +299,41 @@ function extractSkillsFromJd(jdText) {
   return { technical, soft, seniority };
 }
 
+// ── Heuristic: does pasted/uploaded text look like a CV/resume rather than a
+// job description? Zero-cost check (no AI call) — the paste path is
+// deliberately AI-free. Hard-blocks "Generate Job Description" when it fires
+// (Sayan-confirmed, no override) since a false negative here would create a
+// job whose "description" is actually a candidate's personal/contact info.
+const JD_KEYWORDS = [
+  "responsibilit", "requirement", "we are looking", "you will", "must have",
+  "ideal candidate", "role overview", "about the role", "key skills",
+  "qualifications", "about us", "about the company", "what you'll do",
+  "what we offer", "the role", "your role", "nice to have", "preferred",
+];
+const CV_HEADER_LINES = ["attributes", "experience", "education", "references", "objective", "career summary"];
+
+function looksLikeCv(jdText) {
+  const trimmed = jdText.trim();
+  if (!trimmed) return false;
+  const lower = trimmed.toLowerCase();
+  const lines = trimmed.split("\n").map(l => l.trim()).filter(Boolean);
+  const firstFewLines = lines.slice(0, 6).join(" ");
+
+  const hasEmail = /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i.test(firstFewLines);
+  const hasPhone = /(\+?\d[\d\s-]{7,}\d)/.test(firstFewLines);
+  const hasJdKeyword = JD_KEYWORDS.some(k => lower.includes(k));
+  const hasCvHeaderLine = lines.slice(0, 10).some(l => CV_HEADER_LINES.includes(l.toLowerCase()));
+
+  // Contact-info block up top (email + phone in the first few lines) with no
+  // JD language anywhere is a strong CV signal — real JDs almost never open
+  // with a person's personal contact details.
+  if (hasEmail && hasPhone && !hasJdKeyword) return true;
+  // A standalone CV-section heading ("ATTRIBUTES"/"EXPERIENCE"/etc.) near the
+  // top, again with no JD language, is the other classic CV shape.
+  if (hasCvHeaderLine && !hasJdKeyword) return true;
+  return false;
+}
+
 // ── Main component ─────────────────────────────────────────────────────────
 export default function CreateJobPageModern() {
   const nav = useNavigate();
@@ -321,6 +356,7 @@ export default function CreateJobPageModern() {
   const [skillInput, setSkillInput] = useState("");
   const [jdUploading, setJdUploading] = useState(false);
   const [jdUploadError, setJdUploadError] = useState(null);
+  const pastedJdLooksLikeCv = useMemo(() => looksLikeCv(pastedJD), [pastedJD]);
 
   // Step 2
   const [form, setForm] = useState({
@@ -395,6 +431,7 @@ export default function CreateJobPageModern() {
 
     // Paste path — no API call; extract skills locally and use JD as-is
     if (!hasBrief && hasJD) {
+      if (pastedJdLooksLikeCv) return; // defensive backstop — button is already disabled for this case
       const extracted = extractSkillsFromJd(pastedJD);
       setAiResponse({
         generatedJdText: pastedJD,
@@ -406,6 +443,13 @@ export default function CreateJobPageModern() {
       });
       setEditedJD(pastedJD);
       setJdEditable(false);
+      // No AI call on this path, so no real jobTitle source — best-effort
+      // guess from the JD's own first line (real JDs are often headed with
+      // the role title), only when the user hasn't already typed one.
+      const firstLine = pastedJD.trim().split("\n")[0]?.trim();
+      if (firstLine && firstLine.length <= 80) {
+        setForm(p => p.title ? p : { ...p, title: firstLine });
+      }
       return;
     }
 
@@ -431,6 +475,7 @@ export default function CreateJobPageModern() {
       setJdEditable(false);
       setForm(p => ({
         ...p,
+        ...(data.jobTitle ? { title:    data.jobTitle } : {}),
         ...(data.company  ? { company:  data.company  } : {}),
         ...(data.location ? { location: data.location } : {}),
       }));
@@ -714,13 +759,20 @@ export default function CreateJobPageModern() {
                 </Typography>
               )}
 
+              {pastedJdLooksLikeCv && (
+                <Alert severity="error" sx={{ mt: 1.5, borderRadius: "10px" }}>
+                  This looks like a candidate's CV/resume, not a job description — please paste or upload the actual job description instead.
+                </Alert>
+              )}
+
               <Typography sx={{ fontSize: 11.5, color: MUTED, mt: 1.5, lineHeight: 1.5 }}>
                 Click "Generate Job Description" below — your pasted JD will be used as-is and skills will be extracted automatically.
               </Typography>
             </Box>
           )}
 
-          <GenerateBtn onClick={handleGenerate} loading={loading} disabled={!brief.trim() && !pastedJD.trim()} />
+          <GenerateBtn onClick={handleGenerate} loading={loading}
+            disabled={(!brief.trim() && !pastedJD.trim()) || (!!pastedJD.trim() && pastedJdLooksLikeCv)} />
 
           {/* ── Output section (appears after generation) ── */}
           {aiResponse && (
@@ -987,6 +1039,27 @@ export default function CreateJobPageModern() {
                 {generatedJD || "—"}
               </Box>
             )}
+          </Box>
+
+          {/* Post directly to job boards — disabled until account setup with us */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexWrap: "wrap", mb: 2 }}>
+            <Typography sx={{ fontSize: 12, color: MUTED }}>Post directly to:</Typography>
+            {["Post to LinkedIn", "Post to Seek", "Post to Website"].map(label => (
+              <Tooltip key={label} title="Contact us to set up job board posting for your account" arrow>
+                <span>
+                  <Button
+                    variant="outlined"
+                    disabled
+                    sx={{
+                      fontSize: 12, fontWeight: 500, borderRadius: "50px", textTransform: "none",
+                      borderColor: BORDER, color: MUTED, px: 2, py: 0.5,
+                    }}
+                  >
+                    {label}
+                  </Button>
+                </span>
+              </Tooltip>
+            ))}
           </Box>
 
           {/* Action row */}

@@ -75,7 +75,19 @@ export default function AddCandidatesModernPage() {
   const nav       = useNavigate();
   const { jobId } = useParams();
   const location  = useLocation();
-  const jobTitle  = location.state?.jobTitle || location.state?.job?.title || "";
+  const job       = location.state?.job || null;
+  const jobTitle  = location.state?.jobTitle || job?.title || "";
+
+  // Builds a free-text query for AI Talent Search from what's already known
+  // about the job — the backend's own extractFilters() turns this into
+  // structured skills/location/seniority server-side, so no client-side
+  // parsing is needed here.
+  function buildTalentSearchQuery() {
+    if (!job) return jobTitle;
+    return [job.title, ...(job.stackTags || []), job.location, job.seniority]
+      .filter(Boolean)
+      .join(" ");
+  }
   const loginId   = localStorage.getItem("loginId") || "";
 
   const [bulkMode, setBulkMode] = useState(false);
@@ -738,7 +750,10 @@ export default function AddCandidatesModernPage() {
         {/* ── AI Talent Search button ── */}
         <Button
           fullWidth
-          onClick={() => nav("/talent-search")}
+          onClick={() => {
+            const prefillQuery = buildTalentSearchQuery();
+            nav("/talent-search", prefillQuery ? { state: { prefillQuery } } : undefined);
+          }}
           sx={{
             borderRadius: "50px", py: 1.75, fontSize: 15, fontWeight: 600,
             textTransform: "none", boxShadow: "0 4px 20px rgba(29,114,232,0.22)",
