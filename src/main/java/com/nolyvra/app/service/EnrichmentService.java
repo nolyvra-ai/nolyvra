@@ -59,28 +59,39 @@ public class EnrichmentService {
     // ─── POST /api/enrichment/start ────────────────────────────────────────────
 
     public EnrichmentStartResponse start(EnrichmentStartRequest req, String loginId) {
+        System.out.println("[Enrichment] start: candidateId=" + req.candidateId()
+                + " name=" + req.firstName() + " " + req.lastName()
+                + " currentCompany=" + req.currentCompany());
         if (matchkraftApiKey == null || matchkraftApiKey.isBlank()) {
+            System.err.println("[Enrichment] start: rejected — matchkraft.api-key not configured");
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Email finder is not configured.");
         }
         if (req.firstName() == null || req.firstName().isBlank()
                 || req.lastName() == null || req.lastName().isBlank()) {
+            System.err.println("[Enrichment] start: rejected — missing first/last name");
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Candidate name is required for enrichment.");
         }
         if (!tokenService.deductToken(loginId)) {
+            System.err.println("[Enrichment] start: rejected — insufficient tokens for loginId=" + loginId);
             throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
         }
 
         String companyName = req.currentCompany() != null && !req.currentCompany().isBlank()
                 ? req.currentCompany()
                 : resolveCompanyFromCv(req.candidateId(), loginId);
+        System.out.println("[Enrichment] start: resolved companyName=" + companyName);
 
         if (companyName == null || companyName.isBlank()) {
+            System.err.println("[Enrichment] start: rejected — no company resolvable (no currentCompany, "
+                    + "and either no candidateId, no CV text on file, or OpenAI extraction returned NONE)");
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "No company information available for this candidate — cannot resolve an email.");
         }
 
         String website = resolveWebsite(companyName);
+        System.out.println("[Enrichment] start: resolved website=" + website + " for company=" + companyName);
         if (website == null || website.isBlank()) {
+            System.err.println("[Enrichment] start: rejected — OpenAI could not resolve a website for \"" + companyName + "\"");
             throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY,
                     "Could not determine a website for \"" + companyName + "\".");
         }

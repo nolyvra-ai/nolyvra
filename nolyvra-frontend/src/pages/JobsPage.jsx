@@ -312,7 +312,7 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
                   onClick={e => { e.stopPropagation(); handleFindEmail(c); }}
                   disabled={enrichingIds.has(c.id)}
                   sx={{ fontSize: 10.5, fontWeight: 500, minWidth: 0, px: 0, py: 0, mt: 0.25, color: ACCENT, textTransform: "none" }}>
-                  {enrichingIds.has(c.id) ? <CircularProgress size={10} sx={{ color: ACCENT }} /> : "✉ Find Email"}
+                  {enrichingIds.has(c.id) ? <CircularProgress size={10} sx={{ color: ACCENT }} /> : "✨ Enrich Email"}
                 </Button>
               )}
               {enrichErrors[c.id] && (

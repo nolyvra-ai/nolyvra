@@ -1069,7 +1069,7 @@ export function TalentSearchPage() {
                           onClick={e => { e.stopPropagation(); handleFindEmail(c, ekey); }}
                           disabled={enrichingKeys.has(ekey)}
                           sx={{ fontSize: 11, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none", "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
-                          {enrichingKeys.has(ekey) ? <CircularProgress size={12} sx={{ color: ACCENT }} /> : "✉ Find Email"}
+                          {enrichingKeys.has(ekey) ? <CircularProgress size={12} sx={{ color: ACCENT }} /> : "✨ Enrich Email"}
                         </Button>
                       )}
                     </Box>
@@ -1128,7 +1128,7 @@ export function TalentSearchPage() {
                                 onClick={() => handleFindEmail(c, ekey)}
                                 disabled={enrichingKeys.has(ekey)}
                                 sx={{ fontSize: 10, minWidth: 0, px: 0.75, py: 0.25, color: ACCENT, textTransform: "none" }}>
-                                {enrichingKeys.has(ekey) ? <CircularProgress size={10} sx={{ color: ACCENT }} /> : "Find"}
+                                {enrichingKeys.has(ekey) ? <CircularProgress size={10} sx={{ color: ACCENT }} /> : "✨ Enrich"}
                               </Button>
                             </Box>
                           )}
