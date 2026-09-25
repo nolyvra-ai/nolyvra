@@ -896,9 +896,7 @@ export function TalentSearchPage() {
                 ? <Badge label={`● ${dbResults.length} total records`} variant="accent" />
                 : <>
                     <Badge label={`● Internal DB (${internalCount})`} variant="accent" />
-                    <Badge label={`● Agent Suggestion · Seltz (${seltzCount})`} variant="seltz" />
-                    <Badge label={`● Agent Suggestion · Parallel (${parallelCount})`} variant="parallel" />
-                    <Badge label={`● Agent Suggestion · Exa (${exaCount})`} variant="exa" />
+                    <Badge label={`● Agent Suggestion (${seltzCount + parallelCount + exaCount})`} variant="seltz" />
                     <Badge label={`● Active Profiles in Market (${coreSignalCount})`} variant="purple" />
                     <Badge label={`● Nexus Verified (${nexusCount})`} variant="nexus" />
                   </>}
