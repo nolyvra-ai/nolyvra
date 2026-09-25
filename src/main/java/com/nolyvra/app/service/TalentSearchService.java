@@ -775,7 +775,7 @@ public class TalentSearchService {
 
         // Get all candidates for this login with their latest analysis
         return jdbc.query("""
-                select c.id, c.name, c.email, c.phone_number, c.linkedin_url, c.cv_text, c.job_id,
+                select c.id, c.name, c.email, c.phone_number, c.linkedin_url, c.cv_text, c.job_id, c.skills,
                        coalesce(j.title, 'Not Assigned') as job_title,
                        coalesce(j.company, '') as company,
                        a.capability_score, a.risk_level
@@ -791,10 +791,17 @@ public class TalentSearchService {
                 """,
                 (rs, rowNum) -> {
                     String cvText = rs.getString("cv_text");
+                    List<String> candidateSkills = parseSkillsJson(rs.getString("skills"));
+                    List<String> matched = extractMatchedSkills(candidateSkills, cvText, filters.skills());
+
+                    // Same "picking up all candidates" bug as scoreInternalCandidates:
+                    // a specified skill list must actually exclude non-matches, not just
+                    // fail to add a scoring bonus.
+                    if (!filters.skills().isEmpty() && matched.isEmpty()) return null;
+
                     int score = scoreCandidate(cvText, filters,
                             rs.getObject("capability_score") != null ? rs.getInt("capability_score") : 50);
 
-                    List<String> matched = extractMatchedSkills(cvText, filters.skills());
                     List<String> gaps = filters.skills().stream()
                             .filter(s -> !matched.contains(s))
                             .collect(Collectors.toList());
@@ -809,7 +816,10 @@ public class TalentSearchService {
                             rs.getString("phone_number"),
                             matched, gaps, score, 0,
                             "INTERNAL", true, null, null, null, null);
-                }, loginId);
+                }, loginId)
+                .stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 
     // ─── External search (Bright Data) — shared by NL search, job-page search, ──
@@ -1308,7 +1318,8 @@ public class TalentSearchService {
                 """,
                 (rs, rowNum) -> {
                     String cvText = rs.getString("cv_text");
-                    List<String> matched = extractMatchedSkills(cvText, skills);
+                    List<String> candidateSkills = parseSkillsJson(rs.getString("skills"));
+                    List<String> matched = extractMatchedSkills(candidateSkills, cvText, skills);
                     List<String> gaps = skills.stream()
                             .filter(s -> !matched.contains(s))
                             .collect(Collectors.toList());
@@ -1327,7 +1338,7 @@ public class TalentSearchService {
                     }
 
                     Integer capabilityScore = (Integer) rs.getObject("capability_score");
-                    int score = scoreAgainstFilters(filters, matched.size(),
+                    FilterMatch match = scoreAgainstFilters(filters, matched.size(),
                             capabilityScore != null ? capabilityScore : 50,
                             candidateLocation, distanceKm, rs.getString("current_title"),
                             rs.getBigDecimal("years_experience"),
@@ -1337,6 +1348,11 @@ public class TalentSearchService {
                             (Integer) rs.getObject("notice_period_weeks"),
                             rs.getString("work_rights"),
                             (Boolean) rs.getObject("remote_flexible"));
+
+                    // Candidate fails at least one criterion the recruiter actually
+                    // specified — exclude rather than just down-score, otherwise a
+                    // search always returns the entire roster (see scoreAgainstFilters).
+                    if (!match.matches()) return null;
 
                     Long analysisId = (Long) rs.getObject("analysis_id");
                     String linkedinUrl = rs.getString("linkedin_url");
@@ -1356,7 +1372,7 @@ public class TalentSearchService {
                             .location(rs.getString("location"))
                             .state(rs.getString("state"))
                             .distanceKm(distanceKm)
-                            .skills(parseSkillsJson(rs.getString("skills")))
+                            .skills(candidateSkills)
                             .updatedAt(updatedAt != null ? updatedAt.toInstant() : null)
                             .yearsExperience(rs.getBigDecimal("years_experience"))
                             .seniorityLevel(rs.getString("seniority_level"))
@@ -1368,8 +1384,8 @@ public class TalentSearchService {
                             .remoteFlexible((Boolean) rs.getObject("remote_flexible"))
                             .matchedSkills(matched)
                             .gapSkills(gaps)
-                            .matchScore(score)
-                            .matchTier(matchTier(score))
+                            .matchScore(match.score())
+                            .matchTier(matchTier(match.score()))
                             .consistencyScore((Integer) rs.getObject("consistency_score"))
                             .capabilityScore(capabilityScore)
                             .riskLevel(rs.getString("risk_level"))
@@ -1377,18 +1393,31 @@ public class TalentSearchService {
                             .build();
                 }, loginId)
                 .stream()
+                .filter(Objects::nonNull)
                 .sorted(Comparator.comparingInt(CandidateSearchResult::matchScore).reversed())
                 .collect(Collectors.toList());
     }
 
-    private int scoreAgainstFilters(CandidateFilterRequest filters, int matchedSkillCount, int baseScore,
+    // Result of scoring a candidate against Smart Talent Lens filters: `score` for
+    // ranking, `matches` for whether the candidate should be included at all.
+    // `matches` is false only when the recruiter specified a criterion (skills,
+    // radius, years, seniority, salary, notice period, work rights, remote) AND
+    // the candidate's data confirms a mismatch — missing/unknown candidate data
+    // is never treated as a mismatch, only as "can't verify, don't penalize".
+    private record FilterMatch(int score, boolean matches) {}
+
+    private FilterMatch scoreAgainstFilters(CandidateFilterRequest filters, int matchedSkillCount, int baseScore,
             String candidateLocation, Double distanceKm, String candidateTitle, BigDecimal candidateYears,
             String candidateSeniority, BigDecimal candidateSalaryMin, BigDecimal candidateSalaryMax,
             Integer candidateNoticeWeeks, String candidateWorkRights, Boolean candidateRemoteFlexible) {
 
         int score = baseScore;
+        boolean mismatch = false;
         List<String> skills = filters.skills() != null ? filters.skills() : List.of();
-        score += skills.isEmpty() ? 0 : matchedSkillCount * 10;
+        if (!skills.isEmpty()) {
+            if (matchedSkillCount == 0) mismatch = true;
+            else score += matchedSkillCount * 10;
+        }
 
         if (filters.jobTitleKeywords() != null && !filters.jobTitleKeywords().isBlank()
                 && candidateTitle != null && !candidateTitle.isBlank()) {
@@ -1402,13 +1431,13 @@ public class TalentSearchService {
 
         if (filters.radiusKm() != null && distanceKm != null) {
             // Real distance available (both locations geocoded) — prefer this over text matching.
-            score += distanceKm <= filters.radiusKm() ? 10 : -10;
-        } else if (filters.location() != null && !filters.location().isBlank()) {
-            if (candidateLocation != null
-                    && candidateLocation.toLowerCase().contains(filters.location().toLowerCase())) {
+            if (distanceKm <= filters.radiusKm()) score += 10;
+            else mismatch = true;
+        } else if (filters.location() != null && !filters.location().isBlank() && candidateLocation != null) {
+            if (candidateLocation.toLowerCase().contains(filters.location().toLowerCase())) {
                 score += 10;
-            } else if (candidateLocation != null) {
-                score -= 5;
+            } else {
+                mismatch = true;
             }
         }
 
@@ -1416,11 +1445,11 @@ public class TalentSearchService {
             boolean withinRange =
                     (filters.minYears() == null || candidateYears.compareTo(filters.minYears()) >= 0) &&
                     (filters.maxYears() == null || candidateYears.compareTo(filters.maxYears()) <= 0);
-            score += withinRange ? 5 : -5;
+            if (withinRange) score += 5; else mismatch = true;
         }
 
         if (filters.seniorityLevel() != null && !filters.seniorityLevel().isBlank() && candidateSeniority != null) {
-            score += candidateSeniority.equalsIgnoreCase(filters.seniorityLevel()) ? 5 : -5;
+            if (candidateSeniority.equalsIgnoreCase(filters.seniorityLevel())) score += 5; else mismatch = true;
         }
 
         if ((filters.salaryMin() != null || filters.salaryMax() != null)
@@ -1428,23 +1457,23 @@ public class TalentSearchService {
             boolean overlaps =
                     (filters.salaryMax() == null || candidateSalaryMin.compareTo(filters.salaryMax()) <= 0) &&
                     (filters.salaryMin() == null || candidateSalaryMax.compareTo(filters.salaryMin()) >= 0);
-            score += overlaps ? 5 : -10;
+            if (overlaps) score += 5; else mismatch = true;
         }
 
         if (filters.noticePeriodMaxWeeks() != null && candidateNoticeWeeks != null) {
-            score += candidateNoticeWeeks <= filters.noticePeriodMaxWeeks() ? 5 : -5;
+            if (candidateNoticeWeeks <= filters.noticePeriodMaxWeeks()) score += 5; else mismatch = true;
         }
 
         if (filters.workRights() != null && !filters.workRights().isBlank()
                 && !"any".equalsIgnoreCase(filters.workRights()) && candidateWorkRights != null) {
-            score += candidateWorkRights.equalsIgnoreCase(filters.workRights()) ? 5 : -10;
+            if (candidateWorkRights.equalsIgnoreCase(filters.workRights())) score += 5; else mismatch = true;
         }
 
-        if (Boolean.TRUE.equals(filters.remoteFlexible()) && Boolean.TRUE.equals(candidateRemoteFlexible)) {
-            score += 5;
+        if (Boolean.TRUE.equals(filters.remoteFlexible()) && candidateRemoteFlexible != null) {
+            if (candidateRemoteFlexible) score += 5; else mismatch = true;
         }
 
-        return Math.max(5, Math.min(score, 99));
+        return new FilterMatch(Math.max(5, Math.min(score, 99)), !mismatch);
     }
 
     private String matchTier(int score) {
@@ -1526,6 +1555,22 @@ public class TalentSearchService {
         String lower = cvText.toLowerCase();
         return skills.stream()
                 .filter(s -> lower.contains(s.toLowerCase()))
+                .collect(Collectors.toList());
+    }
+
+    // Prefers the candidate's structured `skills` column (exact, case-insensitive
+    // match) over free-text CV substring matching — avoids both false negatives
+    // (a skill phrased differently in prose) and false positives (a substring that
+    // happens to appear in unrelated CV text) wherever structured data exists.
+    // Falls back to the cv_text substring check for candidates with no structured
+    // skills captured yet.
+    private List<String> extractMatchedSkills(List<String> candidateSkills, String cvText, List<String> skills) {
+        if (skills == null || skills.isEmpty()) return List.of();
+        Set<String> normalizedCandidateSkills = candidateSkills == null ? Set.of()
+                : candidateSkills.stream().map(String::toLowerCase).collect(Collectors.toSet());
+        String lowerCv = cvText == null ? "" : cvText.toLowerCase();
+        return skills.stream()
+                .filter(s -> normalizedCandidateSkills.contains(s.toLowerCase()) || lowerCv.contains(s.toLowerCase()))
                 .collect(Collectors.toList());
     }
 

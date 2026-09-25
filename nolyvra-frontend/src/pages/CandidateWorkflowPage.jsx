@@ -12,9 +12,21 @@ const WARN = "#D97706", WARN_BG = "#FFFBEB", WARN_BR = "#FDE68A";
 const DANGER = "#DC2626", DANGER_BG = "#FEF2F2", DANGER_BR = "#FECACA";
 const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
 const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
+const TEAL = "#0D9488", TEAL_BG = "#F0FDFA", TEAL_BR = "#99F6E4";
 const SURFACE = "#FAFBFD";
 
 const STAGES = ["Screening","Interview","Assessment","Offer","Selected","Rejected"];
+
+// One distinct color per stage so the "Jobs Applied" pill is scannable at a
+// glance — Selected/Rejected stay success/danger to match the stage stepper.
+const STAGE_VARIANT = {
+  Screening: "accent",
+  Interview: "warning",
+  Assessment: "purple",
+  Offer: "teal",
+  Selected: "success",
+  Rejected: "danger",
+};
 
 function authHeader() {
   return { Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` };
@@ -75,6 +87,7 @@ function Badge({ label, variant = "neutral" }) {
     accent:{bg:ACCENT_BG,border:ACCENT_BR,color:ACCENT},
     neutral:{bg:"#F1F3F7",border:BORDER,color:MUTED},
     purple:{bg:PURPLE_BG,border:PURPLE_BR,color:PURPLE},
+    teal:{bg:TEAL_BG,border:TEAL_BR,color:TEAL},
   }[variant]??{bg:"#F1F3F7",border:BORDER,color:MUTED};
   return (
     <Box sx={{display:"inline-flex",alignItems:"center",bgcolor:s.bg,border:`1px solid ${s.border}`,
@@ -249,9 +262,7 @@ function JobApplicationRow({ application, candidateId, candidateName, candidateE
             {application.jobTitle || "Untitled Role"}
           </Typography>
           <Typography sx={{ fontSize: 12, color: MUTED }}>{application.jobCompany}</Typography>
-          <Badge label={application.stage} variant={
-            application.stage === "Selected" ? "success" :
-            application.stage === "Rejected" ? "danger" : "accent"} />
+          <Badge label={application.stage} variant={STAGE_VARIANT[application.stage] ?? "neutral"} />
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
           <Button size="small" onClick={(e) => { e.stopPropagation(); nav(`/analysis/${candidateId}`); }}

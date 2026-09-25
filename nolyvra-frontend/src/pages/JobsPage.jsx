@@ -500,6 +500,9 @@ const CANDIDATE_EXTRA_COLUMNS = [
   { key: "createdAt",    label: "Applied On", get: c => c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-GB") : "—" },
 ];
 
+// Canonical candidate stages, matching StageBadge's config above.
+const CANDIDATE_STAGES = ["Screening", "Interview", "Assessment", "Offer", "Selected", "Rejected"];
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function JobsPage() {
   const nav = useNavigate();
@@ -522,6 +525,7 @@ export default function JobsPage() {
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [candidateStageFilter, setCandidateStageFilter] = useState("All");
   const [analysisDialog, setAnalysisDialog] = useState(false); // Change 4
   // ── Removed: editJob, editOpen state — no longer needed ──────────────────
 
@@ -792,6 +796,11 @@ export default function JobsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedJobId]);
 
+  // Switching to a different job shouldn't carry over the previous job's stage filter.
+  useEffect(() => {
+    setCandidateStageFilter("All");
+  }, [selectedJobId]);
+
   function handleLoadMoreCandidates() {
     if (!selectedJobId) return;
     const meta = candidatesMeta.get(selectedJobId);
@@ -824,7 +833,23 @@ export default function JobsPage() {
     }), [jobsWithDefaults, search, statusFilter]);
 
   const selectedJob = jobsWithDefaults.find(j => j.id === selectedJobId);
-  const selectedCandidates = selectedJobId ? (candidatesByJob.get(selectedJobId) ?? []) : [];
+  const rawSelectedCandidates = useMemo(() =>
+    selectedJobId ? (candidatesByJob.get(selectedJobId) ?? []) : [],
+    [selectedJobId, candidatesByJob]);
+  const candidateStageCounts = useMemo(() => {
+    const counts = { All: rawSelectedCandidates.length };
+    for (const stage of CANDIDATE_STAGES) {
+      counts[stage] = rawSelectedCandidates.filter(c => c.stage === stage).length;
+    }
+    return counts;
+  }, [rawSelectedCandidates]);
+  const selectedCandidates = useMemo(() =>
+    rawSelectedCandidates
+      .filter(c => candidateStageFilter === "All" || c.stage === candidateStageFilter)
+      // Best capability match first; candidates not yet analysed (no score) sort last.
+      .slice()
+      .sort((a, b) => (b.capabilityScore ?? -1) - (a.capabilityScore ?? -1)),
+    [rawSelectedCandidates, candidateStageFilter]);
   const selectedCandidatesMeta = selectedJobId ? candidatesMeta.get(selectedJobId) : null;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -1316,6 +1341,13 @@ export default function JobsPage() {
                 </Button>
                 <ColumnPickerButton options={CANDIDATE_EXTRA_COLUMNS} selected={extraCandidateColumns} onToggle={toggleExtraCandidateColumn} />
               </Box>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 2.25, py: 1.25, borderBottom: `1px solid ${BORDER}` }}>
+              <Typography sx={{ fontSize: 12, color: MUTED, fontWeight: 500 }}>Stage:</Typography>
+              {["All", ...CANDIDATE_STAGES].map(s => (
+                <FilterChip key={s} label={`${s} (${candidateStageCounts[s] ?? 0})`}
+                  active={candidateStageFilter === s} onClick={() => setCandidateStageFilter(s)} />
+              ))}
             </Box>
             {candidatesLoading ? (
               <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>

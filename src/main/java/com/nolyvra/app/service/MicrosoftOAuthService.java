@@ -2,6 +2,9 @@ package com.nolyvra.app.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nolyvra.app.model.InboxMessageSummary;
+import com.nolyvra.app.model.InboxPageResponse;
+import com.nolyvra.app.model.InboxThreadMessage;
 import com.nolyvra.app.model.OAuthToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +19,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -26,7 +31,13 @@ public class MicrosoftOAuthService {
     private static final String AUTH_URL      = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize";
     private static final String TOKEN_URL     = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
     private static final String SEND_MAIL_URL = "https://graph.microsoft.com/v1.0/me/sendMail";
-    private static final String SCOPES        = "openid email profile Mail.Send offline_access";
+    private static final String INBOX_URL     = "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages";
+    private static final String MESSAGES_URL  = "https://graph.microsoft.com/v1.0/me/messages";
+    // Mail.ReadWrite added for the Email Centre inbox (list/read/mark-read/archive) —
+    // Mail.Send kept as its own scope since Graph requires it explicitly for sendMail
+    // even when ReadWrite is also granted. Existing connections must reconnect to
+    // pick up the new scope.
+    private static final String SCOPES        = "openid email profile Mail.Send Mail.ReadWrite offline_access";
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
@@ -151,6 +162,129 @@ public class MicrosoftOAuthService {
         if (res.statusCode() >= 400) {
             throw new RuntimeException("Graph API error " + res.statusCode());
         }
+    }
+
+    // ─── Live inbox read (Email Centre) — nothing fetched here is persisted;
+    // every call goes straight to Graph so the inbox always reflects the real
+    // mailbox. ────────────────────────────────────────────────────────────────
+
+    private static final String LIST_SELECT = "$select=id,conversationId,subject,from,toRecipients,"
+            + "bodyPreview,receivedDateTime,isRead";
+
+    // pageToken (when present) is the full Graph @odata.nextLink from a previous
+    // page — Graph's own opaque cursor, not something we compute or store.
+    public InboxPageResponse listInboxMessages(String loginId, boolean unreadOnly, String pageToken, int pageSize)
+            throws Exception {
+        String accessToken = getValidAccessToken(loginId);
+        if (accessToken == null) throw new IllegalStateException("No valid Outlook token for: " + loginId);
+
+        String url;
+        if (pageToken != null && !pageToken.isBlank()) {
+            url = pageToken;
+        } else {
+            url = INBOX_URL + "?" + LIST_SELECT
+                    + "&$orderby=receivedDateTime desc"
+                    + "&$top=" + pageSize
+                    + (unreadOnly ? "&$filter=isRead eq false" : "");
+        }
+        JsonNode json = getJson(url, accessToken);
+        List<InboxMessageSummary> messages = new ArrayList<>();
+        for (JsonNode m : json.path("value")) {
+            messages.add(new InboxMessageSummary(
+                    m.path("id").asText(),
+                    m.path("conversationId").asText(),
+                    "microsoft",
+                    m.path("from").path("emailAddress").path("name").asText(""),
+                    m.path("from").path("emailAddress").path("address").asText(""),
+                    m.path("subject").asText(""),
+                    m.path("bodyPreview").asText(""),
+                    parseGraphDate(m.path("receivedDateTime").asText(null)),
+                    !m.path("isRead").asBoolean(true)));
+        }
+        String nextLink = json.path("@odata.nextLink").asText(null);
+        return new InboxPageResponse(messages, nextLink);
+    }
+
+    // A Graph "conversation" is the closest thing to a thread — every message
+    // sharing a conversationId, oldest first so the detail pane reads top-down.
+    public List<InboxThreadMessage> getConversationMessages(String loginId, String conversationId) throws Exception {
+        String accessToken = getValidAccessToken(loginId);
+        if (accessToken == null) throw new IllegalStateException("No valid Outlook token for: " + loginId);
+
+        String url = MESSAGES_URL + "?$filter=" + enc("conversationId eq '" + conversationId + "'")
+                + "&$orderby=receivedDateTime asc"
+                + "&$select=id,conversationId,subject,from,toRecipients,body,receivedDateTime,isRead";
+        JsonNode json = getJson(url, accessToken);
+
+        List<InboxThreadMessage> messages = new ArrayList<>();
+        for (JsonNode m : json.path("value")) {
+            List<String> toAddresses = new ArrayList<>();
+            for (JsonNode t : m.path("toRecipients")) {
+                String addr = t.path("emailAddress").path("address").asText(null);
+                if (addr != null && !addr.isBlank()) toAddresses.add(addr);
+            }
+            String bodyContent = m.path("body").path("content").asText("");
+            boolean isHtml = "html".equalsIgnoreCase(m.path("body").path("contentType").asText(""));
+            messages.add(new InboxThreadMessage(
+                    m.path("id").asText(),
+                    "microsoft",
+                    m.path("from").path("emailAddress").path("name").asText(""),
+                    m.path("from").path("emailAddress").path("address").asText(""),
+                    toAddresses,
+                    m.path("subject").asText(""),
+                    isHtml ? bodyContent : null,
+                    isHtml ? null : bodyContent,
+                    parseGraphDate(m.path("receivedDateTime").asText(null)),
+                    false, // direction resolved by the caller against the mailbox's own address
+                    !m.path("isRead").asBoolean(true)));
+        }
+        return messages;
+    }
+
+    private static Instant parseGraphDate(String iso) {
+        if (iso == null || iso.isBlank()) return null;
+        try { return java.time.OffsetDateTime.parse(iso).toInstant(); }
+        catch (Exception e) { return null; }
+    }
+
+    public void markMessageRead(String loginId, String messageId, boolean read) throws Exception {
+        String accessToken = getValidAccessToken(loginId);
+        if (accessToken == null) throw new IllegalStateException("No valid Outlook token for: " + loginId);
+
+        String payload = objectMapper.writeValueAsString(Map.of("isRead", read));
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(MESSAGES_URL + "/" + enc(messageId)))
+                .header("Authorization", "Bearer " + accessToken)
+                .header("Content-Type", "application/json")
+                .method("PATCH", HttpRequest.BodyPublishers.ofString(payload))
+                .build();
+        HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+        if (res.statusCode() >= 400) throw new RuntimeException("Graph API error " + res.statusCode());
+    }
+
+    public void archiveMessage(String loginId, String messageId) throws Exception {
+        String accessToken = getValidAccessToken(loginId);
+        if (accessToken == null) throw new IllegalStateException("No valid Outlook token for: " + loginId);
+
+        String payload = objectMapper.writeValueAsString(Map.of("destinationId", "archive"));
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(MESSAGES_URL + "/" + enc(messageId) + "/move"))
+                .header("Authorization", "Bearer " + accessToken)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(payload))
+                .build();
+        HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+        if (res.statusCode() >= 400) throw new RuntimeException("Graph API error " + res.statusCode());
+    }
+
+    private JsonNode getJson(String url, String accessToken) throws Exception {
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Authorization", "Bearer " + accessToken)
+                .GET().build();
+        HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+        if (res.statusCode() >= 400) throw new RuntimeException("Graph API error " + res.statusCode());
+        return objectMapper.readTree(res.body());
     }
 
     // ─── Private helpers ──────────────────────────────────────────────────────
