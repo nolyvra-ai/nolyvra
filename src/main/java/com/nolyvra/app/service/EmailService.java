@@ -24,6 +24,7 @@ public class EmailService {
     private final GoogleOAuthService googleOAuthService;
     private final ResendEmailService resendEmailService;
     private final String mailFrom;
+    private final String escalationEmail;
 
     public EmailService(
             JavaMailSender mailSender,
@@ -32,7 +33,8 @@ public class EmailService {
             @Lazy MicrosoftOAuthService microsoftOAuthService,
             @Lazy GoogleOAuthService googleOAuthService,
             ResendEmailService resendEmailService,
-            @Value("${spring.mail.username:}") String mailFrom) {
+            @Value("${spring.mail.username:}") String mailFrom,
+            @Value("${support.escalation-email:sayan.b@nolyvra.com}") String escalationEmail) {
         this.mailSender             = mailSender;
         this.jdbc                   = jdbc;
         this.workflowService        = workflowService;
@@ -40,6 +42,7 @@ public class EmailService {
         this.googleOAuthService     = googleOAuthService;
         this.resendEmailService     = resendEmailService;
         this.mailFrom               = mailFrom;
+        this.escalationEmail        = escalationEmail;
     }
 
     private static final RowMapper<EmailHistoryResponse> HISTORY_MAPPER = (rs, rowNum) -> {
@@ -188,6 +191,17 @@ public class EmailService {
                 "delete from email_history where id = ? and login_id = ?",
                 id, loginId);
         return rows > 0;
+    }
+
+    // ─── POST /api/emails/service-request ─────────────────────────────────────
+
+    public boolean sendServiceRequestEmail(String name, String email, String comments, String loginId) {
+        String subject = "Service request from " + name;
+        String body = "Raised by: " + loginId
+                + "\nName: " + name
+                + "\nEmail: " + email
+                + "\n\nComments:\n" + comments;
+        return sendSystemEmail(escalationEmail, subject, body);
     }
 
     public boolean sendSystemEmail(String toAddress, String subject, String body) {

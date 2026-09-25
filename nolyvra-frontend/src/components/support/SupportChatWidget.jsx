@@ -16,8 +16,10 @@ import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import { helpArticles } from "../../content/help";
 import HelpArticleView from "../help/HelpArticleView";
+import useDraggable from "../../hooks/useDraggable";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+const DEMO_BOOKING_URL = "https://cal.com/sayan-bhattacharya-v2t36a/30min";
 
 const FUSE_OPTIONS = {
   keys: [
@@ -163,6 +165,22 @@ function HomeTab({ userName, onGoToMessages, onGoToHelp, topArticles }) {
             <Typography sx={{ fontSize: 11.5, color: "rgba(255,255,255,0.75)" }}>
               Demo video coming soon
             </Typography>
+          </Box>
+          <Box sx={{ px: 1.75, pb: 1.75 }}>
+            <Box
+              component="a"
+              href={DEMO_BOOKING_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{
+                display: "flex", alignItems: "center", justifyContent: "center",
+                py: 1, borderRadius: "8px", textDecoration: "none",
+                bgcolor: ACCENT, color: "#fff", fontSize: 12.5, fontWeight: 700,
+                "&:hover": { bgcolor: "#1660CC" },
+              }}
+            >
+              Book a demo
+            </Box>
           </Box>
         </Box>
 
@@ -403,11 +421,20 @@ export default function SupportChatWidget() {
   const topArticles = useMemo(() => helpArticles.slice(0, 3), []);
   const [agent] = useState(() => TEAM_PROFILES[Math.floor(Math.random() * TEAM_PROFILES.length)]);
 
+  const { pos, containerRef, startDrag, consumeDragFlag, reclamp } = useDraggable({ right: 24, bottom: 24 });
+
   useEffect(() => {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
   }, [messages, sending]);
+
+  useEffect(() => { reclamp(); }, [open, reclamp]);
+
+  function dragHandleProps(e) {
+    if (e.target.closest("button")) return;
+    startDrag(e);
+  }
 
   function goToMessages() {
     setActiveTab("messages");
@@ -467,7 +494,7 @@ export default function SupportChatWidget() {
   };
 
   return (
-    <Box sx={{ position: "fixed", right: 24, bottom: 24, zIndex: 1300 }}>
+    <Box ref={containerRef} sx={{ position: "fixed", right: pos.right, bottom: pos.bottom, zIndex: 1300 }}>
       {open && (
         <Box sx={{
           width: 380,
@@ -482,9 +509,9 @@ export default function SupportChatWidget() {
         }}>
           {/* Header — branded on Home/Help, swaps to the assigned agent's identity on Messages */}
           {activeTab === "messages" ? (
-            <Box sx={{
+            <Box onPointerDown={dragHandleProps} sx={{
               bgcolor: "#fff", borderBottom: `1px solid ${BORDER}`, color: TEXT, px: 1.5, py: 1.25,
-              display: "flex", alignItems: "center", gap: 1, flexShrink: 0,
+              display: "flex", alignItems: "center", gap: 1, flexShrink: 0, cursor: "grab",
             }}>
               <IconButton size="small" onClick={() => setActiveTab("home")} sx={{ color: TEXT_SEC }}>
                 <ArrowBackRoundedIcon fontSize="small" />
@@ -509,9 +536,10 @@ export default function SupportChatWidget() {
               </IconButton>
             </Box>
           ) : (
-            <Box sx={{
+            <Box onPointerDown={dragHandleProps} sx={{
               background: HEADER_GRADIENT, color: "#fff", px: 2, pt: 2, pb: 1.5,
               display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0,
+              cursor: "grab",
             }}>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                 <Box sx={{
@@ -577,11 +605,13 @@ export default function SupportChatWidget() {
       )}
 
       <IconButton
-        onClick={() => setOpen((o) => !o)}
+        onPointerDown={startDrag}
+        onClick={() => { if (consumeDragFlag()) return; setOpen((o) => !o); }}
         sx={{
           width: 56, height: 56, color: "#fff",
           background: HEADER_GRADIENT,
           boxShadow: "0 6px 20px rgba(124,58,237,0.35)",
+          cursor: "grab",
           "&:hover": { background: HEADER_GRADIENT, opacity: 0.92 },
         }}
       >
