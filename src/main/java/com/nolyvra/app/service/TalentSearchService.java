@@ -1579,7 +1579,7 @@ public class TalentSearchService {
                     Integer capabilityScore = (Integer) rs.getObject("capability_score");
                     FilterMatch match = scoreAgainstFilters(filters, matched.size(),
                             capabilityScore != null ? capabilityScore : 50,
-                            candidateLocation, distanceKm, rs.getString("current_title"),
+                            candidateLocation, distanceKm, rs.getString("current_title"), candidateSkills,
                             rs.getBigDecimal("years_experience"),
                             rs.getString("seniority_level"),
                             rs.getBigDecimal("expected_salary_min"),
@@ -1646,9 +1646,10 @@ public class TalentSearchService {
     private record FilterMatch(int score, boolean matches) {}
 
     private FilterMatch scoreAgainstFilters(CandidateFilterRequest filters, int matchedSkillCount, int baseScore,
-            String candidateLocation, Double distanceKm, String candidateTitle, BigDecimal candidateYears,
-            String candidateSeniority, BigDecimal candidateSalaryMin, BigDecimal candidateSalaryMax,
-            Integer candidateNoticeWeeks, String candidateWorkRights, Boolean candidateRemoteFlexible) {
+            String candidateLocation, Double distanceKm, String candidateTitle, List<String> candidateSkills,
+            BigDecimal candidateYears, String candidateSeniority, BigDecimal candidateSalaryMin,
+            BigDecimal candidateSalaryMax, Integer candidateNoticeWeeks, String candidateWorkRights,
+            Boolean candidateRemoteFlexible) {
 
         int score = baseScore;
         boolean mismatch = false;
@@ -1658,25 +1659,47 @@ public class TalentSearchService {
             else score += matchedSkillCount * 10;
         }
 
-        if (filters.jobTitleKeywords() != null && !filters.jobTitleKeywords().isBlank()
-                && candidateTitle != null && !candidateTitle.isBlank()) {
-            // Title match is a bonus signal only — no penalty if it doesn't match,
-            // since recruiters often search across adjacent/related titles too.
-            if (candidateTitle.toLowerCase().contains(filters.jobTitleKeywords().toLowerCase())
-                    || filters.jobTitleKeywords().toLowerCase().contains(candidateTitle.toLowerCase())) {
+        // Role match — matches against current_title OR the candidate's skills list
+        // (Sayan-confirmed 2026-09-25). Unlike the old bonus-only version, this now
+        // excludes a candidate when we have title and/or skills data and neither
+        // matches — consistent with every other filter below. Still doesn't penalize
+        // a candidate with no title AND no skills on file at all (nothing to verify).
+        if (filters.jobTitleKeywords() != null && !filters.jobTitleKeywords().isBlank()) {
+            String keyword = filters.jobTitleKeywords().toLowerCase();
+            boolean titleKnown = candidateTitle != null && !candidateTitle.isBlank();
+            boolean titleMatches = titleKnown
+                    && (candidateTitle.toLowerCase().contains(keyword) || keyword.contains(candidateTitle.toLowerCase()));
+            boolean skillsKnown = candidateSkills != null && !candidateSkills.isEmpty();
+            boolean skillsMatch = skillsKnown && candidateSkills.stream()
+                    .anyMatch(s -> s != null && !s.isBlank()
+                            && (s.toLowerCase().contains(keyword) || keyword.contains(s.toLowerCase())));
+
+            if (titleMatches || skillsMatch) {
                 score += 10;
+            } else if (titleKnown || skillsKnown) {
+                mismatch = true;
             }
         }
 
-        if (filters.radiusKm() != null && distanceKm != null) {
-            // Real distance available (both locations geocoded) — prefer this over text matching.
-            if (distanceKm <= filters.radiusKm()) score += 10;
-            else mismatch = true;
-        } else if (filters.location() != null && !filters.location().isBlank() && candidateLocation != null) {
-            if (candidateLocation.toLowerCase().contains(filters.location().toLowerCase())) {
-                score += 10;
-            } else {
+        // Location match — Sayan-confirmed 2026-09-25: unlike every filter above/below
+        // (which never penalize missing candidate data), a location filter now excludes
+        // a candidate with no location on file at all, since "Melbourne" silently
+        // returning candidates with an unknown location was the reported bug.
+        boolean locationFilterSet = filters.radiusKm() != null
+                || (filters.location() != null && !filters.location().isBlank());
+        if (locationFilterSet) {
+            if (candidateLocation == null || candidateLocation.isBlank()) {
                 mismatch = true;
+            } else if (filters.radiusKm() != null && distanceKm != null) {
+                // Real distance available (both locations geocoded) — prefer this over text matching.
+                if (distanceKm <= filters.radiusKm()) score += 10;
+                else mismatch = true;
+            } else if (filters.location() != null && !filters.location().isBlank()) {
+                if (candidateLocation.toLowerCase().contains(filters.location().toLowerCase())) {
+                    score += 10;
+                } else {
+                    mismatch = true;
+                }
             }
         }
 
