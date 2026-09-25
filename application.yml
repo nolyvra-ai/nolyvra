@@ -1,5 +1,12 @@
 server:
   port: ${PORT:8080}
+  error:
+    # Spring Boot's default (never) strips the reason string off every
+    # ResponseStatusException before it reaches the client — including the
+    # user-facing messages this app deliberately throws (insufficient tokens,
+    # enrichment failures, etc). Without this, clients only ever see the
+    # generic HTTP reason phrase ("Unprocessable Entity") instead of why.
+    include-message: always
 spring:
   servlet:
     multipart:

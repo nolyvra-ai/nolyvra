@@ -31,6 +31,8 @@ spring:
 
 server:
   port: ${PORT:8080}
+  error:
+    include-message: always
 
 password-reset:
   frontend-url: ${PASSWORD_RESET_FRONTEND_URL:http://localhost:5173}
