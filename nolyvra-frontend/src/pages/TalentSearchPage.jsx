@@ -17,24 +17,40 @@ const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
 const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
 const NEXUS = "#0D9488", NEXUS_BG = "#F0FDFA", NEXUS_BR = "#99F6E4";
 const SELTZ = "#DB2777", SELTZ_BG = "#FDF2F8", SELTZ_BR = "#FBCFE8";
+const PARALLEL = "#4F46E5", PARALLEL_BG = "#EEF2FF", PARALLEL_BR = "#C7D2FE";
+const EXA = "#0891B2", EXA_BG = "#ECFEFF", EXA_BR = "#A5F3FC";
 
 function sourceAccent(source) {
   if (source === "CORESIGNAL") return PURPLE;
   if (source === "SELTZ") return SELTZ;
+  if (source === "PARALLEL") return PARALLEL;
+  if (source === "EXA") return EXA;
   if (source === "NEXUS" || source === "BOTH") return NEXUS;
   return ACCENT;
 }
 function sourceAccentHover(source) {
   if (source === "CORESIGNAL") return "#6D28D9";
   if (source === "SELTZ") return "#BE185D";
+  if (source === "PARALLEL") return "#4338CA";
+  if (source === "EXA") return "#0E7490";
   if (source === "NEXUS" || source === "BOTH") return "#0F766E";
   return "#1660CC";
 }
 function sourceBorder(source) {
   if (source === "CORESIGNAL") return PURPLE_BR;
   if (source === "SELTZ") return SELTZ_BR;
+  if (source === "PARALLEL") return PARALLEL_BR;
+  if (source === "EXA") return EXA_BR;
   if (source === "NEXUS" || source === "BOTH") return NEXUS_BR;
   return ACCENT_BR;
+}
+function sourceBg(source) {
+  if (source === "CORESIGNAL") return PURPLE_BG;
+  if (source === "SELTZ") return SELTZ_BG;
+  if (source === "PARALLEL") return PARALLEL_BG;
+  if (source === "EXA") return EXA_BG;
+  if (source === "NEXUS" || source === "BOTH") return NEXUS_BG;
+  return ACCENT_BG;
 }
 
 function Tag({ label, variant = "neutral" }) {
@@ -56,6 +72,8 @@ function Badge({ label, variant = "neutral" }) {
     purple:  { bg: PURPLE_BG,  border: PURPLE_BR,  color: PURPLE  },
     nexus:   { bg: NEXUS_BG,   border: NEXUS_BR,   color: NEXUS   },
     seltz:   { bg: SELTZ_BG,   border: SELTZ_BR,   color: SELTZ   },
+    parallel:{ bg: PARALLEL_BG,border: PARALLEL_BR,color: PARALLEL},
+    exa:     { bg: EXA_BG,     border: EXA_BR,     color: EXA     },
     neutral: { bg: "#F1F3F7",  border: BORDER,     color: MUTED   },
   }[variant] ?? { bg: "#F1F3F7", border: BORDER, color: MUTED };
   return (
@@ -112,10 +130,11 @@ function SourceBadge({ source, tier }) {
       </Box>
     );
   }
-  if (source === "SELTZ") {
+  if (source === "SELTZ" || source === "PARALLEL" || source === "EXA") {
+    const c = sourceAccent(source), bg = sourceBg(source), br = sourceBorder(source);
     return (
-      <Box sx={{ display: "inline-flex", alignItems: "center", gap: "6px", px: "9px", py: "3px", bgcolor: SELTZ_BG, border: `1px solid ${SELTZ_BR}`, borderRadius: "20px", fontSize: 10.5, fontWeight: 600, color: SELTZ, mb: 1 }}>
-        <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: SELTZ, flexShrink: 0 }} />
+      <Box sx={{ display: "inline-flex", alignItems: "center", gap: "6px", px: "9px", py: "3px", bgcolor: bg, border: `1px solid ${br}`, borderRadius: "20px", fontSize: 10.5, fontWeight: 600, color: c, mb: 1 }}>
+        <Box sx={{ width: 5, height: 5, borderRadius: "50%", bgcolor: c, flexShrink: 0 }} />
         Source · Agent Suggestion
       </Box>
     );
@@ -272,6 +291,19 @@ export function TalentSearchPage() {
   const [pipelineJobs,      setPipelineJobs]      = useState([]);
   const [pipelineSaving,    setPipelineSaving]    = useState(false);
   const [pipelineError,     setPipelineError]     = useState("");
+
+  // ── Bulk "Shortlist Talent" dialog state ──────────────────────────────────
+  const [shortlistDialog,  setShortlistDialog]  = useState(false);
+  const [shortlistJobId,   setShortlistJobId]   = useState("");
+  const [shortlistCount,   setShortlistCount]   = useState(10);
+  const [shortlistSaving,  setShortlistSaving]  = useState(false);
+  const [shortlistError,   setShortlistError]   = useState("");
+  const [shortlistSummary, setShortlistSummary] = useState(null);
+
+  // ── Data enrichment (Find Email) — per-candidate state, keyed by enrichKey ──
+  const [enrichingKeys, setEnrichingKeys] = useState(new Set());
+  const [enrichedEmails, setEnrichedEmails] = useState({});
+  const [enrichErrors,   setEnrichErrors]   = useState({});
 
   // ── New: DB mode ──────────────────────────────────────────────────────────
   const [dbMode,    setDbMode]    = useState(false);
@@ -568,6 +600,40 @@ export function TalentSearchPage() {
     finally { setPipelineSaving(false); }
   }
 
+  // Ranks the currently-loaded search results by match score and adds them one
+  // at a time to the chosen job's pipeline (same endpoint as "Assign to Job"),
+  // skipping duplicates and backfilling from the next-ranked candidate so the
+  // run still lands `shortlistCount` successful adds when possible — bounded by
+  // how many results are already loaded on the page (never triggers a fresh
+  // search/fetch).
+  async function handleShortlistSave() {
+    if (!shortlistJobId) { setShortlistError("Please select a job."); return; }
+    setShortlistSaving(true); setShortlistError(""); setShortlistSummary(null);
+    try {
+      const ranked = [...(result?.results ?? [])]
+        .sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0));
+      let added = 0, duplicates = 0, failed = 0;
+      for (const c of ranked) {
+        if (added >= shortlistCount) break;
+        try {
+          const url = new URL(`${API_BASE}/api/jobs/${shortlistJobId}/candidates`);
+          url.searchParams.set("loginId", loginId);
+          const res = await fetch(url.toString(), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+            body: JSON.stringify({ name: c.name ?? "", linkedinUrl: c.linkedinUrl ?? "", email: emailFor(c) ?? "", cvText: "" }),
+          });
+          if (res.status === 409) { duplicates++; continue; }
+          if (!res.ok) { failed++; continue; }
+          added++;
+        } catch { failed++; }
+      }
+      setShortlistSummary({ added, duplicates, failed, requested: shortlistCount });
+    } finally {
+      setShortlistSaving(false);
+    }
+  }
+
   async function fetchCoreSignalProfile(path) {
     setCsProfile(null); setCsProfileLoading(true); setCsProfileOpen(true);
     try {
@@ -603,16 +669,88 @@ export function TalentSearchPage() {
       openCoreSignalApiProfile(c.coreSignalApiId);
     } else if (c.source === "NEXUS" && c.nexusProfileUrl) {
       window.open(c.nexusProfileUrl, "_blank", "noopener,noreferrer");
-    } else if (c.source === "SELTZ" && c.linkedinUrl) {
-      // Seltz returns the full profile in the search response itself (no
-      // separate "collect" call like CoreSignal/Bright Data) — nothing to
-      // fetch here, just open the source profile.
+    } else if ((c.source === "SELTZ" || c.source === "PARALLEL" || c.source === "EXA") && c.linkedinUrl) {
+      // Seltz/parallel.ai/exa.ai all return the full profile in the search
+      // response itself (no separate "collect" call like CoreSignal/Bright
+      // Data) — nothing to fetch here, just open the source profile.
       window.open(c.linkedinUrl, "_blank", "noopener,noreferrer");
     }
   }
 
+  // Stable per-candidate identity for the enrichment state maps — search results
+  // don't always have a candidateId (only INTERNAL/matched NEXUS do). Deliberately
+  // NOT index-based, so it can be looked up from any context (right-side detail
+  // panel, shortlist ranking) — not just the row it was originally rendered in.
+  function enrichKey(c) {
+    return c.candidateId || c.linkedinUrl || c.name || "unknown";
+  }
+
+  // A found email lives only in enrichedEmails until the candidate becomes a
+  // real DB row (that's when the backend persists it) — every place that reads
+  // a candidate's email for a payload (Assign to Job, Shortlist, Upload CV
+  // prefill) must go through this, or a just-found email would silently be
+  // dropped when creating that row.
+  function emailFor(c) {
+    return enrichedEmails[enrichKey(c)] ?? c.email;
+  }
+
+  function splitName(fullName) {
+    const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return { firstName: "", lastName: "" };
+    if (parts.length === 1) return { firstName: parts[0], lastName: "" };
+    return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
+  }
+
+  // Confirm → start MatchKraft email-finder job (deducts 10 tokens server-side,
+  // same as every other external search source) → poll until a terminal status,
+  // up to 60s. On success the email is shown inline via enrichedEmails; if the
+  // candidate is DB-backed the backend also persists it onto the candidate row.
+  async function handleFindEmail(c, key) {
+    if (enrichingKeys.has(key)) return;
+    const { firstName, lastName } = splitName(c.name);
+    if (!firstName || !lastName) {
+      setEnrichErrors(prev => ({ ...prev, [key]: "Need a full name to look up an email." }));
+      return;
+    }
+    if (!window.confirm("Find this candidate's email address? This will deduct 10 tokens from your account. Continue?")) return;
+
+    setEnrichingKeys(prev => new Set(prev).add(key));
+    setEnrichErrors(prev => { const next = { ...prev }; delete next[key]; return next; });
+    try {
+      const startUrl = new URL(`${API_BASE}/api/enrichment/start`);
+      startUrl.searchParams.set("loginId", loginId);
+      const startRes = await fetch(startUrl.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` },
+        body: JSON.stringify({ candidateId: c.candidateId ?? null, firstName, lastName, currentCompany: c.currentCompany ?? null }),
+      });
+      if (startRes.status === 402) throw new Error("You have run out of tokens. Please upgrade your plan to continue.");
+      if (!startRes.ok) throw new Error(await startRes.text());
+      const { jobId } = await startRes.json();
+
+      let email = null;
+      for (let attempt = 0; attempt < 20; attempt++) {
+        await new Promise(r => setTimeout(r, 3000));
+        const pollUrl = new URL(`${API_BASE}/api/enrichment/${jobId}`);
+        pollUrl.searchParams.set("loginId", loginId);
+        if (c.candidateId) pollUrl.searchParams.set("candidateId", c.candidateId);
+        const pollRes = await fetch(pollUrl.toString(), { headers: { Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
+        if (!pollRes.ok) continue;
+        const data = await pollRes.json();
+        if (data.status !== "PENDING") { email = data.email; break; }
+      }
+
+      if (email) setEnrichedEmails(prev => ({ ...prev, [key]: email }));
+      else setEnrichErrors(prev => ({ ...prev, [key]: "No email found for this candidate." }));
+    } catch (e) {
+      setEnrichErrors(prev => ({ ...prev, [key]: e.message || "Enrichment failed." }));
+    } finally {
+      setEnrichingKeys(prev => { const next = new Set(prev); next.delete(key); return next; });
+    }
+  }
+
   function handleAssignToJob(c) {
-    setPipelineCandidate(c); setPipelineJobId(""); setPipelineError(""); setPipelineDialog(true);
+    setPipelineCandidate({ ...c, email: emailFor(c) }); setPipelineJobId(""); setPipelineError(""); setPipelineDialog(true);
   }
 
   // ── Derived display data ──────────────────────────────────────────────────
@@ -623,6 +761,8 @@ export function TalentSearchPage() {
   // the blended response no longer carries internalCount/coreSignalCount.
   const internalCount   = (result?.results ?? []).filter(c => c.source === "INTERNAL").length;
   const seltzCount      = (result?.results ?? []).filter(c => c.source === "SELTZ").length;
+  const parallelCount   = (result?.results ?? []).filter(c => c.source === "PARALLEL").length;
+  const exaCount        = (result?.results ?? []).filter(c => c.source === "EXA").length;
   const coreSignalCount = (result?.results ?? []).filter(c => c.source === "CORESIGNAL").length;
   const nexusCount      = (result?.results ?? []).filter(c => c.source === "NEXUS" || c.source === "BOTH").length;
 
@@ -713,6 +853,17 @@ export function TalentSearchPage() {
             sx={{ fontSize: 13, py: "9px", px: "20px", bgcolor: PURPLE, borderRadius: "8px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#6D28D9", boxShadow: "none" } }}>
             {loading && !dbMode ? <CircularProgress size={16} sx={{ color: "#fff" }} /> : "✦ Search Talent"}
           </Button>
+          <Button variant="outlined"
+            onClick={() => { setShortlistDialog(true); setShortlistJobId(""); setShortlistError(""); setShortlistSummary(null); }}
+            disabled={!(result?.results?.length > 0) || loading}
+            sx={{
+              fontSize: 13, py: "9px", px: "18px", borderRadius: "8px", textTransform: "none",
+              borderColor: "rgba(255,255,255,0.3)", color: "#fff",
+              "&:hover": { borderColor: "#fff", bgcolor: "rgba(255,255,255,0.08)" },
+              "&.Mui-disabled": { borderColor: "rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.3)" },
+            }}>
+            ☰ Shortlist Talent
+          </Button>
           {QUICK.map(q => (
             <Box key={q} onClick={() => setQuery(q)}
               sx={{ bgcolor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)", px: "10px", py: "4px", borderRadius: "20px", fontSize: 11, cursor: "pointer", "&:hover": { bgcolor: "rgba(255,255,255,0.15)" } }}>
@@ -745,7 +896,9 @@ export function TalentSearchPage() {
                 ? <Badge label={`● ${dbResults.length} total records`} variant="accent" />
                 : <>
                     <Badge label={`● Internal DB (${internalCount})`} variant="accent" />
-                    <Badge label={`● Agent Suggestion (${seltzCount})`} variant="seltz" />
+                    <Badge label={`● Agent Suggestion · Seltz (${seltzCount})`} variant="seltz" />
+                    <Badge label={`● Agent Suggestion · Parallel (${parallelCount})`} variant="parallel" />
+                    <Badge label={`● Agent Suggestion · Exa (${exaCount})`} variant="exa" />
                     <Badge label={`● Active Profiles in Market (${coreSignalCount})`} variant="purple" />
                     <Badge label={`● Nexus Verified (${nexusCount})`} variant="nexus" />
                   </>}
@@ -794,6 +947,8 @@ export function TalentSearchPage() {
               {displayResults.map((c, i) => {
                 const scoreColor = c.matchScore >= 80 ? SUCCESS : c.matchScore >= 60 ? WARN : DANGER;
                 const accentColor = sourceAccent(c.source);
+                const ekey = enrichKey(c);
+                const foundEmail = emailFor(c);
                 return (
                   <Paper key={i} elevation={0}
                     onClick={() => setSelected(c)}
@@ -852,7 +1007,7 @@ export function TalentSearchPage() {
                     </Typography>
 
                     {/* Contact block */}
-                    <ContactBlock email={c.email} phone={revealedPhones[c.nexusCandidateId] ?? c.phone} linkedin={c.linkedinUrl} />
+                    <ContactBlock email={foundEmail} phone={revealedPhones[c.nexusCandidateId] ?? c.phone} linkedin={c.linkedinUrl} />
                     <PhoneConsentBlock c={c}
                       requested={consentRequested.has(c.nexusCandidateId)}
                       revealedPhone={revealedPhones[c.nexusCandidateId]}
@@ -880,17 +1035,17 @@ export function TalentSearchPage() {
                           sx={{ flex: 1, fontSize: 11, bgcolor: NEXUS, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#0F766E", boxShadow: "none" } }}>
                           View on Nexus
                         </Button>
-                      ) : c.source === "SELTZ" ? (
+                      ) : (c.source === "SELTZ" || c.source === "PARALLEL" || c.source === "EXA") ? (
                         <Button size="small" variant="contained"
                           onClick={() => c.linkedinUrl && window.open(c.linkedinUrl, "_blank", "noopener,noreferrer")}
-                          sx={{ flex: 1, fontSize: 11, bgcolor: SELTZ, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#BE185D", boxShadow: "none" } }}>
+                          sx={{ flex: 1, fontSize: 11, bgcolor: sourceAccent(c.source), borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: sourceAccentHover(c.source), boxShadow: "none" } }}>
                           View Profile
                         </Button>
                       ) : (
                         <Button size="small" variant="contained"
                           onClick={() => {
                             if (!c.cvText?.trim()) { setNoCvError(true); setTimeout(() => setNoCvError(false), 3000); }
-                            else nav("/candidates/new", { state: { prefill: { name: c.name ?? "", email: c.email ?? "", linkedinUrl: c.linkedinUrl ?? "", cvText: c.cvText ?? "" } } });
+                            else nav("/candidates/new", { state: { prefill: { name: c.name ?? "", email: foundEmail ?? "", linkedinUrl: c.linkedinUrl ?? "", cvText: c.cvText ?? "" } } });
                           }}
                           sx={{ flex: 1, fontSize: 11, bgcolor: PURPLE, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#6D28D9", boxShadow: "none" } }}>
                           Run Analysis
@@ -898,19 +1053,31 @@ export function TalentSearchPage() {
                       )}
 
                       <Button size="small" variant="outlined"
-                        onClick={e => { e.stopPropagation(); setPipelineCandidate(c); setPipelineJobId(""); setPipelineError(""); setPipelineDialog(true); }}
+                        onClick={e => { e.stopPropagation(); setPipelineCandidate({ ...c, email: foundEmail }); setPipelineJobId(""); setPipelineError(""); setPipelineDialog(true); }}
                         sx={{ flex: 1, fontSize: 11, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none", "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
                         + Pipeline
                       </Button>
 
-                      {(c.source === "CORESIGNAL" || c.source === "SELTZ") && (
+                      {(c.source === "CORESIGNAL" || c.source === "SELTZ" || c.source === "PARALLEL" || c.source === "EXA") && (
                         <Button size="small" variant="outlined"
-                          onClick={e => { e.stopPropagation(); nav("/candidates/new", { state: { prefill: { name: c.name ?? "", email: c.email ?? "", linkedinUrl: c.linkedinUrl ?? "", cvText: "" } } }); }}
-                          sx={{ fontSize: 11, borderColor: c.source === "SELTZ" ? SELTZ_BR : PURPLE_BR, color: c.source === "SELTZ" ? SELTZ : PURPLE, borderRadius: "6px", textTransform: "none", "&:hover": { borderColor: c.source === "SELTZ" ? SELTZ : PURPLE, bgcolor: c.source === "SELTZ" ? SELTZ_BG : PURPLE_BG } }}>
+                          onClick={e => { e.stopPropagation(); nav("/candidates/new", { state: { prefill: { name: c.name ?? "", email: foundEmail ?? "", linkedinUrl: c.linkedinUrl ?? "", cvText: "" } } }); }}
+                          sx={{ fontSize: 11, borderColor: sourceBorder(c.source), color: sourceAccent(c.source), borderRadius: "6px", textTransform: "none", "&:hover": { borderColor: sourceAccent(c.source), bgcolor: sourceBg(c.source) } }}>
                           ⬆ Upload CV
                         </Button>
                       )}
+
+                      {!foundEmail && (
+                        <Button size="small" variant="outlined"
+                          onClick={e => { e.stopPropagation(); handleFindEmail(c, ekey); }}
+                          disabled={enrichingKeys.has(ekey)}
+                          sx={{ fontSize: 11, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none", "&:hover": { borderColor: ACCENT, color: ACCENT } }}>
+                          {enrichingKeys.has(ekey) ? <CircularProgress size={12} sx={{ color: ACCENT }} /> : "✉ Find Email"}
+                        </Button>
+                      )}
                     </Box>
+                    {enrichErrors[ekey] && (
+                      <Typography sx={{ fontSize: 10.5, color: DANGER, mt: 0.5 }}>⚠ {enrichErrors[ekey]}</Typography>
+                    )}
                   </Paper>
                 );
               })}
@@ -936,6 +1103,8 @@ export function TalentSearchPage() {
                     const emptyStyle = { color: "#C2C8D4", fontWeight: 400 };
                     const val = v => v || "—";
                     const valSx = v => v ? { fontSize: 12, fontWeight: 500, color: TEXT } : { fontSize: 12, ...emptyStyle };
+                    const ekey = enrichKey(c);
+                    const displayEmail = emailFor(c);
                     return (
                       <TableRow key={i}
                         onClick={() => setSelected(c)}
@@ -951,7 +1120,24 @@ export function TalentSearchPage() {
                           </Box>
                         </TableCell>
                         <TableCell sx={{ fontSize: 12, color: MUTED, whiteSpace: "nowrap", py: 1.25 }}>{c.currentCompany || "—"}</TableCell>
-                        <TableCell sx={{ py: 1.25 }}><Typography sx={valSx(c.email)}>{val(c.email)}</Typography></TableCell>
+                        <TableCell sx={{ py: 1.25 }}>
+                          {displayEmail ? (
+                            <Typography sx={valSx(displayEmail)}>{displayEmail}</Typography>
+                          ) : (
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }} onClick={e => e.stopPropagation()}>
+                              <Typography sx={valSx(null)}>—</Typography>
+                              <Button size="small" variant="text"
+                                onClick={() => handleFindEmail(c, ekey)}
+                                disabled={enrichingKeys.has(ekey)}
+                                sx={{ fontSize: 10, minWidth: 0, px: 0.75, py: 0.25, color: ACCENT, textTransform: "none" }}>
+                                {enrichingKeys.has(ekey) ? <CircularProgress size={10} sx={{ color: ACCENT }} /> : "Find"}
+                              </Button>
+                            </Box>
+                          )}
+                          {enrichErrors[ekey] && (
+                            <Typography sx={{ fontSize: 10, color: DANGER, mt: 0.25 }}>⚠ {enrichErrors[ekey]}</Typography>
+                          )}
+                        </TableCell>
                         <TableCell sx={{ py: 1.25 }}><Typography sx={valSx(c.phone)}>{val(c.phone)}</Typography></TableCell>
                         <TableCell sx={{ py: 1.25, maxWidth: 180 }}>
                           <Typography sx={{ ...valSx(c.linkedinUrl), color: c.linkedinUrl ? ACCENT : "#C2C8D4", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -975,11 +1161,11 @@ export function TalentSearchPage() {
                               if (isCS && c.coresignalId) openCoreSignalProfile(c.coresignalId);
                               else if (isCS && c.coreSignalApiId) openCoreSignalApiProfile(c.coreSignalApiId);
                               else if (c.source === "NEXUS" && c.nexusProfileUrl) window.open(c.nexusProfileUrl, "_blank", "noopener,noreferrer");
-                              else if (c.source === "SELTZ" && c.linkedinUrl) window.open(c.linkedinUrl, "_blank", "noopener,noreferrer");
+                              else if ((c.source === "SELTZ" || c.source === "PARALLEL" || c.source === "EXA") && c.linkedinUrl) window.open(c.linkedinUrl, "_blank", "noopener,noreferrer");
                               else if (c.candidateId) nav(`/candidates/${c.candidateId}/workflow`);
                             }}
                             sx={{ fontSize: 11, bgcolor: rowAccent, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: sourceAccentHover(c.source), boxShadow: "none" } }}>
-                            {isCS ? "View Details" : c.source === "NEXUS" ? "View on Nexus" : c.source === "SELTZ" ? "View Profile" : "View"}
+                            {isCS ? "View Details" : c.source === "NEXUS" ? "View on Nexus" : (c.source === "SELTZ" || c.source === "PARALLEL" || c.source === "EXA") ? "View Profile" : "View"}
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -1126,6 +1312,63 @@ export function TalentSearchPage() {
           <Button variant="contained" size="small" onClick={handlePipelineSave} disabled={pipelineSaving}
             sx={{ fontSize: 12, bgcolor: ACCENT, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
             {pipelineSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Add to Pipeline"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ── Bulk "Shortlist Talent" dialog ──────────────────────────────────── */}
+      <Dialog open={shortlistDialog} onClose={() => !shortlistSaving && setShortlistDialog(false)}
+        maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "12px" } }}>
+        <DialogTitle sx={{ fontSize: 14, fontWeight: 600, color: TEXT, pb: 1 }}>Shortlist Candidates</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: 13, color: MUTED, mb: 2 }}>
+            Add the top-ranked candidates from your current search results to a job's pipeline.
+          </Typography>
+          <Box sx={{ display: "flex", gap: 1.5, mb: 2 }}>
+            <TextField select size="small" label="Top" value={shortlistCount}
+              onChange={e => setShortlistCount(Number(e.target.value))}
+              disabled={shortlistSaving}
+              sx={{ width: 100, "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}>
+              {[5, 10, 20, 50].map(n => <MenuItem key={n} value={n} sx={{ fontSize: 13 }}>{n}</MenuItem>)}
+            </TextField>
+            <TextField select fullWidth size="small" label="For Job" value={shortlistJobId}
+              onChange={e => { setShortlistJobId(e.target.value); setShortlistError(""); }}
+              disabled={shortlistSaving}
+              sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }}>
+              <MenuItem value="" sx={{ fontSize: 13, color: MUTED }}>— Select a job —</MenuItem>
+              {pipelineJobs.map(job => (
+                <MenuItem key={job.id} value={job.id} sx={{ fontSize: 13 }}>
+                  {job.title}{job.company ? ` — ${job.company}` : ""}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Box>
+          {shortlistError && <Typography sx={{ fontSize: 12, color: DANGER, mb: 1, fontWeight: 500 }}>⚠ {shortlistError}</Typography>}
+          {shortlistSummary && (
+            <Box>
+              <Typography sx={{ fontSize: 12.5, color: shortlistSummary.added > 0 ? SUCCESS : MUTED, fontWeight: 600 }}>
+                {shortlistSummary.added > 0
+                  ? `The shortlisted candidate${shortlistSummary.added !== 1 ? "s" : ""} ${shortlistSummary.added !== 1 ? "have" : "has"} been added. Please review all the candidates.`
+                  : "No candidates were added."}
+              </Typography>
+              {(shortlistSummary.duplicates > 0 || shortlistSummary.failed > 0 || shortlistSummary.added < shortlistSummary.requested) && (
+                <Typography sx={{ fontSize: 11.5, color: MUTED, mt: 0.5 }}>
+                  {shortlistSummary.added} of {shortlistSummary.requested} requested
+                  {shortlistSummary.duplicates > 0 ? ` · ${shortlistSummary.duplicates} already in pipeline` : ""}
+                  {shortlistSummary.failed > 0 ? ` · ${shortlistSummary.failed} failed` : ""}
+                </Typography>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button variant="outlined" size="small" onClick={() => setShortlistDialog(false)} disabled={shortlistSaving}
+            sx={{ fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none" }}>
+            {shortlistSummary ? "Close" : "Cancel"}
+          </Button>
+          <Button variant="contained" size="small" onClick={handleShortlistSave} disabled={shortlistSaving}
+            sx={{ fontSize: 12, bgcolor: PURPLE, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#6D28D9", boxShadow: "none" } }}>
+            {shortlistSaving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Shortlist"}
           </Button>
         </DialogActions>
       </Dialog>

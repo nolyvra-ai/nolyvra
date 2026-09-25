@@ -160,10 +160,10 @@ public class NexusBlendedSearchService {
     // Fixed display-order grouping (Sayan-confirmed) — mirrors
     // TalentSearchService.sourceGroupRank. INTERNAL/NEXUS/BOTH stay mixed
     // together in group 0 (ranked amongst themselves by rankingScore above),
-    // Seltz is group 1, CoreSignal/Bright Data (still labeled "CORESIGNAL") is
-    // group 2.
+    // Seltz/parallel.ai/exa.ai are group 1 (interleaved together by score),
+    // CoreSignal/Bright Data (still labeled "CORESIGNAL") is group 2.
     private int sourceGroupRank(String source) {
-        if ("SELTZ".equals(source)) return 1;
+        if ("SELTZ".equals(source) || "PARALLEL".equals(source) || "EXA".equals(source)) return 1;
         if ("CORESIGNAL".equals(source)) return 2;
         return 0;
     }
