@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Box, IconButton, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
@@ -6,6 +6,7 @@ import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineRounded";
 import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import { helpArticles } from "../../content/help";
+import useDraggable from "../../hooks/useDraggable";
 
 const ACCENT = "#1D72E8";
 const TEXT = "#0F1623";
@@ -36,6 +37,15 @@ export default function GettingStartedGuideWidget() {
     []
   );
 
+  const { pos, containerRef, startDrag, consumeDragFlag, reclamp } = useDraggable({ right: 24, bottom: STACK_BOTTOM });
+
+  useEffect(() => { reclamp(); }, [expanded, reclamp]);
+
+  function dragHandleProps(e) {
+    if (e.target.closest("button")) return;
+    startDrag(e);
+  }
+
   function setExpandedPersist(value) {
     setExpanded(value);
     localStorage.setItem(STORAGE_KEY, String(value));
@@ -50,12 +60,14 @@ export default function GettingStartedGuideWidget() {
   if (!expanded) {
     return (
       <Box
-        onClick={() => setExpandedPersist(true)}
+        ref={containerRef}
+        onPointerDown={startDrag}
+        onClick={() => { if (consumeDragFlag()) return; setExpandedPersist(true); }}
         sx={{
-          position: "fixed", right: 24, bottom: STACK_BOTTOM, zIndex: 1250,
+          position: "fixed", right: pos.right, bottom: pos.bottom, zIndex: 1250,
           display: "flex", alignItems: "center", gap: 0.75,
           bgcolor: ACCENT, color: "#fff", borderRadius: "999px",
-          px: 2, py: 1.1, cursor: "pointer", boxShadow: "0 6px 20px rgba(29,114,232,0.35)",
+          px: 2, py: 1.1, cursor: "grab", boxShadow: "0 6px 20px rgba(29,114,232,0.35)",
           fontSize: 13, fontWeight: 700, "&:hover": { bgcolor: "#1660CC" },
         }}
       >
@@ -66,15 +78,15 @@ export default function GettingStartedGuideWidget() {
   }
 
   return (
-    <Box sx={{
-      position: "fixed", right: 24, bottom: STACK_BOTTOM, zIndex: 1250,
+    <Box ref={containerRef} sx={{
+      position: "fixed", right: pos.right, bottom: pos.bottom, zIndex: 1250,
       width: 320, borderRadius: "14px", overflow: "hidden",
       bgcolor: "#fff", boxShadow: "0 20px 50px rgba(15,22,35,0.25)",
       border: `1px solid ${BORDER}`,
     }}>
-      <Box sx={{
+      <Box onPointerDown={dragHandleProps} sx={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        px: 1.75, py: 1.25, borderBottom: `1px solid ${BORDER}`,
+        px: 1.75, py: 1.25, borderBottom: `1px solid ${BORDER}`, cursor: "grab",
       }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.75 }}>
           <DragIndicatorRoundedIcon sx={{ fontSize: 16, color: "#C4C9D4" }} />
