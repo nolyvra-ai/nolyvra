@@ -52,6 +52,10 @@ public class TalentSearchService {
     private final String coreSignalApiBaseUrl;
     private final String seltzApiKey;
     private final String seltzBaseUrl;
+    private final String parallelApiKey;
+    private final String parallelBaseUrl;
+    private final String exaApiKey;
+    private final String exaBaseUrl;
     private final TokenService tokenService;
 
     public TalentSearchService(
@@ -66,7 +70,11 @@ public class TalentSearchService {
             @Value("${coresignal.api-key:}") String coreSignalApiKey,
             @Value("${coresignal.base-url:https://api.coresignal.com/cdapi/v2}") String coreSignalApiBaseUrl,
             @Value("${seltz.api-key:}") String seltzApiKey,
-            @Value("${seltz.base-url:https://api.seltz.ai/v1}") String seltzBaseUrl) {
+            @Value("${seltz.base-url:https://api.seltz.ai/v1}") String seltzBaseUrl,
+            @Value("${parallel.api-key:}") String parallelApiKey,
+            @Value("${parallel.base-url:https://api.parallel.ai}") String parallelBaseUrl,
+            @Value("${exa.api-key:}") String exaApiKey,
+            @Value("${exa.base-url:https://api.exa.ai}") String exaBaseUrl) {
         this.jdbc = jdbc;
         this.openAI = openAIClient;
         this.objectMapper = objectMapper;
@@ -81,6 +89,10 @@ public class TalentSearchService {
         this.coreSignalApiBaseUrl = coreSignalApiBaseUrl;
         this.seltzApiKey = seltzApiKey;
         this.seltzBaseUrl = seltzBaseUrl;
+        this.parallelApiKey = parallelApiKey;
+        this.parallelBaseUrl = parallelBaseUrl;
+        this.exaApiKey = exaApiKey;
+        this.exaBaseUrl = exaBaseUrl;
     }
 
     // ─── POST /api/talent-search/query ───────────────────────────────────────
@@ -102,6 +114,17 @@ public class TalentSearchService {
         // (see sourceGroupRank) ahead of CoreSignal/Bright Data.
         List<TalentSearchResult> seltzResults = seltzApiKey != null && !seltzApiKey.isBlank()
                 ? searchSeltz(req.query(), loginId)
+                : List.of();
+
+        // Step 2c/2d: Search parallel.ai and exa.ai (if API keys configured) — same
+        // "agent suggestion" treatment as Seltz: plain query, no AI relevance scoring,
+        // own lists so they can be surfaced as their own display blocks (see
+        // sourceGroupRank, which groups all three together ahead of CoreSignal).
+        List<TalentSearchResult> parallelResults = parallelApiKey != null && !parallelApiKey.isBlank()
+                ? searchParallel(req.query(), loginId)
+                : List.of();
+        List<TalentSearchResult> exaResults = exaApiKey != null && !exaApiKey.isBlank()
+                ? searchExa(req.query(), loginId)
                 : List.of();
 
         // Step 3: Search Bright Data (if API key configured)
@@ -127,6 +150,12 @@ public class TalentSearchService {
         seltzResults = seltzResults.stream()
                 .sorted(Comparator.comparingInt(TalentSearchResult::matchScore).reversed())
                 .collect(Collectors.toList());
+        parallelResults = parallelResults.stream()
+                .sorted(Comparator.comparingInt(TalentSearchResult::matchScore).reversed())
+                .collect(Collectors.toList());
+        exaResults = exaResults.stream()
+                .sorted(Comparator.comparingInt(TalentSearchResult::matchScore).reversed())
+                .collect(Collectors.toList());
         externalResults = externalResults.stream()
                 .sorted(Comparator.comparingInt(TalentSearchResult::matchScore).reversed())
                 .collect(Collectors.toList());
@@ -139,6 +168,8 @@ public class TalentSearchService {
                 from < internalResults.size() ? internalResults.subList(from, to) : List.of());
         if (page == 0) {
             paged.addAll(seltzResults);
+            paged.addAll(parallelResults);
+            paged.addAll(exaResults);
             paged.addAll(externalResults);
         }
         // Fixed display-order grouping (not pure matchScore) — see sourceGroupRank.
@@ -148,7 +179,8 @@ public class TalentSearchService {
 
         return new TalentSearchResponse(
                 req.query(),
-                internalResults.size() + seltzResults.size() + externalResults.size(),
+                internalResults.size() + seltzResults.size() + parallelResults.size()
+                        + exaResults.size() + externalResults.size(),
                 internalResults.size(),
                 externalResults.size(),
                 paged);
@@ -759,12 +791,208 @@ public class TalentSearchService {
                 .collect(Collectors.toList());
     }
 
+    // ─── parallel.ai search — findall/entity-search, no OpenAI relevance scoring ─
+    // Same "agent suggestion" treatment as Seltz above: entity's `description`
+    // field already carries title/company as pipe-delimited "Key: value | ..."
+    // text, so there's no separate "collect full profile" step. Reuses
+    // seltz_cache (URL-keyed, source-agnostic) rather than a dedicated table —
+    // Sayan-confirmed, keep it to one external-profile cache table.
+
+    private static final int PARALLEL_MAX_RESULTS = 10;
+
+    private List<TalentSearchResult> searchParallel(String query, String loginId) {
+        if (parallelApiKey == null || parallelApiKey.isBlank()) return List.of();
+        if (!tokenService.deductToken(loginId)) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
+        }
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-api-key", parallelApiKey);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(
+                    Map.of("entity_type", "people", "objective", query, "match_limit", PARALLEL_MAX_RESULTS),
+                    headers);
+
+            ResponseEntity<String> resp = restTemplate.exchange(
+                    parallelBaseUrl + "/v1beta/findall/entity-search", HttpMethod.POST, entity, String.class);
+
+            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
+                System.err.println("[Parallel] search returned HTTP " + resp.getStatusCode());
+                return List.of();
+            }
+
+            JsonNode entities = objectMapper.readTree(resp.getBody()).path("entities");
+            if (!entities.isArray() || entities.isEmpty()) return List.of();
+
+            List<TalentSearchResult> results = new ArrayList<>();
+            for (JsonNode ent : entities) {
+                if (results.size() >= PARALLEL_MAX_RESULTS) break;
+                String url = textField(ent, "url");
+                if (url == null) continue;
+                TalentSearchResult mapped = upsertAndMapParallel(
+                        url, textField(ent, "name"), textField(ent, "description"), results.size());
+                if (mapped != null) results.add(mapped);
+            }
+            return results;
+        } catch (Exception e) {
+            System.err.println("[Parallel] search failed: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            return List.of();
+        }
+    }
+
+    private TalentSearchResult upsertAndMapParallel(String url, String name, String description, int rank) {
+        try {
+            Map<String, String> fields = parsePipeFields(description);
+            String currentTitle = fields.get("Title");
+            String currentCompany = null;
+            String headline = fields.get("Headline");
+            if (headline != null) {
+                int atIdx = headline.lastIndexOf(" at ");
+                if (atIdx > 0) {
+                    if (currentTitle == null) currentTitle = headline.substring(0, atIdx).trim();
+                    currentCompany = headline.substring(atIdx + 4).trim();
+                }
+            }
+
+            jdbc.update("""
+                    insert into seltz_cache
+                        (seltz_url, full_name, job_title, current_company, content, last_searched_at)
+                    values (?, ?, ?, ?, ?, now())
+                    on conflict (seltz_url) do update set
+                        full_name        = excluded.full_name,
+                        job_title        = excluded.job_title,
+                        current_company  = excluded.current_company,
+                        content          = excluded.content,
+                        cached_at        = now(),
+                        last_searched_at = now()
+                    """,
+                    url, name, currentTitle, currentCompany, description);
+
+            // No AI relevance scoring for parallel.ai — synthetic descending score
+            // preserves its own return order for within-group sorting only.
+            int score = Math.max(60, 99 - rank);
+
+            return new TalentSearchResult(
+                    null, name, currentTitle, currentCompany, url, null, null,
+                    List.of(), List.of(), score, 0,
+                    "PARALLEL", false, null, null, null, null);
+        } catch (Exception e) {
+            System.err.println("[Parallel] upsert/map failed for url " + url + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    // Parses parallel.ai's "Key: value | Key2: value2 | ..." description format.
+    private Map<String, String> parsePipeFields(String description) {
+        Map<String, String> fields = new LinkedHashMap<>();
+        if (description == null) return fields;
+        for (String part : description.split("\\s*\\|\\s*")) {
+            int idx = part.indexOf(':');
+            if (idx > 0) fields.put(part.substring(0, idx).trim(), part.substring(idx + 1).trim());
+        }
+        return fields;
+    }
+
+    // ─── exa.ai search — /search with category=people, no OpenAI relevance scoring ─
+    // Exa returns a structured `entities[0].properties` block (name/workHistory)
+    // alongside most results; falls back to the plain result title when absent.
+    // Reuses seltz_cache, same as parallel.ai above.
+
+    private static final int EXA_MAX_RESULTS = 10;
+
+    private List<TalentSearchResult> searchExa(String query, String loginId) {
+        if (exaApiKey == null || exaApiKey.isBlank()) return List.of();
+        if (!tokenService.deductToken(loginId)) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
+        }
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-api-key", exaApiKey);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(
+                    Map.of("query", query, "category", "people", "numResults", EXA_MAX_RESULTS,
+                            "contents", Map.of("text", true)),
+                    headers);
+
+            ResponseEntity<String> resp = restTemplate.exchange(
+                    exaBaseUrl + "/search", HttpMethod.POST, entity, String.class);
+
+            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
+                System.err.println("[Exa] search returned HTTP " + resp.getStatusCode());
+                return List.of();
+            }
+
+            JsonNode items = objectMapper.readTree(resp.getBody()).path("results");
+            if (!items.isArray() || items.isEmpty()) return List.of();
+
+            List<TalentSearchResult> results = new ArrayList<>();
+            for (JsonNode item : items) {
+                if (results.size() >= EXA_MAX_RESULTS) break;
+                String url = textField(item, "url");
+                if (url == null) continue;
+                TalentSearchResult mapped = upsertAndMapExa(
+                        url, textField(item, "title"), item.path("entities"), results.size());
+                if (mapped != null) results.add(mapped);
+            }
+            return results;
+        } catch (Exception e) {
+            System.err.println("[Exa] search failed: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            return List.of();
+        }
+    }
+
+    private TalentSearchResult upsertAndMapExa(String url, String fallbackTitle, JsonNode entities, int rank) {
+        try {
+            String name = fallbackTitle;
+            String currentTitle = null;
+            String currentCompany = null;
+
+            if (entities.isArray() && !entities.isEmpty()) {
+                JsonNode props = entities.get(0).path("properties");
+                String entityName = textField(props, "name");
+                if (entityName != null) name = entityName;
+                JsonNode workHistory = props.path("workHistory");
+                if (workHistory.isArray() && !workHistory.isEmpty()) {
+                    JsonNode current = workHistory.get(0);
+                    currentTitle = textField(current, "title");
+                    currentCompany = textField(current.path("company"), "name");
+                }
+            }
+
+            jdbc.update("""
+                    insert into seltz_cache
+                        (seltz_url, full_name, job_title, current_company, last_searched_at)
+                    values (?, ?, ?, ?, now())
+                    on conflict (seltz_url) do update set
+                        full_name        = excluded.full_name,
+                        job_title        = excluded.job_title,
+                        current_company  = excluded.current_company,
+                        cached_at        = now(),
+                        last_searched_at = now()
+                    """,
+                    url, name, currentTitle, currentCompany);
+
+            // No AI relevance scoring for exa.ai — synthetic descending score
+            // preserves its own return order for within-group sorting only.
+            int score = Math.max(60, 99 - rank);
+
+            return new TalentSearchResult(
+                    null, name, currentTitle, currentCompany, url, null, null,
+                    List.of(), List.of(), score, 0,
+                    "EXA", false, null, null, null, null);
+        } catch (Exception e) {
+            System.err.println("[Exa] upsert/map failed for url " + url + ": " + e.getMessage());
+            return null;
+        }
+    }
+
     // Fixed display-order grouping (Sayan-confirmed): Internal (and, one layer
-    // up in NexusBlendedSearchService, Nexus/Both) first, then Seltz, then
-    // CoreSignal/Bright Data — overrides pure matchScore ordering across
+    // up in NexusBlendedSearchService, Nexus/Both) first, then Seltz/parallel.ai/
+    // exa.ai (interleaved together by matchScore, all "agent suggestion" sources),
+    // then CoreSignal/Bright Data — overrides pure matchScore ordering across
     // groups, while each group still sorts by matchScore within itself.
     private int sourceGroupRank(String source) {
-        if ("SELTZ".equals(source)) return 1;
+        if ("SELTZ".equals(source) || "PARALLEL".equals(source) || "EXA".equals(source)) return 1;
         if ("CORESIGNAL".equals(source)) return 2;
         return 0;
     }
@@ -869,13 +1097,22 @@ public class TalentSearchService {
     // Same fetch-20-then-AI-select-top-10 behavior as the NL search flow — one
     // extra token deducted per call for the AI scoring pass (see applyAiScoring).
 
-    // Seltz results go first (Sayan-confirmed display order), BrightData's
-    // AI-scored batch follows — Seltz isn't merged into the scored batch since
-    // it skips AI scoring entirely, same as the main search() flow.
+    // Seltz/parallel.ai/exa.ai results go first (Sayan-confirmed display order),
+    // BrightData's AI-scored batch follows — none of the three are merged into
+    // the scored batch since they skip AI scoring entirely, same as the main
+    // search() flow. All three reuse the same job-derived query text (seltzJobQuery)
+    // since it's just a free-text prompt, not Seltz-specific.
     public List<TalentSearchResult> searchCoreSignalForJob(String jdText, List<String> skills, String location,
                                                              String title, String seniority, String loginId) {
+        String jobQuery = seltzJobQuery(jdText, title, skills, location);
         List<TalentSearchResult> seltzResults = seltzApiKey != null && !seltzApiKey.isBlank()
-                ? searchSeltz(seltzJobQuery(jdText, title, skills, location), loginId)
+                ? searchSeltz(jobQuery, loginId)
+                : List.of();
+        List<TalentSearchResult> parallelResults = parallelApiKey != null && !parallelApiKey.isBlank()
+                ? searchParallel(jobQuery, loginId)
+                : List.of();
+        List<TalentSearchResult> exaResults = exaApiKey != null && !exaApiKey.isBlank()
+                ? searchExa(jobQuery, loginId)
                 : List.of();
 
         List<TalentSearchResult> brightDataResults = List.of();
@@ -886,6 +1123,8 @@ public class TalentSearchService {
         }
 
         List<TalentSearchResult> combined = new ArrayList<>(seltzResults);
+        combined.addAll(parallelResults);
+        combined.addAll(exaResults);
         combined.addAll(brightDataResults);
         return combined;
     }

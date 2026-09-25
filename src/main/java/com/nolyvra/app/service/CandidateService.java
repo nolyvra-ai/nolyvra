@@ -391,6 +391,22 @@ public class CandidateService {
         return getCandidate(candidateId, loginId);
     }
 
+    // ─── Enrichment: persist a found email without touching any other field ───
+    // (the full-row updateCandidate above requires resending every field, which
+    // the enrichment flow doesn't have on hand — this is a narrow single-column
+    // update instead.)
+    public boolean updateEmail(String candidateId, String loginId, String email) {
+        int rows = jdbc.update("""
+                update candidates
+                set email = ?, updated_at = now()
+                where id = ?
+                  and login_id = ?
+                  and is_active = true
+                """,
+                email, candidateId, loginId);
+        return rows > 0;
+    }
+
     // ─── Update stage ─────────────────────────────────────────────────────────
 
     public boolean updateStage(String candidateId, StageUpdateRequest req, String loginId) {

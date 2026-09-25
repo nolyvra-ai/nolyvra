@@ -68,6 +68,18 @@ seltz:
   api-key: ${SELTZ_API_KEY:}
   base-url: ${SELTZ_BASE_URL:https://api.seltz.ai/v1}
 
+parallel:
+  api-key: ${PARALLEL_API_KEY:}
+  base-url: ${PARALLEL_BASE_URL:https://api.parallel.ai}
+
+exa:
+  api-key: ${EXA_API_KEY:}
+  base-url: ${EXA_BASE_URL:https://api.exa.ai}
+
+matchkraft:
+  api-key: ${MATCHKRAFT_API_KEY:}
+  base-url: ${MATCHKRAFT_BASE_URL:https://app.matchkraft.com}
+
 microsoft:
   client-id: ${MICROSOFT_CLIENT_ID:}
   client-secret: ${MICROSOFT_CLIENT_SECRET:}
