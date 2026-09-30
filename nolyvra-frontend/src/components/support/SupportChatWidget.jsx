@@ -10,7 +10,6 @@ import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import HomeRoundedIcon from "@mui/icons-material/HomeRounded";
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
-import PlayCircleRoundedIcon from "@mui/icons-material/PlayCircleRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
@@ -147,7 +146,6 @@ function HomeTab({ userName, onGoToMessages, onGoToHelp, topArticles }) {
       </Box>
 
       <Box sx={{ px: 1.75, mt: -2.5, display: "flex", flexDirection: "column", gap: 1.25 }}>
-        {/* Video placeholder — real demo to be added later */}
         <Box sx={{
           bgcolor: "#fff", borderRadius: "12px", border: `1px solid ${BORDER}`,
           boxShadow: "0 2px 10px rgba(15,22,35,0.06)", overflow: "hidden",
@@ -155,16 +153,13 @@ function HomeTab({ userName, onGoToMessages, onGoToHelp, topArticles }) {
           <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT, px: 1.75, pt: 1.5, pb: 1 }}>
             Nolyvra — Quick Start
           </Typography>
-          <Box sx={{
-            mx: 1.75, mb: 1.75, height: 140, borderRadius: "8px",
-            background: "linear-gradient(135deg, #1D2A4A 0%, #1D72E8 100%)",
-            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-            gap: 0.5, color: "rgba(255,255,255,0.9)",
-          }}>
-            <PlayCircleRoundedIcon sx={{ fontSize: 40 }} />
-            <Typography sx={{ fontSize: 11.5, color: "rgba(255,255,255,0.75)" }}>
-              Demo video coming soon
-            </Typography>
+          <Box sx={{ mx: 1.75, mb: 1.75, borderRadius: "8px", overflow: "hidden" }}>
+            <Box
+              component="iframe"
+              src="https://watchclueso.com/embed/dun4u76dffhbuj2f"
+              allow="fullscreen; autoplay; picture-in-picture"
+              sx={{ width: "100%", aspectRatio: "16/9", border: "none", display: "block" }}
+            />
           </Box>
           <Box sx={{ px: 1.75, pb: 1.75 }}>
             <Box
