@@ -52,6 +52,10 @@ public class TalentSearchService {
     private final String coreSignalApiBaseUrl;
     private final String seltzApiKey;
     private final String seltzBaseUrl;
+    private final String parallelApiKey;
+    private final String parallelBaseUrl;
+    private final String exaApiKey;
+    private final String exaBaseUrl;
     private final TokenService tokenService;
 
     public TalentSearchService(
@@ -66,7 +70,11 @@ public class TalentSearchService {
             @Value("${coresignal.api-key:}") String coreSignalApiKey,
             @Value("${coresignal.base-url:https://api.coresignal.com/cdapi/v2}") String coreSignalApiBaseUrl,
             @Value("${seltz.api-key:}") String seltzApiKey,
-            @Value("${seltz.base-url:https://api.seltz.ai/v1}") String seltzBaseUrl) {
+            @Value("${seltz.base-url:https://api.seltz.ai/v1}") String seltzBaseUrl,
+            @Value("${parallel.api-key:}") String parallelApiKey,
+            @Value("${parallel.base-url:https://api.parallel.ai}") String parallelBaseUrl,
+            @Value("${exa.api-key:}") String exaApiKey,
+            @Value("${exa.base-url:https://api.exa.ai}") String exaBaseUrl) {
         this.jdbc = jdbc;
         this.openAI = openAIClient;
         this.objectMapper = objectMapper;
@@ -81,6 +89,10 @@ public class TalentSearchService {
         this.coreSignalApiBaseUrl = coreSignalApiBaseUrl;
         this.seltzApiKey = seltzApiKey;
         this.seltzBaseUrl = seltzBaseUrl;
+        this.parallelApiKey = parallelApiKey;
+        this.parallelBaseUrl = parallelBaseUrl;
+        this.exaApiKey = exaApiKey;
+        this.exaBaseUrl = exaBaseUrl;
     }
 
     // ─── POST /api/talent-search/query ───────────────────────────────────────
@@ -102,6 +114,17 @@ public class TalentSearchService {
         // (see sourceGroupRank) ahead of CoreSignal/Bright Data.
         List<TalentSearchResult> seltzResults = seltzApiKey != null && !seltzApiKey.isBlank()
                 ? searchSeltz(req.query(), loginId)
+                : List.of();
+
+        // Step 2c/2d: Search parallel.ai and exa.ai (if API keys configured) — same
+        // "agent suggestion" treatment as Seltz: plain query, no AI relevance scoring,
+        // own lists so they can be surfaced as their own display blocks (see
+        // sourceGroupRank, which groups all three together ahead of CoreSignal).
+        List<TalentSearchResult> parallelResults = parallelApiKey != null && !parallelApiKey.isBlank()
+                ? searchParallel(req.query(), loginId)
+                : List.of();
+        List<TalentSearchResult> exaResults = exaApiKey != null && !exaApiKey.isBlank()
+                ? searchExa(req.query(), loginId)
                 : List.of();
 
         // Step 3: Search Bright Data (if API key configured)
@@ -127,6 +150,12 @@ public class TalentSearchService {
         seltzResults = seltzResults.stream()
                 .sorted(Comparator.comparingInt(TalentSearchResult::matchScore).reversed())
                 .collect(Collectors.toList());
+        parallelResults = parallelResults.stream()
+                .sorted(Comparator.comparingInt(TalentSearchResult::matchScore).reversed())
+                .collect(Collectors.toList());
+        exaResults = exaResults.stream()
+                .sorted(Comparator.comparingInt(TalentSearchResult::matchScore).reversed())
+                .collect(Collectors.toList());
         externalResults = externalResults.stream()
                 .sorted(Comparator.comparingInt(TalentSearchResult::matchScore).reversed())
                 .collect(Collectors.toList());
@@ -139,6 +168,8 @@ public class TalentSearchService {
                 from < internalResults.size() ? internalResults.subList(from, to) : List.of());
         if (page == 0) {
             paged.addAll(seltzResults);
+            paged.addAll(parallelResults);
+            paged.addAll(exaResults);
             paged.addAll(externalResults);
         }
         // Fixed display-order grouping (not pure matchScore) — see sourceGroupRank.
@@ -148,7 +179,8 @@ public class TalentSearchService {
 
         return new TalentSearchResponse(
                 req.query(),
-                internalResults.size() + seltzResults.size() + externalResults.size(),
+                internalResults.size() + seltzResults.size() + parallelResults.size()
+                        + exaResults.size() + externalResults.size(),
                 internalResults.size(),
                 externalResults.size(),
                 paged);
@@ -759,12 +791,208 @@ public class TalentSearchService {
                 .collect(Collectors.toList());
     }
 
+    // ─── parallel.ai search — findall/entity-search, no OpenAI relevance scoring ─
+    // Same "agent suggestion" treatment as Seltz above: entity's `description`
+    // field already carries title/company as pipe-delimited "Key: value | ..."
+    // text, so there's no separate "collect full profile" step. Reuses
+    // seltz_cache (URL-keyed, source-agnostic) rather than a dedicated table —
+    // Sayan-confirmed, keep it to one external-profile cache table.
+
+    private static final int PARALLEL_MAX_RESULTS = 10;
+
+    private List<TalentSearchResult> searchParallel(String query, String loginId) {
+        if (parallelApiKey == null || parallelApiKey.isBlank()) return List.of();
+        if (!tokenService.deductToken(loginId)) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
+        }
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-api-key", parallelApiKey);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(
+                    Map.of("entity_type", "people", "objective", query, "match_limit", PARALLEL_MAX_RESULTS),
+                    headers);
+
+            ResponseEntity<String> resp = restTemplate.exchange(
+                    parallelBaseUrl + "/v1beta/findall/entity-search", HttpMethod.POST, entity, String.class);
+
+            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
+                System.err.println("[Parallel] search returned HTTP " + resp.getStatusCode());
+                return List.of();
+            }
+
+            JsonNode entities = objectMapper.readTree(resp.getBody()).path("entities");
+            if (!entities.isArray() || entities.isEmpty()) return List.of();
+
+            List<TalentSearchResult> results = new ArrayList<>();
+            for (JsonNode ent : entities) {
+                if (results.size() >= PARALLEL_MAX_RESULTS) break;
+                String url = textField(ent, "url");
+                if (url == null) continue;
+                TalentSearchResult mapped = upsertAndMapParallel(
+                        url, textField(ent, "name"), textField(ent, "description"), results.size());
+                if (mapped != null) results.add(mapped);
+            }
+            return results;
+        } catch (Exception e) {
+            System.err.println("[Parallel] search failed: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            return List.of();
+        }
+    }
+
+    private TalentSearchResult upsertAndMapParallel(String url, String name, String description, int rank) {
+        try {
+            Map<String, String> fields = parsePipeFields(description);
+            String currentTitle = fields.get("Title");
+            String currentCompany = null;
+            String headline = fields.get("Headline");
+            if (headline != null) {
+                int atIdx = headline.lastIndexOf(" at ");
+                if (atIdx > 0) {
+                    if (currentTitle == null) currentTitle = headline.substring(0, atIdx).trim();
+                    currentCompany = headline.substring(atIdx + 4).trim();
+                }
+            }
+
+            jdbc.update("""
+                    insert into seltz_cache
+                        (seltz_url, full_name, job_title, current_company, content, last_searched_at)
+                    values (?, ?, ?, ?, ?, now())
+                    on conflict (seltz_url) do update set
+                        full_name        = excluded.full_name,
+                        job_title        = excluded.job_title,
+                        current_company  = excluded.current_company,
+                        content          = excluded.content,
+                        cached_at        = now(),
+                        last_searched_at = now()
+                    """,
+                    url, name, currentTitle, currentCompany, description);
+
+            // No AI relevance scoring for parallel.ai — synthetic descending score
+            // preserves its own return order for within-group sorting only.
+            int score = Math.max(60, 99 - rank);
+
+            return new TalentSearchResult(
+                    null, name, currentTitle, currentCompany, url, null, null,
+                    List.of(), List.of(), score, 0,
+                    "PARALLEL", false, null, null, null, null);
+        } catch (Exception e) {
+            System.err.println("[Parallel] upsert/map failed for url " + url + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    // Parses parallel.ai's "Key: value | Key2: value2 | ..." description format.
+    private Map<String, String> parsePipeFields(String description) {
+        Map<String, String> fields = new LinkedHashMap<>();
+        if (description == null) return fields;
+        for (String part : description.split("\\s*\\|\\s*")) {
+            int idx = part.indexOf(':');
+            if (idx > 0) fields.put(part.substring(0, idx).trim(), part.substring(idx + 1).trim());
+        }
+        return fields;
+    }
+
+    // ─── exa.ai search — /search with category=people, no OpenAI relevance scoring ─
+    // Exa returns a structured `entities[0].properties` block (name/workHistory)
+    // alongside most results; falls back to the plain result title when absent.
+    // Reuses seltz_cache, same as parallel.ai above.
+
+    private static final int EXA_MAX_RESULTS = 10;
+
+    private List<TalentSearchResult> searchExa(String query, String loginId) {
+        if (exaApiKey == null || exaApiKey.isBlank()) return List.of();
+        if (!tokenService.deductToken(loginId)) {
+            throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
+        }
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-api-key", exaApiKey);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(
+                    Map.of("query", query, "category", "people", "numResults", EXA_MAX_RESULTS,
+                            "contents", Map.of("text", true)),
+                    headers);
+
+            ResponseEntity<String> resp = restTemplate.exchange(
+                    exaBaseUrl + "/search", HttpMethod.POST, entity, String.class);
+
+            if (!resp.getStatusCode().is2xxSuccessful() || resp.getBody() == null) {
+                System.err.println("[Exa] search returned HTTP " + resp.getStatusCode());
+                return List.of();
+            }
+
+            JsonNode items = objectMapper.readTree(resp.getBody()).path("results");
+            if (!items.isArray() || items.isEmpty()) return List.of();
+
+            List<TalentSearchResult> results = new ArrayList<>();
+            for (JsonNode item : items) {
+                if (results.size() >= EXA_MAX_RESULTS) break;
+                String url = textField(item, "url");
+                if (url == null) continue;
+                TalentSearchResult mapped = upsertAndMapExa(
+                        url, textField(item, "title"), item.path("entities"), results.size());
+                if (mapped != null) results.add(mapped);
+            }
+            return results;
+        } catch (Exception e) {
+            System.err.println("[Exa] search failed: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            return List.of();
+        }
+    }
+
+    private TalentSearchResult upsertAndMapExa(String url, String fallbackTitle, JsonNode entities, int rank) {
+        try {
+            String name = fallbackTitle;
+            String currentTitle = null;
+            String currentCompany = null;
+
+            if (entities.isArray() && !entities.isEmpty()) {
+                JsonNode props = entities.get(0).path("properties");
+                String entityName = textField(props, "name");
+                if (entityName != null) name = entityName;
+                JsonNode workHistory = props.path("workHistory");
+                if (workHistory.isArray() && !workHistory.isEmpty()) {
+                    JsonNode current = workHistory.get(0);
+                    currentTitle = textField(current, "title");
+                    currentCompany = textField(current.path("company"), "name");
+                }
+            }
+
+            jdbc.update("""
+                    insert into seltz_cache
+                        (seltz_url, full_name, job_title, current_company, last_searched_at)
+                    values (?, ?, ?, ?, now())
+                    on conflict (seltz_url) do update set
+                        full_name        = excluded.full_name,
+                        job_title        = excluded.job_title,
+                        current_company  = excluded.current_company,
+                        cached_at        = now(),
+                        last_searched_at = now()
+                    """,
+                    url, name, currentTitle, currentCompany);
+
+            // No AI relevance scoring for exa.ai — synthetic descending score
+            // preserves its own return order for within-group sorting only.
+            int score = Math.max(60, 99 - rank);
+
+            return new TalentSearchResult(
+                    null, name, currentTitle, currentCompany, url, null, null,
+                    List.of(), List.of(), score, 0,
+                    "EXA", false, null, null, null, null);
+        } catch (Exception e) {
+            System.err.println("[Exa] upsert/map failed for url " + url + ": " + e.getMessage());
+            return null;
+        }
+    }
+
     // Fixed display-order grouping (Sayan-confirmed): Internal (and, one layer
-    // up in NexusBlendedSearchService, Nexus/Both) first, then Seltz, then
-    // CoreSignal/Bright Data — overrides pure matchScore ordering across
+    // up in NexusBlendedSearchService, Nexus/Both) first, then Seltz/parallel.ai/
+    // exa.ai (interleaved together by matchScore, all "agent suggestion" sources),
+    // then CoreSignal/Bright Data — overrides pure matchScore ordering across
     // groups, while each group still sorts by matchScore within itself.
     private int sourceGroupRank(String source) {
-        if ("SELTZ".equals(source)) return 1;
+        if ("SELTZ".equals(source) || "PARALLEL".equals(source) || "EXA".equals(source)) return 1;
         if ("CORESIGNAL".equals(source)) return 2;
         return 0;
     }
@@ -775,7 +1003,7 @@ public class TalentSearchService {
 
         // Get all candidates for this login with their latest analysis
         return jdbc.query("""
-                select c.id, c.name, c.email, c.phone_number, c.linkedin_url, c.cv_text, c.job_id,
+                select c.id, c.name, c.email, c.phone_number, c.linkedin_url, c.cv_text, c.job_id, c.skills,
                        coalesce(j.title, 'Not Assigned') as job_title,
                        coalesce(j.company, '') as company,
                        a.capability_score, a.risk_level
@@ -791,10 +1019,17 @@ public class TalentSearchService {
                 """,
                 (rs, rowNum) -> {
                     String cvText = rs.getString("cv_text");
+                    List<String> candidateSkills = parseSkillsJson(rs.getString("skills"));
+                    List<String> matched = extractMatchedSkills(candidateSkills, cvText, filters.skills());
+
+                    // Same "picking up all candidates" bug as scoreInternalCandidates:
+                    // a specified skill list must actually exclude non-matches, not just
+                    // fail to add a scoring bonus.
+                    if (!filters.skills().isEmpty() && matched.isEmpty()) return null;
+
                     int score = scoreCandidate(cvText, filters,
                             rs.getObject("capability_score") != null ? rs.getInt("capability_score") : 50);
 
-                    List<String> matched = extractMatchedSkills(cvText, filters.skills());
                     List<String> gaps = filters.skills().stream()
                             .filter(s -> !matched.contains(s))
                             .collect(Collectors.toList());
@@ -809,7 +1044,10 @@ public class TalentSearchService {
                             rs.getString("phone_number"),
                             matched, gaps, score, 0,
                             "INTERNAL", true, null, null, null, null);
-                }, loginId);
+                }, loginId)
+                .stream()
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 
     // ─── External search (Bright Data) — shared by NL search, job-page search, ──
@@ -859,13 +1097,22 @@ public class TalentSearchService {
     // Same fetch-20-then-AI-select-top-10 behavior as the NL search flow — one
     // extra token deducted per call for the AI scoring pass (see applyAiScoring).
 
-    // Seltz results go first (Sayan-confirmed display order), BrightData's
-    // AI-scored batch follows — Seltz isn't merged into the scored batch since
-    // it skips AI scoring entirely, same as the main search() flow.
+    // Seltz/parallel.ai/exa.ai results go first (Sayan-confirmed display order),
+    // BrightData's AI-scored batch follows — none of the three are merged into
+    // the scored batch since they skip AI scoring entirely, same as the main
+    // search() flow. All three reuse the same job-derived query text (seltzJobQuery)
+    // since it's just a free-text prompt, not Seltz-specific.
     public List<TalentSearchResult> searchCoreSignalForJob(String jdText, List<String> skills, String location,
                                                              String title, String seniority, String loginId) {
+        String jobQuery = seltzJobQuery(jdText, title, skills, location);
         List<TalentSearchResult> seltzResults = seltzApiKey != null && !seltzApiKey.isBlank()
-                ? searchSeltz(seltzJobQuery(jdText, title, skills, location), loginId)
+                ? searchSeltz(jobQuery, loginId)
+                : List.of();
+        List<TalentSearchResult> parallelResults = parallelApiKey != null && !parallelApiKey.isBlank()
+                ? searchParallel(jobQuery, loginId)
+                : List.of();
+        List<TalentSearchResult> exaResults = exaApiKey != null && !exaApiKey.isBlank()
+                ? searchExa(jobQuery, loginId)
                 : List.of();
 
         List<TalentSearchResult> brightDataResults = List.of();
@@ -876,6 +1123,8 @@ public class TalentSearchService {
         }
 
         List<TalentSearchResult> combined = new ArrayList<>(seltzResults);
+        combined.addAll(parallelResults);
+        combined.addAll(exaResults);
         combined.addAll(brightDataResults);
         return combined;
     }
@@ -1308,7 +1557,8 @@ public class TalentSearchService {
                 """,
                 (rs, rowNum) -> {
                     String cvText = rs.getString("cv_text");
-                    List<String> matched = extractMatchedSkills(cvText, skills);
+                    List<String> candidateSkills = parseSkillsJson(rs.getString("skills"));
+                    List<String> matched = extractMatchedSkills(candidateSkills, cvText, skills);
                     List<String> gaps = skills.stream()
                             .filter(s -> !matched.contains(s))
                             .collect(Collectors.toList());
@@ -1327,9 +1577,9 @@ public class TalentSearchService {
                     }
 
                     Integer capabilityScore = (Integer) rs.getObject("capability_score");
-                    int score = scoreAgainstFilters(filters, matched.size(),
+                    FilterMatch match = scoreAgainstFilters(filters, matched.size(),
                             capabilityScore != null ? capabilityScore : 50,
-                            candidateLocation, distanceKm, rs.getString("current_title"),
+                            candidateLocation, distanceKm, rs.getString("current_title"), candidateSkills,
                             rs.getBigDecimal("years_experience"),
                             rs.getString("seniority_level"),
                             rs.getBigDecimal("expected_salary_min"),
@@ -1337,6 +1587,11 @@ public class TalentSearchService {
                             (Integer) rs.getObject("notice_period_weeks"),
                             rs.getString("work_rights"),
                             (Boolean) rs.getObject("remote_flexible"));
+
+                    // Candidate fails at least one criterion the recruiter actually
+                    // specified — exclude rather than just down-score, otherwise a
+                    // search always returns the entire roster (see scoreAgainstFilters).
+                    if (!match.matches()) return null;
 
                     Long analysisId = (Long) rs.getObject("analysis_id");
                     String linkedinUrl = rs.getString("linkedin_url");
@@ -1356,7 +1611,7 @@ public class TalentSearchService {
                             .location(rs.getString("location"))
                             .state(rs.getString("state"))
                             .distanceKm(distanceKm)
-                            .skills(parseSkillsJson(rs.getString("skills")))
+                            .skills(candidateSkills)
                             .updatedAt(updatedAt != null ? updatedAt.toInstant() : null)
                             .yearsExperience(rs.getBigDecimal("years_experience"))
                             .seniorityLevel(rs.getString("seniority_level"))
@@ -1368,8 +1623,8 @@ public class TalentSearchService {
                             .remoteFlexible((Boolean) rs.getObject("remote_flexible"))
                             .matchedSkills(matched)
                             .gapSkills(gaps)
-                            .matchScore(score)
-                            .matchTier(matchTier(score))
+                            .matchScore(match.score())
+                            .matchTier(matchTier(match.score()))
                             .consistencyScore((Integer) rs.getObject("consistency_score"))
                             .capabilityScore(capabilityScore)
                             .riskLevel(rs.getString("risk_level"))
@@ -1377,38 +1632,74 @@ public class TalentSearchService {
                             .build();
                 }, loginId)
                 .stream()
+                .filter(Objects::nonNull)
                 .sorted(Comparator.comparingInt(CandidateSearchResult::matchScore).reversed())
                 .collect(Collectors.toList());
     }
 
-    private int scoreAgainstFilters(CandidateFilterRequest filters, int matchedSkillCount, int baseScore,
-            String candidateLocation, Double distanceKm, String candidateTitle, BigDecimal candidateYears,
-            String candidateSeniority, BigDecimal candidateSalaryMin, BigDecimal candidateSalaryMax,
-            Integer candidateNoticeWeeks, String candidateWorkRights, Boolean candidateRemoteFlexible) {
+    // Result of scoring a candidate against Smart Talent Lens filters: `score` for
+    // ranking, `matches` for whether the candidate should be included at all.
+    // `matches` is false only when the recruiter specified a criterion (skills,
+    // radius, years, seniority, salary, notice period, work rights, remote) AND
+    // the candidate's data confirms a mismatch — missing/unknown candidate data
+    // is never treated as a mismatch, only as "can't verify, don't penalize".
+    private record FilterMatch(int score, boolean matches) {}
+
+    private FilterMatch scoreAgainstFilters(CandidateFilterRequest filters, int matchedSkillCount, int baseScore,
+            String candidateLocation, Double distanceKm, String candidateTitle, List<String> candidateSkills,
+            BigDecimal candidateYears, String candidateSeniority, BigDecimal candidateSalaryMin,
+            BigDecimal candidateSalaryMax, Integer candidateNoticeWeeks, String candidateWorkRights,
+            Boolean candidateRemoteFlexible) {
 
         int score = baseScore;
+        boolean mismatch = false;
         List<String> skills = filters.skills() != null ? filters.skills() : List.of();
-        score += skills.isEmpty() ? 0 : matchedSkillCount * 10;
+        if (!skills.isEmpty()) {
+            if (matchedSkillCount == 0) mismatch = true;
+            else score += matchedSkillCount * 10;
+        }
 
-        if (filters.jobTitleKeywords() != null && !filters.jobTitleKeywords().isBlank()
-                && candidateTitle != null && !candidateTitle.isBlank()) {
-            // Title match is a bonus signal only — no penalty if it doesn't match,
-            // since recruiters often search across adjacent/related titles too.
-            if (candidateTitle.toLowerCase().contains(filters.jobTitleKeywords().toLowerCase())
-                    || filters.jobTitleKeywords().toLowerCase().contains(candidateTitle.toLowerCase())) {
+        // Role match — matches against current_title OR the candidate's skills list
+        // (Sayan-confirmed 2026-09-25). Unlike the old bonus-only version, this now
+        // excludes a candidate when we have title and/or skills data and neither
+        // matches — consistent with every other filter below. Still doesn't penalize
+        // a candidate with no title AND no skills on file at all (nothing to verify).
+        if (filters.jobTitleKeywords() != null && !filters.jobTitleKeywords().isBlank()) {
+            String keyword = filters.jobTitleKeywords().toLowerCase();
+            boolean titleKnown = candidateTitle != null && !candidateTitle.isBlank();
+            boolean titleMatches = titleKnown
+                    && (candidateTitle.toLowerCase().contains(keyword) || keyword.contains(candidateTitle.toLowerCase()));
+            boolean skillsKnown = candidateSkills != null && !candidateSkills.isEmpty();
+            boolean skillsMatch = skillsKnown && candidateSkills.stream()
+                    .anyMatch(s -> s != null && !s.isBlank()
+                            && (s.toLowerCase().contains(keyword) || keyword.contains(s.toLowerCase())));
+
+            if (titleMatches || skillsMatch) {
                 score += 10;
+            } else if (titleKnown || skillsKnown) {
+                mismatch = true;
             }
         }
 
-        if (filters.radiusKm() != null && distanceKm != null) {
-            // Real distance available (both locations geocoded) — prefer this over text matching.
-            score += distanceKm <= filters.radiusKm() ? 10 : -10;
-        } else if (filters.location() != null && !filters.location().isBlank()) {
-            if (candidateLocation != null
-                    && candidateLocation.toLowerCase().contains(filters.location().toLowerCase())) {
-                score += 10;
-            } else if (candidateLocation != null) {
-                score -= 5;
+        // Location match — Sayan-confirmed 2026-09-25: unlike every filter above/below
+        // (which never penalize missing candidate data), a location filter now excludes
+        // a candidate with no location on file at all, since "Melbourne" silently
+        // returning candidates with an unknown location was the reported bug.
+        boolean locationFilterSet = filters.radiusKm() != null
+                || (filters.location() != null && !filters.location().isBlank());
+        if (locationFilterSet) {
+            if (candidateLocation == null || candidateLocation.isBlank()) {
+                mismatch = true;
+            } else if (filters.radiusKm() != null && distanceKm != null) {
+                // Real distance available (both locations geocoded) — prefer this over text matching.
+                if (distanceKm <= filters.radiusKm()) score += 10;
+                else mismatch = true;
+            } else if (filters.location() != null && !filters.location().isBlank()) {
+                if (candidateLocation.toLowerCase().contains(filters.location().toLowerCase())) {
+                    score += 10;
+                } else {
+                    mismatch = true;
+                }
             }
         }
 
@@ -1416,11 +1707,11 @@ public class TalentSearchService {
             boolean withinRange =
                     (filters.minYears() == null || candidateYears.compareTo(filters.minYears()) >= 0) &&
                     (filters.maxYears() == null || candidateYears.compareTo(filters.maxYears()) <= 0);
-            score += withinRange ? 5 : -5;
+            if (withinRange) score += 5; else mismatch = true;
         }
 
         if (filters.seniorityLevel() != null && !filters.seniorityLevel().isBlank() && candidateSeniority != null) {
-            score += candidateSeniority.equalsIgnoreCase(filters.seniorityLevel()) ? 5 : -5;
+            if (candidateSeniority.equalsIgnoreCase(filters.seniorityLevel())) score += 5; else mismatch = true;
         }
 
         if ((filters.salaryMin() != null || filters.salaryMax() != null)
@@ -1428,23 +1719,23 @@ public class TalentSearchService {
             boolean overlaps =
                     (filters.salaryMax() == null || candidateSalaryMin.compareTo(filters.salaryMax()) <= 0) &&
                     (filters.salaryMin() == null || candidateSalaryMax.compareTo(filters.salaryMin()) >= 0);
-            score += overlaps ? 5 : -10;
+            if (overlaps) score += 5; else mismatch = true;
         }
 
         if (filters.noticePeriodMaxWeeks() != null && candidateNoticeWeeks != null) {
-            score += candidateNoticeWeeks <= filters.noticePeriodMaxWeeks() ? 5 : -5;
+            if (candidateNoticeWeeks <= filters.noticePeriodMaxWeeks()) score += 5; else mismatch = true;
         }
 
         if (filters.workRights() != null && !filters.workRights().isBlank()
                 && !"any".equalsIgnoreCase(filters.workRights()) && candidateWorkRights != null) {
-            score += candidateWorkRights.equalsIgnoreCase(filters.workRights()) ? 5 : -10;
+            if (candidateWorkRights.equalsIgnoreCase(filters.workRights())) score += 5; else mismatch = true;
         }
 
-        if (Boolean.TRUE.equals(filters.remoteFlexible()) && Boolean.TRUE.equals(candidateRemoteFlexible)) {
-            score += 5;
+        if (Boolean.TRUE.equals(filters.remoteFlexible()) && candidateRemoteFlexible != null) {
+            if (candidateRemoteFlexible) score += 5; else mismatch = true;
         }
 
-        return Math.max(5, Math.min(score, 99));
+        return new FilterMatch(Math.max(5, Math.min(score, 99)), !mismatch);
     }
 
     private String matchTier(int score) {
@@ -1526,6 +1817,22 @@ public class TalentSearchService {
         String lower = cvText.toLowerCase();
         return skills.stream()
                 .filter(s -> lower.contains(s.toLowerCase()))
+                .collect(Collectors.toList());
+    }
+
+    // Prefers the candidate's structured `skills` column (exact, case-insensitive
+    // match) over free-text CV substring matching — avoids both false negatives
+    // (a skill phrased differently in prose) and false positives (a substring that
+    // happens to appear in unrelated CV text) wherever structured data exists.
+    // Falls back to the cv_text substring check for candidates with no structured
+    // skills captured yet.
+    private List<String> extractMatchedSkills(List<String> candidateSkills, String cvText, List<String> skills) {
+        if (skills == null || skills.isEmpty()) return List.of();
+        Set<String> normalizedCandidateSkills = candidateSkills == null ? Set.of()
+                : candidateSkills.stream().map(String::toLowerCase).collect(Collectors.toSet());
+        String lowerCv = cvText == null ? "" : cvText.toLowerCase();
+        return skills.stream()
+                .filter(s -> normalizedCandidateSkills.contains(s.toLowerCase()) || lowerCv.contains(s.toLowerCase()))
                 .collect(Collectors.toList());
     }
 

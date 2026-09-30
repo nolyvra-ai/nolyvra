@@ -618,6 +618,27 @@ export default function CreateJobPageModern() {
 
           {briefError && <Alert severity="error" sx={{ mb: 2, borderRadius: "10px" }}>{briefError}</Alert>}
 
+          {/* Fetch job from an external board — disabled until account setup with us */}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, flexWrap: "wrap", mb: 2 }}>
+            <Typography sx={{ fontSize: 12, color: MUTED }}>Or fetch directly from:</Typography>
+            {["Fetch job from Seek", "Fetch job from LinkedIn"].map(label => (
+              <Tooltip key={label} title="Contact us to set up job board posting for your account" arrow>
+                <span>
+                  <Button
+                    variant="outlined"
+                    disabled
+                    sx={{
+                      fontSize: 12, fontWeight: 500, borderRadius: "50px", textTransform: "none",
+                      borderColor: BORDER, color: MUTED, px: 2, py: 0.5,
+                    }}
+                  >
+                    {label}
+                  </Button>
+                </span>
+              </Tooltip>
+            ))}
+          </Box>
+
           {/* "Already have existing JD?" toggle */}
           <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 1.5 }}>
             <Box

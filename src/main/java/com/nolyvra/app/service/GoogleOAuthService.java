@@ -2,6 +2,9 @@ package com.nolyvra.app.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nolyvra.app.model.InboxMessageSummary;
+import com.nolyvra.app.model.InboxPageResponse;
+import com.nolyvra.app.model.InboxThreadMessage;
 import com.nolyvra.app.model.OAuthToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,8 +19,16 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Service
 public class GoogleOAuthService {
@@ -28,7 +39,13 @@ public class GoogleOAuthService {
     private static final String TOKEN_URL = "https://oauth2.googleapis.com/token";
     private static final String USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
     private static final String SEND_MAIL_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
-    private static final String SCOPES = "openid email profile https://www.googleapis.com/auth/gmail.send";
+    private static final String MESSAGES_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages";
+    private static final String THREADS_URL = "https://gmail.googleapis.com/gmail/v1/users/me/threads";
+    // gmail.modify added for the Email Centre inbox (list/read/mark-read/archive) —
+    // it's a superset of gmail.send, kept alongside it for clarity. Existing
+    // connections must reconnect to pick up the new scope.
+    private static final String SCOPES = "openid email profile https://www.googleapis.com/auth/gmail.send"
+            + " https://www.googleapis.com/auth/gmail.modify";
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
@@ -36,6 +53,10 @@ public class GoogleOAuthService {
     private final String clientId;
     private final String clientSecret;
     private final String redirectUri;
+    // Gmail's message-list endpoint only returns ids — fetching each message's
+    // metadata for the inbox list view is fanned out in parallel over this pool,
+    // same pattern as TalentSearchService's coreSignalApiExecutor.
+    private final ExecutorService inboxExecutor = Executors.newFixedThreadPool(8);
 
     public GoogleOAuthService(
             JdbcTemplate jdbc,
@@ -136,6 +157,183 @@ public class GoogleOAuthService {
         if (res.statusCode() >= 400) {
             throw new RuntimeException("Gmail API error " + res.statusCode());
         }
+    }
+
+    // ─── Live inbox read (Email Centre) — nothing fetched here is persisted;
+    // every call goes straight to Gmail so the inbox always reflects the real
+    // mailbox. ────────────────────────────────────────────────────────────────
+
+    public InboxPageResponse listInboxMessages(String loginId, boolean unreadOnly, String pageToken, int pageSize)
+            throws Exception {
+        String accessToken = getValidAccessToken(loginId);
+        if (accessToken == null) throw new IllegalStateException("No valid Gmail token for: " + loginId);
+
+        String q = unreadOnly ? "in:inbox is:unread" : "in:inbox";
+        String listUrl = MESSAGES_URL + "?q=" + enc(q) + "&maxResults=" + pageSize
+                + (pageToken != null && !pageToken.isBlank() ? "&pageToken=" + enc(pageToken) : "");
+        JsonNode listJson = getJson(listUrl, accessToken);
+
+        // Gmail's list endpoint only returns {id, threadId} — fan out metadata
+        // fetches in parallel rather than N sequential round trips.
+        List<String> ids = new ArrayList<>();
+        for (JsonNode idNode : listJson.path("messages")) ids.add(idNode.path("id").asText());
+
+        List<InboxMessageSummary> messages = new CopyOnWriteArrayList<>();
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+        for (String id : ids) {
+            futures.add(CompletableFuture.runAsync(() -> {
+                try { messages.add(fetchMessageSummary(accessToken, id)); }
+                catch (Exception ignored) { /* skip a message that failed to fetch rather than fail the whole page */ }
+            }, inboxExecutor));
+        }
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+
+        // Parallel fetch scrambles order — restore Gmail's own recency ordering.
+        messages.sort(Comparator.comparing(InboxMessageSummary::occurredAt,
+                Comparator.nullsLast(Comparator.reverseOrder())));
+
+        return new InboxPageResponse(messages, listJson.path("nextPageToken").asText(null));
+    }
+
+    private InboxMessageSummary fetchMessageSummary(String accessToken, String id) throws Exception {
+        String url = MESSAGES_URL + "/" + enc(id)
+                + "?format=metadata&metadataHeaders=From&metadataHeaders=Subject";
+        JsonNode m = getJson(url, accessToken);
+        Map<String, String> headers = extractHeaders(m);
+        String[] from = splitNameAddress(headers.getOrDefault("From", ""));
+        return new InboxMessageSummary(
+                m.path("id").asText(),
+                m.path("threadId").asText(),
+                "google",
+                from[0], from[1],
+                headers.getOrDefault("Subject", ""),
+                m.path("snippet").asText(""),
+                parseInternalDate(m),
+                isUnread(m));
+    }
+
+    // A Gmail "thread" already groups every message in the conversation —
+    // oldest first so the detail pane reads top-down.
+    public List<InboxThreadMessage> getThreadMessages(String loginId, String threadId) throws Exception {
+        String accessToken = getValidAccessToken(loginId);
+        if (accessToken == null) throw new IllegalStateException("No valid Gmail token for: " + loginId);
+
+        JsonNode thread = getJson(THREADS_URL + "/" + enc(threadId) + "?format=full", accessToken);
+
+        List<InboxThreadMessage> result = new ArrayList<>();
+        for (JsonNode m : thread.path("messages")) {
+            Map<String, String> headers = extractHeaders(m);
+            String[] from = splitNameAddress(headers.getOrDefault("From", ""));
+            List<String> toAddresses = new ArrayList<>();
+            for (String addr : headers.getOrDefault("To", "").split(",")) {
+                String a = splitNameAddress(addr.trim())[1];
+                if (!a.isBlank()) toAddresses.add(a);
+            }
+            JsonNode payload = m.path("payload");
+            String html = findMimePart(payload, "text/html");
+            String text = findMimePart(payload, "text/plain");
+
+            result.add(new InboxThreadMessage(
+                    m.path("id").asText(),
+                    "google",
+                    from[0], from[1],
+                    toAddresses,
+                    headers.getOrDefault("Subject", ""),
+                    html, text,
+                    parseInternalDate(m),
+                    false, // direction resolved by the caller against the mailbox's own address
+                    isUnread(m)));
+        }
+        return result;
+    }
+
+    public void markMessageRead(String loginId, String messageId, boolean read) throws Exception {
+        String accessToken = getValidAccessToken(loginId);
+        if (accessToken == null) throw new IllegalStateException("No valid Gmail token for: " + loginId);
+        String payload = objectMapper.writeValueAsString(read
+                ? Map.of("removeLabelIds", List.of("UNREAD"))
+                : Map.of("addLabelIds", List.of("UNREAD")));
+        postModify(accessToken, messageId, payload);
+    }
+
+    public void archiveMessage(String loginId, String messageId) throws Exception {
+        String accessToken = getValidAccessToken(loginId);
+        if (accessToken == null) throw new IllegalStateException("No valid Gmail token for: " + loginId);
+        String payload = objectMapper.writeValueAsString(Map.of("removeLabelIds", List.of("INBOX")));
+        postModify(accessToken, messageId, payload);
+    }
+
+    private void postModify(String accessToken, String messageId, String payload) throws Exception {
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(MESSAGES_URL + "/" + enc(messageId) + "/modify"))
+                .header("Authorization", "Bearer " + accessToken)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(payload))
+                .build();
+        HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+        if (res.statusCode() >= 400) throw new RuntimeException("Gmail API error " + res.statusCode());
+    }
+
+    private JsonNode getJson(String url, String accessToken) throws Exception {
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Authorization", "Bearer " + accessToken)
+                .GET().build();
+        HttpResponse<String> res = httpClient.send(req, HttpResponse.BodyHandlers.ofString());
+        if (res.statusCode() >= 400) throw new RuntimeException("Gmail API error " + res.statusCode());
+        return objectMapper.readTree(res.body());
+    }
+
+    private static Instant parseInternalDate(JsonNode message) {
+        try { return Instant.ofEpochMilli(Long.parseLong(message.path("internalDate").asText("0"))); }
+        catch (Exception e) { return null; }
+    }
+
+    private static boolean isUnread(JsonNode message) {
+        for (JsonNode label : message.path("labelIds")) {
+            if ("UNREAD".equals(label.asText())) return true;
+        }
+        return false;
+    }
+
+    private static Map<String, String> extractHeaders(JsonNode message) {
+        Map<String, String> headers = new HashMap<>();
+        for (JsonNode h : message.path("payload").path("headers")) {
+            headers.put(h.path("name").asText(), h.path("value").asText(""));
+        }
+        return headers;
+    }
+
+    private static String[] splitNameAddress(String raw) {
+        if (raw == null || raw.isBlank()) return new String[]{"", ""};
+        int lt = raw.indexOf('<');
+        int gt = raw.indexOf('>');
+        if (lt >= 0 && gt > lt) {
+            String name = raw.substring(0, lt).trim().replaceAll("^\"|\"$", "");
+            String addr = raw.substring(lt + 1, gt).trim();
+            return new String[]{name, addr};
+        }
+        return new String[]{"", raw.trim()};
+    }
+
+    // Recursively walks Gmail's (possibly multipart) MIME payload for the first
+    // part matching mimeType, decoding its base64url body.
+    private static String findMimePart(JsonNode payload, String mimeType) {
+        if (payload == null || payload.isMissingNode()) return null;
+        if (mimeType.equals(payload.path("mimeType").asText(""))) {
+            return decodeBase64Url(payload.path("body").path("data").asText(null));
+        }
+        for (JsonNode part : payload.path("parts")) {
+            String found = findMimePart(part, mimeType);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private static String decodeBase64Url(String data) {
+        if (data == null || data.isBlank()) return null;
+        try { return new String(Base64.getUrlDecoder().decode(data), StandardCharsets.UTF_8); }
+        catch (Exception e) { return null; }
     }
 
     private String fetchUserEmail(String accessToken) {

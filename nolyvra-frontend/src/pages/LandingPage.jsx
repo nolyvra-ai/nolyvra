@@ -418,7 +418,7 @@ export default function LandingPage() {
               <button onClick={()=>nav("/login")} style={{ display:"inline-flex",alignItems:"center",gap:8,padding:"13px 22px",borderRadius:999,fontSize:14,fontWeight:500,fontFamily:"inherit",cursor:"pointer",background:"rgba(255,255,255,.06)",color:"#fff",border:"1px solid rgba(255,255,255,.16)",transition:"all .2s" }}>
                 Login to Platform →
               </button>
-              <a href="https://calendar.app.google/ZTop8tDUSfVZnmJz8" target="_blank" rel="noopener noreferrer" style={{ display:"inline-flex",alignItems:"center",gap:8,padding:"13px 22px",borderRadius:999,fontSize:14,fontWeight:500,fontFamily:"inherit",cursor:"pointer",background:"rgba(255,255,255,.06)",color:"#fff",border:"1px solid rgba(255,255,255,.16)",transition:"all .2s",textDecoration:"none" }}>
+              <a href="https://cal.com/sayan-bhattacharya-v2t36a/30min" target="_blank" rel="noopener noreferrer" style={{ display:"inline-flex",alignItems:"center",gap:8,padding:"13px 22px",borderRadius:999,fontSize:14,fontWeight:500,fontFamily:"inherit",cursor:"pointer",background:"rgba(255,255,255,.06)",color:"#fff",border:"1px solid rgba(255,255,255,.16)",transition:"all .2s",textDecoration:"none" }}>
                 Book Demo
               </a>
             </div>

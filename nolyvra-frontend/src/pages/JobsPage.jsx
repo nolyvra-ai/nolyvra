@@ -2,7 +2,7 @@ import {
   Box, Paper, Typography, Table, TableHead, TableRow,
   TableCell, TableBody, Button, TextField, InputAdornment,
   Alert, LinearProgress, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions,
-  IconButton, Tooltip,
+  IconButton, Tooltip, MenuItem,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import SearchIcon from "@mui/icons-material/Search";
@@ -66,7 +66,28 @@ const DANGER = "#DC2626", DANGER_BG = "#FEF2F2", DANGER_BR = "#FECACA";
 const ACCENT_BG = "#EBF2FF", ACCENT_BR = "#BFDBFE";
 const PURPLE = "#7C3AED", PURPLE_BG = "#F5F3FF", PURPLE_BR = "#C4B5FD";
 const SELTZ = "#DB2777", SELTZ_BG = "#FDF2F8", SELTZ_BR = "#FBCFE8";
+const PARALLEL = "#4F46E5", PARALLEL_BG = "#EEF2FF", PARALLEL_BR = "#C7D2FE";
+const EXA = "#0891B2", EXA_BG = "#ECFEFF", EXA_BR = "#A5F3FC";
 const NEUTRAL_BG = "#F1F3F7", SURFACE = "#FAFBFD", SELECTED_BG = "#EBF2FF";
+
+// Agent-suggestion sources (Seltz/parallel.ai/exa.ai) — each its own accent
+// color for the card border/avatar/score AND its "Agent Suggestion" chip.
+// CoreSignal/Bright Data keeps its existing look: purple card accent, but a
+// blue "LinkedIn" chip (unchanged from the original Seltz-only branching).
+const AGENT_SOURCE_COLORS = {
+  SELTZ:    { accent: SELTZ,    border: SELTZ_BR,    hover: "#BE185D" },
+  PARALLEL: { accent: PARALLEL, border: PARALLEL_BR, hover: "#4338CA" },
+  EXA:      { accent: EXA,      border: EXA_BR,      hover: "#0E7490" },
+};
+function externalCandidateAccent(source) {
+  return AGENT_SOURCE_COLORS[source] ?? { accent: PURPLE, border: PURPLE_BR, hover: "#6D28D9" };
+}
+function externalCandidateChip(source) {
+  const known = AGENT_SOURCE_COLORS[source];
+  return known
+    ? { bg: source === "SELTZ" ? SELTZ_BG : source === "PARALLEL" ? PARALLEL_BG : EXA_BG, border: known.border, color: known.accent, label: "Agent Suggestion" }
+    : { bg: ACCENT_BG, border: ACCENT_BR, color: ACCENT, label: "LinkedIn" };
+}
 const HUBSPOT = "#FF7A59", HUBSPOT_BG = "rgba(255,122,89,0.08)", HUBSPOT_BR = "rgba(255,122,89,0.25)";
 const HUBSPOT_LABEL_BG = "#FFF1EC";
 
@@ -182,6 +203,53 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
   const nav = useNavigate();
   const [fitPopup, setFitPopup] = useState(null); // { candidate, loading, error, summary, alreadyAnalysed }
 
+  // ── Data enrichment (Find Email) — keyed by candidate.id, which is always
+  // present here (unlike the ephemeral Talent Search results). Deducts the
+  // existing flat 10-token charge server-side and, once found, persists the
+  // email onto the candidate row.
+  const [enrichingIds,   setEnrichingIds]   = useState(new Set());
+  const [enrichedEmails, setEnrichedEmails] = useState({});
+  const [enrichErrors,   setEnrichErrors]   = useState({});
+
+  function splitName(fullName) {
+    const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return { firstName: "", lastName: "" };
+    if (parts.length === 1) return { firstName: parts[0], lastName: "" };
+    return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
+  }
+
+  async function handleFindEmail(c) {
+    if (enrichingIds.has(c.id)) return;
+    const { firstName, lastName } = splitName(c.name);
+    if (!firstName || !lastName) {
+      setEnrichErrors(prev => ({ ...prev, [c.id]: "Need a full name to look up an email." }));
+      return;
+    }
+    if (!window.confirm("Find this candidate's email address? This will deduct 10 tokens from your account. Continue?")) return;
+
+    setEnrichingIds(prev => new Set(prev).add(c.id));
+    setEnrichErrors(prev => { const next = { ...prev }; delete next[c.id]; return next; });
+    try {
+      const { jobId } = await apiPostJson("/api/enrichment/start", { candidateId: c.id, firstName, lastName, currentCompany: null });
+      let email = null;
+      for (let attempt = 0; attempt < 20; attempt++) {
+        await new Promise(r => setTimeout(r, 3000));
+        try {
+          const data = await apiGet(`/api/enrichment/${jobId}?candidateId=${encodeURIComponent(c.id)}`);
+          if (data.status !== "PENDING") { email = data.email; break; }
+        } catch {
+          // Transient poll failure — next tick retries.
+        }
+      }
+      if (email) setEnrichedEmails(prev => ({ ...prev, [c.id]: email }));
+      else setEnrichErrors(prev => ({ ...prev, [c.id]: "No email found for this candidate." }));
+    } catch (e) {
+      setEnrichErrors(prev => ({ ...prev, [c.id]: e?.message || "Enrichment failed." }));
+    } finally {
+      setEnrichingIds(prev => { const next = new Set(prev); next.delete(c.id); return next; });
+    }
+  }
+
   async function openFitPopup(c) {
     const alreadyAnalysed = c.status === "Analysed";
     setFitPopup({ candidate: c, loading: true, error: "", summary: "", alreadyAnalysed });
@@ -237,7 +305,19 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
               <Typography sx={{ fontSize: 13, fontWeight: 700, color: TEXT, lineHeight: 1.2 }}>
                 {c.name || "—"}
               </Typography>
-              {c.email && <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>{c.email}</Typography>}
+              {(enrichedEmails[c.id] ?? c.email) ? (
+                <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>{enrichedEmails[c.id] ?? c.email}</Typography>
+              ) : (
+                <Button size="small" variant="text"
+                  onClick={e => { e.stopPropagation(); handleFindEmail(c); }}
+                  disabled={enrichingIds.has(c.id)}
+                  sx={{ fontSize: 10.5, fontWeight: 500, minWidth: 0, px: 0, py: 0, mt: 0.25, color: ACCENT, textTransform: "none" }}>
+                  {enrichingIds.has(c.id) ? <CircularProgress size={10} sx={{ color: ACCENT }} /> : "✨ Enrich Email"}
+                </Button>
+              )}
+              {enrichErrors[c.id] && (
+                <Typography sx={{ fontSize: 10, color: DANGER, mt: 0.25 }}>⚠ {enrichErrors[c.id]}</Typography>
+              )}
             </TableCell>
             <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, color: TEXT, borderBottom: `1px solid ${BORDER}` }}>
               {jobTitle}
@@ -412,10 +492,8 @@ function SuitableCandidateCard({ c, onView, onAdd, adding, added, alreadyOnJob }
 // ─── External Candidate card (Bright Data / LinkedIn match) ────────────────────
 function ExternalCandidateCard({ c, onAdd, adding, added }) {
   const hasPhoto = !!c.avatarUrl && c.defaultAvatar !== true;
-  const isSeltz = c.source === "SELTZ";
-  const accent = isSeltz ? SELTZ : PURPLE;
-  const accentBorder = isSeltz ? SELTZ_BR : PURPLE_BR;
-  const accentHover = isSeltz ? "#BE185D" : "#6D28D9";
+  const { accent, border: accentBorder, hover: accentHover } = externalCandidateAccent(c.source);
+  const chip = externalCandidateChip(c.source);
   return (
     <Box sx={{
       display: "flex", alignItems: "center", gap: 1.25, p: "10px 14px",
@@ -432,8 +510,8 @@ function ExternalCandidateCard({ c, onAdd, adding, added }) {
           <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: TEXT, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
             {c.name}
           </Typography>
-          <Box sx={{ display: "inline-flex", px: "6px", py: "1px", bgcolor: isSeltz ? SELTZ_BG : ACCENT_BG, border: `1px solid ${isSeltz ? SELTZ_BR : ACCENT_BR}`, borderRadius: "10px", fontSize: 9.5, fontWeight: 600, color: isSeltz ? SELTZ : ACCENT, whiteSpace: "nowrap", flexShrink: 0 }}>
-            {isSeltz ? "Agent Suggestion" : "LinkedIn"}
+          <Box sx={{ display: "inline-flex", px: "6px", py: "1px", bgcolor: chip.bg, border: `1px solid ${chip.border}`, borderRadius: "10px", fontSize: 9.5, fontWeight: 600, color: chip.color, whiteSpace: "nowrap", flexShrink: 0 }}>
+            {chip.label}
           </Box>
         </Box>
         <Typography sx={{ fontSize: 11, color: MUTED, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -500,6 +578,9 @@ const CANDIDATE_EXTRA_COLUMNS = [
   { key: "createdAt",    label: "Applied On", get: c => c.createdAt ? new Date(c.createdAt).toLocaleDateString("en-GB") : "—" },
 ];
 
+// Canonical candidate stages, matching StageBadge's config above.
+const CANDIDATE_STAGES = ["Screening", "Interview", "Assessment", "Offer", "Selected", "Rejected"];
+
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function JobsPage() {
   const nav = useNavigate();
@@ -522,7 +603,11 @@ export default function JobsPage() {
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [candidateStageFilter, setCandidateStageFilter] = useState("All");
   const [analysisDialog, setAnalysisDialog] = useState(false); // Change 4
+  // ── Bulk Analysis (Candidates table) ──────────────────────────────────────
+  const [bulkAnalysisStatus, setBulkAnalysisStatus] = useState(null); // {batchId, queued, running, succeeded, failed, skipped, total}
+  const [bulkAnalyzing,      setBulkAnalyzing]      = useState(false);
   // ── Removed: editJob, editOpen state — no longer needed ──────────────────
 
   function toggleExtraJobColumn(key) {
@@ -557,11 +642,16 @@ export default function JobsPage() {
   const [addingKeys, setAddingKeys] = useState(new Set());
   const [addedKeys, setAddedKeys]   = useState(new Set());
 
+  // ── Bulk "Shortlist Top N" (External Candidates panel) ────────────────────
+  const [shortlistTopN,        setShortlistTopN]        = useState(10);
+  const [shortlistingExternal, setShortlistingExternal] = useState(false);
+  const [shortlistMsg,         setShortlistMsg]         = useState("");
+
   useEffect(() => {
     // Switching jobs invalidates any previous find/search results
     setSuitableCandidates([]); setSuitableFetched(false); setSuitableError("");
     setExternalCandidates([]); setExternalFetched(false); setExternalError("");
-    setAddingKeys(new Set()); setAddedKeys(new Set());
+    setAddingKeys(new Set()); setAddedKeys(new Set()); setShortlistMsg("");
   }, [selectedJobId]);
 
   async function handleFindSuitableCandidates() {
@@ -642,8 +732,10 @@ export default function JobsPage() {
     };
   }
 
+  // Returns "added" | "duplicate" | "error" so bulk callers (handleShortlistTopExternal)
+  // can tally outcomes — existing single-click callers ignore the return value.
   async function handleAddToJob(key, payload) {
-    if (!selectedJobId || addingKeys.has(key) || addedKeys.has(key)) return;
+    if (!selectedJobId || addingKeys.has(key) || addedKeys.has(key)) return "duplicate";
     setAddingKeys(prev => new Set(prev).add(key));
     try {
       const loginId = localStorage.getItem("loginId") || "";
@@ -656,7 +748,7 @@ export default function JobsPage() {
       });
       if (res.status === 409) {
         setAddedKeys(prev => new Set(prev).add(key));
-        return;
+        return "duplicate";
       }
       if (!res.ok) { const t = await res.text().catch(() => ""); throw new Error(`${res.status} - ${t}`); }
       const created = await res.json();
@@ -672,11 +764,43 @@ export default function JobsPage() {
       });
       setJobs(prev => prev.map(j => j.id === selectedJobId
         ? { ...j, candidateCount: (j.candidateCount ?? 0) + 1 } : j));
+      return "added";
     } catch (e) {
       setErr(e?.message || "Failed to add candidate to job");
+      return "error";
     } finally {
       setAddingKeys(prev => { const next = new Set(prev); next.delete(key); return next; });
     }
+  }
+
+  // Ranks the currently-loaded external candidates by match score and adds them
+  // one at a time via handleAddToJob, skipping ones already added and backfilling
+  // from the next-ranked candidate so the run still lands `n` successful adds
+  // when possible — bounded by how many are already loaded (never triggers a
+  // fresh search/"load more").
+  async function handleShortlistTopExternal(n) {
+    if (!selectedJobId || shortlistingExternal || externalCandidates.length === 0) return;
+    setShortlistingExternal(true); setShortlistMsg("");
+    const ranked = externalCandidates
+      .map((c, i) => ({ c, key: `external-${c.coresignalId ?? i}` }))
+      .filter(({ key }) => !addedKeys.has(key))
+      .sort((a, b) => (b.c.matchScore ?? 0) - (a.c.matchScore ?? 0));
+    let added = 0, duplicates = 0, failed = 0;
+    for (const { c, key } of ranked) {
+      if (added >= n) break;
+      const outcome = await handleAddToJob(key, externalCandidatePayload(c));
+      if (outcome === "added") added++;
+      else if (outcome === "duplicate") duplicates++;
+      else if (outcome === "error") failed++;
+    }
+    const parts = [added > 0
+      ? `The shortlisted candidate${added !== 1 ? "s" : ""} ${added !== 1 ? "have" : "has"} been added. Please review all the candidates.`
+      : "No candidates were added."];
+    if (duplicates > 0) parts.push(`${duplicates} already in pipeline`);
+    if (failed > 0) parts.push(`${failed} failed`);
+    if (added < n) parts.push(`not enough external candidates loaded to reach ${n}`);
+    setShortlistMsg(parts.join(" · "));
+    setShortlistingExternal(false);
   }
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -792,11 +916,50 @@ export default function JobsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedJobId]);
 
+  // Switching to a different job shouldn't carry over the previous job's stage filter
+  // or a stale bulk-analysis progress indicator from the job left behind.
+  useEffect(() => {
+    setCandidateStageFilter("All");
+    setBulkAnalysisStatus(null);
+  }, [selectedJobId]);
+
   function handleLoadMoreCandidates() {
     if (!selectedJobId) return;
     const meta = candidatesMeta.get(selectedJobId);
     loadCandidatesForJob(selectedJobId, meta?.offset ?? 0, false);
   }
+
+  const bulkAnalysisBatchId = bulkAnalysisStatus?.batchId;
+  const bulkAnalysisActive = !!bulkAnalysisStatus &&
+    ((bulkAnalysisStatus.queued ?? 0) + (bulkAnalysisStatus.running ?? 0) > 0);
+
+  // Polls the batch until nothing is left queued/running, then refetches the
+  // job's candidates so fresh capabilityScore values flow through — the table
+  // (selectedCandidates below) is already sorted descending by capabilityScore,
+  // so that refetch is what "reorders by score" once analysis completes.
+  useEffect(() => {
+    if (!bulkAnalysisBatchId) return undefined;
+    let cancelled = false;
+    let timer = null;
+    const jobId = selectedJobId;
+    const poll = async () => {
+      try {
+        const data = await apiGet(`/api/analysis-jobs/batches/${bulkAnalysisBatchId}`);
+        if (cancelled) return;
+        setBulkAnalysisStatus(data);
+        if ((data.queued ?? 0) + (data.running ?? 0) === 0) {
+          if (timer) window.clearInterval(timer);
+          if (jobId === selectedJobId) loadCandidatesForJob(jobId, 0, true);
+        }
+      } catch {
+        // Transient poll failure — next tick retries.
+      }
+    };
+    poll();
+    timer = window.setInterval(poll, 3000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bulkAnalysisBatchId]);
 
   // ── Derived values ────────────────────────────────────────────────────────
   const jobsWithDefaults = useMemo(() =>
@@ -824,10 +987,42 @@ export default function JobsPage() {
     }), [jobsWithDefaults, search, statusFilter]);
 
   const selectedJob = jobsWithDefaults.find(j => j.id === selectedJobId);
-  const selectedCandidates = selectedJobId ? (candidatesByJob.get(selectedJobId) ?? []) : [];
+  const rawSelectedCandidates = useMemo(() =>
+    selectedJobId ? (candidatesByJob.get(selectedJobId) ?? []) : [],
+    [selectedJobId, candidatesByJob]);
+  const candidateStageCounts = useMemo(() => {
+    const counts = { All: rawSelectedCandidates.length };
+    for (const stage of CANDIDATE_STAGES) {
+      counts[stage] = rawSelectedCandidates.filter(c => c.stage === stage).length;
+    }
+    return counts;
+  }, [rawSelectedCandidates]);
+  const selectedCandidates = useMemo(() =>
+    rawSelectedCandidates
+      .filter(c => candidateStageFilter === "All" || c.stage === candidateStageFilter)
+      // Best capability match first; candidates not yet analysed (no score) sort last.
+      .slice()
+      .sort((a, b) => (b.capabilityScore ?? -1) - (a.capabilityScore ?? -1)),
+    [rawSelectedCandidates, candidateStageFilter]);
   const selectedCandidatesMeta = selectedJobId ? candidatesMeta.get(selectedJobId) : null;
+  const unanalyzedCandidateCount = rawSelectedCandidates.filter(c => c.status !== "Analysed").length;
 
   // ── Handlers ──────────────────────────────────────────────────────────────
+  async function handleRunBulkAnalysisForJob() {
+    if (!selectedJobId || bulkAnalyzing || bulkAnalysisActive) return;
+    const unanalyzed = rawSelectedCandidates.filter(c => c.status !== "Analysed");
+    if (unanalyzed.length === 0) return;
+    setBulkAnalyzing(true);
+    try {
+      const data = await apiPostJson("/api/analysis-jobs/bulk", { candidateIds: unanalyzed.map(c => c.id) });
+      setBulkAnalysisStatus(data);
+    } catch (e) {
+      setErr(e?.message || "Failed to queue bulk analysis");
+    } finally {
+      setBulkAnalyzing(false);
+    }
+  }
+
   async function handleRunAnalysis(candidateId) {
     try {
       const loginId = localStorage.getItem("loginId") || "";
@@ -1304,6 +1499,21 @@ export default function JobsPage() {
                 <Typography sx={{ fontSize: 11, color: MUTED }}>
                   {selectedCandidates.length} candidate{selectedCandidates.length !== 1 ? "s" : ""}
                 </Typography>
+                <Button size="small" variant="outlined"
+                  onClick={handleRunBulkAnalysisForJob}
+                  disabled={unanalyzedCandidateCount === 0 || bulkAnalyzing || bulkAnalysisActive}
+                  startIcon={(bulkAnalyzing || bulkAnalysisActive)
+                    ? <CircularProgress size={12} sx={{ color: ACCENT }} />
+                    : <AutoAwesomeIcon sx={{ fontSize: 12 }} />}
+                  sx={{
+                    fontSize: 11, fontWeight: 500, borderColor: ACCENT_BR, color: ACCENT,
+                    borderRadius: "6px", textTransform: "none",
+                    "&:hover": { borderColor: ACCENT, bgcolor: ACCENT_BG }
+                  }}>
+                  {bulkAnalysisActive
+                    ? `Analyzing ${(bulkAnalysisStatus.succeeded ?? 0) + (bulkAnalysisStatus.failed ?? 0)}/${bulkAnalysisStatus.total ?? 0}…`
+                    : `Run Bulk Analysis${unanalyzedCandidateCount > 0 ? ` (${unanalyzedCandidateCount})` : ""}`}
+                </Button>
                 <Button size="small" variant="contained"
                   startIcon={<AddIcon sx={{ fontSize: 12 }} />}
                   onClick={() => nav("/candidates/new")}
@@ -1316,6 +1526,13 @@ export default function JobsPage() {
                 </Button>
                 <ColumnPickerButton options={CANDIDATE_EXTRA_COLUMNS} selected={extraCandidateColumns} onToggle={toggleExtraCandidateColumn} />
               </Box>
+            </Box>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, px: 2.25, py: 1.25, borderBottom: `1px solid ${BORDER}` }}>
+              <Typography sx={{ fontSize: 12, color: MUTED, fontWeight: 500 }}>Stage:</Typography>
+              {["All", ...CANDIDATE_STAGES].map(s => (
+                <FilterChip key={s} label={`${s} (${candidateStageCounts[s] ?? 0})`}
+                  active={candidateStageFilter === s} onClick={() => setCandidateStageFilter(s)} />
+              ))}
             </Box>
             {candidatesLoading ? (
               <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
@@ -1420,18 +1637,37 @@ export default function JobsPage() {
                   Search External Candidates
                 </Typography>
               </Box>
-              <Button size="small" variant="contained" onClick={handleSearchExternalCandidates} disabled={externalLoading}
-                startIcon={externalLoading ? <CircularProgress size={13} sx={{ color: "#fff" }} /> : null}
-                sx={{
-                  fontSize: 11, fontWeight: 500, bgcolor: PURPLE, borderRadius: "6px",
-                  textTransform: "none", boxShadow: "none",
-                  "&:hover": { bgcolor: "#6D28D9", boxShadow: "none" }
-                }}>
-                {externalLoading ? "Searching…" : "Search External"}
-              </Button>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <TextField select size="small" value={shortlistTopN}
+                  onChange={e => setShortlistTopN(Number(e.target.value))}
+                  disabled={shortlistingExternal}
+                  sx={{ width: 74, "& .MuiOutlinedInput-root": { borderRadius: "6px", fontSize: 11 } }}>
+                  {[5, 10, 20, 50].map(n => <MenuItem key={n} value={n} sx={{ fontSize: 11 }}>{n}</MenuItem>)}
+                </TextField>
+                <Button size="small" variant="outlined"
+                  onClick={() => handleShortlistTopExternal(shortlistTopN)}
+                  disabled={externalCandidates.length === 0 || shortlistingExternal}
+                  startIcon={shortlistingExternal ? <CircularProgress size={13} sx={{ color: PURPLE }} /> : null}
+                  sx={{
+                    fontSize: 11, fontWeight: 500, borderColor: PURPLE_BR, color: PURPLE, borderRadius: "6px",
+                    textTransform: "none", "&:hover": { borderColor: PURPLE, bgcolor: PURPLE_BG }
+                  }}>
+                  {shortlistingExternal ? "Shortlisting…" : `Shortlist Top ${shortlistTopN}`}
+                </Button>
+                <Button size="small" variant="contained" onClick={handleSearchExternalCandidates} disabled={externalLoading}
+                  startIcon={externalLoading ? <CircularProgress size={13} sx={{ color: "#fff" }} /> : null}
+                  sx={{
+                    fontSize: 11, fontWeight: 500, bgcolor: PURPLE, borderRadius: "6px",
+                    textTransform: "none", boxShadow: "none",
+                    "&:hover": { bgcolor: "#6D28D9", boxShadow: "none" }
+                  }}>
+                  {externalLoading ? "Searching…" : "Search External"}
+                </Button>
+              </Box>
             </Box>
             <Box sx={{ p: 2.25 }}>
               {externalError && <Alert severity="error" sx={{ mb: 1.5 }}>{externalError}</Alert>}
+              {shortlistMsg && <Alert severity="info" sx={{ mb: 1.5 }} onClose={() => setShortlistMsg("")}>{shortlistMsg}</Alert>}
               {!externalFetched && !externalLoading && (
                 <Typography sx={{ fontSize: 12.5, color: MUTED, textAlign: "center", py: 1.5 }}>
                   Click "Search External" to blend cached matches with fresh LinkedIn candidates for this job.

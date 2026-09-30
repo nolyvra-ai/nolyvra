@@ -2,6 +2,7 @@ import { Box } from "@mui/material";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAppMode } from "../context/AppModeContext";
+import ServiceRequestModal from "./support/ServiceRequestModal";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const BG     = "#FFFFFF";
@@ -66,6 +67,7 @@ export default function TopBar() {
   const { mode } = useAppMode();
 
   const [tokens, setTokens] = useState(null);
+  const [serviceRequestOpen, setServiceRequestOpen] = useState(false);
 
   useEffect(() => {
     const id = localStorage.getItem("loginId") || "";
@@ -172,9 +174,22 @@ export default function TopBar() {
         </Box>
       )}
 
+      {/* Raise service request */}
+      <Box onClick={() => setServiceRequestOpen(true)} title="Raise Service Request" sx={{
+        ml: tokens !== null ? "8px" : "auto",
+        display: "flex", alignItems: "center", gap: "6px",
+        px: "12px", py: "4px", borderRadius: "20px", flexShrink: 0,
+        border: `1px solid ${ACCENT}`, color: ACCENT,
+        fontSize: 11, fontWeight: 500, cursor: "pointer",
+        userSelect: "none", transition: "all .15s",
+        "&:hover": { borderColor: "#3D8EFF", color: "#3D8EFF", bgcolor: "rgba(29,114,232,0.08)" },
+      }}>
+        Raise Service Request
+      </Box>
+
       {/* Help */}
       <Box onClick={() => nav("/help")} title="Help Center" sx={{
-        ml: tokens !== null ? "8px" : "auto",
+        ml: "8px",
         width: 26, height: 26, borderRadius: "50%", flexShrink: 0,
         display: "flex", alignItems: "center", justifyContent: "center",
         border: `1px solid ${ACCENT}`, color: ACCENT,
@@ -184,6 +199,8 @@ export default function TopBar() {
       }}>
         ?
       </Box>
+
+      <ServiceRequestModal open={serviceRequestOpen} onClose={() => setServiceRequestOpen(false)} />
 
       {/* Logout */}
       <Box onClick={handleLogout} sx={{
