@@ -133,6 +133,13 @@ public class JobService {
     // list without an N+1 candidates+analysis fetch per job just to render
     // those two table columns.
 
+    public long countJobs(String loginId) {
+        Long count = jdbc.queryForObject(
+                "select count(*) from jobs where login_id = ? and is_active = true",
+                Long.class, loginId);
+        return count == null ? 0L : count;
+    }
+
     public List<JobResponse> listJobs(String loginId) {
         return listJobs(loginId, null, null);
     }
