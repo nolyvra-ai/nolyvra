@@ -424,7 +424,7 @@ export default function LandingPage() {
             </div>
 
             <div style={{ display:"flex",flexDirection:"column",alignItems:"center",animation:"nlUp 1.1s .6s ease both" }}>
-              <div style={{ fontSize:13.5,color:"rgba(255,255,255,.5)",lineHeight:1.6,textAlign:"center" }}>Trusted by recruitment teams across&nbsp;<span style={{ color:"rgba(255,255,255,.82)",fontWeight:600 }}>Australia</span>&nbsp;and globally.</div>
+              <div style={{ fontSize:13.5,color:"rgba(255,255,255,.5)",lineHeight:1.6,textAlign:"center" }}>Trusted by recruitment teams across&nbsp;<span style={{ color:"rgba(255,255,255,.82)",fontWeight:600 }}>Australia</span>,&nbsp;<span style={{ color:"rgba(255,255,255,.82)",fontWeight:600 }}>New Zealand</span>&nbsp;and globally.</div>
             </div>
           </div>
         </div>
