@@ -293,7 +293,7 @@ export default function RecruitmentUnitedPage() {
             <div className="ru-chip c3"><span className="ru-dot" style={{ background:"var(--ru-red)" }}></span><span className="ru-label">CV parsed</span><span className="ru-sub">↔ LinkedIn diff</span></div>
           </div>
 
-          <p className="ru-trust-line">Trusted by recruitment teams across <b>Australia</b> and globally · brought to you with <b>Recruitment United</b></p>
+          <p className="ru-trust-line">Trusted by recruitment teams across <b>Australia</b>, <b>New Zealand</b> and globally · brought to you with <b>Recruitment United</b></p>
         </section>
 
         <section id="offer" className="ru-section">
