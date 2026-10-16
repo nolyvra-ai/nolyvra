@@ -806,6 +806,18 @@ export default function AddCandidatePage() {
           )}
           <Button
             size="small"
+            variant="outlined"
+            onClick={onSave}
+            sx={{
+              fontSize: 12, fontWeight: 500, borderColor: BORDER, color: TEXT,
+              borderRadius: "6px", textTransform: "none",
+              "&:hover": { borderColor: "#C0C8D8", bgcolor: SURFACE },
+            }}
+          >
+            {duplicateForNewJob ? "Create New Application" : isEditMode ? "Save Changes" : "Save Without Analysis"}
+          </Button>
+          <Button
+            size="small"
             variant="contained"
             onClick={onSubmit}
             sx={{

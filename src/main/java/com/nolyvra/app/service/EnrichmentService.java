@@ -10,16 +10,19 @@ import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 // Candidate email lookup via MatchKraft's email-finder API. Flat 10-token charge
-// (reuses TokenService.deductToken, already exactly 10/call) deducted upfront,
-// same as every other external search source in this app — regardless of
-// whether a company/website/email can ultimately be resolved.
+// (reuses TokenService.deductToken, already exactly 10/call) — only the balance
+// is checked upfront; the charge is taken in getResult() once an email is
+// actually found, so a lookup that resolves no company/website/email is free.
 //
 // MatchKraft needs firstName/lastName/website per candidate, but nothing in this
 // app stores a candidate's company *website* (only a name, and only for some
@@ -37,6 +40,11 @@ public class EnrichmentService {
     private final String model;
     private final String matchkraftApiKey;
     private final String matchkraftBaseUrl;
+
+    // Jobs already charged — getResult() is polled repeatedly, so this keeps the
+    // charge to once per job. In-memory is fine on the single Render instance; a
+    // restart between finding the email and recording it can only miss a charge.
+    private final Set<String> chargedJobIds = ConcurrentHashMap.newKeySet();
 
     public EnrichmentService(
             ObjectMapper objectMapper,
@@ -71,7 +79,7 @@ public class EnrichmentService {
             System.err.println("[Enrichment] start: rejected — missing first/last name");
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Candidate name is required for enrichment.");
         }
-        if (!tokenService.deductToken(loginId)) {
+        if (!tokenService.hasTokens(loginId)) {
             System.err.println("[Enrichment] start: rejected — insufficient tokens for loginId=" + loginId);
             throw new ResponseStatusException(HttpStatus.PAYMENT_REQUIRED, "Insufficient tokens");
         }
@@ -176,6 +184,13 @@ public class EnrichmentService {
             return jobId;
         } catch (ResponseStatusException e) {
             throw e;
+        } catch (HttpClientErrorException.Forbidden e) {
+            // MatchKraft allows one running job per account at a time.
+            if (e.getResponseBodyAsString().contains("one job only")) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Another email lookup is still running — please wait for it to finish and try again.");
+            }
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Email finder request failed: " + e.getMessage());
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Email finder request failed: " + e.getMessage());
         }
@@ -197,8 +212,13 @@ public class EnrichmentService {
             String status = textField(node, "status");
             String email = extractEmail(node);
 
-            if (email != null && !email.isBlank() && candidateId != null && !candidateId.isBlank()) {
-                candidateService.updateEmail(candidateId, loginId, email);
+            if (email != null && !email.isBlank()) {
+                if (chargedJobIds.add(jobId) && !tokenService.deductToken(loginId)) {
+                    System.err.println("[Enrichment] getResult: could not deduct tokens for loginId=" + loginId + " job=" + jobId);
+                }
+                if (candidateId != null && !candidateId.isBlank()) {
+                    candidateService.updateEmail(candidateId, loginId, email);
+                }
             }
             return new EnrichmentResultResponse(jobId, status != null ? status : "PENDING", email, candidateId);
         } catch (Exception e) {
