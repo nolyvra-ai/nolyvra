@@ -51,7 +51,7 @@ public class CandidateImportService {
             JdbcTemplate jdbc,
             OpenAIClient openAIClient,
             ObjectMapper objectMapper,
-            @Value("${openai.model:gpt-4o-mini}") String model) {
+            @Value("${openai.model}") String model) {
         this.jdbc         = jdbc;
         this.openAI       = openAIClient;
         this.objectMapper = objectMapper;
@@ -381,7 +381,6 @@ public class CandidateImportService {
                     .model(model)
                     .addSystemMessage(systemPrompt)
                     .addUserMessage(userMessage)
-                    .temperature(0.1)
                     .build();
             String content = openAI.chat().completions().create(params)
                     .choices().getFirst().message().content()

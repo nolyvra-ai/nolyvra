@@ -23,7 +23,7 @@ public class CrmCoWorkerService {
 
     public CrmCoWorkerService(OpenAIClient openAI, ObjectMapper objectMapper,
                                JdbcTemplate jdbc, TokenService tokenService,
-                               @Value("${openai.model:gpt-4o-mini}") String model) {
+                               @Value("${openai.model}") String model) {
         this.openAI       = openAI;
         this.objectMapper = objectMapper;
         this.jdbc         = jdbc;
@@ -60,7 +60,6 @@ public class CrmCoWorkerService {
                 .model(model)
                 .addSystemMessage(fullPrompt)
                 .addUserMessage(request.message())
-                .temperature(0.3)
                 .build();
 
         try {

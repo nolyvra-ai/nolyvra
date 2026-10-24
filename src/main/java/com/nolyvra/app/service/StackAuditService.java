@@ -44,7 +44,7 @@ public class StackAuditService {
             JdbcTemplate jdbc,
             ObjectMapper objectMapper,
             OpenAIClient openAI,
-            @Value("${openai.model:gpt-4o-mini}") String model
+            @Value("${openai.model}") String model
     ) {
         this.jdbc         = jdbc;
         this.objectMapper = objectMapper;
@@ -221,7 +221,6 @@ public class StackAuditService {
                 .model(model)
                 .addSystemMessage(systemPrompt)
                 .addUserMessage(userPrompt)
-                .temperature(0.5)
                 .build();
 
         try {

@@ -45,7 +45,7 @@ coworker:
 
 openai:
   api-key: ${OPENAI_API_KEY:}
-  model: gpt-4o-mini
+  model: gpt-6-luna
   transcription-model: ${OPENAI_TRANSCRIPTION_MODEL:whisper-1}
 
 support:

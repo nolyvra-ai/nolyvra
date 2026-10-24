@@ -54,7 +54,7 @@ public class SupportChatService {
             ObjectMapper objectMapper,
             ResendEmailService resendEmailService,
             JdbcTemplate jdbc,
-            @Value("${openai.model:gpt-4o-mini}") String model,
+            @Value("${openai.model}") String model,
             @Value("${support.escalation-email:sayan.b@nolyvra.com}") String escalationEmail) {
         this.openAI = openAI;
         this.objectMapper = objectMapper;
@@ -67,7 +67,6 @@ public class SupportChatService {
     public SupportChatResponse respond(String loginId, SupportChatRequest request) {
         var builder = ChatCompletionCreateParams.builder()
                 .model(model)
-                .temperature(0.2)
                 .addFunctionTool(answerFromDocsTool())
                 .addFunctionTool(startCoworkerActionTool())
                 .addFunctionTool(navigateToTool())

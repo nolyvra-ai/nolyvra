@@ -33,7 +33,7 @@ public class AnalysisService {
             OpenAIClient openAIClient,
             JdbcTemplate jdbcTemplate,
             TokenService tokenService,
-            @Value("${openai.model:gpt-4o-mini}") String model,
+            @Value("${openai.model}") String model,
             CandidateAnalysisRunner analysisRunner,
             ReminderService reminderService) {
         this.objectMapper = objectMapper;
@@ -472,7 +472,6 @@ public class AnalysisService {
                 .model(model)
                 .addSystemMessage(systemPrompt)
                 .addUserMessage(userPrompt)
-                .temperature(0.2)
                 .build();
         var completion = openAI.chat().completions().create(params);
         return completion.choices().getFirst().message().content()

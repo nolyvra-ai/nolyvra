@@ -44,7 +44,7 @@ public class InboxService {
             EmailService emailService,
             OpenAIClient openAIClient,
             ObjectMapper objectMapper,
-            @Value("${openai.model:gpt-4o-mini}") String model) {
+            @Value("${openai.model}") String model) {
         this.microsoftOAuthService = microsoftOAuthService;
         this.googleOAuthService = googleOAuthService;
         this.emailService = emailService;
@@ -153,7 +153,6 @@ public class InboxService {
                 .model(model)
                 .addSystemMessage(systemPrompt)
                 .addUserMessage("INBOUND EMAIL:\n" + messageBody + "\n\nTEMPLATES:\n" + templateList)
-                .temperature(0.2)
                 .build();
 
         try {

@@ -38,7 +38,7 @@ public class InterviewTranscriptService {
             OpenAIClient openAI,
             ObjectMapper objectMapper,
             TokenService tokenService,
-            @Value("${openai.model:gpt-4o-mini}") String model) {
+            @Value("${openai.model}") String model) {
         this.jdbc = jdbc;
         this.openAI = openAI;
         this.objectMapper = objectMapper;
@@ -344,7 +344,6 @@ public class InterviewTranscriptService {
     private String callOpenAI(String systemPrompt, String userPrompt) {
         var params = ChatCompletionCreateParams.builder()
                 .model(model)
-                .temperature(0.2)
                 .addMessage(ChatCompletionSystemMessageParam.builder()
                         .content(systemPrompt)
                         .build())

@@ -51,7 +51,7 @@ public class EnrichmentService {
             OpenAIClient openAIClient,
             TokenService tokenService,
             CandidateService candidateService,
-            @Value("${openai.model:gpt-4o-mini}") String model,
+            @Value("${openai.model}") String model,
             @Value("${matchkraft.api-key:}") String matchkraftApiKey,
             @Value("${matchkraft.base-url:https://app.matchkraft.com}") String matchkraftBaseUrl) {
         this.objectMapper = objectMapper;
@@ -126,7 +126,6 @@ public class EnrichmentService {
                 .model(model)
                 .addSystemMessage(systemPrompt)
                 .addUserMessage("CV:\n" + cvText)
-                .temperature(0.1)
                 .build();
         try {
             String content = openAI.chat().completions().create(params)
@@ -149,7 +148,6 @@ public class EnrichmentService {
                 .model(model)
                 .addSystemMessage(systemPrompt)
                 .addUserMessage("COMPANY: " + companyName)
-                .temperature(0.1)
                 .build();
         try {
             String content = openAI.chat().completions().create(params)
