@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Box, CircularProgress, Dialog, DialogContent, DialogActions,
   TextField, MenuItem, Checkbox, Button, Alert, IconButton, Tooltip,
-  Tabs, Tab,
+  Tabs, Tab, Snackbar,
 } from "@mui/material";
 import HubOutlinedIcon from "@mui/icons-material/HubOutlined";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
@@ -162,6 +162,13 @@ const CloseIcon = () => (
     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
   </svg>
 );
+const NoteIcon = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 4h16v11l-5 5H4z"/>
+    <path d="M15 20v-5h5"/>
+    <line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="12" y2="13"/>
+  </svg>
+);
 const InvoiceIcon = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M6 2h9l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/>
@@ -251,7 +258,7 @@ function formatFeeTotals(totals) {
 }
 
 // ─── Client row ───────────────────────────────────────────────────────────────
-function ClientRow({ client, onEdit, onSelect, onInvoice, hubSpotStatus }) {
+function ClientRow({ client, onEdit, onSelect, onInvoice, onQuickNote, hubSpotStatus }) {
   const nav = useNavigate();
   const feeLabel = formatFeeTotals(client.totalFee);
   const hubSpotLinked = Boolean(hubSpotStatus?.linked);
@@ -361,22 +368,39 @@ function ClientRow({ client, onEdit, onSelect, onInvoice, hubSpotStatus }) {
             </IconButton>
           </Tooltip>
         )}
-        <Box onClick={e => { e.stopPropagation(); onInvoice(client); }} sx={{
-          px: "8px", py: "5px", borderRadius: "6px",
-          border: `1px solid ${BORDER}`, color: MUTED, bgcolor: SURFACE,
-          display: "flex", alignItems: "center", cursor: "pointer",
-          "&:hover": { color: ACCENT, borderColor: ACCENT }, transition: "all .12s",
-        }}>
-          <InvoiceIcon />
-        </Box>
-        <Box onClick={e => { e.stopPropagation(); onEdit(client); }} sx={{
-          px: "8px", py: "5px", borderRadius: "6px",
-          border: `1px solid ${BORDER}`, color: MUTED, bgcolor: SURFACE,
-          display: "flex", alignItems: "center", cursor: "pointer",
-          "&:hover": { color: ACCENT, borderColor: ACCENT }, transition: "all .12s",
-        }}>
-          <EditIcon />
-        </Box>
+        <Tooltip title="Create Xero invoice">
+          <Box onClick={e => { e.stopPropagation(); onInvoice(client); }} role="button"
+            aria-label={`Create Xero invoice for ${client.companyName}`} sx={{
+            px: "8px", py: "5px", borderRadius: "6px",
+            border: `1px solid ${BORDER}`, color: MUTED, bgcolor: SURFACE,
+            display: "flex", alignItems: "center", cursor: "pointer",
+            "&:hover": { color: ACCENT, borderColor: ACCENT }, transition: "all .12s",
+          }}>
+            <InvoiceIcon />
+          </Box>
+        </Tooltip>
+        <Tooltip title="Add quick note">
+          <Box onClick={e => { e.stopPropagation(); onQuickNote(client); }} role="button"
+            aria-label={`Add quick note for ${client.companyName}`} sx={{
+            px: "8px", py: "5px", borderRadius: "6px",
+            border: `1px solid ${BORDER}`, color: MUTED, bgcolor: SURFACE,
+            display: "flex", alignItems: "center", cursor: "pointer",
+            "&:hover": { color: ACCENT, borderColor: ACCENT }, transition: "all .12s",
+          }}>
+            <NoteIcon />
+          </Box>
+        </Tooltip>
+        <Tooltip title="Edit client">
+          <Box onClick={e => { e.stopPropagation(); onEdit(client); }} role="button"
+            aria-label={`Edit ${client.companyName}`} sx={{
+            px: "8px", py: "5px", borderRadius: "6px",
+            border: `1px solid ${BORDER}`, color: MUTED, bgcolor: SURFACE,
+            display: "flex", alignItems: "center", cursor: "pointer",
+            "&:hover": { color: ACCENT, borderColor: ACCENT }, transition: "all .12s",
+          }}>
+            <EditIcon />
+          </Box>
+        </Tooltip>
       </Box>
     </Box>
   );
@@ -1161,6 +1185,52 @@ function ClientDetailDialog({ client, onClose, onEdit }) {
           onInvoiced={() => { setShowInvoiceDialog(false); loadInvoices(); }}
         />
       )}
+    </Dialog>
+  );
+}
+
+// ─── Quick note dialog — adds a note to the client's Notes timeline ──────────
+function QuickNoteDialog({ client, onClose, onSaved }) {
+  const [note, setNote]     = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr]       = useState("");
+
+  async function handleSave() {
+    if (!note.trim()) return;
+    setSaving(true);
+    setErr("");
+    try {
+      await apiPostJson(`/api/clients/${client.id}/notes`, { note: note.trim() });
+      onSaved();
+    } catch (e) {
+      setErr(e.message || "Failed to save note.");
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Dialog open onClose={saving ? undefined : onClose} maxWidth="xs" fullWidth
+      PaperProps={{ sx: { borderRadius: "16px", m: "24px" } }}>
+      <DialogContent sx={{ p: "20px 24px 8px" }}>
+        <Box sx={{ fontSize: 16, fontWeight: 700, color: TEXT, mb: "14px" }}>
+          Quick note — {client.companyName}
+        </Box>
+        <TextField autoFocus fullWidth multiline minRows={4} placeholder="Add a note about this client…"
+          value={note} onChange={e => setNote(e.target.value)} disabled={saving}
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: "8px", fontSize: 13 } }} />
+        {err && <Alert severity="error" sx={{ mt: "12px", fontSize: 12 }}>{err}</Alert>}
+      </DialogContent>
+      <DialogActions sx={{ px: "24px", pb: "20px", gap: "8px" }}>
+        <Button size="small" variant="outlined" onClick={onClose} disabled={saving}
+          sx={{ fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none" }}>
+          Cancel
+        </Button>
+        <Button size="small" variant="contained" onClick={handleSave} disabled={saving || !note.trim()}
+          sx={{ fontSize: 12, bgcolor: ACCENT, borderRadius: "6px", textTransform: "none", boxShadow: "none",
+            "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
+          {saving ? <CircularProgress size={14} sx={{ color: "#fff" }} /> : "Save Note"}
+        </Button>
+      </DialogActions>
     </Dialog>
   );
 }
@@ -1963,6 +2033,8 @@ export default function ClientTrackerPage() {
   const [addFromPotential,  setAddFromPotential]  = useState(null);
   const [selectedClient,    setSelectedClient]    = useState(null);
   const [invoicingClient,   setInvoicingClient]   = useState(null);
+  const [quickNoteClient,   setQuickNoteClient]   = useState(null);
+  const [noteSavedToast,    setNoteSavedToast]    = useState(false);
   const [hubSpotStatuses,   setHubSpotStatuses]   = useState({});
   const [hubSpotBusy,       setHubSpotBusy]       = useState({});
   const [hubSpotError,      setHubSpotError]      = useState("");
@@ -2432,6 +2504,7 @@ export default function ClientTrackerPage() {
               filtered.map(c => (
                 <ClientRow key={c.id} client={c} onEdit={setEditingClient}
                   onSelect={setSelectedClient} onInvoice={setInvoicingClient}
+                  onQuickNote={setQuickNoteClient}
                   hubSpotStatus={hubSpotStatuses[c.id]}
                   />
               ))
@@ -2657,6 +2730,17 @@ export default function ClientTrackerPage() {
           onInvoiced={loadClients}
         />
       )}
+      {quickNoteClient && (
+        <QuickNoteDialog
+          client={quickNoteClient}
+          onClose={() => setQuickNoteClient(null)}
+          onSaved={() => { setQuickNoteClient(null); setNoteSavedToast(true); }}
+        />
+      )}
+      <Snackbar open={noteSavedToast} autoHideDuration={3000} onClose={() => setNoteSavedToast(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}>
+        <Alert severity="success" onClose={() => setNoteSavedToast(false)} sx={{ fontSize: 13 }}>Note saved</Alert>
+      </Snackbar>
     </Box>
   );
 }
