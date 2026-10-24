@@ -204,12 +204,13 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
   const [fitPopup, setFitPopup] = useState(null); // { candidate, loading, error, summary, alreadyAnalysed }
 
   // ── Data enrichment (Find Email) — keyed by candidate.id, which is always
-  // present here (unlike the ephemeral Talent Search results). Deducts the
-  // existing flat 10-token charge server-side and, once found, persists the
-  // email onto the candidate row.
+  // present here (unlike the ephemeral Talent Search results). The existing flat
+  // 10-token charge is taken server-side only once an email is found, and the
+  // email is then persisted onto the candidate row.
   const [enrichingIds,   setEnrichingIds]   = useState(new Set());
   const [enrichedEmails, setEnrichedEmails] = useState({});
-  const [enrichErrors,   setEnrichErrors]   = useState({});
+  const [enrichErrors,   setEnrichErrors]   = useState({}); // id -> { msg, info }
+  const [enrichConfirm,  setEnrichConfirm]  = useState(null); // candidate awaiting confirmation
 
   function splitName(fullName) {
     const parts = (fullName || "").trim().split(/\s+/).filter(Boolean);
@@ -218,15 +219,18 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
     return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
   }
 
-  async function handleFindEmail(c) {
+  function handleFindEmail(c) {
     if (enrichingIds.has(c.id)) return;
     const { firstName, lastName } = splitName(c.name);
     if (!firstName || !lastName) {
-      setEnrichErrors(prev => ({ ...prev, [c.id]: "Need a full name to look up an email." }));
+      setEnrichErrors(prev => ({ ...prev, [c.id]: { msg: "Need a full name to look up an email." } }));
       return;
     }
-    if (!window.confirm("Find this candidate's email address? This will deduct 10 tokens from your account. Continue?")) return;
+    setEnrichConfirm(c);
+  }
 
+  async function runFindEmail(c) {
+    const { firstName, lastName } = splitName(c.name);
     setEnrichingIds(prev => new Set(prev).add(c.id));
     setEnrichErrors(prev => { const next = { ...prev }; delete next[c.id]; return next; });
     try {
@@ -242,9 +246,15 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
         }
       }
       if (email) setEnrichedEmails(prev => ({ ...prev, [c.id]: email }));
-      else setEnrichErrors(prev => ({ ...prev, [c.id]: "No email found for this candidate." }));
+      else setEnrichErrors(prev => ({ ...prev, [c.id]: { msg: "No email found, no tokens used.", info: true } }));
     } catch (e) {
-      setEnrichErrors(prev => ({ ...prev, [c.id]: e?.message || "Enrichment failed." }));
+      // apiPostJson throws the raw response body — Spring's JSON error shape.
+      let body = null;
+      try { body = JSON.parse(e?.message); } catch { /* not JSON */ }
+      const err = body?.status === 422 ? { msg: "No email found, no tokens used.", info: true }
+        : body?.status === 402 ? { msg: "You have run out of tokens. Please upgrade your plan to continue." }
+        : { msg: body?.message || "Enrichment failed." };
+      setEnrichErrors(prev => ({ ...prev, [c.id]: err }));
     } finally {
       setEnrichingIds(prev => { const next = new Set(prev); next.delete(c.id); return next; });
     }
@@ -316,7 +326,9 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
                 </Button>
               )}
               {enrichErrors[c.id] && (
-                <Typography sx={{ fontSize: 10, color: DANGER, mt: 0.25 }}>⚠ {enrichErrors[c.id]}</Typography>
+                <Typography sx={{ fontSize: 10, color: enrichErrors[c.id].info ? MUTED : DANGER, mt: 0.25 }}>
+                  {enrichErrors[c.id].info ? "" : "⚠ "}{enrichErrors[c.id].msg}
+                </Typography>
               )}
             </TableCell>
             <TableCell sx={{ py: 1.5, px: 2, fontSize: 12, color: TEXT, borderBottom: `1px solid ${BORDER}` }}>
@@ -390,6 +402,26 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
       </TableBody>
     </Table>
     </Box>
+
+    <Dialog open={!!enrichConfirm} onClose={() => setEnrichConfirm(null)} maxWidth="xs" fullWidth
+      PaperProps={{ sx: { borderRadius: "10px" } }}>
+      <DialogTitle sx={{ fontSize: 14, fontWeight: 600, color: TEXT, pb: 1 }}>Find Email</DialogTitle>
+      <DialogContent>
+        <Typography sx={{ fontSize: 13, color: MUTED }}>
+          Find the email address for <strong style={{ color: TEXT }}>{enrichConfirm?.name}</strong>?
+          This uses 10 tokens, charged only if an email is found.
+        </Typography>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+        <Button variant="outlined" size="small" onClick={() => setEnrichConfirm(null)}
+          sx={{ fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none" }}>Cancel</Button>
+        <Button variant="contained" size="small"
+          onClick={() => { const c = enrichConfirm; setEnrichConfirm(null); runFindEmail(c); }}
+          sx={{ fontSize: 12, bgcolor: ACCENT, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
+          Continue
+        </Button>
+      </DialogActions>
+    </Dialog>
 
     <Dialog open={!!fitPopup} onClose={() => setFitPopup(null)} maxWidth="xs" fullWidth
       PaperProps={{ sx: { borderRadius: "10px" } }}>

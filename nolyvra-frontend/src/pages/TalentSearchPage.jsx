@@ -303,7 +303,8 @@ export function TalentSearchPage() {
   // ── Data enrichment (Find Email) — per-candidate state, keyed by enrichKey ──
   const [enrichingKeys, setEnrichingKeys] = useState(new Set());
   const [enrichedEmails, setEnrichedEmails] = useState({});
-  const [enrichErrors,   setEnrichErrors]   = useState({});
+  const [enrichErrors,   setEnrichErrors]   = useState({}); // key -> { msg, info }
+  const [enrichConfirm,  setEnrichConfirm]  = useState(null); // { c, key } awaiting confirmation
 
   // ── New: DB mode ──────────────────────────────────────────────────────────
   const [dbMode,    setDbMode]    = useState(false);
@@ -701,19 +702,22 @@ export function TalentSearchPage() {
     return { firstName: parts[0], lastName: parts.slice(1).join(" ") };
   }
 
-  // Confirm → start MatchKraft email-finder job (deducts 10 tokens server-side,
-  // same as every other external search source) → poll until a terminal status,
-  // up to 60s. On success the email is shown inline via enrichedEmails; if the
-  // candidate is DB-backed the backend also persists it onto the candidate row.
-  async function handleFindEmail(c, key) {
+  // Confirm → start MatchKraft email-finder job (10 tokens, charged server-side
+  // only once an email is found) → poll until a terminal status, up to 60s. On
+  // success the email is shown inline via enrichedEmails; if the candidate is
+  // DB-backed the backend also persists it onto the candidate row.
+  function handleFindEmail(c, key) {
     if (enrichingKeys.has(key)) return;
     const { firstName, lastName } = splitName(c.name);
     if (!firstName || !lastName) {
-      setEnrichErrors(prev => ({ ...prev, [key]: "Need a full name to look up an email." }));
+      setEnrichErrors(prev => ({ ...prev, [key]: { msg: "Need a full name to look up an email." } }));
       return;
     }
-    if (!window.confirm("Find this candidate's email address? This will deduct 10 tokens from your account. Continue?")) return;
+    setEnrichConfirm({ c, key });
+  }
 
+  async function runFindEmail(c, key) {
+    const { firstName, lastName } = splitName(c.name);
     setEnrichingKeys(prev => new Set(prev).add(key));
     setEnrichErrors(prev => { const next = { ...prev }; delete next[key]; return next; });
     try {
@@ -725,7 +729,14 @@ export function TalentSearchPage() {
         body: JSON.stringify({ candidateId: c.candidateId ?? null, firstName, lastName, currentCompany: c.currentCompany ?? null }),
       });
       if (startRes.status === 402) throw new Error("You have run out of tokens. Please upgrade your plan to continue.");
-      if (!startRes.ok) throw new Error(await startRes.text());
+      if (startRes.status === 422) {
+        setEnrichErrors(prev => ({ ...prev, [key]: { msg: "No email found, no tokens used.", info: true } }));
+        return;
+      }
+      if (!startRes.ok) {
+        const body = await startRes.json().catch(() => null);
+        throw new Error(body?.message || "Enrichment failed.");
+      }
       const { jobId } = await startRes.json();
 
       let email = null;
@@ -741,9 +752,9 @@ export function TalentSearchPage() {
       }
 
       if (email) setEnrichedEmails(prev => ({ ...prev, [key]: email }));
-      else setEnrichErrors(prev => ({ ...prev, [key]: "No email found for this candidate." }));
+      else setEnrichErrors(prev => ({ ...prev, [key]: { msg: "No email found, no tokens used.", info: true } }));
     } catch (e) {
-      setEnrichErrors(prev => ({ ...prev, [key]: e.message || "Enrichment failed." }));
+      setEnrichErrors(prev => ({ ...prev, [key]: { msg: e.message || "Enrichment failed." } }));
     } finally {
       setEnrichingKeys(prev => { const next = new Set(prev); next.delete(key); return next; });
     }
@@ -1074,7 +1085,9 @@ export function TalentSearchPage() {
                       )}
                     </Box>
                     {enrichErrors[ekey] && (
-                      <Typography sx={{ fontSize: 10.5, color: DANGER, mt: 0.5 }}>⚠ {enrichErrors[ekey]}</Typography>
+                      <Typography sx={{ fontSize: 10.5, color: enrichErrors[ekey].info ? MUTED : DANGER, mt: 0.5 }}>
+                        {enrichErrors[ekey].info ? "" : "⚠ "}{enrichErrors[ekey].msg}
+                      </Typography>
                     )}
                   </Paper>
                 );
@@ -1133,7 +1146,9 @@ export function TalentSearchPage() {
                             </Box>
                           )}
                           {enrichErrors[ekey] && (
-                            <Typography sx={{ fontSize: 10, color: DANGER, mt: 0.25 }}>⚠ {enrichErrors[ekey]}</Typography>
+                            <Typography sx={{ fontSize: 10, color: enrichErrors[ekey].info ? MUTED : DANGER, mt: 0.25 }}>
+                              {enrichErrors[ekey].info ? "" : "⚠ "}{enrichErrors[ekey].msg}
+                            </Typography>
                           )}
                         </TableCell>
                         <TableCell sx={{ py: 1.25 }}><Typography sx={valSx(c.phone)}>{val(c.phone)}</Typography></TableCell>
@@ -1281,6 +1296,27 @@ export function TalentSearchPage() {
           </Box>
         </>
       )}
+
+      {/* ── Enrich Email confirmation dialog ──────────────────────────────── */}
+      <Dialog open={!!enrichConfirm} onClose={() => setEnrichConfirm(null)}
+        maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "12px" } }}>
+        <DialogTitle sx={{ fontSize: 14, fontWeight: 600, color: TEXT, pb: 1 }}>Find Email</DialogTitle>
+        <DialogContent>
+          <Typography sx={{ fontSize: 13, color: MUTED }}>
+            Find the email address for <strong style={{ color: TEXT }}>{enrichConfirm?.c.name}</strong>?
+            This uses 10 tokens, charged only if an email is found.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+          <Button variant="outlined" size="small" onClick={() => setEnrichConfirm(null)}
+            sx={{ fontSize: 12, borderColor: BORDER, color: TEXT, borderRadius: "6px", textTransform: "none" }}>Cancel</Button>
+          <Button variant="contained" size="small"
+            onClick={() => { const { c, key } = enrichConfirm; setEnrichConfirm(null); runFindEmail(c, key); }}
+            sx={{ fontSize: 12, bgcolor: ACCENT, borderRadius: "6px", textTransform: "none", boxShadow: "none", "&:hover": { bgcolor: "#1660CC", boxShadow: "none" } }}>
+            Continue
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* ── Pipeline dialog (unchanged) ───────────────────────────────────── */}
       <Dialog open={pipelineDialog} onClose={() => !pipelineSaving && setPipelineDialog(false)}

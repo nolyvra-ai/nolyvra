@@ -338,6 +338,9 @@ export default function LandingPage() {
           .lp-nav{padding:0 16px!important}
           .nl-hero{padding-left:20px!important;padding-right:20px!important}
           .lp-footer{flex-direction:column!important;gap:20px!important;text-align:center!important;padding:32px 20px!important;align-items:center!important}
+          .nl-partner{padding:72px 20px!important}
+          .nl-partner h2{font-size:34px!important;letter-spacing:-1px!important}
+          .nl-partner-card{flex-direction:column!important;padding:28px 22px!important}
         }
       `}</style>
 
@@ -837,6 +840,45 @@ export default function LandingPage() {
           </div>
         </div>
       </div>
+
+      {/* ══════════════ OUR PARTNER ══════════════ */}
+      <section className="nl-partner" style={{ maxWidth:1280,margin:"0 auto",padding:"120px 56px" }}>
+        <div style={{ textAlign:"center",marginBottom:44 }}>
+          <Eyebrow>Our partner</Eyebrow>
+          <h2 style={{ fontSize:54,fontWeight:600,letterSpacing:"-1.8px",lineHeight:1.08,marginBottom:20,color:C.ink }}>
+            Local expertise, <GradItalic>backed by nolyvra.</GradItalic>
+          </h2>
+          <p style={{ fontSize:17,lineHeight:1.6,color:C.dim,maxWidth:560,margin:"0 auto" }}>
+            As our official NZ partner, Quantium Labs offers exclusive partner pricing and dedicated support — from onboarding and data migration to ongoing local expertise.
+          </p>
+        </div>
+        <div className="nl-partner-card" style={{ maxWidth:920,margin:"0 auto",display:"flex",alignItems:"center",gap:40,background:"#fff",border:`1px solid ${C.line}`,borderRadius:20,padding:"40px 44px",boxShadow:C.shadowMd }}>
+          <div style={{ flexShrink:0,width:220,height:120,display:"flex",alignItems:"center",justifyContent:"center",background:C.bgSoft,border:`1px solid ${C.line}`,borderRadius:14,padding:16 }}>
+            <img src="/quantiuamlabs_logo.png" alt="Quantium Labs" style={{ maxWidth:"100%",maxHeight:"100%",objectFit:"contain",display:"block" }} />
+          </div>
+          <div style={{ flex:1,minWidth:0 }}>
+            <div style={{ display:"flex",alignItems:"center",flexWrap:"wrap",gap:10,marginBottom:12 }}>
+              <span style={{ fontSize:20,fontWeight:600,letterSpacing:"-.4px",color:C.ink }}>Quantium Labs</span>
+              <span style={{ fontSize:11,fontWeight:600,color:C.indigo,background:C.bgTint,border:`1px solid ${C.line2}`,borderRadius:99,padding:"4px 10px" }}>🇳🇿 Official NZ Partner</span>
+            </div>
+            <p style={{ fontSize:15,lineHeight:1.65,color:C.dim,marginBottom:18 }}>
+              Quantium Labs is a New Zealand technology consultancy combining AI, cloud, cybersecurity and automation.
+              They help NZ agencies get started with nolyvra — from setup and data migration to ongoing local support.
+            </p>
+            <div style={{ display:"flex",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:16 }}>
+              <div style={{ display:"flex",flexWrap:"wrap",gap:8 }}>
+                {["Onboarding","Data migration","Local support"].map(t=>(
+                  <span key={t} style={{ fontSize:12,fontWeight:500,color:C.ink2,background:C.bgSoft,border:`1px solid ${C.line}`,borderRadius:8,padding:"6px 12px" }}>{t}</span>
+                ))}
+              </div>
+              <a href="https://quantiumlabs.co.nz/#contact-us" target="_blank" rel="noopener noreferrer"
+                style={{ display:"inline-flex",alignItems:"center",gap:6,background:C.grad,color:"#fff",fontSize:14,fontWeight:600,textDecoration:"none",borderRadius:10,padding:"11px 20px",boxShadow:"0 6px 18px rgba(99,102,241,.3)",whiteSpace:"nowrap" }}>
+                Talk to Quantium Labs →
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* ══════════════ TESTIMONIALS ══════════════ */}
       <section id="social" style={{ maxWidth:1280,margin:"0 auto",padding:"0 56px 120px" }}>
