@@ -26,7 +26,7 @@ public class OpenAICvFieldExtractor implements CvFieldExtractor {
             OpenAIClient openAI,
             ObjectMapper objectMapper,
             TokenService tokenService,
-            @Value("${openai.model:gpt-4o-mini}") String model) {
+            @Value("${openai.model}") String model) {
         this.openAI = openAI;
         this.objectMapper = objectMapper;
         this.tokenService = tokenService;
@@ -65,7 +65,6 @@ public class OpenAICvFieldExtractor implements CvFieldExtractor {
             var params = ChatCompletionCreateParams.builder()
                     .model(model)
                     .addUserMessage(prompt)
-                    .temperature(0.0)
                     .build();
 
             String content = openAI.chat().completions().create(params)

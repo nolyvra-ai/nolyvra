@@ -39,7 +39,7 @@ public class JobService {
             OpenAIClient openAIClient,
             ObjectMapper objectMapper,
             TokenService tokenService,
-            @Value("${openai.model:gpt-4o-mini}") String model) {
+            @Value("${openai.model}") String model) {
         this.jdbc = jdbc;
         this.openAI = openAIClient;
         this.objectMapper = objectMapper;
@@ -282,7 +282,6 @@ public class JobService {
                 .model(model)
                 .addSystemMessage(systemPrompt)
                 .addUserMessage(userPrompt)
-                .temperature(0.3)
                 .build();
 
         var completion = openAI.chat().completions().create(params);

@@ -27,7 +27,7 @@ public class InterviewQuestionsService {
             OpenAIClient openAI,
             ObjectMapper objectMapper,
             TokenService tokenService,
-            @Value("${openai.model:gpt-4o-mini}") String model,
+            @Value("${openai.model}") String model,
             JobApplicationService jobApplicationService) {
         this.jdbc = jdbc;
         this.openAI = openAI;
@@ -266,7 +266,6 @@ public class InterviewQuestionsService {
     private String callOpenAI(String systemPrompt, String userPrompt) {
         var params = ChatCompletionCreateParams.builder()
                 .model(model)
-                .temperature(0.4)
                 .addMessage(ChatCompletionSystemMessageParam.builder()
                         .content(systemPrompt)
                         .build())

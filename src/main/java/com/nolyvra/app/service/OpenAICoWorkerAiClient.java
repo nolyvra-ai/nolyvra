@@ -27,7 +27,7 @@ public class OpenAICoWorkerAiClient implements CoWorkerAiClient {
             OpenAIClient openAI,
             ObjectMapper objectMapper,
             TokenService tokenService,
-            @Value("${openai.model:gpt-4o-mini}") String model) {
+            @Value("${openai.model}") String model) {
         this.openAI = openAI;
         this.objectMapper = objectMapper;
         this.tokenService = tokenService;
@@ -52,7 +52,6 @@ public class OpenAICoWorkerAiClient implements CoWorkerAiClient {
                 .model(model)
                 .addSystemMessage(buildSystemPrompt(context, history))
                 .addUserMessage(message)
-                .temperature(0.3)
                 .build();
 
         var completion = openAI.chat().completions().create(params);
