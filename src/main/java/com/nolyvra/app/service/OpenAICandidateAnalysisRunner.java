@@ -30,7 +30,7 @@ public class OpenAICandidateAnalysisRunner implements CandidateAnalysisRunner {
             OpenAIClient openAI,
             ObjectMapper objectMapper,
             TokenService tokenService,
-            @Value("${openai.model:gpt-4o-mini}") String model) {
+            @Value("${openai.model}") String model) {
         this.openAI = openAI;
         this.objectMapper = objectMapper;
         this.tokenService = tokenService;
@@ -144,7 +144,6 @@ public class OpenAICandidateAnalysisRunner implements CandidateAnalysisRunner {
                     .model(model)
                     .addSystemMessage(systemPrompt)
                     .addUserMessage(userPrompt)
-                    .temperature(0.2)
                     .build();
 
             var completion = openAI.chat().completions().create(params);

@@ -63,7 +63,7 @@ public class TalentSearchService {
             OpenAIClient openAIClient,
             ObjectMapper objectMapper,
             TokenService tokenService,
-            @Value("${openai.model:gpt-4o-mini}") String model,
+            @Value("${openai.model}") String model,
             @Value("${brightdata.api-key:}") String brightDataApiKey,
             @Value("${brightdata.dataset-id:gd_l1viktl72bvl7bjuj0}") String brightDataDatasetId,
             @Value("${brightdata.base-url:https://api.brightdata.com}") String brightDataBaseUrl,
@@ -569,7 +569,6 @@ public class TalentSearchService {
                     .model(model)
                     .addSystemMessage(systemPrompt)
                     .addUserMessage(text.toString())
-                    .temperature(0.1)
                     .build();
 
             String content = openAI.chat().completions().create(params)
@@ -614,7 +613,6 @@ public class TalentSearchService {
                 .model(model)
                 .addSystemMessage(systemPrompt)
                 .addUserMessage("QUERY: " + query)
-                .temperature(0.1)
                 .build();
 
         try {
@@ -1482,7 +1480,6 @@ public class TalentSearchService {
                     .model(model)
                     .addSystemMessage(systemPrompt)
                     .addUserMessage(userPrompt)
-                    .temperature(0.1)
                     .build();
 
             String content = openAI.chat().completions().create(params)

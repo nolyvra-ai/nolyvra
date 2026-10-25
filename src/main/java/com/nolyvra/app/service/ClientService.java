@@ -52,7 +52,7 @@ public class ClientService {
             OpenAIClient openAIClient,
             ObjectMapper objectMapper,
             TokenService tokenService,
-            @Value("${openai.model:gpt-4o-mini}") String model,
+            @Value("${openai.model}") String model,
             @Value("${brightdata.api-key:}") String brightDataApiKey,
             @Value("${brightdata.company-dataset-id:gd_l1vijqt9jfj7olije}") String brightDataCompanyDatasetId,
             @Value("${brightdata.base-url:https://api.brightdata.com}") String brightDataBaseUrl) {
@@ -1298,7 +1298,6 @@ public class ClientService {
                 .model(model)
                 .addSystemMessage(systemPrompt)
                 .addUserMessage(userPrompt)
-                .temperature(0.7)
                 .build();
 
         try {

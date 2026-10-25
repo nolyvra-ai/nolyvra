@@ -35,7 +35,7 @@ public class CandidateExperienceService {
             OpenAIClient openAIClient,
             JdbcTemplate jdbcTemplate,
             TokenService tokenService,
-            @Value("${openai.model:gpt-4o-mini}") String model) {
+            @Value("${openai.model}") String model) {
         this.objectMapper = objectMapper;
         this.openAI = openAIClient;
         this.jdbc = jdbcTemplate;
@@ -134,7 +134,6 @@ public class CandidateExperienceService {
                 .model(model)
                 .addSystemMessage(systemPrompt)
                 .addUserMessage(userPrompt)
-                .temperature(0.2)
                 .build();
         var completion = openAI.chat().completions().create(params);
         return completion.choices().getFirst().message().content()

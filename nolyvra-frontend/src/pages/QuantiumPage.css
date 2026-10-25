@@ -1,0 +1,374 @@
+/* Quantium Labs partner page — supplied by Quantium Labs, scoped under .qp-root
+   so none of it leaks into the rest of the app. Tailwind's own global reset
+   (preflight) is disabled in QuantiumPage.jsx; the :where() block below is a
+   page-scoped replacement with zero specificity, so Tailwind utilities still win. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+:where(.qp-root) *, :where(.qp-root) ::before, :where(.qp-root) ::after {
+  box-sizing: border-box;
+  border-width: 0;
+  border-style: solid;
+  border-color: #e5e7eb;
+}
+:where(.qp-root) :is(h1, h2, h3, h4, h5, h6, p, blockquote, ol, ul, figure) { margin: 0; }
+:where(.qp-root) :is(h1, h2, h3, h4, h5, h6) { font-size: inherit; font-weight: inherit; }
+:where(.qp-root) :is(ol, ul) { list-style: none; padding: 0; }
+:where(.qp-root) :is(img, svg) { display: block; max-width: 100%; height: auto; }
+:where(.qp-root) a { color: inherit; text-decoration: inherit; }
+:where(.qp-root) :is(button, input) { font: inherit; color: inherit; margin: 0; }
+:where(.qp-root) button { background-color: transparent; background-image: none; padding: 0; cursor: pointer; }
+
+.qp-root {
+  min-height: 100vh;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  background: #fff;
+  color: #0f172a;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.qp-root .bg-grid-pattern {
+  background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.qp-root .glass-card {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(12px);
+  border: 1px solid #e2e8f0;
+}
+
+.qp-root .gradient-text {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.qp-root .gradient-border {
+  border-image: linear-gradient(to right, #4f46e5, #7c3aed) 1;
+}
+
+.qp-root ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.qp-root ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.qp-root ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+.qp-root ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.qp-root .pricing-carousel::-webkit-scrollbar {
+  height: 8px;
+}
+
+.qp-root .pricing-carousel::-webkit-scrollbar-track,
+.qp-root .pricing-carousel::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+}
+
+.qp-root .pricing-carousel::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+.qp-root .pricing-carousel::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+.qp-root .pricing-carousel::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.qp-root .workflow-creative {
+  --workflow-ink: #17211d;
+  --workflow-muted: #69766f;
+  --workflow-line: #dbe4de;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) 96px minmax(0, 0.85fr);
+  align-items: center;
+  max-width: 850px;
+  min-height: 220px;
+  margin: 0 auto 38px;
+  padding: 22px 26px;
+  border: 1px solid #e2e8e2;
+  border-radius: 18px;
+  background-color: rgba(255, 255, 255, 0.82);
+  background-image: radial-gradient(#dbe4de 0.8px, transparent 0.8px);
+  background-size: 18px 18px;
+  text-align: left;
+  box-shadow: 0 16px 50px rgba(28, 48, 36, 0.07);
+}
+
+.qp-root .workflow-sources {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.qp-root .workflow-eyebrow {
+  color: #748078;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.qp-root .workflow-sources > .workflow-eyebrow {
+  grid-column: 1 / -1;
+  margin: 0 0 1px 3px;
+}
+
+.qp-root .workflow-tool {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 10px 9px;
+  border: 1px solid #e2e8e2;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 4px 12px rgba(23, 33, 29, 0.04);
+  animation: workflow-arrive 600ms both;
+}
+
+.qp-root .workflow-tool-cv { animation-delay: 80ms; }
+.qp-root .workflow-tool-ats { animation-delay: 160ms; }
+.qp-root .workflow-tool-inbox { animation-delay: 240ms; }
+.qp-root .workflow-tool-calendar { animation-delay: 320ms; }
+
+.qp-root .workflow-tool-icon,
+.qp-root .workflow-brand-mark {
+  display: grid;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 8px;
+  background: #edf3ee;
+  color: #426651;
+  font-size: 13px;
+}
+
+.qp-root .workflow-tool-cv .workflow-tool-icon { background: #fff3e7; color: #bb702d; }
+.qp-root .workflow-tool-ats .workflow-tool-icon { background: #eaf1fb; color: #4a6e9f; }
+.qp-root .workflow-tool-inbox .workflow-tool-icon { background: #fbeceb; color: #a95e5c; }
+.qp-root .workflow-tool-calendar .workflow-tool-icon { background: #f4efdf; color: #887334; }
+
+.qp-root .workflow-tool > span:nth-child(2) {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.qp-root .workflow-tool strong {
+  overflow: hidden;
+  color: var(--workflow-ink);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qp-root .workflow-tool small {
+  overflow: hidden;
+  color: var(--workflow-muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qp-root .workflow-tool-more {
+  margin-left: auto;
+  color: #aab4ad;
+  font-size: 10px;
+}
+
+.qp-root .workflow-bridge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #65776a;
+}
+
+.qp-root .workflow-bridge-label {
+  color: #78847c;
+  font-size: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.qp-root .workflow-bridge-line {
+  position: relative;
+  width: 54px;
+  border-top: 1px dashed #8ca696;
+}
+
+.qp-root .workflow-bridge-line::after {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #5e876b;
+  content: '';
+  animation: workflow-flow 1.8s ease-in-out infinite;
+}
+
+.qp-root .workflow-bridge-arrow {
+  display: none;
+}
+
+.qp-root .workflow-destination {
+  padding: 17px;
+  border: 1px solid #d6e3d9;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(28, 48, 36, 0.09);
+  animation: workflow-arrive 650ms 360ms both;
+}
+
+.qp-root .workflow-destination-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qp-root .workflow-brand-mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: #244b37;
+  color: white;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.qp-root .workflow-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  color: #28734a;
+  font-size: 8px;
+  font-weight: 800;
+}
+
+.qp-root .workflow-live i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34a368;
+}
+
+.qp-root .workflow-destination-name {
+  display: block;
+  margin-top: 12px;
+  color: var(--workflow-ink);
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.qp-root .workflow-destination-copy {
+  display: block;
+  margin-top: 4px;
+  color: var(--workflow-muted);
+  font-size: 10px;
+}
+
+.qp-root .workflow-capabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 13px;
+}
+
+.qp-root .workflow-capabilities span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 7px;
+  border-radius: 6px;
+  background: #f0f5f1;
+  color: #3c5f48;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+@keyframes workflow-arrive {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes workflow-flow {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(49px); }
+}
+
+@media (max-width: 640px) {
+  .qp-root .workflow-creative {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 11px;
+    min-height: 0;
+    margin-bottom: 30px;
+    padding: 16px;
+  }
+
+  .qp-root .workflow-sources {
+    gap: 7px;
+  }
+
+  .qp-root .workflow-tool {
+    gap: 7px;
+    padding: 8px 7px;
+  }
+
+  .qp-root .workflow-tool-icon {
+    width: 26px;
+    height: 26px;
+    font-size: 11px;
+  }
+
+  .qp-root .workflow-tool strong { font-size: 10px; }
+  .qp-root .workflow-tool small { font-size: 8px; }
+
+  .qp-root .workflow-bridge {
+    flex-direction: row;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .qp-root .workflow-bridge-line {
+    width: 36px;
+    transform: rotate(90deg);
+  }
+
+  .qp-root .workflow-bridge-line::after {
+    animation-name: workflow-flow-mobile;
+  }
+
+  .qp-root .workflow-bridge-arrow { display: inline-block; }
+
+  .qp-root .workflow-destination { padding: 13px; }
+  .qp-root .workflow-destination-name { font-size: 19px; }
+}
+
+@keyframes workflow-flow-mobile {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(31px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qp-root .workflow-tool,
+  .qp-root .workflow-destination,
+  .qp-root .workflow-bridge-line::after {
+    animation: none;
+  }
+}

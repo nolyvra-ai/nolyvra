@@ -24,7 +24,7 @@ public class MessageService {
             JdbcTemplate jdbc,
             WorkflowService workflowService,
             TokenService tokenService,
-            @Value("${openai.model:gpt-4o-mini}") String model) {
+            @Value("${openai.model}") String model) {
         this.openAI = openAIClient;
         this.jdbc   = jdbc;
         this.workflowService = workflowService;
@@ -129,7 +129,6 @@ public class MessageService {
                 .model(model)
                 .addSystemMessage(systemPrompt)
                 .addUserMessage(userPrompt)
-                .temperature(0.4)
                 .build();
 
         if (!tokenService.deductToken(loginId)) {
