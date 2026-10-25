@@ -871,7 +871,7 @@ export default function LandingPage() {
                   <span key={t} style={{ fontSize:12,fontWeight:500,color:C.ink2,background:C.bgSoft,border:`1px solid ${C.line}`,borderRadius:8,padding:"6px 12px" }}>{t}</span>
                 ))}
               </div>
-              <a href="https://quantiumlabs.co.nz/#contact-us" target="_blank" rel="noopener noreferrer"
+              <a href="/quantium" onClick={e => { e.preventDefault(); nav("/quantium"); }}
                 style={{ display:"inline-flex",alignItems:"center",gap:6,background:C.grad,color:"#fff",fontSize:14,fontWeight:600,textDecoration:"none",borderRadius:10,padding:"11px 20px",boxShadow:"0 6px 18px rgba(99,102,241,.3)",whiteSpace:"nowrap" }}>
                 Talk to Quantium Labs →
               </a>

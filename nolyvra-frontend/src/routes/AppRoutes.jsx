@@ -32,6 +32,7 @@ import ContactsListPage        from "../pages/ContactsListPage";
 import PrivacyPage             from "../pages/PrivacyPage";
 import TermsPage               from "../pages/TermsPage";
 import RecruitmentUnitedPage    from "../pages/RecruitmentUnitedPage";
+import QuantiumPage             from "../pages/QuantiumPage";
 import CrmEmployeesPage        from "../pages/CrmEmployeesPage";
 import CrmEmployeeDetailPage   from "../pages/CrmEmployeeDetailPage";
 import CrmDepartmentsPage      from "../pages/CrmDepartmentsPage";
@@ -67,6 +68,7 @@ export default function AppRoutes() {
       <Route path="/privacy"                            element={<PrivacyPage />} />
       <Route path="/terms"                              element={<TermsPage />} />
       <Route path="/recruitment-united"                 element={<RecruitmentUnitedPage />} />
+      <Route path="/quantium"                           element={<QuantiumPage />} />
       <Route path="/interview/:token"                   element={<PublicInterviewPage />} />
 
       {/* App pages */}
