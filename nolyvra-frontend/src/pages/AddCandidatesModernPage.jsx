@@ -141,7 +141,7 @@ export default function AddCandidatesModernPage() {
         headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
         body: formData,
       });
-      if (res.status === 402) throw new Error("Token limit reached. Please upgrade your plan.");
+      if (res.status === 402) throw new Error("Credit limit reached. Please upgrade your plan.");
       if (!res.ok) throw new Error("Could not parse CV. Please try a different file.");
       const data = await res.json();
       const allowedSeniority = ["Junior", "Mid", "Mid-Senior", "Senior", "Lead/Principal"];

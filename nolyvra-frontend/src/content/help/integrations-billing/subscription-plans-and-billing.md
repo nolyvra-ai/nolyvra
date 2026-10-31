@@ -8,7 +8,7 @@ summary: View your current plan and usage, or change your subscription.
 
 ## What it does
 
-Shows your current plan, job/candidate limits, and token balance, and lets you upgrade,
+Shows your current plan, job/candidate limits, and credit balance, and lets you upgrade,
 downgrade, or manage billing details via Stripe's self-service portal.
 
 ## How to access it

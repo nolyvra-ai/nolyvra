@@ -170,7 +170,7 @@ export default function TopBar() {
           color: tokens < 30 ? "#DC2626" : tokens < 100 ? "#D97706" : PURPLE,
           fontSize: 11, fontWeight: 600, userSelect: "none",
         }}>
-          ✦ {tokens} tokens
+          ✦ {tokens} credits
         </Box>
       )}
 

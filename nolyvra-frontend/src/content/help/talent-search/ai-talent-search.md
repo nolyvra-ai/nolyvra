@@ -9,7 +9,7 @@ summary: Search external candidate databases and get AI-scored results for a rol
 ## What it does
 
 Searches external candidate data sources for people matching a role's requirements, then uses
-AI to score and rank the results. Each profile pulled counts against your plan's token/usage
+AI to score and rank the results. Each profile pulled counts against your plan's credit/usage
 balance since it's a live, billed lookup.
 
 ## Searching and results

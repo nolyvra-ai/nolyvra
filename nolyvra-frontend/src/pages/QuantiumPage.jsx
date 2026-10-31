@@ -1172,7 +1172,7 @@ export default function QuantiumPage() {
                           <div className="grid grid-cols-2 gap-2 mb-6">
                               <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
                                   <span className="text-base font-extrabold text-slate-800 block">100</span>
-                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tokens</span>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Credits</span>
                               </div>
                               <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
                                   <span className="text-base font-extrabold text-slate-800 block">1</span>
@@ -1225,7 +1225,7 @@ export default function QuantiumPage() {
                           <div className="grid grid-cols-2 gap-2 mb-6">
                               <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
                                   <span className="text-base font-extrabold text-slate-800 block">100</span>
-                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tokens</span>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Credits</span>
                               </div>
                               <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
                                   <span className="text-base font-extrabold text-slate-800 block">1</span>
@@ -1240,7 +1240,7 @@ export default function QuantiumPage() {
                               <li className="flex items-center gap-2"><i className="fa-solid fa-circle-check text-emerald-500"></i> Authenticity Detection</li>
                               <li className="flex items-center gap-2"><i className="fa-solid fa-circle-check text-emerald-500"></i> Placement Probability</li>
                               <li className="flex items-center gap-2"><i className="fa-solid fa-circle-check text-emerald-500"></i> AI Email Generator</li>
-                              <li className="flex items-center gap-2"><i className="fa-solid fa-circle-check text-emerald-500"></i> Top-up tokens anytime</li>
+                              <li className="flex items-center gap-2"><i className="fa-solid fa-circle-check text-emerald-500"></i> Top-up credits anytime</li>
                               <li className="flex items-center gap-2 text-slate-300"><i className="fa-solid fa-circle-xmark text-slate-300"></i> AI Talent Search</li>
                               <li className="flex items-center gap-2 text-slate-300"><i className="fa-solid fa-circle-xmark text-slate-300"></i> Advanced AI Model</li>
                           </ul>
@@ -1278,7 +1278,7 @@ export default function QuantiumPage() {
                           <div className="grid grid-cols-2 gap-2 mb-6">
                               <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
                                   <span className="text-base font-extrabold text-slate-800 block">500</span>
-                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tokens/Mo</span>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Credits/Mo</span>
                               </div>
                               <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
                                   <span className="text-base font-extrabold text-slate-800 block">1</span>
@@ -1334,7 +1334,7 @@ export default function QuantiumPage() {
                           <div className="grid grid-cols-2 gap-2 mb-6">
                               <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
                                   <span className="text-base font-extrabold text-slate-800 block">750</span>
-                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tokens/Mo</span>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Credits/Mo</span>
                               </div>
                               <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
                                   <span className="text-base font-extrabold text-slate-800 block">5</span>
@@ -1385,7 +1385,7 @@ export default function QuantiumPage() {
                           <div className="grid grid-cols-2 gap-2 mb-6">
                               <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
                                   <span className="text-base font-extrabold text-slate-800 block">3,000</span>
-                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tokens/Mo</span>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Credits/Mo</span>
                               </div>
                               <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
                                   <span className="text-base font-extrabold text-slate-800 block">15</span>
@@ -1429,7 +1429,7 @@ export default function QuantiumPage() {
                           <div className="grid grid-cols-2 gap-2 mb-6">
                               <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
                                   <span className="text-xs font-bold text-slate-700 block">Custom</span>
-                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tokens</span>
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Credits</span>
                               </div>
                               <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-center">
                                   <span className="text-base font-extrabold text-slate-800 block">∞</span>

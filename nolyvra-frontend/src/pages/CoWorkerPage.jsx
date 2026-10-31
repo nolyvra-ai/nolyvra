@@ -737,7 +737,7 @@ export default function CoWorkerPage() {
       setMessages(prev => [...prev, {
         role: "assistant",
         content: msg.includes("402") || msg.includes("Insufficient tokens")
-          ? "You have run out of tokens. Please upgrade your plan to continue."
+          ? "You have run out of credits. Please upgrade your plan to continue."
           : "Failed to execute action. Please try again.",
         id: Date.now(),
       }]);

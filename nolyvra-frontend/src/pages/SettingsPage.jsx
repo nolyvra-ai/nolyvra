@@ -21,7 +21,7 @@ const SURFACE = "#FAFBFD";
 
 const SETTINGS_SECTIONS = [
   { key: "account", label: "Account", description: "Password and session" },
-  { key: "billing", label: "Billing", description: "Plan, usage and tokens" },
+  { key: "billing", label: "Billing", description: "Plan, usage and credits" },
   { key: "team", label: "Team", description: "Invite and manage team members" },
   { key: "integrations", label: "Integrations", description: "Connected services" },
   { key: "email", label: "Email & Notifications", description: "Notification preferences" },
@@ -1013,7 +1013,7 @@ function AdminSettingsPanel() {
       {activeSection === "billing" && tokensPurchased && (
         <Alert severity="success" onClose={() => setTokensPurchased(false)}
           sx={{ borderRadius: "10px", fontSize: 13 }}>
-          🪙 Tokens added to your account successfully! Your balance has been updated.
+          🪙 Credits added to your account successfully! Your balance has been updated.
         </Alert>
       )}
 
@@ -1117,7 +1117,7 @@ function AdminSettingsPanel() {
                 {[
                   { label: "Max Jobs", value: usage.maxJobs },
                   { label: "Max Candidates", value: usage.maxCandidates },
-                  { label: "Max Tokens", value: usage.maxTokens },
+                  { label: "Max Credits", value: usage.maxTokens },
                   {
                     label: "Renews On", value: usage.renewDate
                       ? new Date(usage.renewDate).toLocaleDateString("en-GB",
@@ -1143,10 +1143,10 @@ function AdminSettingsPanel() {
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1.75, mb: 2 }}>
                 <UsageBar label="Jobs" used={usage.currentJobs} max={usage.maxJobs} />
                 <UsageBar label="Candidates" used={usage.currentCandidates} max={usage.maxCandidates} />
-                <UsageBar label="Tokens"
+                <UsageBar label="Credits"
                   used={(usage.maxTokens ?? 0) - (usage.tokensRemaining ?? 0)}
                   max={usage.maxTokens ?? 0}
-                  remainingLabel={`${usage.tokensRemaining ?? 0} tokens remaining · renews ${usage.renewDate
+                  remainingLabel={`${usage.tokensRemaining ?? 0} credits remaining · renews ${usage.renewDate
                       ? new Date(usage.renewDate).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
                       : "—"
                     }`}
@@ -1197,9 +1197,9 @@ function AdminSettingsPanel() {
         overflow: "hidden", bgcolor: "#fff"
       }}>
         <Box sx={{ px: 2.25, py: 1.5, borderBottom: `1px solid ${BORDER}` }}>
-          <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>🪙 Buy Tokens</Typography>
+          <Typography sx={{ fontSize: 13, fontWeight: 600, color: TEXT }}>🪙 Buy Credits</Typography>
           <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
-            Top up your token balance. Tokens are added instantly after payment.
+            Top up your credit balance. Credits are added instantly after payment.
           </Typography>
         </Box>
         <Box sx={{ p: 2.25, display: "flex", flexDirection: "column", gap: 1.5 }}>
@@ -1235,13 +1235,13 @@ function AdminSettingsPanel() {
                     {pack.tokens.toLocaleString()}
                   </Typography>
                   <Typography sx={{ fontSize: 10, color: MUTED, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".4px", mt: 0.25 }}>
-                    tokens
+                    credits
                   </Typography>
                   <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.5, mt: 1 }}>
                     <Typography sx={{ fontSize: 16, fontWeight: 700, color: isSelected ? ACCENT : TEXT }}>
                       ${pack.price}
                     </Typography>
-                    <Typography sx={{ fontSize: 10, color: MUTED }}>· {pack.perToken} / token</Typography>
+                    <Typography sx={{ fontSize: 10, color: MUTED }}>· {pack.perToken} / credit</Typography>
                   </Box>
                 </Box>
               );
@@ -1626,7 +1626,7 @@ function AdminSettingsPanel() {
               ➕ Additional Limits
             </Typography>
             <Typography sx={{ fontSize: 11, color: MUTED, mt: 0.25 }}>
-              Grant extra tokens, jobs or candidates on top of plan limits
+              Grant extra credits, jobs or candidates on top of plan limits
             </Typography>
           </Box>
           <Box sx={{ p: 2.25, display: "flex", flexDirection: "column", gap: 1.5 }}>
@@ -1650,7 +1650,7 @@ function AdminSettingsPanel() {
             </Box>
             <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 1.5 }}>
               {[
-                { label: "Additional Tokens", key: "tokens" },
+                { label: "Additional Credits", key: "tokens" },
                 { label: "Additional Jobs",   key: "jobs" },
                 { label: "Additional Candidates", key: "candidates" },
               ].map(({ label, key }) => (
