@@ -73,6 +73,6 @@ export const WALKTHROUGH_STEPS = [
     slug: "integrations-billing",
     icon: "🔌",
     headline: "Integrations & Billing",
-    body: "Connect Outlook, Gmail, HubSpot, and Xero, and manage your plan and token balance — all from Settings.",
+    body: "Connect Outlook, Gmail, HubSpot, and Xero, and manage your plan and credit balance — all from Settings.",
   },
 ];

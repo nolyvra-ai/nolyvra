@@ -467,7 +467,7 @@ export default function CreateJobPageModern() {
         },
         body: JSON.stringify({ briefText: brief }),
       });
-      if (res.status === 402) throw new Error("Token limit reached. Please upgrade your plan.");
+      if (res.status === 402) throw new Error("Credit limit reached. Please upgrade your plan.");
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setAiResponse(data);
