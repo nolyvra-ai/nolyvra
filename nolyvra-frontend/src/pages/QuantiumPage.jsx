@@ -633,7 +633,7 @@ export default function QuantiumPage() {
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-200">
                                   <div className="bg-white p-4 rounded-2xl border border-slate-200 text-center">
                                       <span className="text-xs text-slate-500 font-medium uppercase tracking-wider block mb-1">Estimated Annual Cost Savings</span>
-                                      <span id="annual-savings" className="text-2xl sm:text-3xl font-extrabold text-emerald-600">${annualSavings.toLocaleString('en-US')} AUD</span>
+                                      <span id="annual-savings" className="text-2xl sm:text-3xl font-extrabold text-emerald-600">${annualSavings.toLocaleString('en-US')} USD</span>
                                       <span className="text-[11px] text-slate-400 block mt-1">vs traditional tool stack</span>
                                   </div>
                                   <div className="bg-white p-4 rounded-2xl border border-slate-200 text-center">
@@ -1100,7 +1100,7 @@ export default function QuantiumPage() {
                               <span className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Early-Customer Rate</span>
                               <div className="flex items-baseline justify-center gap-1 my-3">
                                   <span className="text-4xl font-extrabold text-slate-900">$39</span>
-                                  <span className="text-slate-500 text-sm font-medium">/ seat / mo AUD</span>
+                                  <span className="text-slate-500 text-sm font-medium">/ seat / mo USD</span>
                               </div>
                               <span className="text-xs text-emerald-600 font-bold block mb-6">Replaces $465/mo in standard tools</span>
                               <button onClick={() => showToast('Initiating free trial registration...')} className="w-full py-3.5 bg-gradient-to-r from-brand-600 to-accent-500 hover:from-brand-700 hover:to-accent-600 text-white font-bold text-sm rounded-xl shadow-lg shadow-brand-500/20 transition-all">
