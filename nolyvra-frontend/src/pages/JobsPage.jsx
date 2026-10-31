@@ -246,13 +246,13 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
         }
       }
       if (email) setEnrichedEmails(prev => ({ ...prev, [c.id]: email }));
-      else setEnrichErrors(prev => ({ ...prev, [c.id]: { msg: "No email found, no tokens used.", info: true } }));
+      else setEnrichErrors(prev => ({ ...prev, [c.id]: { msg: "No email found, no credits used.", info: true } }));
     } catch (e) {
       // apiPostJson throws the raw response body — Spring's JSON error shape.
       let body = null;
       try { body = JSON.parse(e?.message); } catch { /* not JSON */ }
-      const err = body?.status === 422 ? { msg: "No email found, no tokens used.", info: true }
-        : body?.status === 402 ? { msg: "You have run out of tokens. Please upgrade your plan to continue." }
+      const err = body?.status === 422 ? { msg: "No email found, no credits used.", info: true }
+        : body?.status === 402 ? { msg: "You have run out of credits. Please upgrade your plan to continue." }
         : { msg: body?.message || "Enrichment failed." };
       setEnrichErrors(prev => ({ ...prev, [c.id]: err }));
     } finally {
@@ -409,7 +409,7 @@ function CandidateSubTable({ candidates, jobTitle, onRunAnalysis, onRemoveCandid
       <DialogContent>
         <Typography sx={{ fontSize: 13, color: MUTED }}>
           Find the email address for <strong style={{ color: TEXT }}>{enrichConfirm?.name}</strong>?
-          This uses 10 tokens, charged only if an email is found.
+          This uses 10 credits, charged only if an email is found.
         </Typography>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
@@ -1061,7 +1061,7 @@ export default function JobsPage() {
       const url = new URL(`${API_BASE}/api/candidates/${candidateId}/analyze`);
       url.searchParams.set("loginId", loginId);
       const res = await fetch(url.toString(), { method: "POST", headers: { "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` } });
-      if (res.status === 402) { setErr("You have run out of tokens. Please upgrade your plan to continue."); return; }
+      if (res.status === 402) { setErr("You have run out of credits. Please upgrade your plan to continue."); return; }
       if (!res.ok) { setErr("Analysis failed. Please try again."); return; }
       const analysis = await apiGet(`/api/candidates/${candidateId}/analysis`);
 

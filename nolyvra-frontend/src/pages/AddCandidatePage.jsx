@@ -339,7 +339,7 @@ export default function AddCandidatePage() {
 
       if (!res.ok) {
         if (res.status === 402) {
-          setCvUploadError("You have run out of tokens. Please upgrade your plan to continue.");
+          setCvUploadError("You have run out of credits. Please upgrade your plan to continue.");
         } else {
           setCvUploadError("Could not read the file. Please try a different document.");
         }
@@ -694,7 +694,7 @@ export default function AddCandidatePage() {
       }).then(analyzeRes => {
         if (!isMountedRef.current) return;
         if (analyzeRes.status === 402) {
-          setValidationErr("You have run out of tokens. Please upgrade your plan to run analysis.");
+          setValidationErr("You have run out of credits. Please upgrade your plan to run analysis.");
         } else if (!analyzeRes.ok) {
           setValidationErr("Analysis failed. Please try again.");
         } else {

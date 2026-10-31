@@ -200,7 +200,7 @@ export default function CreateJobPage() {
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localStorage.getItem("sessionToken") || ""}` },
         body: JSON.stringify({ briefText }),
       });
-      if (res.status === 402) throw new Error("You have run out of tokens. Please upgrade your plan to continue.");
+      if (res.status === 402) throw new Error("You have run out of credits. Please upgrade your plan to continue.");
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setBriefResult(data);

@@ -166,7 +166,7 @@ export default function PricingPage() {
                 <div style={{ fontSize:12,color:"#9AA3B4",marginTop:3 }}>1 month trial · No card needed</div>
               </div>
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20 }}>
-                {limitItem("100","Tokens")}{limitItem("1","User")}
+                {limitItem("100","Credits")}{limitItem("1","User")}
               </div>
               <div style={{ height:1,background:"#E2E6ED",margin:"18px 0" }} />
               <div style={{ display:"flex",flexDirection:"column",gap:9,flex:1,marginBottom:22 }}>
@@ -198,7 +198,7 @@ export default function PricingPage() {
                 <span style={{ display:"inline-flex",background:"#ECFDF5",border:"1px solid #A7F3D0",borderRadius:4,padding:"2px 7px",fontSize:11,fontWeight:600,color:"#065F46",marginTop:5 }}>{isYearly?"Save 20% vs monthly":"Flexible, cancel anytime"}</span>
               </div>
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20 }}>
-                {limitItem("100","Tokens")}{limitItem("1","User")}
+                {limitItem("100","Credits")}{limitItem("1","User")}
               </div>
               <div style={{ height:1,background:"#E2E6ED",margin:"18px 0" }} />
               <div style={{ display:"flex",flexDirection:"column",gap:9,flex:1,marginBottom:22 }}>
@@ -208,7 +208,7 @@ export default function PricingPage() {
                 {featItem("Authenticity Detection")}
                 {featItem("Placement Probability")}
                 {featItem("AI Email Generator")}
-                {featItem("Top-up tokens anytime")}
+                {featItem("Top-up credits anytime")}
                 {featItem("AI Talent Search",null,true)}
                 {featItem("Advanced AI Model",null,true)}
               </div>
@@ -230,7 +230,7 @@ export default function PricingPage() {
                 <span style={{ display:"inline-flex",background:"#F0FDF4",border:"1px solid #BBF7D0",borderRadius:4,padding:"2px 7px",fontSize:11,fontWeight:600,color:"#16A34A",marginTop:5 }}>{isYearly?"Save $600/yr · First year pricing":"Save $50/mo · Launch pricing"}</span>
               </div>
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20 }}>
-                {limitItem("500","Tokens/mo")}{limitItem("1","User")}
+                {limitItem("500","Credits/mo")}{limitItem("1","User")}
               </div>
               <div style={{ height:1,background:"#E2E6ED",margin:"18px 0" }} />
               <div style={{ display:"flex",flexDirection:"column",gap:9,flex:1,marginBottom:22 }}>
@@ -262,7 +262,7 @@ export default function PricingPage() {
                 <span style={{ display:"inline-flex",background:"#F0FDF4",border:"1px solid #BBF7D0",borderRadius:4,padding:"2px 7px",fontSize:11,fontWeight:600,color:"#16A34A",marginTop:5 }}>{isYearly?"Save $1,200/yr · First year pricing":"Save $100/mo · Launch pricing"}</span>
               </div>
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20 }}>
-                {limitItem("750","Tokens/mo")}{limitItem("5","Users")}
+                {limitItem("750","Credits/mo")}{limitItem("5","Users")}
               </div>
               <div style={{ height:1,background:"#E2E6ED",margin:"18px 0" }} />
               <div style={{ display:"flex",flexDirection:"column",gap:9,flex:1,marginBottom:22 }}>
@@ -293,7 +293,7 @@ export default function PricingPage() {
                 <span style={{ display:"inline-flex",background:"#F0FDF4",border:"1px solid #BBF7D0",borderRadius:4,padding:"2px 7px",fontSize:11,fontWeight:600,color:"#16A34A",marginTop:5 }}>{isYearly?"Save $1,800/yr · First year pricing":"Save $100/mo · Launch pricing"}</span>
               </div>
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20 }}>
-                {limitItem("3,000","Tokens/mo")}{limitItem("15","Users")}
+                {limitItem("3,000","Credits/mo")}{limitItem("15","Users")}
               </div>
               <div style={{ height:1,background:"#E2E6ED",margin:"18px 0" }} />
               <div style={{ display:"flex",flexDirection:"column",gap:9,flex:1,marginBottom:22 }}>
@@ -319,7 +319,7 @@ export default function PricingPage() {
                 <div style={{ fontSize:12,color:"#9AA3B4",marginTop:6 }}>Tailored to your organisation</div>
               </div>
               <div style={{ display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:20 }}>
-                {limitItem("Custom","Tokens")}{limitItem("∞","Users")}
+                {limitItem("Custom","Credits")}{limitItem("∞","Users")}
               </div>
               <div style={{ height:1,background:"#E2E6ED",margin:"18px 0" }} />
               <div style={{ display:"flex",flexDirection:"column",gap:9,flex:1,marginBottom:22 }}>
@@ -344,8 +344,8 @@ export default function PricingPage() {
         <div style={{ maxWidth:1200,margin:"0 auto" }}>
           <div style={{ fontSize:24,fontWeight:700,color:"#0F1623",letterSpacing:"-.4px",marginBottom:32,textAlign:"center" }}>Frequently Asked Questions</div>
           <div style={{ display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:20 }}>
-            {[["🪙","What is a Token?","Tokens power AI analysis. Each candidate analysis consumes tokens for CV scoring, authenticity detection, interview question generation and placement probability. 1 full analysis ≈ 10 tokens."],
-              ["🔄","Do tokens roll over?","Yes — unused tokens roll over to the next month, so you never lose what you've paid for. Your balance accumulates until you use it or upgrade your plan."],
+            {[["🪙","What is a Credit?","Credits power AI analysis. Each candidate analysis consumes credits for CV scoring, authenticity detection, interview question generation and placement probability. 1 full analysis ≈ 10 credits."],
+              ["🔄","Do credits roll over?","Yes — unused credits roll over to the next month, so you never lose what you've paid for. Your balance accumulates until you use it or upgrade your plan."],
               ["💳","Can I change my plan?","Yes. You can upgrade or downgrade at any time. Upgrades take effect immediately. Downgrades take effect at the start of your next billing cycle."],
               ["🔒","Is my data secure?","All candidate and job data is encrypted at rest and in transit. nolyvra does not store PII beyond what is needed for analysis and never shares data with third parties."],
               ["🎁","What is launch pricing?","Our first-year launch pricing is a special discount for early adopters. Prices shown are locked in for your first full year — no surprise increases after signup."],
@@ -378,7 +378,7 @@ export default function PricingPage() {
               </tr>
             </thead>
             <tbody>
-              {[["AI Tokens / month","100","100","500","750","3,000","Custom"],
+              {[["AI Credits / month","100","100","500","750","3,000","Custom"],
                 ["Users","1","1","1","5","15","Unlimited"],
               ].map(([feat,...vals]) => (
                 <tr key={feat}>

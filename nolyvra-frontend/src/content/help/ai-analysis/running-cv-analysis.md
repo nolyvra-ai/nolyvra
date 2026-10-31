@@ -14,6 +14,6 @@ breakdown of strengths and gaps to help you decide who to progress.
 ## How to access it
 
 From a candidate's page, click **Analyze**, or navigate to `/analysis/:candidateId`. Each
-analysis uses tokens from your plan's balance.
+analysis uses credits from your plan's balance.
 
 ![Running CV analysis screenshot](/help-assets/ai-analysis/running-cv-analysis.png)

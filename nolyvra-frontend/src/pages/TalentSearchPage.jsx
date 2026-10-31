@@ -489,7 +489,7 @@ export function TalentSearchPage() {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` },
       body: JSON.stringify({ query: searchQuery, pageSize: 9, page }),
     });
-    if (res.status === 402) throw new Error("You have run out of tokens. Please upgrade your plan to continue searching.");
+    if (res.status === 402) throw new Error("You have run out of credits. Please upgrade your plan to continue searching.");
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   }
@@ -537,7 +537,7 @@ export function TalentSearchPage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` },
         body: JSON.stringify({ query: searchedQuery, nexusPage }),
       });
-      if (res.status === 402) throw new Error("You have run out of tokens. Please upgrade your plan to continue searching.");
+      if (res.status === 402) throw new Error("You have run out of credits. Please upgrade your plan to continue searching.");
       if (!res.ok) throw new Error(await res.text());
       const fresh = (await res.json()).results ?? [];
       const existingCsIds = new Set(allResults.filter(c => c.coresignalId).map(c => c.coresignalId));
@@ -728,9 +728,9 @@ export function TalentSearchPage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("sessionToken") || ""}` },
         body: JSON.stringify({ candidateId: c.candidateId ?? null, firstName, lastName, currentCompany: c.currentCompany ?? null }),
       });
-      if (startRes.status === 402) throw new Error("You have run out of tokens. Please upgrade your plan to continue.");
+      if (startRes.status === 402) throw new Error("You have run out of credits. Please upgrade your plan to continue.");
       if (startRes.status === 422) {
-        setEnrichErrors(prev => ({ ...prev, [key]: { msg: "No email found, no tokens used.", info: true } }));
+        setEnrichErrors(prev => ({ ...prev, [key]: { msg: "No email found, no credits used.", info: true } }));
         return;
       }
       if (!startRes.ok) {
@@ -752,7 +752,7 @@ export function TalentSearchPage() {
       }
 
       if (email) setEnrichedEmails(prev => ({ ...prev, [key]: email }));
-      else setEnrichErrors(prev => ({ ...prev, [key]: { msg: "No email found, no tokens used.", info: true } }));
+      else setEnrichErrors(prev => ({ ...prev, [key]: { msg: "No email found, no credits used.", info: true } }));
     } catch (e) {
       setEnrichErrors(prev => ({ ...prev, [key]: { msg: e.message || "Enrichment failed." } }));
     } finally {
@@ -1304,7 +1304,7 @@ export function TalentSearchPage() {
         <DialogContent>
           <Typography sx={{ fontSize: 13, color: MUTED }}>
             Find the email address for <strong style={{ color: TEXT }}>{enrichConfirm?.c.name}</strong>?
-            This uses 10 tokens, charged only if an email is found.
+            This uses 10 credits, charged only if an email is found.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>

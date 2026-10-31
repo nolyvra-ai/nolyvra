@@ -17,5 +17,5 @@ score:
 - **What's in it** — an overall fit score, a summary of strengths and gaps, CV-vs-LinkedIn
   consistency, and any risk flags worth a closer look before you progress the candidate.
 
-Each analysis uses tokens from your plan's balance, so it's worth running once you're
+Each analysis uses credits from your plan's balance, so it's worth running once you're
 seriously considering a candidate rather than on every profile.
