@@ -5,7 +5,7 @@
 //
 // Thread summaries carry `displayName` (added 2026-07-26, see shared-contracts.md) —
 // falls back to the raw candidateId only if Nexus returns a null name.
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Box, Paper, Typography, Button, TextField, CircularProgress, Alert } from "@mui/material";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
@@ -31,37 +31,82 @@ export function NexusMessagesPage() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
 
-  async function loadThreads() {
-    setLoadingThreads(true); setError(null);
+  const selectedRef = useRef(null);
+  const threadRequest = useRef(0);
+  const messageRequest = useRef(0);
+
+  const loadThreads = useCallback(async (initial = false) => {
+    const request = ++threadRequest.current;
+    if (initial) setLoadingThreads(true);
     try {
       const url = new URL(`${API_BASE}/api/nexus-messaging/threads`);
       url.searchParams.set("loginId", loginId);
       const res = await fetch(url.toString(), { headers: authHeaders() });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      setThreads((data ?? []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
-    } catch (e) { setError(e.message); }
-    finally { setLoadingThreads(false); }
-  }
+      if (request === threadRequest.current) {
+        setThreads((data ?? []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+      }
+    } catch (e) {
+      if (request === threadRequest.current) setError(e.message);
+    } finally {
+      if (request === threadRequest.current) setLoadingThreads(false);
+    }
+  }, [loginId]);
 
-  useEffect(() => { loadThreads(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function openThread(thread) {
-    setSelectedThread(thread);
-    setMessages([]); setSendError(""); setReplyBody("");
-    setLoadingMessages(true);
+  const loadMessages = useCallback(async (thread) => {
+    const request = ++messageRequest.current;
     try {
       const url = new URL(`${API_BASE}/api/nexus-messaging/threads/${thread.id}/messages`);
       url.searchParams.set("loginId", loginId);
       const res = await fetch(url.toString(), { headers: authHeaders() });
       if (!res.ok) throw new Error(await res.text());
-      setMessages((await res.json()) ?? []);
-    } catch (e) { setError(e.message); }
-    finally { setLoadingMessages(false); }
+      const data = await res.json();
+      if (request === messageRequest.current && selectedRef.current?.id === thread.id) {
+        setMessages(data ?? []);
+      }
+    } catch (e) {
+      if (request === messageRequest.current && selectedRef.current?.id === thread.id) setError(e.message);
+    } finally {
+      if (request === messageRequest.current && selectedRef.current?.id === thread.id) setLoadingMessages(false);
+    }
+  }, [loginId]);
+
+  useEffect(() => {
+    let disposed = false;
+    let timer;
+    const threadRequests = threadRequest;
+    const messageRequests = messageRequest;
+    // Schedule after completion so slow requests do not pile up.
+    async function refresh(initial = false) {
+      if (initial || document.visibilityState !== "hidden") {
+        await Promise.all([
+          loadThreads(initial),
+          selectedRef.current ? loadMessages(selectedRef.current) : Promise.resolve(),
+        ]);
+      }
+      if (!disposed) timer = setTimeout(refresh, 5000);
+    }
+    refresh(true);
+    return () => {
+      disposed = true;
+      clearTimeout(timer);
+      threadRequests.current++;
+      messageRequests.current++;
+    };
+  }, [loadThreads, loadMessages]);
+
+  function openThread(thread) {
+    selectedRef.current = thread;
+    setSelectedThread(thread);
+    setMessages([]); setSendError(""); setReplyBody(""); setError(null);
+    setLoadingMessages(true);
+    loadMessages(thread);
   }
 
   async function handleReply() {
     if (!replyBody.trim() || !selectedThread) return;
+    const thread = selectedThread;
     setSending(true); setSendError("");
     try {
       const url = new URL(`${API_BASE}/api/talent-search/nexus-blend/message`);
@@ -69,12 +114,17 @@ export function NexusMessagesPage() {
       const res = await fetch(url.toString(), {
         method: "POST",
         headers: authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ nexusCandidateId: selectedThread.candidateId, body: replyBody }),
+        body: JSON.stringify({ nexusCandidateId: thread.candidateId, body: replyBody }),
       });
       if (!res.ok) throw new Error(await res.text());
-      setReplyBody("");
-      await openThread(selectedThread);
-    } catch (e) { setSendError(e.message); }
+      if (selectedRef.current?.id === thread.id) {
+        setReplyBody("");
+        await loadMessages(thread);
+      }
+      await loadThreads();
+    } catch (e) {
+      if (selectedRef.current?.id === thread.id) setSendError(e.message);
+    }
     finally { setSending(false); }
   }
 
