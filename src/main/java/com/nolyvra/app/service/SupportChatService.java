@@ -7,6 +7,7 @@ import com.nolyvra.app.model.SupportChatResponse;
 import com.openai.core.JsonValue;
 import com.openai.models.FunctionDefinition;
 import com.openai.models.FunctionParameters;
+import com.openai.models.ReasoningEffort;
 import com.openai.models.chat.completions.ChatCompletionCreateParams;
 import com.openai.models.chat.completions.ChatCompletionMessage;
 import com.openai.models.chat.completions.ChatCompletionMessageFunctionToolCall;
@@ -67,6 +68,8 @@ public class SupportChatService {
     public SupportChatResponse respond(String loginId, SupportChatRequest request) {
         var builder = ChatCompletionCreateParams.builder()
                 .model(model)
+                // Function tools on /v1/chat/completions require reasoning off for the current model.
+                .reasoningEffort(ReasoningEffort.NONE)
                 .addFunctionTool(answerFromDocsTool())
                 .addFunctionTool(startCoworkerActionTool())
                 .addFunctionTool(navigateToTool())
